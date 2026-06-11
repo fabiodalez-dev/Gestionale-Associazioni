@@ -38,7 +38,7 @@ class IscrizioneController extends Controller
 
     public function show(Request $request, Associazione $associazione): View|RedirectResponse
     {
-        /** @var Account $account */
+        /** @var ?Account $account */
         $account = $request->user('account');
 
         if (! $associazione->iscrizioni_socio_aperte) {
@@ -48,13 +48,13 @@ class IscrizioneController extends Controller
             ]);
         }
 
-        if ($account->socio_id !== null) {
+        if ($account?->socio_id !== null) {
             return redirect()
                 ->route('pubblico.account.tessera', ['associazione' => $associazione->slug])
                 ->with('success', 'Sei già socio: trovi tessera e quote qui.');
         }
 
-        $richiesta = $this->ultimaRichiesta($associazione, $account);
+        $richiesta = $account !== null ? $this->ultimaRichiesta($associazione, $account) : null;
 
         if ($richiesta !== null && $richiesta->isInAttesa()) {
             return view('pubblico.iscrizione.stato', [
@@ -74,11 +74,11 @@ class IscrizioneController extends Controller
 
     public function store(IscrizioneSocioRequest $request, Associazione $associazione): RedirectResponse
     {
-        /** @var Account $account */
+        /** @var ?Account $account */
         $account = $request->user('account');
 
         try {
-            $richiesta = $this->form->salva($account, $request->validated());
+            $richiesta = $this->form->salva($account, $request->validated(), $associazione);
         } catch (IscrizioneException $e) {
             // Errore di dominio (chiuse / già socio / doppia richiesta):
             // messaggio in italiano pensato per l'utente, niente stack trace
@@ -89,16 +89,23 @@ class IscrizioneController extends Controller
 
         $this->notificaAdmin($richiesta);
 
-        if ($richiesta->isApprovata()) {
-            // Modalità diretta: l'account è già collegato al nuovo socio
+        if ($richiesta->isApprovata() && $account !== null) {
+            // Modalità diretta con account: già collegato al nuovo socio
             return redirect()
                 ->route('pubblico.account.tessera', ['associazione' => $associazione->slug])
                 ->with('success', 'Benvenuto/a! La tua iscrizione è stata registrata: ora sei socio di '.$associazione->nome.'.');
         }
 
+        if ($richiesta->isApprovata()) {
+            // Modalità diretta da ospite: nessuna area riservata da mostrare
+            return redirect()
+                ->route('pubblico.home.show', ['associazione' => $associazione->slug])
+                ->with('success', 'Benvenuto/a! La tua iscrizione a '.$associazione->nome.' è stata registrata: riceverai le comunicazioni via email.');
+        }
+
         return redirect()
-            ->route('pubblico.iscriviti', ['associazione' => $associazione->slug])
-            ->with('success', 'Richiesta di iscrizione inviata! L\'associazione la valuterà e riceverai una risposta.');
+            ->route($account !== null ? 'pubblico.iscriviti' : 'pubblico.home.show', ['associazione' => $associazione->slug])
+            ->with('success', 'Richiesta di iscrizione inviata! L\'associazione la valuterà e riceverai una risposta via email.');
     }
 
     /**

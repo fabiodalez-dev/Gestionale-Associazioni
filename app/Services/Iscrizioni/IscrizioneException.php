@@ -22,6 +22,11 @@ class IscrizioneException extends RuntimeException
         return new self('Il tuo account è già collegato a un socio.');
     }
 
+    public static function emailGiaSocio(): self
+    {
+        return new self("Risulta già un socio con questa email: se sei tu, contatta l'associazione oppure accedi al tuo account.");
+    }
+
     public static function richiestaGiaInAttesa(): self
     {
         return new self('Hai già una richiesta di iscrizione in attesa di approvazione.');

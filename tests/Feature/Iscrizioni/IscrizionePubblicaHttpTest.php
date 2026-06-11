@@ -85,21 +85,27 @@ class IscrizionePubblicaHttpTest extends TestCase
 
     // ── GET: guardie e stati ─────────────────────────────────────────
 
-    public function test_guest_viene_reindirizzato_alla_login_del_tenant(): void
+    public function test_il_form_e_pubblico_anche_per_gli_ospiti(): void
     {
+        // Il form di iscrizione è aperto a tutti: gli ospiti vedono
+        // anche i campi anagrafici e il consenso privacy
         $this->get($this->urlTenant('iscriviti'))
-            ->assertRedirect($this->urlTenant('login'));
+            ->assertOk()
+            ->assertSee('name="nome"', false)
+            ->assertSee('name="privacy"', false);
     }
 
-    public function test_account_non_verificato_viene_bloccato(): void
+    public function test_account_non_verificato_accede_comunque_al_form(): void
     {
+        // Coerenza col form pubblico: un account non verificato non è
+        // meno affidabile di un ospite anonimo
         $nonVerificato = Account::factory()->nonVerificato()->create([
             'associazione_id' => $this->associazione->id,
         ]);
 
         $this->actingAs($nonVerificato, 'account')
             ->get($this->urlTenant('iscriviti'))
-            ->assertRedirect($this->urlTenant('verifica-email'));
+            ->assertOk();
     }
 
     public function test_iscrizioni_chiuse_mostra_la_pagina_dedicata(): void

@@ -8,10 +8,18 @@
             <div class="card shadow-sm" style="border-radius: var(--ds-radius-lg);">
                 <div class="card-body p-4">
                     <h1 class="h4 mb-1">Iscriviti a {{ $associazione->nome }}</h1>
-                    <p class="text-muted small mb-3">
-                        Ciao {{ $account->nome }}! Compila il modulo per richiedere l'iscrizione come socio.
-                        Nome, cognome ed email arrivano dal tuo account.
-                    </p>
+                    @if ($account !== null)
+                        <p class="text-muted small mb-3">
+                            Ciao {{ $account->nome }}! Compila il modulo per richiedere l'iscrizione come socio.
+                            Nome, cognome ed email arrivano dal tuo account.
+                        </p>
+                    @else
+                        <p class="text-muted small mb-3">
+                            Compila il modulo per richiedere l'iscrizione come socio: non serve un account.
+                            Hai già un account? <a href="{{ route('pubblico.login', $associazione->slug) }}">Accedi</a>
+                            e i tuoi dati verranno compilati automaticamente.
+                        </p>
+                    @endif
 
                     @if ($ultimaRifiutata !== null)
                         <div class="alert alert-warning" role="alert">
@@ -36,6 +44,28 @@
                         <x-honeypot />
 
                         <div class="row g-3">
+                            {{-- Ospite senza account: anagrafica dal form --}}
+                            @if ($account === null)
+                                <div class="col-md-6">
+                                    <label for="campo-nome" class="form-label">Nome <span class="text-danger">*</span></label>
+                                    <input type="text" name="nome" id="campo-nome" value="{{ old('nome') }}"
+                                           class="form-control @error('nome') is-invalid @enderror" required>
+                                    @error('nome')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="campo-cognome" class="form-label">Cognome <span class="text-danger">*</span></label>
+                                    <input type="text" name="cognome" id="campo-cognome" value="{{ old('cognome') }}"
+                                           class="form-control @error('cognome') is-invalid @enderror" required>
+                                    @error('cognome')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                                <div class="col-12">
+                                    <label for="campo-email" class="form-label">Email <span class="text-danger">*</span></label>
+                                    <input type="email" name="email" id="campo-email" value="{{ old('email') }}"
+                                           class="form-control @error('email') is-invalid @enderror" required autocomplete="email">
+                                    @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            @endif
+
                             {{-- Campi anagrafici standard (schema-driven, solo i visibili) --}}
                             @foreach ($schema['campi_standard'] as $riga)
                                 @continue(! $riga['visibile'])
@@ -118,6 +148,21 @@
                                     @endif
                                 </div>
                             @endforeach
+
+                            @if ($account === null)
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="privacy" id="campo-privacy" value="1"
+                                               class="form-check-input @error('privacy') is-invalid @enderror"
+                                               @checked(old('privacy')) required>
+                                        <label for="campo-privacy" class="form-check-label">
+                                            Ho letto e accetto l'<a href="{{ route('privacy-policy.show', $associazione->id) }}" target="_blank">informativa sulla privacy</a>
+                                            <span class="text-danger">*</span>
+                                        </label>
+                                        @error('privacy')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    </div>
+                                </div>
+                            @endif
 
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary w-100">

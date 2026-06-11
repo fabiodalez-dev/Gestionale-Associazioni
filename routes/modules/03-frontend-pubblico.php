@@ -131,29 +131,32 @@ Route::prefix('a/{associazione:slug}')
         | dal controller sotto tenant scope → 404 uniforme cross-tenant.
         |
         */
+        /*
+        |------------------------------------------------------------------
+        | Iscrizione socio (form personalizzabile per tenant) — PUBBLICA
+        |------------------------------------------------------------------
+        |
+        | Aperta anche agli OSPITI senza account: per loro il form chiede
+        | anche nome/cognome/email + consenso privacy e la richiesta nasce
+        | senza account collegato. Con account loggato l'anagrafica arriva
+        | dall'account e la richiesta resta collegata.
+        | GET: iscrizioni chiuse → pagina dedicata; già socio → redirect
+        | tessera; richiesta in_attesa (solo con account) → pagina stato.
+        | POST: honeypot spatie + throttle 5/m, rules() dinamiche.
+        |
+        */
+        Route::get('/iscriviti', [IscrizioneController::class, 'show'])
+            ->name('iscriviti');
+
+        Route::post('/iscriviti', [IscrizioneController::class, 'store'])
+            ->middleware([ProtectAgainstSpam::class, 'throttle:5,1'])
+            ->name('iscriviti.store');
+
         Route::middleware([
             AutenticaAccount::class.':account',
             EnsureAccountValido::class,
             EnsureAccountVerificato::class,
         ])->group(function (): void {
-
-            /*
-            |--------------------------------------------------------------
-            | Iscrizione socio (form personalizzabile per tenant)
-            |--------------------------------------------------------------
-            |
-            | GET: iscrizioni chiuse → pagina dedicata; già socio →
-            | redirect tessera; richiesta in_attesa → pagina stato;
-            | altrimenti form dallo schema di FormIscrizioneService.
-            | POST: honeypot spatie + throttle 5/m, rules() dinamiche.
-            |
-            */
-            Route::get('/iscriviti', [IscrizioneController::class, 'show'])
-                ->name('iscriviti');
-
-            Route::post('/iscriviti', [IscrizioneController::class, 'store'])
-                ->middleware([ProtectAgainstSpam::class, 'throttle:5,1'])
-                ->name('iscriviti.store');
 
             Route::post('/eventi/{evento}/prenota', [PrenotazioneController::class, 'store'])
                 ->middleware('throttle:10,1')

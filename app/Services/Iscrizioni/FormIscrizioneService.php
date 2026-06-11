@@ -102,10 +102,18 @@ class FormIscrizioneService
      *
      * @return array<string, list<mixed>>
      */
-    public function rules(Associazione $associazione): array
+    public function rules(Associazione $associazione, bool $ospite = false): array
     {
         $schema = $this->schema($associazione);
         $rules = [];
+
+        // Ospite senza account: anagrafica e consenso privacy dal form
+        if ($ospite) {
+            $rules['nome'] = ['required', 'string', 'max:100'];
+            $rules['cognome'] = ['required', 'string', 'max:100'];
+            $rules['email'] = ['required', 'email', 'max:255'];
+            $rules['privacy'] = ['required', 'accepted'];
+        }
 
         foreach ($schema['campi_standard'] as $riga) {
             if (! $riga['visibile']) {
@@ -144,32 +152,55 @@ class FormIscrizioneService
      *
      * @throws IscrizioneException
      */
-    public function salva(Account $account, array $dati): RichiestaIscrizione
+    public function salva(?Account $account, array $dati, ?Associazione $associazione = null): RichiestaIscrizione
     {
-        $associazione = Associazione::query()->findOrFail($account->associazione_id);
+        $associazione ??= Associazione::query()->findOrFail($account?->associazione_id);
 
         if (! $associazione->iscrizioni_socio_aperte) {
             throw IscrizioneException::iscrizioniChiuse();
         }
 
-        if ($account->socio_id !== null) {
+        if ($account !== null && $account->socio_id !== null) {
             throw IscrizioneException::giaSocio();
         }
 
-        // Una sola richiesta in_attesa per account (check applicativo da piano)
+        // Anagrafica: dall'account se presente, dal form per gli ospiti
+        $nome = $account->nome ?? (string) ($dati['nome'] ?? '');
+        $cognome = $account->cognome ?? (string) ($dati['cognome'] ?? '');
+        $email = $account->email ?? (string) ($dati['email'] ?? '');
+
+        // Una sola richiesta in_attesa per account; per gli ospiti il
+        // dedup è sull'email del socio preiscritto
         $pendente = RichiestaIscrizione::query()
             ->forAssociazione($associazione->id)
-            ->where('account_id', $account->id)
             ->inAttesa()
+            ->when(
+                $account !== null,
+                fn ($q) => $q->where('account_id', $account->id),
+                fn ($q) => $q->whereHas('socio', fn ($s) => $s->withoutGlobalScopes()
+                    ->where('associazione_id', $associazione->id)
+                    ->where('email', $email))
+            )
             ->exists();
 
         if ($pendente) {
             throw IscrizioneException::richiestaGiaInAttesa();
         }
 
+        // Email già appartenente a un socio del tenant → messaggio amichevole
+        // (il vincolo unique(associazione_id, email) lo bloccherebbe comunque)
+        $emailOccupata = Socio::withoutGlobalScopes()
+            ->where('associazione_id', $associazione->id)
+            ->where('email', $email)
+            ->exists();
+
+        if ($emailOccupata) {
+            throw IscrizioneException::emailGiaSocio();
+        }
+
         $schema = $this->schema($associazione);
 
-        return DB::transaction(function () use ($account, $associazione, $dati, $schema): RichiestaIscrizione {
+        return DB::transaction(function () use ($account, $associazione, $dati, $schema, $nome, $cognome, $email): RichiestaIscrizione {
             $diretta = $associazione->isIscrizioneDiretta();
 
             $socio = Socio::create(array_merge(
@@ -177,12 +208,13 @@ class FormIscrizioneService
                 [
                     'associazione_id' => $associazione->id,
                     'numero_socio' => $this->numeriProgressivi->prossimoNumeroSocio($associazione->id),
-                    'nome' => $account->nome,
-                    'cognome' => $account->cognome,
-                    'email' => $account->email,
+                    'nome' => $nome,
+                    'cognome' => $cognome,
+                    'email' => $email,
                     'data_iscrizione' => now()->toDateString(),
                     'stato' => $diretta ? Socio::STATO_ATTIVO : Socio::STATO_IN_ATTESA,
-                    // L'account ha già accettato la privacy alla registrazione
+                    // Account: privacy accettata alla registrazione.
+                    // Ospite: consenso esplicito richiesto dal form (checkbox required).
                     'privacy_consenso' => true,
                 ]
             ));
@@ -201,7 +233,7 @@ class FormIscrizioneService
 
             $richiesta = RichiestaIscrizione::create([
                 'associazione_id' => $associazione->id,
-                'account_id' => $account->id,
+                'account_id' => $account?->id,
                 'socio_id' => $socio->id,
                 'stato' => $diretta
                     ? RichiestaIscrizione::STATO_APPROVATA
@@ -210,7 +242,7 @@ class FormIscrizioneService
                 'gestita_at' => $diretta ? now() : null,
             ]);
 
-            $account->forceFill(array_merge(
+            $account?->forceFill(array_merge(
                 ['richiesta_socio_at' => now()],
                 $diretta ? ['socio_id' => $socio->id] : []
             ))->save();

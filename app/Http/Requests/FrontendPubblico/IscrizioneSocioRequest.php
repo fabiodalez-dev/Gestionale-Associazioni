@@ -18,7 +18,8 @@ class IscrizioneSocioRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user('account') !== null;
+        // Aperto anche agli ospiti: l'anti-abuso è su honeypot + throttle
+        return true;
     }
 
     /**
@@ -28,7 +29,9 @@ class IscrizioneSocioRequest extends FormRequest
     {
         $associazione = $this->associazioneCorrente();
 
-        return $associazione !== null ? $form->rules($associazione) : [];
+        return $associazione !== null
+            ? $form->rules($associazione, ospite: $this->user('account') === null)
+            : [];
     }
 
     /**

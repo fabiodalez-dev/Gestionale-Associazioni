@@ -56,9 +56,16 @@ trait BelongsToAssociazione
             return $user->associazione_id ?: static::sessionAssociazioneId();
         }
 
-        // Guard 'socio' (area soci): scope sull'associazione del socio
+        // Guard 'socio' (area soci) / 'account' (frontend pubblico):
+        // scope sull'associazione dell'utente autenticato
         if ($user !== null && isset($user->associazione_id) && $user->associazione_id) {
             return $user->associazione_id;
+        }
+
+        // Frontend pubblico senza autenticazione: tenant risolto dallo slug
+        // dal middleware RisolviTenantPubblico (prima del fallback sessione)
+        if (app()->bound('tenant.pubblico')) {
+            return app('tenant.pubblico');
         }
 
         return static::sessionAssociazioneId();

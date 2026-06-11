@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Eventi;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Eventi\EventoRequest;
+use App\Models\Associazione;
 use App\Models\Evento;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -50,10 +51,16 @@ class EventoController extends Controller
             $editEvento = Evento::query()->find($request->query('edit'));
         }
 
+        // Associazione corrente: serve per il link "anteprima pubblica"
+        // /a/{slug}/eventi/{id} (mostrato solo se lo slug esiste)
+        $associazioneCorrente = Associazione::query()->find(Evento::currentAssociazioneId());
+
         return view('eventi.index', [
             'eventi' => $eventi,
             'editEvento' => $editEvento,
             'search' => $search,
+            'slugAssociazione' => $associazioneCorrente?->slug,
+            'frontendAttivo' => (bool) ($associazioneCorrente?->frontend_pubblico_attivo),
         ]);
     }
 

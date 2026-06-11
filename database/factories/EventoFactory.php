@@ -37,4 +37,25 @@ class EventoFactory extends Factory
             'data_evento' => now()->setTime(18, 0),
         ]);
     }
+
+    public function pubblicato(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+        ]);
+    }
+
+    public function aPagamento(float $prezzo = 10.0): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'prezzo' => $prezzo,
+        ]);
+    }
+
+    public function conCapienza(int $posti): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'capienza' => $posti,
+        ]);
+    }
 }

@@ -3,50 +3,35 @@
 namespace App\Services\Pagamenti\Gateways;
 
 use App\Models\PaymentGatewaySetting;
-use App\Models\Quota;
+use App\Services\Pagamenti\Pagabile;
 use Illuminate\Support\Facades\Log;
 use Srmklive\PayPal\Services\PayPal as PayPalClient;
 
 /**
- * Implementazione PayPal (srmklive/paypal, Orders API v2) — parità con
- * PaymentService::createPayPalOrder / handlePayPalWebhook del legacy,
- * più la verifica firma webhook (fix sicurezza §8.4 della spec).
+ * Implementazione PayPal (srmklive/paypal, Orders API v2) sull'astrazione
+ * Pagabile (Quota e Prenotazione), con verifica firma webhook
+ * (fix sicurezza §8.4 della spec).
  */
 class PayPalGateway implements PayPalGatewayInterface
 {
     public function createOrder(
         PaymentGatewaySetting $config,
-        Quota $quota,
+        Pagabile $pagabile,
         string $returnUrl,
         string $cancelUrl
     ): ?string {
-        $associazione = $quota->associazione;
-        $currency = strtoupper($config->valuta ?: 'EUR');
-        $amount = number_format((float) $quota->importo, 2, '.', '');
-
         try {
             $provider = $this->provider($config);
 
-            $order = $provider->createOrder([
-                'intent' => 'CAPTURE',
-                'purchase_units' => [[
-                    'amount' => [
-                        'currency_code' => $currency,
-                        'value' => $amount,
-                    ],
-                    // Chiave di correlazione per il webhook
-                    'custom_id' => $quota->id,
-                    'description' => ($associazione->nome ?? 'Associazione').' - '.($quota->tipo ?: 'Quota')." Anno {$quota->anno}",
-                ]],
-                // Migliorìa rispetto al legacy: ritorno esplicito sulla pagina di pagamento
-                'application_context' => [
-                    'return_url' => $returnUrl,
-                    'cancel_url' => $cancelUrl,
-                ],
-            ]);
+            $order = $provider->createOrder(
+                $this->buildOrderPayload($config, $pagabile, $returnUrl, $cancelUrl)
+            );
 
             if (! is_array($order) || empty($order['id'])) {
-                Log::error('PayPalGateway::createOrder: risposta non valida', ['quota_id' => $quota->id]);
+                Log::error('PayPalGateway::createOrder: risposta non valida', [
+                    'pagabile_tipo' => $pagabile->getPagabileTipo(),
+                    'pagabile_id' => $pagabile->getPagabileId(),
+                ]);
 
                 return null;
             }
@@ -64,10 +49,51 @@ class PayPalGateway implements PayPalGatewayInterface
 
             return $base.$order['id'];
         } catch (\Throwable $e) {
-            Log::error('PayPalGateway::createOrder', ['quota_id' => $quota->id, 'error' => $e->getMessage()]);
+            Log::error('PayPalGateway::createOrder', [
+                'pagabile_tipo' => $pagabile->getPagabileTipo(),
+                'pagabile_id' => $pagabile->getPagabileId(),
+                'error' => $e->getMessage(),
+            ]);
 
             return null;
         }
+    }
+
+    /**
+     * Payload dell'ordine PayPal (estratto per testabilità senza API).
+     *
+     * custom_id: UUID nudo per le quote (retrocompatibilità con gli ordini
+     * legacy in volo), "prenotazione:{uuid}" per le prenotazioni.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildOrderPayload(
+        PaymentGatewaySetting $config,
+        Pagabile $pagabile,
+        string $returnUrl,
+        string $cancelUrl
+    ): array {
+        $customId = $pagabile->getPagabileTipo() === Pagabile::TIPO_QUOTA
+            ? $pagabile->getPagabileId()
+            : $pagabile->getPagabileTipo().':'.$pagabile->getPagabileId();
+
+        return [
+            'intent' => 'CAPTURE',
+            'purchase_units' => [[
+                'amount' => [
+                    'currency_code' => strtoupper($config->valuta ?: 'EUR'),
+                    'value' => number_format($pagabile->getImporto(), 2, '.', ''),
+                ],
+                // Chiave di correlazione per il webhook
+                'custom_id' => $customId,
+                'description' => $pagabile->getDescrizioneRiga(),
+            ]],
+            // Migliorìa rispetto al legacy: ritorno esplicito sulla pagina di pagamento
+            'application_context' => [
+                'return_url' => $returnUrl,
+                'cancel_url' => $cancelUrl,
+            ],
+        ];
     }
 
     public function captureOrder(PaymentGatewaySetting $config, string $orderId): ?array

@@ -4,12 +4,13 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Services\Pagamenti\Pagabile;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Quota extends Model
+class Quota extends Model implements Pagabile
 {
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
@@ -108,5 +109,43 @@ class Quota extends Model
             && $this->payment_token_expires !== null
             && $this->payment_token_expires->isFuture()
             && ! $this->isPagata();
+    }
+
+    // ------------------------------------------------------------------
+    // Pagabile (checkout Stripe/PayPal)
+    // ------------------------------------------------------------------
+
+    public function getPagabileId(): string
+    {
+        return (string) $this->id;
+    }
+
+    public function getPagabileTipo(): string
+    {
+        return Pagabile::TIPO_QUOTA;
+    }
+
+    public function getAssociazioneId(): string
+    {
+        return (string) $this->associazione_id;
+    }
+
+    public function getImporto(): float
+    {
+        return (float) $this->importo;
+    }
+
+    public function getDescrizioneRiga(): string
+    {
+        return ($this->associazione->nome ?? 'Associazione')
+            .' - '.($this->tipo ?: 'Quota')
+            ." Anno {$this->anno}";
+    }
+
+    public function getEmailPagatore(): ?string
+    {
+        $email = $this->socio()->withTrashed()->first()?->email;
+
+        return filled($email) ? $email : null;
     }
 }

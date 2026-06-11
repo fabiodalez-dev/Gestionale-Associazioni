@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Associazione extends Model
 {
@@ -19,6 +20,7 @@ class Associazione extends Model
 
     protected $fillable = [
         'nome',
+        'slug',
         'partita_iva',
         'codice_fiscale',
         'indirizzo',
@@ -30,6 +32,8 @@ class Associazione extends Model
         'costo_tessera',
         'logo_url',
         'attiva',
+        'frontend_pubblico_attivo',
+        'descrizione_pubblica',
         'tipo_scadenza_default',
         'giorni_notifica_scadenza',
         'template_email_scadenza',
@@ -41,10 +45,44 @@ class Associazione extends Model
     {
         return [
             'attiva' => 'boolean',
+            'frontend_pubblico_attivo' => 'boolean',
             'costo_tessera' => 'decimal:2',
             'giorni_notifica_scadenza' => 'integer',
             'campi_obbligatori_config' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Slug auto-generato dal nome alla creazione (stesso algoritmo del
+        // backfill in migration: Str::slug + suffisso numerico su collisione)
+        static::creating(function (self $associazione) {
+            if (blank($associazione->slug) && filled($associazione->nome)) {
+                $associazione->slug = static::generaSlugUnivoco($associazione->nome);
+            }
+        });
+    }
+
+    /**
+     * Slug univoco a partire dal nome (suffisso -2, -3, ... su collisione).
+     */
+    public static function generaSlugUnivoco(string $nome): string
+    {
+        $base = Str::slug(Str::limit($nome, 90, ''));
+
+        if ($base === '') {
+            $base = 'associazione';
+        }
+
+        $slug = $base;
+        $i = 2;
+
+        while (static::query()->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.$i;
+            $i++;
+        }
+
+        return $slug;
     }
 
     /**
@@ -237,5 +275,21 @@ class Associazione extends Model
     public function storicoAttivitaSoci(): HasMany
     {
         return $this->hasMany(StoricoAttivitaSocio::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Account, $this>
+     */
+    public function accounts(): HasMany
+    {
+        return $this->hasMany(Account::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Prenotazione, $this>
+     */
+    public function prenotazioni(): HasMany
+    {
+        return $this->hasMany(Prenotazione::class, 'associazione_id');
     }
 }

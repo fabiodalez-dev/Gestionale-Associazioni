@@ -186,6 +186,25 @@
                     Gruppi Dinamici
                 </a>
             </li>
+            @php
+                // Account del frontend pubblico con richiesta "diventa socio" pendente
+                $richiesteSocioPendenti = \Illuminate\Support\Facades\Route::has('accounts.index')
+                    ? \App\Models\Account::query()
+                        ->whereNotNull('richiesta_socio_at')
+                        ->whereNull('socio_id')
+                        ->where('attivo', true)
+                        ->count()
+                    : 0;
+            @endphp
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('accounts.*') ? 'active' : '' }}" href="{{ $nav('accounts.index') }}">
+                    <i class="bi bi-person-vcard me-2"></i>
+                    Account frontend
+                    @if ($richiesteSocioPendenti > 0)
+                        <span class="badge bg-warning text-dark ms-1" title="Richieste socio pendenti">{{ $richiesteSocioPendenti }}</span>
+                    @endif
+                </a>
+            </li>
             @endif
             @if (($sidebarHasAssoc || $isSuperAdmin) && $can('api.view'))
             <li class="nav-item">

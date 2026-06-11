@@ -128,3 +128,23 @@ Schedule::command('model:prune', [
 Schedule::command('activitylog:clean --force')
     ->dailyAt('04:30')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Modulo prenotazioni — scadenze pagamento e promemoria eventi
+|--------------------------------------------------------------------------
+|
+| gestisci-scadenze: ogni minuto marca 'scaduta' le in_attesa_pagamento
+| oltre finestra e promuove la lista d'attesa (mutex per-evento nel
+| PrenotazioneService). promemoria-eventi: ogni giorno alle 08:30 invia
+| il promemoria alle confermate con evento tra 24h e 48h (finestra di
+| 24h + run giornaliero = un solo invio per prenotazione).
+|
+*/
+Schedule::command('prenotazioni:gestisci-scadenze')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('prenotazioni:promemoria-eventi')
+    ->dailyAt('08:30')
+    ->withoutOverlapping();

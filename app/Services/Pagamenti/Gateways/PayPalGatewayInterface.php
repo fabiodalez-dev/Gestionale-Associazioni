@@ -3,7 +3,7 @@
 namespace App\Services\Pagamenti\Gateways;
 
 use App\Models\PaymentGatewaySetting;
-use App\Models\Quota;
+use App\Services\Pagamenti\Pagabile;
 
 /**
  * Astrazione del gateway PayPal (mockata nei test).
@@ -11,13 +11,18 @@ use App\Models\Quota;
 interface PayPalGatewayInterface
 {
     /**
-     * Crea un ordine PayPal (intent CAPTURE) e restituisce l'URL di approvazione.
+     * Crea un ordine PayPal (intent CAPTURE) per il pagabile e restituisce
+     * l'URL di approvazione.
      *
-     * @return string|null URL "approve" su cui redirigere il socio (null su errore API)
+     * La chiave di correlazione del webhook è custom_id:
+     * "prenotazione:{uuid}" per le prenotazioni, UUID nudo per le quote
+     * (retrocompatibilità con gli ordini legacy in volo).
+     *
+     * @return string|null URL "approve" su cui redirigere il pagatore (null su errore API)
      */
     public function createOrder(
         PaymentGatewaySetting $config,
-        Quota $quota,
+        Pagabile $pagabile,
         string $returnUrl,
         string $cancelUrl
     ): ?string;

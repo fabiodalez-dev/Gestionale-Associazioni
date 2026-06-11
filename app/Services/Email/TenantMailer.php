@@ -33,7 +33,7 @@ class TenantMailer
         array $headers = []
     ): array {
         try {
-            $mailer = Mail::build($this->mailerConfig($settings));
+            $mailer = Mail::build(self::mailerConfig($settings));
 
             $mailer->html($bodyHtml, function (Message $message) use ($settings, $toEmail, $toName, $subject, $headers): void {
                 $message->to($toEmail, $toName !== '' ? $toName : null)
@@ -59,9 +59,13 @@ class TenantMailer
     }
 
     /**
+     * Config Laravel del mailer SMTP per il tenant. Pubblico e statico:
+     * riusato da TenantNotificationMailer per registrare a runtime un
+     * mailer nominale da usare nelle Notifiche (frontend pubblico).
+     *
      * @return array<string, mixed>
      */
-    private function mailerConfig(SmtpSetting $settings): array
+    public static function mailerConfig(SmtpSetting $settings): array
     {
         $config = [
             'transport' => 'smtp',

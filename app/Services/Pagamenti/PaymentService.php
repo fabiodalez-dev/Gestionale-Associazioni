@@ -4,6 +4,7 @@ namespace App\Services\Pagamenti;
 
 use App\Models\Associazione;
 use App\Models\PaymentGatewaySetting;
+use App\Models\Prenotazione;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
@@ -13,12 +14,15 @@ use App\Notifications\Quote\BenvenutoSocioNotification;
 use App\Notifications\Quote\PagamentoQuotaNotification;
 use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
+use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Orchestratore pagamenti quote (parità con includes/PaymentService.php legacy):
- * token/link di pagamento, checkout Stripe/PayPal, webhook, post-pagamento
+ * Orchestratore pagamenti (parità con includes/PaymentService.php legacy):
+ * token/link di pagamento, checkout Stripe/PayPal su Pagabile (quote e
+ * prenotazioni), webhook con dispatch per tipo (default 'quota' per
+ * retrocompatibilità con le sessioni in volo), post-pagamento quota
  * (auto-attivazione socio + tessera + notifiche), helper createQuotaForSocio.
  */
 class PaymentService
@@ -30,6 +34,7 @@ class PaymentService
     public function __construct(
         protected StripeGatewayInterface $stripe,
         protected PayPalGatewayInterface $paypal,
+        protected GestiscePagamentoPrenotazione $prenotazioni,
     ) {}
 
     // ------------------------------------------------------------------
@@ -97,24 +102,44 @@ class PaymentService
 
     public function createStripeCheckout(Quota $quota, string $returnUrl, string $cancelUrl): ?string
     {
-        $config = PaymentGatewaySetting::forTenant($quota->associazione_id);
+        return $this->stripeCheckoutFor($quota, $returnUrl, $cancelUrl);
+    }
+
+    public function createPayPalOrder(Quota $quota, string $returnUrl, string $cancelUrl): ?string
+    {
+        return $this->payPalOrderFor($quota, $returnUrl, $cancelUrl);
+    }
+
+    public function createStripeCheckoutPrenotazione(Prenotazione $prenotazione, string $returnUrl, string $cancelUrl): ?string
+    {
+        return $this->stripeCheckoutFor($prenotazione, $returnUrl, $cancelUrl);
+    }
+
+    public function createPayPalOrderPrenotazione(Prenotazione $prenotazione, string $returnUrl, string $cancelUrl): ?string
+    {
+        return $this->payPalOrderFor($prenotazione, $returnUrl, $cancelUrl);
+    }
+
+    protected function stripeCheckoutFor(Pagabile $pagabile, string $returnUrl, string $cancelUrl): ?string
+    {
+        $config = PaymentGatewaySetting::forTenant($pagabile->getAssociazioneId());
 
         if ($config === null || ! $config->isStripeOperational()) {
             return null;
         }
 
-        return $this->stripe->createCheckoutSession($config, $quota, $returnUrl, $cancelUrl);
+        return $this->stripe->createCheckoutSession($config, $pagabile, $returnUrl, $cancelUrl);
     }
 
-    public function createPayPalOrder(Quota $quota, string $returnUrl, string $cancelUrl): ?string
+    protected function payPalOrderFor(Pagabile $pagabile, string $returnUrl, string $cancelUrl): ?string
     {
-        $config = PaymentGatewaySetting::forTenant($quota->associazione_id);
+        $config = PaymentGatewaySetting::forTenant($pagabile->getAssociazioneId());
 
         if ($config === null || ! $config->isPayPalOperational()) {
             return null;
         }
 
-        return $this->paypal->createOrder($config, $quota, $returnUrl, $cancelUrl);
+        return $this->paypal->createOrder($config, $pagabile, $returnUrl, $cancelUrl);
     }
 
     // ------------------------------------------------------------------
@@ -145,15 +170,31 @@ class PaymentService
         }
 
         $session = (array) data_get($event, 'data.object', []);
-        $quotaId = data_get($session, 'metadata.quota_id');
+        $transactionId = (string) (data_get($session, 'payment_intent') ?: data_get($session, 'id', ''));
+
+        // Dispatch per tipo: default 'quota' per retrocompatibilità
+        // con le sessioni checkout legacy in volo (senza metadata.tipo)
+        $tipo = (string) (data_get($session, 'metadata.tipo') ?: Pagabile::TIPO_QUOTA);
+
+        if ($tipo === Pagabile::TIPO_PRENOTAZIONE) {
+            $prenotazioneId = data_get($session, 'metadata.pagabile_id');
+
+            if (blank($prenotazioneId)) {
+                Log::warning('PaymentService: webhook Stripe prenotazione senza pagabile_id nei metadata');
+
+                return false;
+            }
+
+            return $this->onPagamentoPrenotazioneCompletato((string) $prenotazioneId, $associazioneId, 'stripe', $transactionId);
+        }
+
+        $quotaId = data_get($session, 'metadata.quota_id') ?: data_get($session, 'metadata.pagabile_id');
 
         if (blank($quotaId)) {
             Log::warning('PaymentService: webhook Stripe senza quota_id nei metadata');
 
             return false;
         }
-
-        $transactionId = (string) (data_get($session, 'payment_intent') ?: data_get($session, 'id', ''));
 
         return $this->onPaymentCompleted((string) $quotaId, $associazioneId, 'stripe', $transactionId);
     }
@@ -200,18 +241,62 @@ class PaymentService
             return false;
         }
 
-        $quotaId = data_get($capture, 'purchase_units.0.payments.captures.0.custom_id')
+        $customId = data_get($capture, 'purchase_units.0.payments.captures.0.custom_id')
             ?: data_get($capture, 'purchase_units.0.custom_id')
             ?: data_get($event, 'resource.purchase_units.0.custom_id');
 
-        if (blank($quotaId)) {
+        if (blank($customId)) {
             return false;
         }
 
         $captureId = data_get($capture, 'purchase_units.0.payments.captures.0.id');
         $transactionId = (string) ($captureId ?: $orderId);
 
-        return $this->onPaymentCompleted((string) $quotaId, $associazioneId, 'paypal', $transactionId);
+        // custom_id "prenotazione:{uuid}" → prenotazione;
+        // UUID nudo → quota (retrocompatibilità con gli ordini legacy in volo)
+        [$tipo, $pagabileId] = $this->parseCustomId((string) $customId);
+
+        if ($tipo === Pagabile::TIPO_PRENOTAZIONE) {
+            return $this->onPagamentoPrenotazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId);
+        }
+
+        return $this->onPaymentCompleted($pagabileId, $associazioneId, 'paypal', $transactionId);
+    }
+
+    /**
+     * Scompone il custom_id PayPal in [tipo, id].
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected function parseCustomId(string $customId): array
+    {
+        $prefisso = Pagabile::TIPO_PRENOTAZIONE.':';
+
+        if (str_starts_with($customId, $prefisso)) {
+            return [Pagabile::TIPO_PRENOTAZIONE, substr($customId, strlen($prefisso))];
+        }
+
+        return [Pagabile::TIPO_QUOTA, $customId];
+    }
+
+    // ------------------------------------------------------------------
+    // Post-pagamento prenotazione
+    // ------------------------------------------------------------------
+
+    /**
+     * Webhook con tipo=prenotazione: dispatch a
+     * PrenotazioneService::onPagamentoCompletato (transizione di stato sotto
+     * lock per-evento, idempotente sul replay come per le quote — già pagata
+     * → ack senza effetti — e riconferma di una scaduta anche in overbooking).
+     *
+     * Ack SEMPRE al gateway: anche una prenotazione inesistente (null) non
+     * va ritentata (parità col flusso quote).
+     */
+    public function onPagamentoPrenotazioneCompletato(string $prenotazioneId, string $associazioneId, string $gateway, string $transactionId): bool
+    {
+        $this->prenotazioni->onPagamentoCompletato($prenotazioneId, $associazioneId, $gateway, $transactionId);
+
+        return true;
     }
 
     // ------------------------------------------------------------------

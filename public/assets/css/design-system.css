@@ -824,3 +824,6 @@ hr { border-color: var(--ds-border); opacity: 1; }
         transition-duration: 0.01ms !important;
     }
 }
+
+/* QR inline (chillerlan emette SVG con solo viewBox: serve dimensione esplicita) */
+.qr-wrapper svg { width: 100%; height: auto; display: block; }

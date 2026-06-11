@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\ApiKey;
 use App\Models\Utente;
+use App\Policies\Concerns\AuthorizesModulePermissions;
 
 /**
  * Regole pagina "Chiavi API":
@@ -14,7 +15,7 @@ use App\Models\Utente;
  */
 class ApiKeyPolicy
 {
-    use \App\Policies\Concerns\AuthorizesModulePermissions;
+    use AuthorizesModulePermissions;
 
     public function viewAny(Utente $utente): bool
     {

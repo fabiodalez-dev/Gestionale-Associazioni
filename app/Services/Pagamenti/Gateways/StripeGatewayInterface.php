@@ -3,7 +3,7 @@
 namespace App\Services\Pagamenti\Gateways;
 
 use App\Models\PaymentGatewaySetting;
-use App\Models\Quota;
+use App\Services\Pagamenti\Pagabile;
 
 /**
  * Astrazione del gateway Stripe (mockata nei test).
@@ -11,13 +11,16 @@ use App\Models\Quota;
 interface StripeGatewayInterface
 {
     /**
-     * Crea una Checkout Session Stripe per la quota.
+     * Crea una Checkout Session Stripe per il pagabile (Quota o Prenotazione).
      *
-     * @return string|null URL di checkout su cui redirigere il socio (null su errore API)
+     * I metadata della sessione sono {tipo, pagabile_id, associazione_id,
+     * quota_id solo se tipo=quota}: il webhook risale a tenant ed entità da lì.
+     *
+     * @return string|null URL di checkout su cui redirigere il pagatore (null su errore API)
      */
     public function createCheckoutSession(
         PaymentGatewaySetting $config,
-        Quota $quota,
+        Pagabile $pagabile,
         string $successUrl,
         string $cancelUrl
     ): ?string;

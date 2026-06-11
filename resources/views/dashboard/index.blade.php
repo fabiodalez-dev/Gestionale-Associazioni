@@ -95,6 +95,69 @@
         </div>
     </div>
 
+    @if ($kpiPrenotazioni !== null)
+        {{-- KPI prenotazioni frontend pubblico (solo se attivo per il tenant) --}}
+        <h2 class="h5 mb-2"><i class="bi bi-ticket-perforated me-2"></i>Prenotazioni frontend</h2>
+        <div class="metrics-strip mb-3">
+            <div class="metric-cell metric-ok">
+                <div class="metric-head">
+                    <span class="metric-chip"><i class="bi bi-check-circle"></i></span>
+                    <span class="metric-label">Confermate (30 gg)</span>
+                </div>
+                <div class="metric-value">{{ $kpiPrenotazioni['confermate_30gg'] }}</div>
+            </div>
+            <div class="metric-cell">
+                <div class="metric-head">
+                    <span class="metric-chip"><i class="bi bi-cash-stack"></i></span>
+                    <span class="metric-label">Incasso eventi del mese</span>
+                </div>
+                <div class="metric-value">€ {{ number_format($kpiPrenotazioni['incasso_mese'], 2, ',', '.') }}</div>
+            </div>
+            <div class="metric-cell {{ $kpiPrenotazioni['in_lista_attesa'] > 0 ? 'metric-warn' : '' }}">
+                <div class="metric-head">
+                    <span class="metric-chip"><i class="bi bi-people"></i></span>
+                    <span class="metric-label">In lista d'attesa</span>
+                </div>
+                <div class="metric-value">{{ $kpiPrenotazioni['in_lista_attesa'] }}</div>
+            </div>
+            <div class="metric-cell">
+                <div class="metric-head">
+                    <span class="metric-chip"><i class="bi bi-person-vcard"></i></span>
+                    <span class="metric-label">Account registrati</span>
+                </div>
+                <div class="metric-value">{{ $kpiPrenotazioni['account_registrati'] }}</div>
+            </div>
+        </div>
+
+        <div class="panel mb-4">
+            <div class="panel-header"><span>Riempimento prossimi eventi pubblicati</span></div>
+            <ul class="panel-list">
+                @forelse ($kpiPrenotazioni['riempimento'] as $riga)
+                    <li>
+                        <span>
+                            {{ $riga['evento']->titolo }}
+                            <span class="text-muted small">{{ $riga['evento']->data_evento?->format('d/m/Y H:i') }}</span>
+                        </span>
+                        <span class="text-nowrap">
+                            @if ($riga['capienza'] !== null)
+                                <span class="fw-semibold">{{ $riga['confermati'] }}/{{ $riga['capienza'] }}</span>
+                                <span class="badge {{ $riga['percentuale'] >= 100 ? 'bg-danger' : ($riga['percentuale'] >= 80 ? 'bg-warning text-dark' : 'bg-success') }} ms-1">{{ $riga['percentuale'] }}%</span>
+                            @else
+                                <span class="fw-semibold">{{ $riga['confermati'] }}</span>
+                                <span class="text-muted small ms-1">capienza illimitata</span>
+                            @endif
+                        </span>
+                    </li>
+                @empty
+                    <li class="panel-empty">
+                        <i class="bi bi-calendar-event"></i>
+                        Nessun evento pubblicato in programma.
+                    </li>
+                @endforelse
+            </ul>
+        </div>
+    @endif
+
     <div class="row g-3 mb-4">
         <div class="col-12 col-lg-6">
             <div class="panel h-100">

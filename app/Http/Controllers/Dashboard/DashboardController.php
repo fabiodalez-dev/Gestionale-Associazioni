@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Models\Prenotazione;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
@@ -61,6 +63,68 @@ class DashboardController extends Controller
             'prossimiEventi' => $prossimiEventi,
             'associazioni' => $associazioni,
             'vistaGlobale' => $utente->isSuperAdmin() && blank(session('associazione_id')),
+            'kpiPrenotazioni' => $this->kpiPrenotazioni(),
         ]);
+    }
+
+    /**
+     * KPI del sistema di prenotazione pubblico (docs/PIANO-PRENOTAZIONI.md,
+     * sezione Admin). Calcolati SOLO in vista tenant e SOLO se il tenant
+     * ha il frontend pubblico attivo; altrimenti null (sezione nascosta).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function kpiPrenotazioni(): ?array
+    {
+        $tenantId = Evento::currentAssociazioneId();
+
+        if ($tenantId === null) {
+            return null; // vista globale super_admin: nessun KPI prenotazioni
+        }
+
+        $associazione = Associazione::query()->find($tenantId);
+
+        if ($associazione === null || ! $associazione->frontend_pubblico_attivo) {
+            return null;
+        }
+
+        // Riempimento dei prossimi 5 eventi pubblicati (posti confermati / capienza)
+        $riempimento = Evento::query()
+            ->pubblicati()
+            ->where('data_evento', '>=', now())
+            ->orderBy('data_evento')
+            ->limit(5)
+            ->get(['id', 'titolo', 'data_evento', 'capienza'])
+            ->map(function (Evento $evento): array {
+                $confermati = (int) Prenotazione::query()
+                    ->where('evento_id', $evento->id)
+                    ->confermate()
+                    ->sum('posti');
+
+                return [
+                    'evento' => $evento,
+                    'confermati' => $confermati,
+                    'capienza' => $evento->capienza,
+                    'percentuale' => $evento->capienza !== null && $evento->capienza > 0
+                        ? (int) round(min(100, $confermati * 100 / $evento->capienza))
+                        : null,
+                ];
+            });
+
+        return [
+            'confermate_30gg' => Prenotazione::query()
+                ->confermate()
+                ->where('created_at', '>=', now()->subDays(30))
+                ->count(),
+            'incasso_mese' => (float) Prenotazione::query()
+                ->whereNotNull('pagata_at')
+                ->whereBetween('pagata_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->sum('importo_totale'),
+            'in_lista_attesa' => Prenotazione::query()
+                ->where('stato', Prenotazione::STATO_LISTA_ATTESA)
+                ->count(),
+            'account_registrati' => Account::query()->count(),
+            'riempimento' => $riempimento,
+        ];
     }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\EventoApiController;
 use App\Http\Controllers\Eventi\CheckinPageController;
 use App\Http\Controllers\Eventi\EventoController;
 use App\Http\Controllers\Eventi\PartecipanteController;
+use App\Http\Controllers\Eventi\PrenotazioneEventoController;
 use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -43,6 +44,20 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->name('eventi.partecipanti.update');
     Route::delete('/eventi/{evento}/partecipanti/{partecipante}', [PartecipanteController::class, 'destroy'])
         ->name('eventi.partecipanti.destroy');
+
+    // ---- Prenotazioni dal frontend pubblico (tab admin dell'evento) ----
+    Route::get('/eventi/{evento}/prenotazioni', [PrenotazioneEventoController::class, 'index'])
+        ->name('eventi.prenotazioni.index');
+    Route::get('/eventi/{evento}/prenotazioni/export', [PrenotazioneEventoController::class, 'export'])
+        ->name('eventi.prenotazioni.export');
+    Route::post('/eventi/{evento}/prenotazioni/promuovi', [PrenotazioneEventoController::class, 'promuovi'])
+        ->name('eventi.prenotazioni.promuovi');
+    Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/conferma-pagamento', [PrenotazioneEventoController::class, 'confermaPagamento'])
+        ->name('eventi.prenotazioni.conferma-pagamento');
+    Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/annulla', [PrenotazioneEventoController::class, 'annulla'])
+        ->name('eventi.prenotazioni.annulla');
+    Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/reinvia-biglietto', [PrenotazioneEventoController::class, 'reinviaBiglietto'])
+        ->name('eventi.prenotazioni.reinvia');
 });
 
 // ---- Pagina pubblica check-in (senza login: usa l'API key) ----

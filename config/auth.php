@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Account;
 use App\Models\Socio;
 use App\Models\Utente;
 
@@ -36,6 +37,12 @@ return [
             'driver' => 'session',
             'provider' => 'soci',
         ],
+
+        // Frontend pubblico prenotazioni: account ospite (tabella accounts)
+        'account' => [
+            'driver' => 'session',
+            'provider' => 'accounts',
+        ],
     ],
 
     /*
@@ -53,6 +60,11 @@ return [
         'soci' => [
             'driver' => 'eloquent',
             'model' => Socio::class,
+        ],
+
+        'accounts' => [
+            'driver' => 'eloquent',
+            'model' => Account::class,
         ],
     ],
 
@@ -72,6 +84,13 @@ return [
 
         'soci' => [
             'provider' => 'soci',
+            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+
+        'accounts' => [
+            'provider' => 'accounts',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

@@ -107,7 +107,7 @@
 
         <!-- Input manuale -->
         <form id="manualForm" class="d-flex gap-2 mb-4" style="max-width:400px;margin:0 auto">
-            <input type="text" id="manualInput" class="form-control" placeholder="Numero tessera..." style="min-height:44px;font-size:16px">
+            <input type="text" id="manualInput" class="form-control" placeholder="Numero tessera o codice PRN-..." style="min-height:44px;font-size:16px">
             <button type="submit" class="btn" style="background:var(--brand);color:#fff;white-space:nowrap;min-height:44px"><i class="bi bi-check-lg"></i> OK</button>
         </form>
 
@@ -128,6 +128,7 @@
     'use strict';
 
     var CHECKIN_URL = @json(route('tessere.checkin.store'));
+    var BIGLIETTO_CHECKIN_URL = @json(route('biglietti.checkin'));
     var CSRF = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     var currentEventId = null;
@@ -198,10 +199,18 @@
         scanCooldown = true;
         setTimeout(function() { scanCooldown = false; }, 3000);
 
-        // Dal QR: URL di verifica → uuid tessera; altrimenti testo grezzo
+        // Auto-riconoscimento payload:
+        // - URL con /verifica-biglietto/{64 hex} → flusso biglietto;
+        // - URL di verifica tessera → uuid tessera;
+        // - altrimenti testo grezzo (token biglietto, codice PRN o numero tessera).
         var uuid = '';
         try {
             var url = new URL(text);
+            var mb = url.pathname.match(/verifica-biglietto\/([a-f0-9]{64})/i);
+            if (mb) {
+                doCheckinBiglietto({ qr_token: mb[1].toLowerCase() });
+                return;
+            }
             uuid = url.searchParams.get('t') || '';
             if (!uuid) {
                 var m = url.pathname.match(/verifica-tessera\/([a-f0-9-]{36})/i);
@@ -213,18 +222,29 @@
 
         if (!uuid) return;
 
-        if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uuid)) {
+        if (/^[a-f0-9]{64}$/i.test(uuid)) {
+            doCheckinBiglietto({ qr_token: uuid.toLowerCase() });
+        } else if (/^PRN-/i.test(uuid)) {
+            doCheckinBiglietto({ codice: uuid.toUpperCase() });
+        } else if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uuid)) {
             doCheckin({ tessera_id: uuid });
         } else {
             doCheckin({ numero_tessera: uuid });
         }
     }
 
-    // ---- Input manuale (numero tessera o numero socio) ----
+    // ---- Input manuale (numero tessera, numero socio o codice biglietto PRN) ----
     document.getElementById('manualForm').addEventListener('submit', function(e) {
         e.preventDefault();
         var val = manualInput.value.trim();
-        if (val) doCheckin({ numero_tessera: val });
+        if (!val) return;
+        if (/^PRN-/i.test(val)) {
+            doCheckinBiglietto({ codice: val.toUpperCase() });
+        } else if (/^[a-f0-9]{64}$/i.test(val)) {
+            doCheckinBiglietto({ qr_token: val.toLowerCase() });
+        } else {
+            doCheckin({ numero_tessera: val });
+        }
     });
 
     // ---- Check-in ----
@@ -247,6 +267,48 @@
             .catch(function() {
                 showOverlay('result-err', 'bi-wifi-off', 'Errore di rete', 'Verifica la connessione e riprova.');
             });
+    }
+
+    // ---- Check-in biglietto (prenotazione frontend pubblico) ----
+    function doCheckinBiglietto(identifier) {
+        if (!currentEventId) return;
+
+        var payload = Object.assign({ evento_id: currentEventId }, identifier);
+
+        fetch(BIGLIETTO_CHECKIN_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': CSRF
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+            .then(function(res) { showResultBiglietto(res.data); })
+            .catch(function() {
+                showOverlay('result-err', 'bi-wifi-off', 'Errore di rete', 'Verifica la connessione e riprova.');
+            });
+    }
+
+    function showResultBiglietto(data) {
+        var b = data.biglietto || null;
+        var nome = b ? ((b.account_nome || '') + ' ' + (b.account_cognome || '')).trim() : '';
+        var posti = b && b.posti ? (b.posti === 1 ? '1 posto' : b.posti + ' posti') : '';
+
+        if (data.success && !data.already_checked_in) {
+            checkinCount++;
+            checkinCounter.textContent = String(checkinCount);
+            addRecent('bi-ticket-perforated-fill text-success', nome + (posti ? ' · ' + posti : ''));
+            showOverlay('result-ok', 'bi-ticket-perforated-fill', nome, (posti ? posti + ' · ' : '') + (data.message || 'Check-in registrato.'));
+        } else if (data.success && data.already_checked_in) {
+            addRecent('bi-exclamation-circle text-warning', nome + ' (già utilizzato)');
+            showOverlay('result-dup', 'bi-exclamation-circle-fill', nome, data.message || 'Biglietto già utilizzato.');
+        } else {
+            var errMsg = data.error || (data.errors ? Object.values(data.errors)[0][0] : 'Errore durante il check-in.');
+            showOverlay('result-err', 'bi-x-circle-fill', nome || 'Biglietto non valido', errMsg);
+        }
+        manualInput.value = '';
     }
 
     function showResult(data) {

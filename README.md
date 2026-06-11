@@ -23,17 +23,35 @@ e isolamento multi-tenant per `associazione_id` (global scope a livello framewor
 
 ## Installazione
 
+### Installer web (consigliato)
+
 ```bash
 git clone <repository> gestione-associazioni-laravel
 cd gestione-associazioni-laravel
 
+composer install --no-dev
+cp .env.example .env
+```
+
+Poi apri **`/install`** nel browser: il wizard guida in 4 passi
+(requisiti → database → super admin → fine). L'`APP_KEY` viene generata
+automaticamente, le credenziali MySQL vengono scritte nel `.env`, lo schema
+viene migrato e i ruoli seedati. Al termine viene creato
+`storage/app/installed.lock` che disattiva l'installer (eliminalo per
+reinstallare).
+
+### Installazione manuale (CLI)
+
+```bash
 composer install
 cp .env.example .env
 php artisan key:generate
 ```
 
 Configura nel `.env` la connessione MySQL (`DB_*`) e, se devi importare i dati
-della vecchia app, anche le variabili `LEGACY_DB_*`. Poi:
+della vecchia app, anche le variabili `LEGACY_DB_*`. Il lock di installazione
+viene creato automaticamente alla prima richiesta se esiste già un super admin
+nel database. Poi:
 
 ```bash
 php artisan migrate --seed     # schema + ruoli/permessi + dati demo

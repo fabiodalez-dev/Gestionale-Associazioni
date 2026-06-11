@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureTenantSelected;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -24,6 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
+        ]);
+
+        // Guardia installer PRIMA di EncryptCookies (genera APP_KEY se manca)
+        $middleware->web(prepend: [
+            EnsureInstalled::class,
         ]);
 
         // Security headers + Content-Security-Policy su tutte le risposte web (miglioramento 5)

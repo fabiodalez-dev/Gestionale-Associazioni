@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+
+    paths:
+        - app
+
+    # Le tabelle di dominio usano UUID CHAR(36): nessun problema con gli id stringa.
+    checkModelProperties: true
+
+    reportUnmatchedIgnoredErrors: false

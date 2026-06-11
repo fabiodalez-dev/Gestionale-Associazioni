@@ -1,0 +1,87 @@
+<?php
+
+use App\Http\Controllers\AreaSoci\DashboardController;
+use App\Http\Controllers\AreaSoci\EmailOptOutController;
+use App\Http\Controllers\AreaSoci\LoginController;
+use App\Http\Controllers\AreaSoci\PasswordResetController;
+use App\Http\Controllers\AreaSoci\ProfiloController;
+use App\Http\Controllers\AreaSoci\QuoteController;
+use App\Http\Controllers\AreaSoci\SetPasswordController;
+use App\Http\Controllers\AreaSoci\TessereController;
+use App\Http\Middleware\AreaSoci\AutenticaSocio;
+use App\Http\Middleware\AreaSoci\EnsureSocioValido;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Modulo: area-soci (portale member-facing)
+|--------------------------------------------------------------------------
+|
+| Guard dedicata 'socio' (tabella soci), separata dalla sessione admin:
+| il logout del socio non tocca un'eventuale sessione amministrativa.
+| Le rotte pubbliche (login, set password, opt-out email) sono fuori
+| dal middleware di autenticazione; le rotte autenticate usano
+| AutenticaSocio (redirect alla login del portale) + EnsureSocioValido
+| (logout forzato se il socio è stato cancellato) + 'tenant'.
+|
+*/
+
+Route::prefix('area-soci')->name('area-soci.')->group(function () {
+
+    /*
+    |----------------------------------------------------------------------
+    | Rotte pubbliche (senza autenticazione)
+    |----------------------------------------------------------------------
+    */
+
+    Route::get('/login', [LoginController::class, 'show'])->name('login');
+
+    // Rate limit aggiuntivo per IP (il vero throttling per email+IP è nel Form Request)
+    Route::post('/login', [LoginController::class, 'login'])
+        ->middleware('throttle:30,1')
+        ->name('login.attempt');
+
+    // Richiesta link "imposta password" (primo accesso o reset) — risposta neutra
+    Route::post('/password/email', [PasswordResetController::class, 'sendLink'])
+        ->middleware('throttle:5,1')
+        ->name('password.email');
+
+    // Set password con token monouso (TTL 1 ora)
+    Route::get('/set-password/{token}', [SetPasswordController::class, 'show'])
+        ->where('token', '[A-Fa-f0-9]{64}')
+        ->name('set-password');
+    Route::post('/set-password/{token}', [SetPasswordController::class, 'store'])
+        ->where('token', '[A-Fa-f0-9]{64}')
+        ->middleware('throttle:10,1')
+        ->name('set-password.store');
+
+    // Opt-out email via token (link nel footer delle comunicazioni):
+    // GET = pagina di conferma, POST (CSRF) = applica l'opt-out
+    Route::get('/opt-out/{token}', [EmailOptOutController::class, 'show'])
+        ->where('token', '[A-Fa-f0-9]{64}')
+        ->name('optout');
+    Route::post('/opt-out/{token}', [EmailOptOutController::class, 'store'])
+        ->where('token', '[A-Fa-f0-9]{64}')
+        ->middleware('throttle:10,1')
+        ->name('optout.store');
+
+    /*
+    |----------------------------------------------------------------------
+    | Rotte autenticate (guard socio + tenant)
+    |----------------------------------------------------------------------
+    */
+
+    Route::middleware([AutenticaSocio::class.':socio', EnsureSocioValido::class, 'tenant'])->group(function () {
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+        Route::get('/profilo', [ProfiloController::class, 'show'])->name('profilo');
+        Route::patch('/profilo', [ProfiloController::class, 'update'])->name('profilo.update');
+
+        Route::get('/quote', [QuoteController::class, 'index'])->name('quote');
+
+        Route::get('/tessere', [TessereController::class, 'index'])->name('tessere');
+        Route::get('/tessere/{tessera}/pdf', [TessereController::class, 'pdf'])->name('tessere.pdf');
+
+        Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+    });
+});

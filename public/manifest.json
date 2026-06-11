@@ -1,0 +1,30 @@
+{
+  "name": "Gestione Associazioni",
+  "short_name": "Associazioni",
+  "description": "Gestione soci, tessere, eventi e quote",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#FF7B11",
+  "background_color": "#F3F4F6",
+  "lang": "it-IT",
+  "icons": [
+    {
+      "src": "/assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

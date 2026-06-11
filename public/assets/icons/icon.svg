@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="76.8" fill="#FF7B11"/>
+  <!-- Person center (larger) -->
+  <circle cx="256" cy="180" r="48" fill="#fff"/>
+  <path d="M192 310c0-35.3 28.7-64 64-64s64 28.7 64 64v18c0 8.8-7.2 16-16 16H208c-8.8 0-16-7.2-16-16v-18z" fill="#fff"/>
+  <!-- Person left -->
+  <circle cx="152" cy="210" r="36" fill="#fff" opacity=".75"/>
+  <path d="M104 316c0-26.5 21.5-48 48-48s48 21.5 48 48v12c0 6.6-5.4 12-12 12H116c-6.6 0-12-5.4-12-12v-12z" fill="#fff" opacity=".75"/>
+  <!-- Person right -->
+  <circle cx="360" cy="210" r="36" fill="#fff" opacity=".75"/>
+  <path d="M312 316c0-26.5 21.5-48 48-48s48 21.5 48 48v12c0 6.6-5.4 12-12 12H324c-6.6 0-12-5.4-12-12v-12z" fill="#fff" opacity=".75"/>
+  <!-- Text bar -->
+  <rect x="136" y="370" width="240" height="24" rx="12" fill="#fff" opacity=".5"/>
+  <rect x="176" y="406" width="160" height="16" rx="8" fill="#fff" opacity=".3"/>
+</svg>

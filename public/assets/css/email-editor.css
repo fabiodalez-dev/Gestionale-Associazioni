@@ -1,0 +1,33 @@
+/* email-editor.css — GrapesJS editor overrides */
+#gjs {
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Left panel (blocks) width */
+.gjs-pn-views-container {
+    width: 200px !important;
+}
+
+/* Canvas area */
+.gjs-cv-canvas {
+    background-color: #f0f0f0;
+}
+
+/* Override GrapesJS toolbar to match Bootstrap theme */
+.gjs-pn-panel {
+    background-color: #f8f9fa;
+}
+
+.gjs-one-bg {
+    background-color: #f8f9fa;
+}
+
+.gjs-two-color {
+    color: #333;
+}
+
+.gjs-four-color,
+.gjs-four-color-h:hover {
+    color: #FF7B11;
+}

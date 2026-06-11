@@ -95,8 +95,13 @@ class SociFilter
         }
 
         $status = (string) $this->params['status'];
+        $statiPending = [Socio::STATO_IN_ATTESA, Socio::STATO_IN_ATTESA_DI_PAGAMENTO];
 
-        if ($status !== 'all' && in_array($status, Socio::STATI, true)) {
+        // 'pending' è uno stato virtuale: tutte le pre-iscrizioni in attesa
+        // (approvazione O pagamento), usato dal banner della pagina soci
+        if ($status === 'pending') {
+            $query->whereIn('stato', $statiPending);
+        } elseif ($status !== 'all' && in_array($status, Socio::STATI, true)) {
             $query->where('stato', $status);
         }
 
@@ -117,10 +122,9 @@ class SociFilter
         }
 
         $oggi = Carbon::today()->toDateString();
-        $statiPending = [Socio::STATO_IN_ATTESA, Socio::STATO_IN_ATTESA_DI_PAGAMENTO];
 
         // Filtro stato tessera (default 'attive'), saltato per gli stati pending (spec §1.9)
-        if (! in_array($status, $statiPending, true)) {
+        if ($status !== 'pending' && ! in_array($status, $statiPending, true)) {
             if ($this->params['tessera_stato'] === 'attive') {
                 $query->whereHas('ultimaTessera', function (Builder $t) use ($oggi) {
                     $t->where('stato', 'Attiva')

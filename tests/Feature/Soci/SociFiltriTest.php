@@ -70,10 +70,12 @@ class SociFiltriTest extends TestCase
 
     public function test_ricerca_full_text_su_nome_email_e_numero_socio(): void
     {
-        $target = $this->socio(['cognome' => 'Bianchessi', 'email' => 'unica@example.com', 'numero_socio' => '042']);
+        // Nomi fissati: con Faker it_IT un nome casuale può collidere con i
+        // cognomi usati nelle assertDontSee (es. nome di battesimo "Neri")
+        $target = $this->socio(['nome' => 'Carla', 'cognome' => 'Bianchessi', 'email' => 'unica@example.com', 'numero_socio' => '042']);
         Tessera::factory()->create(['socio_id' => $target->id]);
 
-        $altro = $this->socio(['cognome' => 'Neri']);
+        $altro = $this->socio(['nome' => 'Ugo', 'cognome' => 'Neri']);
         Tessera::factory()->create(['socio_id' => $altro->id]);
 
         foreach (['Bianchessi', 'unica@example.com', '042'] as $termine) {

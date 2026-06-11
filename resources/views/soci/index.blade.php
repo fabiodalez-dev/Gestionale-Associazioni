@@ -50,7 +50,7 @@
     @if ($pendingCount > 0)
         <div class="alert alert-warning d-flex justify-content-between align-items-center">
             <span><i class="bi bi-hourglass-split me-1"></i>Ci sono <strong>{{ $pendingCount }}</strong> pre-iscrizioni in attesa di approvazione o pagamento.</span>
-            <a href="{{ route('soci.index', ['status' => 'In Attesa', 'tessera_stato' => 'all']) }}" class="btn btn-sm btn-warning">Vedi</a>
+            <a href="{{ route('soci.index', ['status' => 'pending', 'tessera_stato' => 'all']) }}" class="btn btn-sm btn-warning">Vedi</a>
         </div>
     @endif
 
@@ -68,6 +68,7 @@
                         <label class="form-label small mb-1" for="status">Stato</label>
                         <select class="form-select form-select-sm" id="status" name="status">
                             <option value="all">Tutti</option>
+                            <option value="pending" @selected($filtri['status'] === 'pending')>Pre-iscrizioni (in attesa)</option>
                             @foreach (\App\Models\Socio::STATI as $stato)
                                 <option value="{{ $stato }}" @selected($filtri['status'] === $stato)>{{ $stato }}</option>
                             @endforeach

@@ -102,4 +102,25 @@ class SociPageTest extends TestCase
 
         $this->actingAs($senzaPermessi)->get(route('soci.index'))->assertForbidden();
     }
+
+    public function test_filtro_pending_mostra_entrambi_gli_stati_di_attesa(): void
+    {
+        Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'cognome' => 'AttesaApprovazione',
+            'stato' => 'In Attesa',
+        ]);
+        Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'cognome' => 'AttesaPagamento',
+            'stato' => 'In Attesa di Pagamento',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get('/soci?status=pending&tessera_stato=all');
+
+        $response->assertOk()
+            ->assertSee('AttesaApprovazione')
+            ->assertSee('AttesaPagamento');
+    }
 }

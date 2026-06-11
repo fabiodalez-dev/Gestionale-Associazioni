@@ -1,7 +1,7 @@
 @extends('installer.layout')
 
 @section('title', 'Requisiti')
-@section('step-label', '1 di 4')
+@section('step-label', '1 di 5')
 
 @section('content')
     <h2>Requisiti di sistema</h2>

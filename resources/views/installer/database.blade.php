@@ -1,7 +1,7 @@
 @extends('installer.layout')
 
 @section('title', 'Database')
-@section('step-label', '2 di 4')
+@section('step-label', '2 di 5')
 
 @section('content')
     <h2>Configurazione database</h2>
@@ -44,11 +44,25 @@
                     <input class="form-check-input" type="checkbox" id="crea_database" name="crea_database" value="1" @checked(old('crea_database'))>
                     <label class="form-check-label" for="crea_database">Crea il database se non esiste</label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="consenti_non_vuoto" name="consenti_non_vuoto" value="1" @checked(old('consenti_non_vuoto'))>
+                    <label class="form-check-label" for="consenti_non_vuoto">Consenti database non vuoto <span class="text-muted">(sconsigliato)</span></label>
+                </div>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary w-100 mt-4">
-            <i class="bi bi-database-check me-2"></i>Connetti e installa lo schema
-        </button>
+        <div id="testEsito" class="alert d-none mt-3 mb-0" role="status"></div>
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="button" class="btn btn-outline-secondary" id="testConnessione"
+                    data-url="{{ route('installer.database.test') }}">
+                <i class="bi bi-plug me-1"></i>Testa connessione
+            </button>
+            <button type="submit" class="btn btn-primary flex-fill">
+                <i class="bi bi-database-check me-2"></i>Connetti e installa lo schema
+            </button>
+        </div>
     </form>
+
+    <script src="{{ asset('assets/js/installer.js') }}"></script>
 @endsection

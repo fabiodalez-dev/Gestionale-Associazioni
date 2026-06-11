@@ -64,7 +64,7 @@
         </div>
 
         <div class="installer-steps" aria-hidden="true">
-            @for ($i = 1; $i <= 4; $i++)
+            @for ($i = 1; $i <= 5; $i++)
                 <span class="installer-step {{ $step >= $i ? 'done' : '' }}"></span>
             @endfor
         </div>

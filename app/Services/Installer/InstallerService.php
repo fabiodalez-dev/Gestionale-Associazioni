@@ -4,6 +4,7 @@ namespace App\Services\Installer;
 
 use App\Models\Associazione;
 use App\Models\Utente;
+use Database\Seeders\DemoSeeder;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -21,10 +22,17 @@ class InstallerService
 
     public function markInstalled(): void
     {
-        file_put_contents(
-            config('installer.lock_file'),
-            'Installata il '.now()->format('Y-m-d H:i:s').PHP_EOL
-        );
+        $lockFile = config('installer.lock_file');
+
+        file_put_contents($lockFile, 'Installata il '.now()->format('Y-m-d H:i:s').PHP_EOL);
+
+        // Hardening permessi: file sensibili leggibili solo dal proprietario
+        @chmod($lockFile, 0600);
+
+        $envFile = config('installer.env_file');
+        if (file_exists($envFile)) {
+            @chmod($envFile, 0600);
+        }
     }
 
     /**
@@ -63,9 +71,11 @@ class InstallerService
 
     /**
      * Tenta la connessione MySQL e, se richiesto, crea il database.
+     * Restituisce anche quante tabelle contiene già il database di
+     * destinazione (per avvisare prima di migrare su un DB non vuoto).
      *
      * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
-     * @return array{ok: bool, error: ?string}
+     * @return array{ok: bool, error: ?string, tables: int}
      */
     public function testDatabase(array $cfg, bool $creaDatabase = false): array
     {
@@ -85,10 +95,24 @@ class InstallerService
 
             $pdo->exec("USE `{$nomeDb}`");
 
-            return ['ok' => true, 'error' => null];
+            $stmt = $pdo->prepare(
+                'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?'
+            );
+            $stmt->execute([$nomeDb]);
+            $tables = (int) $stmt->fetchColumn();
+
+            return ['ok' => true, 'error' => null, 'tables' => $tables];
         } catch (PDOException $e) {
-            return ['ok' => false, 'error' => $e->getMessage()];
+            return ['ok' => false, 'error' => $e->getMessage(), 'tables' => 0];
         }
+    }
+
+    /**
+     * Dati dimostrativi (solo contenuti, nessun account utente).
+     */
+    public function seedDemo(): void
+    {
+        Artisan::call('db:seed', ['--class' => DemoSeeder::class, '--force' => true]);
     }
 
     /**

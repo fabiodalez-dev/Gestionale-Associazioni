@@ -69,7 +69,7 @@ class InstallerTest extends TestCase
     {
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('testDatabase')->once()
-                ->andReturn(['ok' => false, 'error' => 'Access denied']);
+                ->andReturn(['ok' => false, 'error' => 'Access denied', 'tables' => 0]);
             $mock->shouldReceive('writeEnv')->never();
             $mock->shouldReceive('runMigrations')->never();
         });
@@ -86,7 +86,7 @@ class InstallerTest extends TestCase
     public function test_database_store_valido_scrive_env_e_migra(): void
     {
         $this->partialMock(InstallerService::class, function ($mock) {
-            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null]);
+            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0]);
             $mock->shouldReceive('writeEnv')->once();
             $mock->shouldReceive('runMigrations')->once();
         });
@@ -109,7 +109,7 @@ class InstallerTest extends TestCase
             'email' => 'mario@apsdemo.it',
             'password' => 'SuperSegreta123',
             'password_confirmation' => 'SuperSegreta123',
-        ])->assertRedirect(route('installer.done'));
+        ])->assertRedirect(route('installer.email'));
 
         $admin = Utente::query()->where('email', 'mario@apsdemo.it')->firstOrFail();
         $this->assertSame('super_admin', $admin->ruolo);
@@ -151,5 +151,99 @@ class InstallerTest extends TestCase
             'password' => 'corta1',
             'password_confirmation' => 'corta1',
         ])->assertSessionHasErrors('password');
+    }
+
+    public function test_database_non_vuoto_richiede_conferma_esplicita(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->twice()
+                ->andReturn(['ok' => true, 'error' => null, 'tables' => 12]);
+            $mock->shouldReceive('writeEnv')->once();
+            $mock->shouldReceive('runMigrations')->once();
+        });
+
+        $payload = [
+            'host' => '127.0.0.1', 'port' => 3306,
+            'database' => 'demo', 'username' => 'root', 'password' => '',
+        ];
+
+        // Senza conferma: errore
+        $this->from('/install/database')
+            ->post('/install/database', $payload)
+            ->assertRedirect('/install/database')
+            ->assertSessionHasErrors('database');
+
+        // Con conferma esplicita: procede
+        $this->post('/install/database', $payload + ['consenti_non_vuoto' => 1])
+            ->assertRedirect(route('installer.admin'));
+    }
+
+    public function test_endpoint_ajax_test_connessione(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()
+                ->andReturn(['ok' => true, 'error' => null, 'tables' => 3]);
+        });
+
+        $this->postJson('/install/database/test', [
+            'host' => '127.0.0.1', 'port' => 3306,
+            'database' => 'demo', 'username' => 'root', 'password' => '',
+        ])->assertOk()->assertJson(['ok' => true, 'tables' => 3]);
+    }
+
+    public function test_dati_demo_opzionali_creano_i_contenuti(): void
+    {
+        $this->seed(RolesSeeder::class);
+
+        $this->post('/install/admin', [
+            'associazione_nome' => 'APS Reale',
+            'associazione_email' => 'info@apsreale.it',
+            'nome' => 'Mario',
+            'cognome' => 'Rossi',
+            'email' => 'mario@apsreale.it',
+            'password' => 'SuperSegreta123',
+            'password_confirmation' => 'SuperSegreta123',
+            'dati_demo' => 1,
+        ])->assertRedirect(route('installer.email'));
+
+        $this->assertDatabaseHas('associazioni', ['nome' => 'Associazione Demo']);
+        $this->assertDatabaseHas('soci', ['cognome' => 'Verdi', 'email' => 'anna.verdi@demo.test']);
+        $this->assertDatabaseHas('eventi', ['titolo' => 'Assemblea annuale']);
+        // Nessun account utente demo
+        $this->assertSame(1, Utente::query()->count());
+    }
+
+    public function test_step_email_puo_essere_saltato(): void
+    {
+        $this->seed(RolesSeeder::class);
+        Utente::factory()->superAdmin()->create();
+
+        $this->post('/install/email', ['driver' => 'log'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('installer.done'));
+    }
+
+    public function test_step_email_salva_le_impostazioni_smtp(): void
+    {
+        $this->seed(RolesSeeder::class);
+        Utente::factory()->superAdmin()->create();
+
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('writeEnv')->once()->withArgs(function (array $valori) {
+                return ($valori['MAIL_MAILER'] ?? null) === 'smtp'
+                    && ($valori['MAIL_HOST'] ?? null) === 'smtp.example.com';
+            });
+        });
+
+        $response = $this->post('/install/email', [
+            'driver' => 'smtp',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'Demo',
+            'smtp_host' => 'smtp.example.com',
+            'smtp_port' => 587,
+            'smtp_encryption' => 'tls',
+        ]);
+
+        $response->assertSessionHasNoErrors()->assertRedirect(route('installer.done'));
     }
 }

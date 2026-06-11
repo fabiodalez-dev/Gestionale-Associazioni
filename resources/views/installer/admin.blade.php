@@ -1,7 +1,7 @@
 @extends('installer.layout')
 
 @section('title', 'Amministratore')
-@section('step-label', '3 di 4')
+@section('step-label', '3 di 5')
 
 @section('content')
     <h2>Super amministratore</h2>
@@ -46,8 +46,16 @@
             </div>
         </div>
 
+        <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" id="dati_demo" name="dati_demo" value="1" @checked(old('dati_demo'))>
+            <label class="form-check-label" for="dati_demo">
+                Installa dati dimostrativi
+                <span class="text-muted">(associazione di esempio con 3 soci, tessere, quote e un evento — nessun account utente)</span>
+            </label>
+        </div>
+
         <button type="submit" class="btn btn-primary w-100 mt-4">
-            <i class="bi bi-person-plus me-2"></i>Crea account e completa
+            <i class="bi bi-person-plus me-2"></i>Crea account e continua
         </button>
     </form>
 @endsection

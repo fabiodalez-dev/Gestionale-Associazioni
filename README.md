@@ -33,8 +33,8 @@ composer install --no-dev
 cp .env.example .env
 ```
 
-Poi apri **`/install`** nel browser: il wizard guida in 4 passi
-(requisiti → database → super admin → fine). L'`APP_KEY` viene generata
+Poi apri **`/install`** nel browser: il wizard guida in 5 passi
+(requisiti → database → super admin → email facoltativa → fine), con test di connessione, protezione contro database non vuoti e dati demo opzionali. L'`APP_KEY` viene generata
 automaticamente, le credenziali MySQL vengono scritte nel `.env`, lo schema
 viene migrato e i ruoli seedati. Al termine viene creato
 `storage/app/installed.lock` che disattiva l'installer (eliminalo per

@@ -1,7 +1,7 @@
 @extends('installer.layout')
 
 @section('title', 'Completata')
-@section('step-label', '4 di 4')
+@section('step-label', '5 di 5')
 
 @section('content')
     <div class="text-center py-2">

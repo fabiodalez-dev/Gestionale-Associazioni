@@ -307,28 +307,38 @@ hr { border-color: var(--ds-border); opacity: 1; }
 .sidebar-footer .sidebar-user-role { font-size: 0.75rem; color: var(--ds-text-muted); line-height: 1.3; }
 .sidebar-footer .btn { font-size: 0.8125rem; }
 
-.theme-toggle {
-    display: flex;
+.theme-toggle-icon {
+    margin-left: auto;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
-    min-height: 36px;
-    padding: 7px 10px;
-    margin-top: 6px;
-    border: none;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border: 1px solid var(--ds-border);
     border-radius: 6px;
-    background: transparent;
+    background: var(--ds-surface);
     color: var(--ds-text-2);
-    font-size: 0.8125rem;
-    font-weight: 500;
+    font-size: 0.875rem;
     cursor: pointer;
-    transition: background-color 150ms ease-out;
+    transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out;
 }
-.theme-toggle:hover { background: oklch(from var(--ds-border) l c h / 0.45); color: var(--ds-text); }
-.theme-toggle i { width: 18px; text-align: center; color: var(--ds-text-muted); }
-.theme-toggle .theme-label-dark { display: none; }
-[data-bs-theme="dark"] .theme-toggle .theme-label-light { display: none; }
-[data-bs-theme="dark"] .theme-toggle .theme-label-dark { display: inline; }
+.theme-toggle-icon:hover { border-color: var(--ds-border-strong); color: var(--ds-text); }
+.theme-toggle-icon:focus-visible { box-shadow: 0 0 0 3px var(--ds-accent-ring); outline: none; }
+.theme-toggle-icon .theme-label-dark { display: none; }
+[data-bs-theme="dark"] .theme-toggle-icon .theme-label-light { display: none; }
+[data-bs-theme="dark"] .theme-toggle-icon .theme-label-dark { display: inline; }
+
+/* variante flottante per le pagine guest (login) */
+.theme-toggle-icon.theme-toggle-floating {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    z-index: 1050;
+    margin-left: 0;
+}
 
 /* contenuto principale */
 .main-content {

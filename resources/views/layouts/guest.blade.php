@@ -81,6 +81,10 @@
     @stack('styles')
 </head>
 <body class="guest-body">
+    <button type="button" class="theme-toggle-icon theme-toggle-floating" id="themeToggle" aria-label="Cambia tema chiaro/scuro" title="Tema chiaro/scuro">
+        <i class="bi bi-moon theme-label-light"></i>
+        <i class="bi bi-sun theme-label-dark"></i>
+    </button>
     <div class="login-wrapper">
         <div class="login-brand">
             <div class="login-brand-icon">
@@ -110,6 +114,14 @@
     </div>
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+        document.getElementById('themeToggle').addEventListener('click', function () {
+            var html = document.documentElement;
+            var next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-bs-theme', next);
+            localStorage.setItem('theme', next);
+        });
+    </script>
     @stack('scripts')
 </body>
 </html>

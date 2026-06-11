@@ -19,6 +19,10 @@
         <div class="sidebar-brand">
             <i class="bi bi-people-fill"></i>
             <span>{{ $associazioneNome }}</span>
+            <button type="button" class="theme-toggle-icon" id="themeToggle" aria-label="Cambia tema chiaro/scuro" title="Tema chiaro/scuro">
+                <i class="bi bi-moon theme-label-light"></i>
+                <i class="bi bi-sun theme-label-dark"></i>
+            </button>
         </div>
 
         @if ($isSuperAdmin)
@@ -218,12 +222,6 @@
                     </button>
                 </form>
             </div>
-            <button type="button" class="theme-toggle" id="themeToggle" aria-label="Cambia tema chiaro/scuro">
-                <i class="bi bi-moon theme-label-light"></i>
-                <i class="bi bi-sun theme-label-dark"></i>
-                <span class="theme-label-light">Tema scuro</span>
-                <span class="theme-label-dark">Tema chiaro</span>
-            </button>
         </div>
     </div>
 </nav>

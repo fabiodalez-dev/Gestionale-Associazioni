@@ -21,21 +21,27 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--ds-bg);
+            background-color: var(--ds-bg);
+            background-image: radial-gradient(900px 480px at 50% -120px, oklch(72% 0.185 55 / 0.09), transparent 70%);
+            background-repeat: no-repeat;
+        }
+        [data-bs-theme="dark"] body.guest-body {
+            background-image: radial-gradient(900px 480px at 50% -120px, oklch(72% 0.185 55 / 0.14), transparent 70%);
         }
         .login-wrapper { width: 100%; max-width: 400px; padding: 16px; }
         .login-brand { text-align: center; margin-bottom: 28px; }
         .login-brand-icon {
-            width: 44px;
-            height: 44px;
-            background: var(--ds-accent);
-            border-radius: 10px;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(180deg, oklch(75% 0.185 58), oklch(67% 0.19 50));
+            border-radius: 13px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 14px;
+            box-shadow: var(--ds-glow-accent), inset 0 1px 0 oklch(100% 0 0 / 0.25);
         }
-        .login-brand-icon i { color: #fff; font-size: 1.3125rem; }
+        .login-brand-icon i { color: #fff; font-size: 1.4375rem; }
         .login-brand h1 { font-size: 1.1875rem; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.01em; }
         .login-brand p { font-size: 0.84375rem; color: var(--ds-text-muted); margin: 0; }
         .login-card {
@@ -43,7 +49,7 @@
             border: 1px solid var(--ds-border);
             border-radius: var(--ds-radius-lg);
             padding: 28px;
-            box-shadow: var(--ds-shadow-sm);
+            box-shadow: var(--ds-shadow-lg);
         }
         .btn-login {
             width: 100%;

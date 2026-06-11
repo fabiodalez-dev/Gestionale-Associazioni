@@ -59,23 +59,38 @@
 
     <div class="metrics-strip mb-4">
         <div class="metric-cell">
-            <div class="metric-label">Totale soci</div>
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-people"></i></span>
+                <span class="metric-label">Totale soci</span>
+            </div>
             <div class="metric-value">{{ $stats['total_soci'] }}</div>
         </div>
-        <div class="metric-cell">
-            <div class="metric-label">Soci attivi</div>
+        <div class="metric-cell metric-ok">
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-person-check"></i></span>
+                <span class="metric-label">Soci attivi</span>
+            </div>
             <div class="metric-value">{{ $stats['soci_attivi'] }}</div>
         </div>
         <div class="metric-cell {{ $stats['scadenze_imminenti'] > 0 ? 'metric-warn' : '' }}">
-            <div class="metric-label">Scadenze 30 giorni</div>
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-hourglass-split"></i></span>
+                <span class="metric-label">Scadenze 30 giorni</span>
+            </div>
             <div class="metric-value">{{ $stats['scadenze_imminenti'] }}</div>
         </div>
         <div class="metric-cell">
-            <div class="metric-label">Eventi questo mese</div>
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-calendar-event"></i></span>
+                <span class="metric-label">Eventi questo mese</span>
+            </div>
             <div class="metric-value">{{ $stats['eventi_mese'] }}</div>
         </div>
         <div class="metric-cell">
-            <div class="metric-label">Quote pagate</div>
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-credit-card"></i></span>
+                <span class="metric-label">Quote pagate</span>
+            </div>
             <div class="metric-value">{{ $stats['quote_pagate'] }}<span class="metric-hint">{{ now()->year }}</span></div>
         </div>
     </div>

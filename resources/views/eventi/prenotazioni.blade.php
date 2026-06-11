@@ -8,6 +8,7 @@
     $badgeStato = [
         Prenotazione::STATO_CONFERMATA => ['bg-success', 'Confermata'],
         Prenotazione::STATO_IN_ATTESA_PAGAMENTO => ['bg-warning text-dark', 'In attesa di pagamento'],
+        Prenotazione::STATO_IN_APPROVAZIONE => ['bg-primary', 'In approvazione'],
         Prenotazione::STATO_LISTA_ATTESA => ['bg-info text-dark', "Lista d'attesa"],
         Prenotazione::STATO_ANNULLATA => ['bg-secondary', 'Annullata'],
         Prenotazione::STATO_SCADUTA => ['bg-dark', 'Scaduta'],
@@ -55,7 +56,12 @@
                 <span class="metric-chip"><i class="bi bi-hourglass-split"></i></span>
                 <span class="metric-label">Posti riservati</span>
             </div>
-            <div class="metric-value">{{ $conteggi['posti_riservati'] }}<span class="metric-hint">{{ $conteggi['numero_riservate'] }} pren.</span></div>
+            <div class="metric-value">
+                {{ $conteggi['posti_riservati'] }}<span class="metric-hint">{{ $conteggi['numero_riservate'] }} pren.</span>
+                @if ($conteggi['numero_da_approvare'] > 0)
+                    <span class="metric-hint text-primary" title="Prenotazioni in attesa della tua approvazione">{{ $conteggi['numero_da_approvare'] }} da approvare</span>
+                @endif
+            </div>
         </div>
         <div class="metric-cell">
             <div class="metric-head">
@@ -150,6 +156,10 @@
                                             <div class="text-warning small">
                                                 <i class="bi bi-clock me-1"></i>entro {{ $prenotazione->scadenza_pagamento_at?->format('d/m/Y H:i') }}
                                             </div>
+                                        @elseif ($prenotazione->stato === Prenotazione::STATO_IN_APPROVAZIONE)
+                                            <div class="text-primary small">
+                                                <i class="bi bi-hourglass me-1"></i>dopo l'approvazione
+                                            </div>
                                         @else
                                             <div class="text-muted small">Non pagata</div>
                                         @endif
@@ -169,6 +179,22 @@
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm" role="group">
+                                        @if ($prenotazione->stato === Prenotazione::STATO_IN_APPROVAZIONE)
+                                            <form method="POST" action="{{ route('eventi.prenotazioni.approva', [$evento, $prenotazione->id]) }}" class="d-inline"
+                                                  onsubmit="return confirm('Approvare la prenotazione {{ $prenotazione->codice }}?{{ (float) $prenotazione->importo_totale > 0 ? ' L\'utente avrà 30 minuti per pagare.' : '' }}');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-outline-success" title="Approva prenotazione">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <button type="button" class="btn btn-outline-danger btn-rifiuta-prenotazione"
+                                                    data-bs-toggle="modal" data-bs-target="#modalRifiutaPrenotazione"
+                                                    data-action="{{ route('eventi.prenotazioni.rifiuta', [$evento, $prenotazione->id]) }}"
+                                                    data-codice="{{ $prenotazione->codice }}"
+                                                    title="Rifiuta prenotazione (motivo obbligatorio)">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        @endif
                                         @if (in_array($prenotazione->stato, [Prenotazione::STATO_IN_ATTESA_PAGAMENTO, Prenotazione::STATO_SCADUTA], true) && $prenotazione->pagata_at === null && (float) $prenotazione->importo_totale > 0)
                                             <form method="POST" action="{{ route('eventi.prenotazioni.conferma-pagamento', [$evento, $prenotazione->id]) }}" class="d-inline"
                                                   onsubmit="return confirm('Registrare il pagamento offline e confermare la prenotazione {{ $prenotazione->codice }}?');">
@@ -220,4 +246,49 @@
             </div>
         @endif
     </div>
+
+    {{-- ── Modale: rifiuto prenotazione in approvazione (motivo obbligatorio) ── --}}
+    <div class="modal fade" id="modalRifiutaPrenotazione" tabindex="-1" aria-labelledby="modalRifiutaPrenotazioneLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="POST" action="#" class="modal-content" id="formRifiutaPrenotazione">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalRifiutaPrenotazioneLabel">
+                        <i class="bi bi-x-circle me-1"></i>Rifiuta prenotazione <span id="rifiutaCodice" class="font-monospace"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        La prenotazione viene annullata e i posti liberati promuovono la lista d'attesa.
+                        Il motivo viene comunicato al richiedente via email.
+                    </p>
+                    <div class="mb-2">
+                        <label for="motivo_rifiuto_prenotazione" class="form-label">Motivo del rifiuto <span class="text-danger">*</span></label>
+                        <textarea class="form-control @error('motivo') is-invalid @enderror" id="motivo_rifiuto_prenotazione"
+                                  name="motivo" rows="3" maxlength="500" required>{{ old('motivo') }}</textarea>
+                        @error('motivo')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-x-lg me-1"></i>Rifiuta</button>
+                </div>
+            </form>
+        </div>
+    </div>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // La modale di rifiuto è condivisa tra le righe: il bottone imposta action e codice
+            document.querySelectorAll('.btn-rifiuta-prenotazione').forEach(function (bottone) {
+                bottone.addEventListener('click', function () {
+                    document.getElementById('formRifiutaPrenotazione').setAttribute('action', bottone.dataset.action);
+                    document.getElementById('rifiutaCodice').textContent = bottone.dataset.codice;
+                });
+            });
+        });
+    </script>
+@endpush

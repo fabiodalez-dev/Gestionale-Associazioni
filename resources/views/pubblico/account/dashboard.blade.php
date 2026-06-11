@@ -64,6 +64,30 @@
                         <a href="{{ route('pubblico.account.tessera', $associazione->slug) }}" class="btn btn-sm btn-primary">
                             Tessera &amp; quote
                         </a>
+                    @elseif ($richiestaIscrizione !== null && $richiestaIscrizione->isInAttesa())
+                        <p class="mb-2"><span class="badge text-bg-info">Richiesta in attesa</span></p>
+                        <p class="text-muted small mb-2">
+                            Hai inviato la richiesta di iscrizione il
+                            {{ $richiestaIscrizione->created_at->format('d/m/Y') }}:
+                            l'associazione la sta valutando.
+                        </p>
+                        <a href="{{ route('pubblico.iscriviti', $associazione->slug) }}" class="btn btn-sm btn-outline-secondary">
+                            Stato della richiesta
+                        </a>
+                    @elseif ($richiestaIscrizione !== null && $richiestaIscrizione->isRifiutata())
+                        <p class="mb-2"><span class="badge text-bg-danger">Richiesta rifiutata</span></p>
+                        @if ($richiestaIscrizione->motivo_rifiuto)
+                            <p class="text-muted small mb-2">Motivo: {{ $richiestaIscrizione->motivo_rifiuto }}</p>
+                        @endif
+                        <a href="{{ route('pubblico.iscriviti', $associazione->slug) }}" class="btn btn-sm btn-primary">
+                            Invia una nuova richiesta
+                        </a>
+                    @elseif ($richiestaIscrizione !== null && $richiestaIscrizione->isApprovata())
+                        <p class="mb-2"><span class="badge text-bg-success">Richiesta approvata</span></p>
+                        <p class="text-muted small mb-0">
+                            La tua iscrizione è stata approvata: l'associazione sta
+                            completando il collegamento della tua scheda socio.
+                        </p>
                     @elseif ($account->richiesta_socio_at !== null)
                         <p class="mb-2"><span class="badge text-bg-info">Richiesta inviata</span></p>
                         <p class="text-muted small mb-0">
@@ -73,7 +97,7 @@
                         </p>
                     @else
                         <p class="text-muted small mb-2">Vuoi far parte di {{ $associazione->nome }}?</p>
-                        <a href="{{ route('pubblico.account.diventa-socio', $associazione->slug) }}" class="btn btn-sm btn-primary">
+                        <a href="{{ route('pubblico.iscriviti', $associazione->slug) }}" class="btn btn-sm btn-primary">
                             Diventa socio
                         </a>
                     @endif

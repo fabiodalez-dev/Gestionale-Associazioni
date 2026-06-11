@@ -66,6 +66,21 @@
                         Soci
                     </a>
                 </li>
+                @php
+                    // Richieste di iscrizione dal form pubblico in attesa di esito
+                    $richiesteIscrizionePendenti = \Illuminate\Support\Facades\Route::has('richieste-iscrizione.index')
+                        ? \App\Models\RichiestaIscrizione::query()->inAttesa()->count()
+                        : 0;
+                @endphp
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('richieste-iscrizione.*') ? 'active' : '' }}" href="{{ $nav('richieste-iscrizione.index') }}">
+                        <i class="bi bi-person-plus me-2"></i>
+                        Richieste iscrizione
+                        @if ($richiesteIscrizionePendenti > 0)
+                            <span class="badge bg-warning text-dark ms-1" title="Richieste di iscrizione da approvare">{{ $richiesteIscrizionePendenti }}</span>
+                        @endif
+                    </a>
+                </li>
                 @endif
                 @if ($can('tessere.view'))
                 <li class="nav-item">

@@ -4,6 +4,7 @@ use App\Http\Controllers\Struttura\AmministratoreController;
 use App\Http\Controllers\Struttura\AssociazioneController;
 use App\Http\Controllers\Struttura\ConfigurazioniController;
 use App\Http\Controllers\Struttura\InvitoController;
+use App\Http\Controllers\Struttura\ModuloIscrizioneController;
 use App\Http\Controllers\Struttura\PreiscrizioneController;
 use App\Http\Controllers\Struttura\PrivacyPolicyController;
 use App\Http\Controllers\Struttura\SedeController;
@@ -76,6 +77,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/configurazioni/campi-obbligatori', [ConfigurazioniController::class, 'updateCampiObbligatori'])->name('configurazioni.campi-obbligatori');
         Route::post('/configurazioni/tessera-template', [ConfigurazioniController::class, 'saveTesseraTemplate'])->name('configurazioni.tessera-template');
         Route::post('/configurazioni/pagamenti', [ConfigurazioniController::class, 'updatePaymentGateway'])->name('configurazioni.pagamenti');
+
+        // Modulo di iscrizione socio (PIANO-ISCRIZIONI §Rotte/Admin):
+        // pagina dedicata linkata dalle Configurazioni, policy struttura.view/update
+        Route::get('/configurazioni/modulo-iscrizione', [ModuloIscrizioneController::class, 'edit'])->name('configurazioni.modulo-iscrizione');
+        Route::post('/configurazioni/modulo-iscrizione', [ModuloIscrizioneController::class, 'update'])->name('configurazioni.modulo-iscrizione.salva');
 
         // Sedi (CRUD dentro configurazioni — spec §2.2)
         Route::post('/configurazioni/sedi', [SedeController::class, 'save'])->name('sedi.save');

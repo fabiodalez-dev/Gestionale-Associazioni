@@ -16,6 +16,23 @@
         <div class="alert alert-danger" role="alert">{{ $errors->first('annulla') }}</div>
     @endif
 
+    @if ($prenotazione->stato === \App\Models\Prenotazione::STATO_IN_APPROVAZIONE)
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-person-check me-1"></i>
+            Questa richiesta è <strong>in attesa di approvazione</strong> da parte dell'associazione:
+            i tuoi posti sono riservati e riceverai un'email con l'esito.
+            @if ((float) $prenotazione->importo_totale > 0)
+                Il pagamento ti sarà richiesto solo dopo l'approvazione.
+            @endif
+        </div>
+    @elseif (filled($prenotazione->motivo_rifiuto))
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-x-circle me-1"></i>
+            La richiesta non è stata approvata dall'associazione.
+            <strong>Motivo:</strong> {{ $prenotazione->motivo_rifiuto }}
+        </div>
+    @endif
+
     <div class="row g-4">
         <div class="col-12 col-lg-7">
             <div class="card h-100">

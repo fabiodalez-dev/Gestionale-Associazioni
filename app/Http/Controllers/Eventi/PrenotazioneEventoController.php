@@ -134,6 +134,73 @@ class PrenotazioneEventoController extends Controller
     }
 
     /**
+     * Approvazione di una prenotazione 'in_approvazione' (eventi con
+     * richiede_approvazione): gratuito → confermata, a pagamento →
+     * in_attesa_pagamento con la finestra dei 30 minuti. Tutto nel
+     * mutex per-evento del service.
+     */
+    public function approvaPrenotazione(Request $request, Evento $evento, string $prenotazione): RedirectResponse
+    {
+        $this->authorize('update', $evento);
+
+        /** @var Prenotazione $record */
+        $record = $evento->prenotazioni()->findOrFail($prenotazione);
+
+        /** @var Utente $utente */
+        $utente = $request->user();
+
+        try {
+            $record = $this->prenotazioni->approva($record, $utente);
+        } catch (PrenotazioneException $e) {
+            return redirect()
+                ->route('eventi.prenotazioni.index', $evento)
+                ->with('error', $e->getMessage());
+        }
+
+        $messaggio = $record->stato === Prenotazione::STATO_CONFERMATA
+            ? "Prenotazione {$record->codice} approvata e confermata."
+            : "Prenotazione {$record->codice} approvata: l'utente ha 30 minuti per completare il pagamento.";
+
+        return redirect()
+            ->route('eventi.prenotazioni.index', $evento)
+            ->with('success', $messaggio);
+    }
+
+    /**
+     * Rifiuto di una prenotazione 'in_approvazione' con motivo obbligatorio
+     * (comunicato all'account): la prenotazione viene annullata e i posti
+     * rilasciati promuovono la lista d'attesa.
+     */
+    public function rifiutaPrenotazione(Request $request, Evento $evento, string $prenotazione): RedirectResponse
+    {
+        $this->authorize('update', $evento);
+
+        $validated = $request->validate([
+            'motivo' => ['required', 'string', 'max:500'],
+        ], [
+            'motivo.required' => 'Il motivo del rifiuto è obbligatorio: viene comunicato al richiedente.',
+        ]);
+
+        /** @var Prenotazione $record */
+        $record = $evento->prenotazioni()->findOrFail($prenotazione);
+
+        /** @var Utente $utente */
+        $utente = $request->user();
+
+        try {
+            $this->prenotazioni->rifiuta($record, $utente, $validated['motivo']);
+        } catch (PrenotazioneException $e) {
+            return redirect()
+                ->route('eventi.prenotazioni.index', $evento)
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('eventi.prenotazioni.index', $evento)
+            ->with('success', "Prenotazione {$record->codice} rifiutata: i posti liberati promuovono la lista d'attesa.");
+    }
+
+    /**
      * Promozione manuale della lista d'attesa (FIFO stretto, stesso
      * algoritmo dello scheduler): utile dopo un aumento di capienza.
      */
@@ -269,11 +336,15 @@ class PrenotazioneEventoController extends Controller
 
         return [
             'posti_confermati' => (int) ($posti[Prenotazione::STATO_CONFERMATA]->posti ?? 0),
-            'posti_riservati' => (int) ($posti[Prenotazione::STATO_IN_ATTESA_PAGAMENTO]->posti ?? 0),
+            // Riservati = in attesa di pagamento + in approvazione (entrambi consumano posti)
+            'posti_riservati' => (int) ($posti[Prenotazione::STATO_IN_ATTESA_PAGAMENTO]->posti ?? 0)
+                + (int) ($posti[Prenotazione::STATO_IN_APPROVAZIONE]->posti ?? 0),
             'posti_in_coda' => (int) ($posti[Prenotazione::STATO_LISTA_ATTESA]->posti ?? 0),
             'numero_confermate' => (int) ($posti[Prenotazione::STATO_CONFERMATA]->numero ?? 0),
-            'numero_riservate' => (int) ($posti[Prenotazione::STATO_IN_ATTESA_PAGAMENTO]->numero ?? 0),
+            'numero_riservate' => (int) ($posti[Prenotazione::STATO_IN_ATTESA_PAGAMENTO]->numero ?? 0)
+                + (int) ($posti[Prenotazione::STATO_IN_APPROVAZIONE]->numero ?? 0),
             'numero_in_coda' => (int) ($posti[Prenotazione::STATO_LISTA_ATTESA]->numero ?? 0),
+            'numero_da_approvare' => (int) ($posti[Prenotazione::STATO_IN_APPROVAZIONE]->numero ?? 0),
             'capienza' => $evento->capienza,
         ];
     }

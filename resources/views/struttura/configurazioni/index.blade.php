@@ -39,6 +39,7 @@
             <div class="card-header">Altre configurazioni</div>
             <div class="list-group list-group-flush">
                 @php $nav = fn (string $name, array $params = []) => \Illuminate\Support\Facades\Route::has($name) ? route($name, $params) : '#'; @endphp
+                <a class="list-group-item list-group-item-action" href="{{ $nav('configurazioni.modulo-iscrizione') }}">Modulo di iscrizione</a>
                 <a class="list-group-item list-group-item-action" href="{{ $nav('tipi-socio.index') }}">Tipi Socio</a>
                 <a class="list-group-item list-group-item-action" href="{{ $nav('categorie-socio.index') }}">Categorie Socio</a>
                 <a class="list-group-item list-group-item-action" href="{{ $nav('amministratori.index') }}">Amministratori</a>

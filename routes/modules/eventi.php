@@ -54,6 +54,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->name('eventi.prenotazioni.promuovi');
     Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/conferma-pagamento', [PrenotazioneEventoController::class, 'confermaPagamento'])
         ->name('eventi.prenotazioni.conferma-pagamento');
+    Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/approva', [PrenotazioneEventoController::class, 'approvaPrenotazione'])
+        ->name('eventi.prenotazioni.approva');
+    Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/rifiuta', [PrenotazioneEventoController::class, 'rifiutaPrenotazione'])
+        ->name('eventi.prenotazioni.rifiuta');
     Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/annulla', [PrenotazioneEventoController::class, 'annulla'])
         ->name('eventi.prenotazioni.annulla');
     Route::post('/eventi/{evento}/prenotazioni/{prenotazione}/reinvia-biglietto', [PrenotazioneEventoController::class, 'reinviaBiglietto'])

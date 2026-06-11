@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\Prenotazione;
+use App\Models\RichiestaIscrizione;
 use App\Services\Prenotazioni\BigliettoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -13,7 +14,8 @@ use Illuminate\Http\Request;
 /**
  * Dashboard dell'area riservata account (/a/{slug}/account):
  * prossime prenotazioni con QR rapido (confermate) e stato della
- * richiesta "diventa socio".
+ * richiesta di iscrizione socio (in attesa / approvata / rifiutata
+ * con motivo, con link al form /iscriviti).
  */
 class DashboardAccountController extends Controller
 {
@@ -44,11 +46,19 @@ class DashboardAccountController extends Controller
             ->filter(fn (Prenotazione $p) => $p->stato === Prenotazione::STATO_CONFERMATA)
             ->mapWithKeys(fn (Prenotazione $p) => [$p->id => $this->biglietti->qrDataUri($p)]);
 
+        // Ultima richiesta di iscrizione dal form /iscriviti (card socio)
+        $richiestaIscrizione = RichiestaIscrizione::query()
+            ->forAssociazione($associazione->id)
+            ->where('account_id', $account->id)
+            ->latest()
+            ->first();
+
         return view('pubblico.account.dashboard', [
             'associazione' => $associazione,
             'account' => $account,
             'prossime' => $prossime,
             'qrRapidi' => $qrRapidi,
+            'richiestaIscrizione' => $richiestaIscrizione,
         ]);
     }
 }

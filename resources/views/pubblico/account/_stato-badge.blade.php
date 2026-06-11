@@ -7,6 +7,9 @@
     @case(\App\Models\Prenotazione::STATO_IN_ATTESA_PAGAMENTO)
         <span class="badge text-bg-warning">In attesa di pagamento</span>
         @break
+    @case(\App\Models\Prenotazione::STATO_IN_APPROVAZIONE)
+        <span class="badge text-bg-primary">In attesa di approvazione</span>
+        @break
     @case(\App\Models\Prenotazione::STATO_LISTA_ATTESA)
         <span class="badge text-bg-info">Lista d'attesa</span>
         @break

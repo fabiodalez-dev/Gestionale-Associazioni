@@ -125,5 +125,101 @@ export async function prenota(page: Page, eventoId: string, posti = 1): Promise<
     if (await selettore.isVisible().catch(() => false)) {
         await selettore.selectOption(String(posti));
     }
-    await page.getByRole('button', { name: /prenota|lista d'attesa/i }).click();
+    await page.getByRole('button', { name: /prenota|lista d'attesa|richiedi la prenotazione/i }).click();
+}
+
+export const SOCIO_PASSWORD = 'SocioE2e!2026';
+
+export type SocioConTessera = {
+    socio_id: string;
+    numero_socio: string;
+    tessera_id: string | null;
+    numero_tessera: string | null;
+    quota_id: string | null;
+};
+
+/**
+ * Crea via fixture un socio 'Attivo' del tenant e2e con tessera dell'anno
+ * (o scaduta / senza tessera / con quota da pagare, a seconda delle opzioni).
+ */
+export function creaSocioConTessera(
+    email: string,
+    opzioni: { password?: string; scaduta?: number; 'senza-tessera'?: number; 'con-quota'?: number } = {},
+): SocioConTessera {
+    return fixture<SocioConTessera>('crea-socio-con-tessera', { email, ...opzioni });
+}
+
+/** Login del socio nell'area soci (guard 'socio', separata da admin/account). */
+export async function loginSocio(page: Page, email: string, password: string = SOCIO_PASSWORD): Promise<void> {
+    await page.goto('/area-soci/login');
+    await page.locator('#email').fill(email);
+    await page.locator('#password').fill(password);
+    await page.locator('#pane-login .btn-login').click();
+    await expect(page).toHaveURL(/area-soci\/?$/);
+}
+
+/**
+ * Configura il modulo di iscrizione del tenant e2e. Le opzioni omesse
+ * RIPRISTINANO il default (iscrizioni aperte, preiscrizione, config null):
+ * chiamarla senza argomenti riporta il tenant allo stato pulito.
+ */
+export function configuraFormIscrizione(
+    opzioni: { aperte?: number; modalita?: 'preiscrizione' | 'diretta'; intro?: string; config?: string } = {},
+): void {
+    fixture('configura-form-iscrizione', opzioni);
+}
+
+export type StatoRichiesta = {
+    stato: string;
+    motivo_rifiuto: string | null;
+    socio_stato: string | null;
+    numero_socio: string | null;
+    account_socio_id: string | null;
+};
+
+/** Ultima richiesta di iscrizione dell'account (via fixture). */
+export function statoRichiesta(email: string): StatoRichiesta {
+    return fixture<StatoRichiesta>('stato-richiesta', { email });
+}
+
+/**
+ * POST JSON autenticato dalla sessione corrente della pagina (cookie
+ * condivisi con page.request) con il token CSRF letto dal cookie
+ * XSRF-TOKEN di Laravel. Usato per gli endpoint scanner/check-in admin.
+ */
+export async function postJsonConCsrf(
+    page: Page,
+    url: string,
+    payload: Record<string, unknown>,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+    const cookies = await page.context().cookies();
+    const xsrf = cookies.find((c) => c.name === 'XSRF-TOKEN');
+    if (!xsrf) {
+        throw new Error('Cookie XSRF-TOKEN assente: serve una pagina già visitata nella sessione.');
+    }
+
+    const risposta = await page.request.post(url, {
+        headers: {
+            'X-XSRF-TOKEN': decodeURIComponent(xsrf.value),
+            Accept: 'application/json',
+        },
+        data: payload,
+    });
+
+    return { status: risposta.status(), body: (await risposta.json()) as Record<string, unknown> };
+}
+
+/**
+ * Compila e invia il form pubblico di iscrizione socio (/a/e2e/iscriviti).
+ * Compila solo i campi passati: gli altri restano vuoti.
+ */
+export async function inviaIscrizione(
+    page: Page,
+    campi: Partial<Record<'telefono' | 'codice_fiscale' | 'data_nascita' | 'citta', string>> = {},
+): Promise<void> {
+    await page.goto(`/a/${SLUG}/iscriviti`);
+    for (const [campo, valore] of Object.entries(campi)) {
+        await page.locator(`#campo-${campo}`).fill(valore);
+    }
+    await page.getByRole('button', { name: /invia la richiesta di iscrizione/i }).click();
 }

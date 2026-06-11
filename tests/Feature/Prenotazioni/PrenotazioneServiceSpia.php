@@ -55,6 +55,21 @@ class PrenotazioneServiceSpia extends PrenotazioneService
         $this->registra('promemoria', $prenotazione);
     }
 
+    protected function notificaInApprovazione(Prenotazione $prenotazione): void
+    {
+        $this->registra('in_approvazione', $prenotazione);
+    }
+
+    protected function notificaRifiutata(Prenotazione $prenotazione): void
+    {
+        $this->registra('rifiutata', $prenotazione);
+    }
+
+    protected function notificaDaApprovare(Prenotazione $prenotazione): void
+    {
+        $this->registra('da_approvare', $prenotazione);
+    }
+
     /**
      * @return list<string> i tipi di notifica inviati, in ordine
      */

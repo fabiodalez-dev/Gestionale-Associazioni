@@ -91,6 +91,19 @@
                         <p class="text-muted small mb-0">Riceverai via email il link per completare il pagamento.</p>
                     @endif
                 </div>
+            @elseif ($prenotazione->stato === \App\Models\Prenotazione::STATO_IN_APPROVAZIONE)
+                <div class="text-center py-3">
+                    <i class="bi bi-person-check text-primary" style="font-size: 4rem;"></i>
+                    <h2 class="h5 mt-3">Richiesta in attesa di approvazione</h2>
+                    <div class="codice-prenotazione my-2">{{ $prenotazione->codice }}</div>
+                    <p class="text-muted mb-0">
+                        Questo evento richiede l'approvazione dell'associazione:
+                        i tuoi posti sono riservati e riceverai un'email con l'esito.
+                        @if ((float) $prenotazione->importo_totale > 0)
+                            Se la richiesta verrà approvata ti invieremo il link per completare il pagamento.
+                        @endif
+                    </p>
+                </div>
             @elseif ($prenotazione->stato === \App\Models\Prenotazione::STATO_LISTA_ATTESA)
                 <div class="text-center py-3">
                     <i class="bi bi-people-fill text-primary" style="font-size: 4rem;"></i>
@@ -115,9 +128,17 @@
             @else
                 <div class="text-center py-3">
                     <i class="bi bi-x-circle text-secondary" style="font-size: 4rem;"></i>
-                    <h2 class="h5 mt-3">Prenotazione annullata</h2>
-                    @if ($prenotazione->annullata_at !== null)
-                        <p class="text-muted mb-0">Annullata il {{ $prenotazione->annullata_at->format('d/m/Y H:i') }}.</p>
+                    @if (filled($prenotazione->motivo_rifiuto))
+                        <h2 class="h5 mt-3">Richiesta non approvata</h2>
+                        <p class="text-muted mb-0">
+                            L'associazione non ha approvato la tua richiesta.<br>
+                            Motivo: {{ $prenotazione->motivo_rifiuto }}
+                        </p>
+                    @else
+                        <h2 class="h5 mt-3">Prenotazione annullata</h2>
+                        @if ($prenotazione->annullata_at !== null)
+                            <p class="text-muted mb-0">Annullata il {{ $prenotazione->annullata_at->format('d/m/Y H:i') }}.</p>
+                        @endif
                     @endif
                 </div>
             @endif

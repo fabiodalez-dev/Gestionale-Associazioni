@@ -13,6 +13,7 @@
            class="btn btn-sm {{ $statoFiltro === null ? 'btn-primary' : 'btn-outline-secondary' }}">Tutte</a>
         @foreach ([
             \App\Models\Prenotazione::STATO_CONFERMATA => 'Confermate',
+            \App\Models\Prenotazione::STATO_IN_APPROVAZIONE => 'In approvazione',
             \App\Models\Prenotazione::STATO_IN_ATTESA_PAGAMENTO => 'In attesa di pagamento',
             \App\Models\Prenotazione::STATO_LISTA_ATTESA => 'Lista d\'attesa',
             \App\Models\Prenotazione::STATO_ANNULLATA => 'Annullate',

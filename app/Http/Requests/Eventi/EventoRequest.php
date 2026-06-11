@@ -52,6 +52,12 @@ class EventoRequest extends FormRequest
             'lista_attesa_attiva' => $this->has('lista_attesa_attiva')
                 ? $this->boolean('lista_attesa_attiva')
                 : ($evento->lista_attesa_attiva ?? true),
+            'iscrizioni_aperte' => $this->has('iscrizioni_aperte')
+                ? $this->boolean('iscrizioni_aperte')
+                : ($evento->iscrizioni_aperte ?? true),
+            'richiede_approvazione' => $this->has('richiede_approvazione')
+                ? $this->boolean('richiede_approvazione')
+                : ($evento->richiede_approvazione ?? false),
         ]);
     }
 
@@ -75,6 +81,8 @@ class EventoRequest extends FormRequest
             'iscrizioni_al' => ['nullable', 'date'],
             'max_posti_per_prenotazione' => ['required', 'integer', 'min:1', 'max:255'],
             'lista_attesa_attiva' => ['required', 'boolean'],
+            'iscrizioni_aperte' => ['required', 'boolean'],
+            'richiede_approvazione' => ['required', 'boolean'],
             'annullamento_entro_ore' => ['required', 'integer', 'min:0', 'max:65535'],
             'immagine_url' => ['nullable', 'string', 'url:http,https', 'max:2048'],
         ];
@@ -153,6 +161,8 @@ class EventoRequest extends FormRequest
             'iscrizioni_al' => 'chiusura iscrizioni',
             'max_posti_per_prenotazione' => 'posti massimi per prenotazione',
             'lista_attesa_attiva' => 'lista d\'attesa',
+            'iscrizioni_aperte' => 'iscrizioni aperte',
+            'richiede_approvazione' => 'approvazione richiesta',
             'annullamento_entro_ore' => 'annullamento entro (ore)',
             'immagine_url' => 'immagine (URL)',
         ];

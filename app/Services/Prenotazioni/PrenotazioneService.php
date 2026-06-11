@@ -8,12 +8,15 @@ use App\Models\Prenotazione;
 use App\Models\Utente;
 use App\Notifications\Prenotazioni\AnnullataNotification;
 use App\Notifications\Prenotazioni\ConfermataNotification;
+use App\Notifications\Prenotazioni\DaApprovareNotification;
 use App\Notifications\Prenotazioni\EventoEsauritoNotification;
+use App\Notifications\Prenotazioni\InApprovazioneNotification;
 use App\Notifications\Prenotazioni\InAttesaPagamentoNotification;
 use App\Notifications\Prenotazioni\InListaAttesaNotification;
 use App\Notifications\Prenotazioni\PagamentoScadutoNotification;
 use App\Notifications\Prenotazioni\PromemoriaEventoNotification;
 use App\Notifications\Prenotazioni\PromozioneListaAttesaNotification;
+use App\Notifications\Prenotazioni\RifiutataNotification;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use Illuminate\Notifications\Notification as NotificationMessage;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +26,13 @@ use Illuminate\Support\Facades\Notification;
 /**
  * Macchina a stati delle prenotazioni eventi (docs/PIANO-PRENOTAZIONI.md).
  *
- * Stati: in_attesa_pagamento · confermata · lista_attesa · annullata · scaduta.
+ * Stati: in_approvazione · in_attesa_pagamento · confermata · lista_attesa
+ * · annullata · scaduta.
+ *
+ * Eventi con richiede_approvazione (docs/PIANO-ISCRIZIONI.md): la creazione
+ * (e la promozione dalla lista d'attesa) produce 'in_approvazione' — posti
+ * riservati, NESSUNA scadenza — e il flusso di pagamento parte solo dopo
+ * approva(); rifiuta() annulla con motivo e promuove la lista d'attesa.
  *
  * Concorrenza (regola unica del piano): ogni operazione che consuma o
  * rilascia posti gira in DB::transaction acquisendo PRIMA lockForUpdate()
@@ -101,6 +110,7 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
                 ->whereIn('stato', [
                     Prenotazione::STATO_CONFERMATA,
                     Prenotazione::STATO_IN_ATTESA_PAGAMENTO,
+                    Prenotazione::STATO_IN_APPROVAZIONE,
                     Prenotazione::STATO_LISTA_ATTESA,
                 ])
                 ->exists();
@@ -113,12 +123,19 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
             $disponibili = $this->postiDisponibiliLocked($evento);
 
             if ($disponibili === null || $posti <= $disponibili) {
-                $stato = $aPagamento
-                    ? Prenotazione::STATO_IN_ATTESA_PAGAMENTO
-                    : Prenotazione::STATO_CONFERMATA;
-                $scadenzaPagamento = $aPagamento
-                    ? now()->addMinutes(self::MINUTI_FINESTRA_PAGAMENTO)
-                    : null;
+                if ($evento->richiede_approvazione) {
+                    // Posti riservati, NESSUNA scadenza: l'eventuale pagamento
+                    // parte solo dopo l'approvazione dell'admin
+                    $stato = Prenotazione::STATO_IN_APPROVAZIONE;
+                    $scadenzaPagamento = null;
+                } else {
+                    $stato = $aPagamento
+                        ? Prenotazione::STATO_IN_ATTESA_PAGAMENTO
+                        : Prenotazione::STATO_CONFERMATA;
+                    $scadenzaPagamento = $aPagamento
+                        ? now()->addMinutes(self::MINUTI_FINESTRA_PAGAMENTO)
+                        : null;
+                }
             } elseif ($evento->lista_attesa_attiva) {
                 $stato = Prenotazione::STATO_LISTA_ATTESA;
                 $scadenzaPagamento = null;
@@ -145,8 +162,14 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
             $this->accodaNotifica(match ($stato) {
                 Prenotazione::STATO_CONFERMATA => 'notificaConfermata',
                 Prenotazione::STATO_IN_ATTESA_PAGAMENTO => 'notificaInAttesaPagamento',
+                Prenotazione::STATO_IN_APPROVAZIONE => 'notificaInApprovazione',
                 default => 'notificaInListaAttesa',
             }, $prenotazione);
+
+            // Richiesta da approvare: avviso anche agli admin del tenant
+            if ($stato === Prenotazione::STATO_IN_APPROVAZIONE) {
+                $this->accodaNotifica('notificaDaApprovare', $prenotazione);
+            }
 
             // L'evento ha appena raggiunto la capienza (questa prenotazione
             // ha consumato esattamente gli ultimi posti): avviso agli admin
@@ -160,6 +183,127 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
         $this->inviaNotifichePendenti();
 
         return $prenotazione;
+    }
+
+    // ------------------------------------------------------------------
+    // Approvazione admin (eventi con richiede_approvazione)
+    // ------------------------------------------------------------------
+
+    /**
+     * Approva una prenotazione 'in_approvazione' (azione admin).
+     *
+     * Esiti (decisi DENTRO il mutex per-evento):
+     * - evento gratuito → confermata;
+     * - evento a pagamento → in_attesa_pagamento con la finestra standard
+     *   di 30 minuti (il flusso di pagamento parte ORA, non alla creazione).
+     *
+     * I posti erano già riservati dall'in_approvazione: nessun nuovo
+     * consumo, nessuna promozione.
+     *
+     * @throws PrenotazioneException
+     */
+    public function approva(Prenotazione $prenotazione, Utente $utente): Prenotazione
+    {
+        $this->verificaTenantAttore($prenotazione, $utente);
+
+        $risultato = DB::transaction(function () use ($prenotazione, $utente): Prenotazione {
+            // Ordine di lock unico: evento, poi prenotazione
+            $this->lockEvento($prenotazione->evento_id);
+
+            $prenotazione = Prenotazione::query()
+                ->withoutGlobalScope('associazione')
+                ->whereKey($prenotazione->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($prenotazione->stato !== Prenotazione::STATO_IN_APPROVAZIONE) {
+                throw PrenotazioneException::nonInApprovazione();
+            }
+
+            $aPagamento = (float) $prenotazione->importo_totale > 0;
+
+            $prenotazione->forceFill([
+                'stato' => $aPagamento
+                    ? Prenotazione::STATO_IN_ATTESA_PAGAMENTO
+                    : Prenotazione::STATO_CONFERMATA,
+                'scadenza_pagamento_at' => $aPagamento
+                    ? now()->addMinutes(self::MINUTI_FINESTRA_PAGAMENTO)
+                    : null,
+                'approvata_at' => now(),
+                'approvata_da' => $utente->id,
+            ])->save();
+
+            $this->accodaNotifica(
+                $aPagamento ? 'notificaInAttesaPagamento' : 'notificaConfermata',
+                $prenotazione
+            );
+
+            return $prenotazione;
+        });
+
+        $this->inviaNotifichePendenti();
+
+        return $risultato;
+    }
+
+    /**
+     * Rifiuta una prenotazione 'in_approvazione' (azione admin, motivo
+     * obbligatorio): passa ad annullata e i posti rilasciati promuovono
+     * la lista d'attesa (FIFO stretto) nella stessa transazione/lock.
+     *
+     * @throws PrenotazioneException
+     */
+    public function rifiuta(Prenotazione $prenotazione, Utente $utente, string $motivo): Prenotazione
+    {
+        $this->verificaTenantAttore($prenotazione, $utente);
+
+        $risultato = DB::transaction(function () use ($prenotazione, $motivo): Prenotazione {
+            // Lock SEMPRE prima sull'evento (ordine unico anti-deadlock)...
+            $evento = $this->lockEvento($prenotazione->evento_id);
+
+            // ...poi rilettura della prenotazione sotto lock (stato fresco)
+            $prenotazione = Prenotazione::query()
+                ->withoutGlobalScope('associazione')
+                ->whereKey($prenotazione->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($prenotazione->stato !== Prenotazione::STATO_IN_APPROVAZIONE) {
+                throw PrenotazioneException::nonInApprovazione();
+            }
+
+            $prenotazione->forceFill([
+                'stato' => Prenotazione::STATO_ANNULLATA,
+                'motivo_rifiuto' => $motivo,
+                'annullata_at' => now(),
+                'motivo_annullamento' => 'Richiesta non approvata: '.$motivo,
+            ])->save();
+
+            $this->accodaNotifica('notificaRifiutata', $prenotazione);
+
+            // L'in_approvazione consumava posti: il rilascio promuove la coda
+            $this->promuovi($evento);
+
+            return $prenotazione;
+        });
+
+        $this->inviaNotifichePendenti();
+
+        return $risultato;
+    }
+
+    /**
+     * L'admin può operare solo sulle prenotazioni del proprio tenant
+     * (il super_admin, senza associazione, su tutte).
+     *
+     * @throws PrenotazioneException
+     */
+    protected function verificaTenantAttore(Prenotazione $prenotazione, Utente $utente): void
+    {
+        if ($utente->associazione_id !== null
+            && $utente->associazione_id !== $prenotazione->associazione_id) {
+            throw PrenotazioneException::tenantNonCoerente();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -327,6 +471,8 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
      * ferma al PRIMO che non entra nei posti rimasti (anche se uno
      * successivo più piccolo entrerebbe). Gratuito → confermata;
      * a pagamento → in_attesa_pagamento con finestra dedicata di 24h.
+     * Eventi con richiede_approvazione: i promossi vanno in_approvazione
+     * (posti riservati, nessuna scadenza, esito dopo la revisione admin).
      *
      * DEVE girare dentro una transazione che detiene già il lock
      * sulla riga eventi.
@@ -358,20 +504,35 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
 
             $aPagamento = (float) $candidata->importo_totale > 0;
 
-            $candidata->forceFill([
-                'stato' => $aPagamento
-                    ? Prenotazione::STATO_IN_ATTESA_PAGAMENTO
-                    : Prenotazione::STATO_CONFERMATA,
-                'promossa_at' => now(),
-                'scadenza_pagamento_at' => $aPagamento
-                    ? now()->addHours(self::ORE_FINESTRA_PROMOZIONE)
-                    : null,
-            ])->save();
+            if ($evento->richiede_approvazione) {
+                // L'uscita dalla coda non salta la revisione: posti riservati,
+                // nessuna scadenza, pagamento solo dopo l'approvazione
+                $candidata->forceFill([
+                    'stato' => Prenotazione::STATO_IN_APPROVAZIONE,
+                    'promossa_at' => now(),
+                    'scadenza_pagamento_at' => null,
+                ])->save();
+            } else {
+                $candidata->forceFill([
+                    'stato' => $aPagamento
+                        ? Prenotazione::STATO_IN_ATTESA_PAGAMENTO
+                        : Prenotazione::STATO_CONFERMATA,
+                    'promossa_at' => now(),
+                    'scadenza_pagamento_at' => $aPagamento
+                        ? now()->addHours(self::ORE_FINESTRA_PROMOZIONE)
+                        : null,
+                ])->save();
+            }
 
             $occupati += $candidata->posti;
             $promosse[] = $candidata;
 
-            $this->accodaNotifica('notificaPromozioneListaAttesa', $candidata);
+            if ($evento->richiede_approvazione) {
+                $this->accodaNotifica('notificaInApprovazione', $candidata);
+                $this->accodaNotifica('notificaDaApprovare', $candidata);
+            } else {
+                $this->accodaNotifica('notificaPromozioneListaAttesa', $candidata);
+            }
         }
 
         return $promosse;
@@ -637,6 +798,41 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
     protected function notificaAnnullata(Prenotazione $prenotazione): void
     {
         $this->notificaAccount($prenotazione, new AnnullataNotification($prenotazione));
+    }
+
+    protected function notificaInApprovazione(Prenotazione $prenotazione): void
+    {
+        $this->notificaAccount($prenotazione, new InApprovazioneNotification($prenotazione));
+    }
+
+    protected function notificaRifiutata(Prenotazione $prenotazione): void
+    {
+        $this->notificaAccount($prenotazione, new RifiutataNotification($prenotazione));
+    }
+
+    /**
+     * Richiesta in approvazione: avviso agli amministratori attivi del
+     * tenant (stesso destinatario di notificaEventoEsaurito). Best-effort,
+     * fuori dalla transazione.
+     */
+    protected function notificaDaApprovare(Prenotazione $prenotazione): void
+    {
+        try {
+            $admins = Utente::query()
+                ->where('associazione_id', $prenotazione->associazione_id)
+                ->where('ruolo', Utente::RUOLO_ADMIN_ASSOCIAZIONE)
+                ->where('attivo', true)
+                ->get();
+
+            if ($admins->isNotEmpty()) {
+                Notification::send($admins, new DaApprovareNotification($prenotazione));
+            }
+        } catch (\Throwable $e) {
+            Log::error('PrenotazioneService: notifica prenotazione da approvare fallita', [
+                'prenotazione_id' => $prenotazione->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     protected function notificaPromemoriaEvento(Prenotazione $prenotazione): void

@@ -9,6 +9,7 @@ use App\Http\Controllers\FrontendPubblico\Account\ProfiloAccountController;
 use App\Http\Controllers\FrontendPubblico\Account\TesseraQuoteController;
 use App\Http\Controllers\FrontendPubblico\CatalogoEventiController;
 use App\Http\Controllers\FrontendPubblico\HomeController;
+use App\Http\Controllers\FrontendPubblico\IscrizioneController;
 use App\Http\Controllers\FrontendPubblico\LoginController;
 use App\Http\Controllers\FrontendPubblico\PagamentoPrenotazioneController;
 use App\Http\Controllers\FrontendPubblico\PasswordResetController;
@@ -135,6 +136,24 @@ Route::prefix('a/{associazione:slug}')
             EnsureAccountValido::class,
             EnsureAccountVerificato::class,
         ])->group(function (): void {
+
+            /*
+            |--------------------------------------------------------------
+            | Iscrizione socio (form personalizzabile per tenant)
+            |--------------------------------------------------------------
+            |
+            | GET: iscrizioni chiuse → pagina dedicata; già socio →
+            | redirect tessera; richiesta in_attesa → pagina stato;
+            | altrimenti form dallo schema di FormIscrizioneService.
+            | POST: honeypot spatie + throttle 5/m, rules() dinamiche.
+            |
+            */
+            Route::get('/iscriviti', [IscrizioneController::class, 'show'])
+                ->name('iscriviti');
+
+            Route::post('/iscriviti', [IscrizioneController::class, 'store'])
+                ->middleware([ProtectAgainstSpam::class, 'throttle:5,1'])
+                ->name('iscriviti.store');
 
             Route::post('/eventi/{evento}/prenota', [PrenotazioneController::class, 'store'])
                 ->middleware('throttle:10,1')

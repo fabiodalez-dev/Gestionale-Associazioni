@@ -6,6 +6,22 @@
     @php
         $esaurito = $postiDisponibili !== null && $postiDisponibili <= 0;
         $aPagamento = (float) $evento->prezzo > 0;
+
+        // Motivo specifico per la CTA disabilitata (evento non prenotabile)
+        $motivoChiusura = null;
+        if (! $evento->isPrenotabile()) {
+            if ($evento->data_evento->isPast()) {
+                $motivoChiusura = 'L\'evento si è già svolto.';
+            } elseif (! $evento->iscrizioni_aperte) {
+                $motivoChiusura = 'Le iscrizioni a questo evento sono chiuse.';
+            } elseif ($evento->iscrizioni_dal !== null && $evento->iscrizioni_dal->isFuture()) {
+                $motivoChiusura = 'Le iscrizioni aprono il '.$evento->iscrizioni_dal->format('d/m/Y').' alle '.$evento->iscrizioni_dal->format('H:i').'.';
+            } elseif ($evento->iscrizioni_al !== null && $evento->iscrizioni_al->isPast()) {
+                $motivoChiusura = 'Le iscrizioni si sono chiuse il '.$evento->iscrizioni_al->format('d/m/Y').' alle '.$evento->iscrizioni_al->format('H:i').'.';
+            } else {
+                $motivoChiusura = 'Le prenotazioni per questo evento non sono aperte.';
+            }
+        }
     @endphp
 
     <nav aria-label="breadcrumb" class="mb-3">
@@ -77,10 +93,13 @@
                     <h2 class="h5 mb-3">Prenota il tuo posto</h2>
 
                     @if (! $evento->isPrenotabile())
-                        <p class="text-muted mb-0">
+                        <p class="text-muted mb-2">
                             <i class="bi bi-info-circle me-1"></i>
-                            Le prenotazioni per questo evento non sono aperte.
+                            {{ $motivoChiusura }}
                         </p>
+                        <button type="button" class="btn btn-primary w-100" disabled>
+                            <i class="bi bi-ticket-perforated me-1"></i> Prenota
+                        </button>
                     @elseif (! auth('account')->check())
                         <p class="text-muted">Per prenotare devi accedere con il tuo account.</p>
                         <a href="{{ route('pubblico.login', $associazione->slug) }}" class="btn btn-primary w-100 mb-2">
@@ -103,12 +122,22 @@
                             <button type="submit" class="btn btn-primary w-100">
                                 @if ($esaurito && $evento->lista_attesa_attiva)
                                     <i class="bi bi-hourglass-split me-1"></i> Entra in lista d'attesa
+                                @elseif ($evento->richiede_approvazione)
+                                    <i class="bi bi-person-check me-1"></i> Richiedi la prenotazione
                                 @else
                                     <i class="bi bi-ticket-perforated me-1"></i> Prenota
                                 @endif
                             </button>
                         </form>
-                        @if ($aPagamento)
+                        @if ($evento->richiede_approvazione)
+                            <p class="text-muted small mt-2 mb-0">
+                                Le prenotazioni richiedono l'approvazione dell'associazione:
+                                riceverai un'email con l'esito.
+                                @if ($aPagamento)
+                                    Il pagamento sarà richiesto solo dopo l'approvazione.
+                                @endif
+                            </p>
+                        @elseif ($aPagamento)
                             <p class="text-muted small mt-2 mb-0">
                                 Il posto resta riservato per 30 minuti in attesa del pagamento.
                             </p>

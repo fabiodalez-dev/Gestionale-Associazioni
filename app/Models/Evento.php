@@ -34,6 +34,17 @@ class Evento extends Model
 
     protected $table = 'eventi';
 
+    /**
+     * Default in-memory allineati ai default DB (modelli non ancora
+     * ricaricati dal database, es. factory->create()).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'iscrizioni_aperte' => true,
+        'richiede_approvazione' => false,
+    ];
+
     protected $fillable = [
         'associazione_id',
         'titolo',
@@ -46,6 +57,8 @@ class Evento extends Model
         'prezzo',
         'iscrizioni_dal',
         'iscrizioni_al',
+        'iscrizioni_aperte',
+        'richiede_approvazione',
         'max_posti_per_prenotazione',
         'lista_attesa_attiva',
         'annullamento_entro_ore',
@@ -61,6 +74,8 @@ class Evento extends Model
             'prezzo' => 'decimal:2',
             'iscrizioni_dal' => 'datetime',
             'iscrizioni_al' => 'datetime',
+            'iscrizioni_aperte' => 'boolean',
+            'richiede_approvazione' => 'boolean',
             'max_posti_per_prenotazione' => 'integer',
             'lista_attesa_attiva' => 'boolean',
             'annullamento_entro_ore' => 'integer',
@@ -96,7 +111,8 @@ class Evento extends Model
 
     /**
      * L'evento accetta prenotazioni dal frontend pubblico?
-     * (Pubblicato, non ancora iniziato, finestra iscrizioni aperta.)
+     * (Pubblicato, non ancora iniziato, iscrizioni non chiuse manualmente,
+     * finestra iscrizioni aperta.)
      */
     public function isPrenotabile(): bool
     {
@@ -105,6 +121,10 @@ class Evento extends Model
         }
 
         if ($this->data_evento->isPast()) {
+            return false;
+        }
+
+        if (! $this->iscrizioni_aperte) {
             return false;
         }
 

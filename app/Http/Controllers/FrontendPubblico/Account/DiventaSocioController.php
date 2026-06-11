@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\FrontendPubblico\Account\DiventaSocioRequest;
 use App\Models\Account;
 use App\Models\Associazione;
+use App\Models\RichiestaIscrizione;
 use App\Models\Utente;
 use App\Notifications\Accounts\RichiestaSocioRicevuta;
 use Illuminate\Contracts\View\View;
@@ -16,23 +17,40 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
 /**
- * Richiesta "diventa socio" dall'area riservata: form con motivazione,
- * set di richiesta_socio_at e notifica best-effort agli amministratori
- * dell'associazione (un fallimento di invio non blocca la richiesta).
+ * Pagina "diventa socio" dell'area riservata (PIANO-ISCRIZIONI §Rotte e UI):
+ * il form di iscrizione personalizzabile /a/{slug}/iscriviti SOSTITUISCE la
+ * vecchia richiesta con motivazione, quindi la GET reindirizza al nuovo form
+ * quando non c'è nessuno stato da mostrare; se invece esiste una richiesta
+ * di iscrizione (o lo stato legacy richiesta_socio_at) la pagina ne mostra
+ * lo stato (in attesa / approvata / rifiutata con motivo) e linka /iscriviti.
  *
- * Il collegamento al socio resta SEMPRE un'azione esplicita dell'admin
+ * La POST legacy (motivazione → notifica admin) resta funzionante:
+ * il collegamento al socio resta SEMPRE un'azione esplicita dell'admin
  * (mai automatico: anti account-takeover).
  */
 class DiventaSocioController extends Controller
 {
-    public function show(Request $request, Associazione $associazione): View
+    public function show(Request $request, Associazione $associazione): View|RedirectResponse
     {
         /** @var Account $account */
         $account = $request->user('account');
 
+        $richiesta = RichiestaIscrizione::query()
+            ->forAssociazione($associazione->id)
+            ->where('account_id', $account->id)
+            ->latest()
+            ->first();
+
+        // Nessuno stato da mostrare → il nuovo form di iscrizione
+        // sostituisce la vecchia richiesta con motivazione
+        if ($account->socio_id === null && $richiesta === null && $account->richiesta_socio_at === null) {
+            return redirect()->route('pubblico.iscriviti', ['associazione' => $associazione->slug]);
+        }
+
         return view('pubblico.account.diventa-socio', [
             'associazione' => $associazione,
             'account' => $account,
+            'richiesta' => $richiesta,
         ]);
     }
 

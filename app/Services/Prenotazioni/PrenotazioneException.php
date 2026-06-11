@@ -47,6 +47,11 @@ class PrenotazioneException extends RuntimeException
         return new self(trim('Questa prenotazione non può essere annullata. '.$motivo));
     }
 
+    public static function nonInApprovazione(): self
+    {
+        return new self('La prenotazione non è in attesa di approvazione.');
+    }
+
     public static function annullamentoOltreTermine(int $ore): self
     {
         return new self(

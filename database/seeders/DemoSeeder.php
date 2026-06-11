@@ -4,25 +4,32 @@ namespace Database\Seeders;
 
 use App\Models\Account;
 use App\Models\Associazione;
+use App\Models\CampoPersonalizzato;
 use App\Models\CategoriaSocio;
 use App\Models\Evento;
 use App\Models\Prenotazione;
 use App\Models\Quota;
+use App\Models\RichiestaIscrizione;
 use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\TipoSocio;
+use App\Models\ValoreCampoPersonalizzato;
 use Illuminate\Database\Seeder;
 
 /**
  * Dati dimostrativi per l'installer web: SOLO contenuti (associazione, soci,
- * tessere, quote, eventi pubblicati, un account demo con prenotazione),
- * NESSUN account utente amministratore e nessuna factory (Faker è una
- * dipendenza dev, assente con composer install --no-dev).
+ * tessere, quote, eventi pubblicati, account demo con prenotazione, form di
+ * iscrizione configurato e una richiesta di iscrizione pendente), NESSUN
+ * account utente amministratore e nessuna factory (Faker è una dipendenza
+ * dev, assente con composer install --no-dev).
  *
  * Il frontend pubblico è attivo su /a/associazione-demo; l'account demo
  * (demo@account-demo.test / demo1234) è verificato e ha una prenotazione
- * confermata sull'evento gratuito.
+ * confermata sull'evento gratuito. Il secondo account
+ * (giulia@account-demo.test / demo1234) ha una richiesta di iscrizione
+ * socio in attesa, visibile nella pagina admin "Richieste iscrizione".
+ * La "Visita guidata in cantina" è l'evento con approvazione richiesta.
  */
 class DemoSeeder extends Seeder
 {
@@ -58,6 +65,38 @@ class DemoSeeder extends Seeder
             'associazione_id' => $associazione->id,
             'nome' => 'Fondatori',
             'descrizione' => 'Soci fondatori',
+        ]);
+
+        // Form di iscrizione pubblico /a/associazione-demo/iscriviti
+        // (PIANO-ISCRIZIONI §Form personalizzabile): modalità preiscrizione
+        // (l'admin approva da "Richieste iscrizione"), campi standard
+        // configurati + un campo personalizzato riusato da config_campi
+        $campoProfessione = CampoPersonalizzato::create([
+            'associazione_id' => $associazione->id,
+            'nome_campo' => 'Professione',
+            'tipo_campo' => 'text',
+            'descrizione' => 'La tua professione attuale',
+            'obbligatorio' => false,
+            'ordine' => 1,
+        ]);
+
+        $associazione->update([
+            'iscrizioni_socio_aperte' => true,
+            'modalita_iscrizione' => Associazione::MODALITA_PREISCRIZIONE,
+            'iscrizione_form_config' => [
+                'intro_html' => '<p>Compila il modulo per richiedere l\'iscrizione: '
+                    .'la segreteria valuterà la tua richiesta entro pochi giorni.</p>',
+                'campi_standard' => [
+                    ['campo' => 'telefono', 'visibile' => true, 'obbligatorio' => true],
+                    ['campo' => 'codice_fiscale', 'visibile' => true, 'obbligatorio' => false],
+                    ['campo' => 'data_nascita', 'visibile' => true, 'obbligatorio' => true],
+                    ['campo' => 'indirizzo', 'visibile' => false, 'obbligatorio' => false],
+                    ['campo' => 'citta', 'visibile' => true, 'obbligatorio' => false],
+                    ['campo' => 'provincia', 'visibile' => false, 'obbligatorio' => false],
+                    ['campo' => 'cap', 'visibile' => false, 'obbligatorio' => false],
+                ],
+                'campi_personalizzati' => [$campoProfessione->id],
+            ],
         ]);
 
         $anno = (int) now()->format('Y');
@@ -137,6 +176,25 @@ class DemoSeeder extends Seeder
             'annullamento_entro_ore' => 48,
         ]);
 
+        // Evento pubblicato CON APPROVAZIONE RICHIESTA: le prenotazioni
+        // nascono "in approvazione" (posti riservati) e l'admin le gestisce
+        // dal tab Prenotazioni dell'evento (PIANO-ISCRIZIONI §Preiscrizione)
+        Evento::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Visita guidata in cantina',
+            'descrizione' => 'Visita con degustazione, posti limitati: ogni richiesta viene approvata dalla segreteria.',
+            'data_evento' => now()->addWeeks(3),
+            'luogo' => 'Cantina Sociale, Pavia',
+            'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+            'capienza' => 15,
+            'prezzo' => 0,
+            'max_posti_per_prenotazione' => 2,
+            'lista_attesa_attiva' => true,
+            'annullamento_entro_ore' => 24,
+            'iscrizioni_aperte' => true,
+            'richiede_approvazione' => true,
+        ]);
+
         // Account demo del frontend pubblico: email verificata,
         // password "demo1234" (hash dal cast 'hashed' del modello)
         $account = Account::create([
@@ -165,5 +223,57 @@ class DemoSeeder extends Seeder
             'prezzo_unitario' => 0,
             'importo_totale' => 0,
         ]);
+
+        // Secondo account con RICHIESTA DI ISCRIZIONE PENDENTE: il flusso
+        // del form pubblico già percorso (socio preiscritto "In Attesa" +
+        // snapshot dati_form), da approvare/rifiutare nella pagina admin
+        // "Richieste iscrizione" (specchio di FormIscrizioneService::salva)
+        $accountRichiedente = Account::create([
+            'associazione_id' => $associazione->id,
+            'nome' => 'Giulia',
+            'cognome' => 'Neri',
+            'email' => 'giulia@account-demo.test',
+            'password' => 'demo1234',
+            'email_verified_at' => now(),
+            'telefono' => '3387654321',
+            'attivo' => true,
+            'preferenze' => ['promemoria_eventi' => true],
+            'privacy_accettata_at' => now(),
+        ]);
+
+        $preiscritta = Socio::create([
+            'associazione_id' => $associazione->id,
+            'numero_socio' => '004',
+            'nome' => $accountRichiedente->nome,
+            'cognome' => $accountRichiedente->cognome,
+            'email' => $accountRichiedente->email,
+            'telefono' => '3387654321',
+            'data_nascita' => '1992-03-15',
+            'citta' => 'Milano',
+            'data_iscrizione' => now()->toDateString(),
+            'stato' => Socio::STATO_IN_ATTESA,
+            'privacy_consenso' => true,
+        ]);
+
+        ValoreCampoPersonalizzato::create([
+            'socio_id' => $preiscritta->id,
+            'campo_id' => $campoProfessione->id,
+            'valore' => 'Grafica freelance',
+        ]);
+
+        RichiestaIscrizione::create([
+            'associazione_id' => $associazione->id,
+            'account_id' => $accountRichiedente->id,
+            'socio_id' => $preiscritta->id,
+            'stato' => RichiestaIscrizione::STATO_IN_ATTESA,
+            'dati_form' => [
+                'telefono' => '3387654321',
+                'data_nascita' => '1992-03-15',
+                'citta' => 'Milano',
+                'custom_field' => [$campoProfessione->id => 'Grafica freelance'],
+            ],
+        ]);
+
+        $accountRichiedente->forceFill(['richiesta_socio_at' => now()])->save();
     }
 }

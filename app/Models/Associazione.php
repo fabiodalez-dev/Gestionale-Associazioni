@@ -16,7 +16,29 @@ class Associazione extends Model
     use HasFactory;
     use HasUuids;
 
+    /** Iscrizione socio: l'admin approva la richiesta (Socio "In Attesa"). */
+    public const MODALITA_PREISCRIZIONE = 'preiscrizione';
+
+    /** Iscrizione socio: Socio "Attivo" e account collegato subito. */
+    public const MODALITA_DIRETTA = 'diretta';
+
+    public const MODALITA_ISCRIZIONE = [
+        self::MODALITA_PREISCRIZIONE,
+        self::MODALITA_DIRETTA,
+    ];
+
     protected $table = 'associazioni';
+
+    /**
+     * Default in-memory allineati ai default DB (modelli non ancora
+     * ricaricati dal database, es. factory->create()).
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'iscrizioni_socio_aperte' => true,
+        'modalita_iscrizione' => self::MODALITA_PREISCRIZIONE,
+    ];
 
     protected $fillable = [
         'nome',
@@ -39,6 +61,9 @@ class Associazione extends Model
         'template_email_scadenza',
         'privacy_policy_html',
         'campi_obbligatori_config',
+        'iscrizioni_socio_aperte',
+        'modalita_iscrizione',
+        'iscrizione_form_config',
     ];
 
     protected function casts(): array
@@ -49,7 +74,14 @@ class Associazione extends Model
             'costo_tessera' => 'decimal:2',
             'giorni_notifica_scadenza' => 'integer',
             'campi_obbligatori_config' => 'array',
+            'iscrizioni_socio_aperte' => 'boolean',
+            'iscrizione_form_config' => 'array',
         ];
+    }
+
+    public function isIscrizioneDiretta(): bool
+    {
+        return $this->modalita_iscrizione === self::MODALITA_DIRETTA;
     }
 
     protected static function booted(): void
@@ -291,5 +323,13 @@ class Associazione extends Model
     public function prenotazioni(): HasMany
     {
         return $this->hasMany(Prenotazione::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<RichiestaIscrizione, $this>
+     */
+    public function richiesteIscrizione(): HasMany
+    {
+        return $this->hasMany(RichiestaIscrizione::class, 'associazione_id');
     }
 }

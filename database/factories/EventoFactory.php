@@ -58,4 +58,24 @@ class EventoFactory extends Factory
             'capienza' => $posti,
         ]);
     }
+
+    /**
+     * Evento che richiede l'approvazione admin delle prenotazioni.
+     */
+    public function conApprovazione(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'richiede_approvazione' => true,
+        ]);
+    }
+
+    /**
+     * Iscrizioni chiuse manualmente (oltre alla finestra iscrizioni_dal/al).
+     */
+    public function iscrizioniChiuse(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'iscrizioni_aperte' => false,
+        ]);
+    }
 }

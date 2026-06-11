@@ -7,9 +7,15 @@ use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Prenotazione;
+use App\Models\Quota;
+use App\Models\RichiestaIscrizione;
+use App\Models\Socio;
+use App\Models\Tessera;
 use App\Models\Utente;
+use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
 use App\Services\Prenotazioni\BigliettoService;
 use App\Services\Prenotazioni\PrenotazioneService;
+use App\Services\Soci\NumeroProgressivoService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -25,7 +31,11 @@ use Illuminate\Support\Facades\URL;
  */
 class E2eFixtureCommand extends Command
 {
-    protected $signature = 'e2e:fixture {azione} {--email=} {--password=} {--titolo=} {--capienza=} {--prezzo=0} {--posti-prenotati=0} {--passato=0} {--evento=}';
+    protected $signature = 'e2e:fixture {azione} {--email=} {--password=} {--titolo=} {--capienza=} {--prezzo=0} {--posti-prenotati=0} {--passato=0} {--evento=}
+        {--richiede-approvazione=0} {--iscrizioni-chiuse=0} {--apertura-futura=0}
+        {--tessera=} {--scaduta=0} {--senza-tessera=0} {--con-quota=0}
+        {--aperte=} {--modalita=} {--intro=} {--config=}
+        {--genera-tessera=0} {--motivo=}';
 
     protected $description = 'Fixture deterministiche per i test E2E (richiede E2E_FIXTURES=1)';
 
@@ -49,6 +59,13 @@ class E2eFixtureCommand extends Command
             'sposta-evento-passato' => $this->spostaEventoPassato(),
             'configura-gateway' => $this->configuraGateway(),
             'azzera-throttle' => $this->azzeraThrottle(),
+            'crea-socio-con-tessera' => $this->creaSocioConTessera(),
+            'link-verifica-tessera' => $this->linkVerificaTessera(),
+            'set-password-socio' => $this->setPasswordSocio(),
+            'configura-form-iscrizione' => $this->configuraFormIscrizione(),
+            'stato-richiesta' => $this->statoRichiesta(),
+            'approva-richiesta' => $this->approvaRichiesta(),
+            'rifiuta-richiesta' => $this->rifiutaRichiesta(),
             default => ['error' => 'azione sconosciuta'],
         };
 
@@ -167,6 +184,9 @@ class E2eFixtureCommand extends Command
             'capienza' => $capienza !== null ? (int) $capienza : null,
             'prezzo' => (float) $this->option('prezzo'),
             'lista_attesa_attiva' => true,
+            'richiede_approvazione' => (bool) $this->option('richiede-approvazione'),
+            'iscrizioni_aperte' => ! $this->option('iscrizioni-chiuse'),
+            'iscrizioni_dal' => $this->option('apertura-futura') ? now()->addDays(3) : null,
         ]);
 
         // Pre-occupa posti con prenotazioni confermate di account fittizi
@@ -340,6 +360,240 @@ class E2eFixtureCommand extends Command
         Cache::flush();
 
         return ['ok' => true];
+    }
+
+    /**
+     * Crea un Socio 'Attivo' con (di default) una tessera per l'anno
+     * corrente. Opzioni: --password (abilita il login area-soci),
+     * --scaduta=1 (tessera dell'anno scorso, scadenza passata),
+     * --senza-tessera=1, --con-quota=1 (quota da pagare anno corrente).
+     *
+     * @return array<string, mixed>
+     */
+    private function creaSocioConTessera(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+        $email = (string) $this->option('email');
+        if ($email === '') {
+            return ['error' => 'serve --email'];
+        }
+
+        $socio = Socio::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'numero_socio' => app(NumeroProgressivoService::class)->prossimoNumeroSocio($associazione->id),
+            'nome' => 'Socio',
+            'cognome' => 'E2E',
+            'email' => $email,
+            'data_iscrizione' => now()->toDateString(),
+            'stato' => Socio::STATO_ATTIVO,
+            'privacy_consenso' => true,
+            // Cast 'hashed' sul model: si assegna la password in chiaro
+            'password_hash' => $this->option('password') ?: null,
+        ]);
+
+        $tessera = null;
+        if (! $this->option('senza-tessera')) {
+            $scaduta = (bool) $this->option('scaduta');
+            $tessera = Tessera::withoutGlobalScopes()->create([
+                'associazione_id' => $associazione->id,
+                'socio_id' => $socio->id,
+                'numero_tessera' => app(NumeroProgressivoService::class)->prossimoNumeroTessera($associazione->id),
+                'anno_validita' => $scaduta ? now()->year - 1 : now()->year,
+                'data_emissione' => $scaduta ? now()->subYear()->toDateString() : now()->toDateString(),
+                'data_scadenza' => $scaduta ? now()->subMonths(3)->toDateString() : now()->endOfYear()->toDateString(),
+                'stato' => Tessera::STATO_ATTIVA,
+                'tipo_scadenza' => Tessera::TIPO_SCADENZA_SOLARE,
+            ]);
+        }
+
+        $quota = null;
+        if ($this->option('con-quota')) {
+            $quota = Quota::withoutGlobalScopes()->create([
+                'associazione_id' => $associazione->id,
+                'socio_id' => $socio->id,
+                'anno' => now()->year,
+                'importo' => 25.00,
+                'data_scadenza' => now()->endOfYear()->toDateString(),
+                'stato' => Quota::STATO_DA_PAGARE,
+                'tipo' => 'Quota Annuale',
+            ]);
+        }
+
+        return [
+            'socio_id' => $socio->id,
+            'numero_socio' => $socio->numero_socio,
+            'tessera_id' => $tessera?->id,
+            'numero_tessera' => $tessera?->numero_tessera,
+            'quota_id' => $quota?->id,
+        ];
+    }
+
+    /**
+     * URL pubblico di verifica della tessera --tessera (lo stesso percorso
+     * contenuto nei QR: l'UUID funge da capability token).
+     *
+     * @return array<string, mixed>
+     */
+    private function linkVerificaTessera(): array
+    {
+        $tesseraId = (string) $this->option('tessera');
+        if ($tesseraId === '') {
+            return ['error' => 'serve --tessera'];
+        }
+
+        return ['url' => route('tessere.verifica', ['tessera' => $tesseraId])];
+    }
+
+    /**
+     * Imposta la password del socio --email (cast 'hashed' sul model),
+     * come farebbe il flusso set-password dell'area soci.
+     *
+     * @return array<string, mixed>
+     */
+    private function setPasswordSocio(): array
+    {
+        $socio = Socio::withoutGlobalScopes()
+            ->where('email', (string) $this->option('email'))
+            ->first();
+
+        if ($socio === null) {
+            return ['error' => 'socio non trovato'];
+        }
+
+        $socio->forceFill([
+            'password_hash' => $this->option('password') ?: 'SocioE2e!2026',
+        ])->save();
+
+        return ['ok' => true, 'socio_id' => $socio->id];
+    }
+
+    /**
+     * Configura il modulo di iscrizione del tenant e2e:
+     * --aperte=0|1, --modalita=preiscrizione|diretta,
+     * --intro="<p>...</p>", --config='{json iscrizione_form_config}'.
+     * Le opzioni omesse ripristinano il default (config null, aperte,
+     * preiscrizione) così ogni test parte da uno stato noto.
+     *
+     * @return array<string, mixed>
+     */
+    private function configuraFormIscrizione(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $config = null;
+        if (is_string($this->option('config')) && $this->option('config') !== '') {
+            $config = json_decode((string) $this->option('config'), true);
+            if (! is_array($config)) {
+                return ['error' => 'config non è JSON valido'];
+            }
+        }
+
+        if (is_string($this->option('intro')) && $this->option('intro') !== '') {
+            $config = ($config ?? []) + ['intro_html' => (string) $this->option('intro')];
+        }
+
+        $associazione->forceFill([
+            'iscrizioni_socio_aperte' => $this->option('aperte') === null || $this->option('aperte') === ''
+                ? true
+                : (bool) (int) $this->option('aperte'),
+            'modalita_iscrizione' => in_array($this->option('modalita'), ['preiscrizione', 'diretta'], true)
+                ? $this->option('modalita')
+                : 'preiscrizione',
+            'iscrizione_form_config' => $config,
+        ])->save();
+
+        return ['ok' => true, 'associazione_id' => $associazione->id];
+    }
+
+    /**
+     * Stato dell'ultima richiesta di iscrizione dell'account --email
+     * (con lo stato del socio collegato, per le assertion E2E).
+     *
+     * @return array<string, mixed>
+     */
+    private function statoRichiesta(): array
+    {
+        $account = $this->trovaAccount();
+        if ($account === null) {
+            return ['error' => 'account non trovato'];
+        }
+
+        $richiesta = RichiestaIscrizione::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->latest()
+            ->first();
+
+        if ($richiesta === null) {
+            return ['error' => 'nessuna richiesta trovata'];
+        }
+
+        $socio = $richiesta->socio_id !== null
+            ? Socio::withoutGlobalScopes()->find($richiesta->socio_id)
+            : null;
+
+        return [
+            'stato' => $richiesta->stato,
+            'motivo_rifiuto' => $richiesta->motivo_rifiuto,
+            'socio_stato' => $socio?->stato,
+            'numero_socio' => $socio?->numero_socio,
+            'account_socio_id' => $account->fresh()?->socio_id,
+        ];
+    }
+
+    /**
+     * Approva (come admin e2e) l'ultima richiesta in attesa dell'account
+     * --email; --genera-tessera=1 emette anche la tessera dell'anno.
+     *
+     * @return array<string, mixed>
+     */
+    private function approvaRichiesta(): array
+    {
+        $richiesta = $this->richiestaInAttesa();
+        if ($richiesta === null) {
+            return ['error' => 'nessuna richiesta in attesa'];
+        }
+
+        $admin = Utente::where('email', 'admin-e2e@example.com')->firstOrFail();
+
+        $richiesta = app(ApprovazioneIscrizioneService::class)
+            ->approva($richiesta, $admin, (bool) $this->option('genera-tessera'));
+
+        return ['ok' => true, 'richiesta_id' => $richiesta->id];
+    }
+
+    /**
+     * Rifiuta (come admin e2e) l'ultima richiesta in attesa dell'account
+     * --email con il motivo --motivo.
+     *
+     * @return array<string, mixed>
+     */
+    private function rifiutaRichiesta(): array
+    {
+        $richiesta = $this->richiestaInAttesa();
+        if ($richiesta === null) {
+            return ['error' => 'nessuna richiesta in attesa'];
+        }
+
+        $admin = Utente::where('email', 'admin-e2e@example.com')->firstOrFail();
+
+        $richiesta = app(ApprovazioneIscrizioneService::class)
+            ->rifiuta($richiesta, $admin, (string) ($this->option('motivo') ?: 'Motivo di test E2E'));
+
+        return ['ok' => true, 'richiesta_id' => $richiesta->id];
+    }
+
+    private function richiestaInAttesa(): ?RichiestaIscrizione
+    {
+        $account = $this->trovaAccount();
+        if ($account === null) {
+            return null;
+        }
+
+        return RichiestaIscrizione::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->where('stato', RichiestaIscrizione::STATO_IN_ATTESA)
+            ->latest()
+            ->first();
     }
 
     private function trovaAccount(): ?Account

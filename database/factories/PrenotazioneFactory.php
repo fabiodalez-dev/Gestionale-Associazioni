@@ -54,6 +54,13 @@ class PrenotazioneFactory extends Factory
         ]);
     }
 
+    public function inApprovazione(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'stato' => Prenotazione::STATO_IN_APPROVAZIONE,
+        ]);
+    }
+
     public function listaAttesa(): static
     {
         return $this->state(fn (array $attributes) => [

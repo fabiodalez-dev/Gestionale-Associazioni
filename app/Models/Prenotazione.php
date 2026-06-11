@@ -15,7 +15,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Macchina a stati:
  * - creazione → confermata (gratuito, posti ok) | in_attesa_pagamento
- *   (a pagamento, posti riservati, scadenza +30') | lista_attesa (pieno);
+ *   (a pagamento, posti riservati, scadenza +30') | lista_attesa (pieno)
+ *   | in_approvazione (evento con richiede_approvazione, posti riservati,
+ *   nessuna scadenza: il flusso pagamento parte solo dopo l'approvazione);
+ * - in_approvazione → confermata | in_attesa_pagamento (approvazione admin)
+ *   | annullata (rifiuto con motivo);
  * - in_attesa_pagamento → confermata (webhook) | scaduta (scheduler) | annullata;
  * - confermata → annullata (utente entro la finestra, admin sempre).
  * Il check-in NON è uno stato: è checkin_at su una confermata.
@@ -32,6 +36,8 @@ class Prenotazione extends Model implements Pagabile
 
     public const STATO_IN_ATTESA_PAGAMENTO = 'in_attesa_pagamento';
 
+    public const STATO_IN_APPROVAZIONE = 'in_approvazione';
+
     public const STATO_CONFERMATA = 'confermata';
 
     public const STATO_LISTA_ATTESA = 'lista_attesa';
@@ -42,16 +48,21 @@ class Prenotazione extends Model implements Pagabile
 
     public const STATI = [
         self::STATO_IN_ATTESA_PAGAMENTO,
+        self::STATO_IN_APPROVAZIONE,
         self::STATO_CONFERMATA,
         self::STATO_LISTA_ATTESA,
         self::STATO_ANNULLATA,
         self::STATO_SCADUTA,
     ];
 
-    /** Stati che consumano posti (riservati o confermati). */
+    /**
+     * Stati che consumano posti (riservati o confermati).
+     * Le 'in_approvazione' riservano il posto come le in_attesa_pagamento.
+     */
     public const STATI_ATTIVI = [
         self::STATO_CONFERMATA,
         self::STATO_IN_ATTESA_PAGAMENTO,
+        self::STATO_IN_APPROVAZIONE,
     ];
 
     /** Alfabeto base32 non ambiguo (niente 0/1/I/L/O/U) per i codici prenotazione. */
@@ -73,6 +84,9 @@ class Prenotazione extends Model implements Pagabile
         'gateway_transaction_id',
         'pagata_at',
         'scadenza_pagamento_at',
+        'approvata_at',
+        'approvata_da',
+        'motivo_rifiuto',
         'promossa_at',
         'annullata_at',
         'motivo_annullamento',
@@ -89,6 +103,7 @@ class Prenotazione extends Model implements Pagabile
             'importo_totale' => 'decimal:2',
             'pagata_at' => 'datetime',
             'scadenza_pagamento_at' => 'datetime',
+            'approvata_at' => 'datetime',
             'promossa_at' => 'datetime',
             'annullata_at' => 'datetime',
             'checkin_at' => 'datetime',
@@ -119,6 +134,16 @@ class Prenotazione extends Model implements Pagabile
     public function checkinUtente(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'checkin_utente_id');
+    }
+
+    /**
+     * Admin che ha approvato la prenotazione (eventi con richiede_approvazione).
+     *
+     * @return BelongsTo<Utente, $this>
+     */
+    public function approvataDa(): BelongsTo
+    {
+        return $this->belongsTo(Utente::class, 'approvata_da');
     }
 
     /**

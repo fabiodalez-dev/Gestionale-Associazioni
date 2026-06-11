@@ -262,6 +262,32 @@
                             @error('lista_attesa_attiva')<div class="text-danger small">{{ $message }}</div>@enderror
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-12 col-md-6 mb-3">
+                            <label class="form-label d-block">Iscrizioni</label>
+                            <div class="form-check form-switch mt-2">
+                                <input type="hidden" name="iscrizioni_aperte" value="0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="iscrizioni_aperte"
+                                       name="iscrizioni_aperte" value="1"
+                                       @checked(old('iscrizioni_aperte', $editEvento?->iscrizioni_aperte ?? true))>
+                                <label class="form-check-label" for="iscrizioni_aperte">Iscrizioni aperte</label>
+                            </div>
+                            <div class="form-text">Chiusura manuale: prevale sulla finestra di apertura/chiusura.</div>
+                            @error('iscrizioni_aperte')<div class="text-danger small">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-12 col-md-6 mb-3">
+                            <label class="form-label d-block">Approvazione</label>
+                            <div class="form-check form-switch mt-2">
+                                <input type="hidden" name="richiede_approvazione" value="0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="richiede_approvazione"
+                                       name="richiede_approvazione" value="1"
+                                       @checked(old('richiede_approvazione', $editEvento?->richiede_approvazione ?? false))>
+                                <label class="form-check-label" for="richiede_approvazione">Richiede approvazione</label>
+                            </div>
+                            <div class="form-text">Le prenotazioni restano "in approvazione" (posti riservati) finché non le confermi.</div>
+                            @error('richiede_approvazione')<div class="text-danger small">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
                     <div class="mb-2">
                         <label for="immagine_url" class="form-label">Immagine (URL)</label>
                         <input type="url" class="form-control @error('immagine_url') is-invalid @enderror"

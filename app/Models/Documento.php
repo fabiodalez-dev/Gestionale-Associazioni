@@ -59,6 +59,9 @@ class Documento extends Model implements HasMedia
             ->singleFile();
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function caricatoDa(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'caricato_da');

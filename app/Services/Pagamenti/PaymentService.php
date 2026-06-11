@@ -379,7 +379,7 @@ class PaymentService
         /** @var Associazione|null $associazione */
         $associazione = Associazione::find($socio->associazione_id);
 
-        $dataScadenza = ($associazione?->tipo_scadenza_default ?? 'solare') === 'annuale'
+        $dataScadenza = ($associazione->tipo_scadenza_default ?? 'solare') === 'annuale'
             ? now()->addYear()->toDateString()
             : now()->endOfYear()->toDateString();
 

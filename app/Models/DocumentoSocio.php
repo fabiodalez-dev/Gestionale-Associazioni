@@ -52,11 +52,17 @@ class DocumentoSocio extends Model implements HasMedia
             ->singleFile();
     }
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function caricatoDa(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'caricato_da');

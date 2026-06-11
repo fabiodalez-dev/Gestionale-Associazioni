@@ -31,7 +31,7 @@ class TesseraPdfRenderer
         $qrUrl = $tessera->qr_code_url ?: $this->qr->verificationUrl($tessera);
         $qrSvg = $this->qr->generateSvg($qrUrl, 3);
 
-        $costo = $socio->tipoSocio?->costo_tessera ?? $associazione->costo_tessera;
+        $costo = $socio->tipoSocio->costo_tessera ?? $associazione->costo_tessera;
         $costoStr = $costo !== null ? '€ '.number_format((float) $costo, 2, ',', '.') : '';
 
         $testo = $this->testoTessera($tessera, $socio, $associazione, $qrSvg, $qrUrl);
@@ -45,7 +45,7 @@ class TesseraPdfRenderer
             'testoTessera' => $testo,
             'logoImg' => $this->logoImg($associazione),
             'dataOggi' => now()->format('d/m/Y'),
-            'validoFinoAl' => $tessera->data_scadenza?->format('d/m/Y') ?? '',
+            'validoFinoAl' => $tessera->data_scadenza->format('d/m/Y'),
         ])
             ->setPaper('a4', 'portrait')
             ->setOption('isRemoteEnabled', true)
@@ -114,7 +114,7 @@ class TesseraPdfRenderer
             '{NUMERO_TESSERA}' => (string) $tessera->numero_tessera,
             '{ANNO_VALIDITA}' => (string) $tessera->anno_validita,
             '{DATA_EMISSIONE}' => now()->format('d/m/Y'),
-            '{DATA_SCADENZA}' => $tessera->data_scadenza?->format('d/m/Y') ?? '',
+            '{DATA_SCADENZA}' => $tessera->data_scadenza->format('d/m/Y'),
             '{QR_CODE}' => $qrSvg,
             '{QR_URL}' => $qrUrl,
         ];

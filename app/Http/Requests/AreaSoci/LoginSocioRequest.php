@@ -48,7 +48,7 @@ class LoginSocioRequest extends FormRequest
      * lookup globale per email (cross-tenant) con password_hash valorizzato,
      * errore generico unico (nessuna user-enumeration), rate limit per email+IP.
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function authenticate(): void
     {
@@ -75,7 +75,7 @@ class LoginSocioRequest extends FormRequest
     }
 
     /**
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function ensureIsNotRateLimited(): void
     {

@@ -47,121 +47,193 @@ class Associazione extends Model
         ];
     }
 
+    /**
+     * @return HasMany<Utente, $this>
+     */
     public function utenti(): HasMany
     {
         return $this->hasMany(Utente::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Socio, $this>
+     */
     public function soci(): HasMany
     {
         return $this->hasMany(Socio::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Sede, $this>
+     */
     public function sedi(): HasMany
     {
         return $this->hasMany(Sede::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<TipoSocio, $this>
+     */
     public function tipiSocio(): HasMany
     {
         return $this->hasMany(TipoSocio::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<CategoriaSocio, $this>
+     */
     public function categorieSocio(): HasMany
     {
         return $this->hasMany(CategoriaSocio::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Tessera, $this>
+     */
     public function tessere(): HasMany
     {
         return $this->hasMany(Tessera::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<TesseraTemplate, $this>
+     */
     public function tesseraTemplates(): HasMany
     {
         return $this->hasMany(TesseraTemplate::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Quota, $this>
+     */
     public function quote(): HasMany
     {
         return $this->hasMany(Quota::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Evento, $this>
+     */
     public function eventi(): HasMany
     {
         return $this->hasMany(Evento::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Documento, $this>
+     */
     public function documenti(): HasMany
     {
         return $this->hasMany(Documento::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<DocumentoSocio, $this>
+     */
     public function documentiSocio(): HasMany
     {
         return $this->hasMany(DocumentoSocio::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<CampoPersonalizzato, $this>
+     */
     public function campiPersonalizzati(): HasMany
     {
         return $this->hasMany(CampoPersonalizzato::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Tag, $this>
+     */
     public function tags(): HasMany
     {
         return $this->hasMany(Tag::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<GruppoDinamico, $this>
+     */
     public function gruppiDinamici(): HasMany
     {
         return $this->hasMany(GruppoDinamico::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<SavedFilter, $this>
+     */
     public function savedFilters(): HasMany
     {
         return $this->hasMany(SavedFilter::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Verbale, $this>
+     */
     public function verbali(): HasMany
     {
         return $this->hasMany(Verbale::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<Scadenza, $this>
+     */
     public function scadenze(): HasMany
     {
         return $this->hasMany(Scadenza::class, 'associazione_id');
     }
 
+    /**
+     * @return HasOne<SmtpSetting, $this>
+     */
     public function smtpSetting(): HasOne
     {
         return $this->hasOne(SmtpSetting::class, 'associazione_id');
     }
 
+    /**
+     * @return HasOne<PaymentGatewaySetting, $this>
+     */
     public function paymentGatewaySetting(): HasOne
     {
         return $this->hasOne(PaymentGatewaySetting::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<EmailTemplate, $this>
+     */
     public function emailTemplates(): HasMany
     {
         return $this->hasMany(EmailTemplate::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<EmailQueue, $this>
+     */
     public function emailQueue(): HasMany
     {
         return $this->hasMany(EmailQueue::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<EmailLog, $this>
+     */
     public function emailLogs(): HasMany
     {
         return $this->hasMany(EmailLog::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<ApiKey, $this>
+     */
     public function apiKeys(): HasMany
     {
         return $this->hasMany(ApiKey::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<StoricoAttivitaSocio, $this>
+     */
     public function storicoAttivitaSoci(): HasMany
     {
         return $this->hasMany(StoricoAttivitaSocio::class, 'associazione_id');

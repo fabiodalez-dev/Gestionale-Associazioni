@@ -38,11 +38,17 @@ class StoricoAttivitaSocio extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function utente(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'utente_id');

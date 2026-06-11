@@ -30,11 +30,17 @@ class TipoSocio extends Model
         ];
     }
 
+    /**
+     * @return HasMany<Socio, $this>
+     */
     public function soci(): HasMany
     {
         return $this->hasMany(Socio::class, 'tipo_socio_id');
     }
 
+    /**
+     * @return HasMany<TesseraTemplate, $this>
+     */
     public function tesseraTemplates(): HasMany
     {
         return $this->hasMany(TesseraTemplate::class, 'tipo_socio_id');

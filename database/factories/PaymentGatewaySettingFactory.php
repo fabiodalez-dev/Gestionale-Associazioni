@@ -7,7 +7,7 @@ use App\Models\PaymentGatewaySetting;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\PaymentGatewaySetting>
+ * @extends Factory<PaymentGatewaySetting>
  */
 class PaymentGatewaySettingFactory extends Factory
 {

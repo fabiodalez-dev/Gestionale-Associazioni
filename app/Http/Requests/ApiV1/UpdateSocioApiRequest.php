@@ -5,6 +5,7 @@ namespace App\Http\Requests\ApiV1;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 
 /**
@@ -73,7 +74,7 @@ class UpdateSocioApiRequest extends FormRequest
         );
     }
 
-    private function errore(string $code, string $message): \Illuminate\Http\JsonResponse
+    private function errore(string $code, string $message): JsonResponse
     {
         return response()->json([
             'success' => false,

@@ -4,6 +4,7 @@ namespace Tests\Feature\quote_pagamenti;
 
 use App\Models\Quota;
 use App\Models\Socio;
+use App\Models\StoricoAttivitaSocio;
 use App\Models\Tessera;
 use App\Notifications\Quote\BenvenutoSocioNotification;
 use App\Notifications\Quote\PagamentoQuotaNotification;
@@ -233,7 +234,7 @@ class WebhookStripeTest extends TestCase
         $this->assertSame(1, Tessera::allTenants()->where('socio_id', $socio->id)->count());
         $this->assertSame(
             1,
-            \App\Models\StoricoAttivitaSocio::allTenants()
+            StoricoAttivitaSocio::allTenants()
                 ->where('socio_id', $socio->id)
                 ->where('tipo_attivita', 'Pagamento Online')
                 ->count()

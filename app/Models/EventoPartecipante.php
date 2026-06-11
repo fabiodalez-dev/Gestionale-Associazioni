@@ -46,11 +46,17 @@ class EventoPartecipante extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Evento, $this>
+     */
     public function evento(): BelongsTo
     {
         return $this->belongsTo(Evento::class, 'evento_id');
     }
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');

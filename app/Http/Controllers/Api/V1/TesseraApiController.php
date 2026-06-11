@@ -49,7 +49,6 @@ class TesseraApiController extends Controller
         }
 
         $valida = $tessera->stato === Tessera::STATO_ATTIVA
-            && $tessera->data_scadenza !== null
             && $tessera->data_scadenza->gte(now()->startOfDay());
 
         return response()->json([
@@ -58,8 +57,8 @@ class TesseraApiController extends Controller
             'tessera' => [
                 'numero_tessera' => $tessera->numero_tessera,
                 'anno_validita' => $tessera->anno_validita,
-                'data_emissione' => $tessera->data_emissione?->format('Y-m-d'),
-                'data_scadenza' => $tessera->data_scadenza?->format('Y-m-d'),
+                'data_emissione' => $tessera->data_emissione->format('Y-m-d'),
+                'data_scadenza' => $tessera->data_scadenza->format('Y-m-d'),
                 'stato' => $tessera->stato,
             ],
             'socio' => [
@@ -137,8 +136,8 @@ class TesseraApiController extends Controller
         }
 
         $payload = $tessera->attributesToArray();
-        $payload['data_emissione'] = $tessera->data_emissione?->format('Y-m-d');
-        $payload['data_scadenza'] = $tessera->data_scadenza?->format('Y-m-d');
+        $payload['data_emissione'] = $tessera->data_emissione->format('Y-m-d');
+        $payload['data_scadenza'] = $tessera->data_scadenza->format('Y-m-d');
         $payload['socio_nome'] = $tessera->socio?->nome;
         $payload['socio_cognome'] = $tessera->socio?->cognome;
         $payload['numero_socio'] = $tessera->socio?->numero_socio;

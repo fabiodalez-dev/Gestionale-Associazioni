@@ -19,6 +19,7 @@ use App\Models\Tag;
 use App\Models\Tessera;
 use App\Models\TipoSocio;
 use App\Services\Soci\NumeroProgressivoService;
+use App\Services\Soci\RequiredFieldsConfig;
 use App\Services\Soci\SociFilter;
 use App\Services\Soci\SocioActivityLogger;
 use App\Services\Soci\SocioService;
@@ -144,7 +145,7 @@ class SocioController extends Controller
         return view('soci.show', [
             'socio' => $socio,
             // Costo tessera mostrato: override tipo socio, fallback associazione (spec §3.4)
-            'costoTessera' => $socio->tipoSocio?->costo_tessera ?? $socio->associazione?->costo_tessera,
+            'costoTessera' => $socio->tipoSocio->costo_tessera ?? $socio->associazione?->costo_tessera,
         ]);
     }
 
@@ -333,8 +334,8 @@ class SocioController extends Controller
             'categorie' => CategoriaSocio::query()->orderBy('nome')->get(['id', 'nome']),
             'tags' => Tag::query()->orderBy('nome_tag')->get(),
             'campiPersonalizzati' => CampoPersonalizzato::query()->orderBy('ordine')->orderBy('nome_campo')->get(),
-            'campiObbligatori' => app(\App\Services\Soci\RequiredFieldsConfig::class)
-                ->per($associazione, \App\Services\Soci\RequiredFieldsConfig::CONTESTO_BACKEND),
+            'campiObbligatori' => app(RequiredFieldsConfig::class)
+                ->per($associazione, RequiredFieldsConfig::CONTESTO_BACKEND),
             'stati' => Socio::STATI,
         ];
     }

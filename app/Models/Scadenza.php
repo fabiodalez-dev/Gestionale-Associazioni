@@ -54,11 +54,17 @@ class Scadenza extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function assegnatoA(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'assegnato_a');
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function completataDa(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'completata_da');

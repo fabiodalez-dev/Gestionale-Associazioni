@@ -93,7 +93,7 @@ class SocioApiController extends Controller
             'citta' => $socio->citta,
             'provincia' => $socio->provincia,
             'cap' => $socio->cap,
-            'data_iscrizione' => $socio->data_iscrizione?->format('Y-m-d'),
+            'data_iscrizione' => $socio->data_iscrizione->format('Y-m-d'),
             'stato' => $socio->stato,
             'note' => $socio->note,
             'tipo_socio' => $socio->tipoSocio?->nome,
@@ -113,7 +113,7 @@ class SocioApiController extends Controller
                     'id' => $t->id,
                     'numero_tessera' => $t->numero_tessera,
                     'anno_validita' => $t->anno_validita,
-                    'data_scadenza' => $t->data_scadenza?->format('Y-m-d'),
+                    'data_scadenza' => $t->data_scadenza->format('Y-m-d'),
                     'stato' => $t->stato,
                 ])
                 ->values(),

@@ -24,7 +24,7 @@ class QuoteController extends Controller
             ->get();
 
         // Finestra "In Scadenza": configurazione dell'associazione (default 30gg come il legacy)
-        $giorniPreavviso = (int) ($socio->associazione?->giorni_notifica_scadenza ?? 30);
+        $giorniPreavviso = (int) ($socio->associazione->giorni_notifica_scadenza ?? 30);
 
         return view('area-soci.quote', [
             'socio' => $socio,

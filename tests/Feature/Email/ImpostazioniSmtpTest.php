@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Email;
 
+use App\Models\Associazione;
 use App\Models\EmailTemplate;
 use App\Models\SmtpSetting;
 use App\Services\Email\TenantMailer;
@@ -105,7 +106,7 @@ class ImpostazioniSmtpTest extends EmailTestCase
 
     public function test_isolamento_tenant_le_impostazioni_di_b_non_sono_visibili_ad_a(): void
     {
-        $assocB = \App\Models\Associazione::factory()->create();
+        $assocB = Associazione::factory()->create();
         $this->configuraSmtp($assocB);
 
         $response = $this->actingAs($this->admin)->get(route('email-impostazioni.index'));

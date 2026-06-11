@@ -37,7 +37,7 @@ class QuotaController extends Controller
             ->with(['socio' => fn ($q) => $q->withTrashed()])
             ->orderByDesc('data_scadenza');
 
-        if ($year !== 'Tutti' && $year !== null && $year !== '') {
+        if ($year !== 'Tutti' && $year !== '') {
             $query->where('anno', (int) $year);
         }
 

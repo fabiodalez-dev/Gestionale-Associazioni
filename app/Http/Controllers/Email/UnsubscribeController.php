@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Email;
 
 use App\Http\Controllers\Controller;
+use App\Models\Associazione;
 use App\Models\Socio;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -80,7 +81,7 @@ class UnsubscribeController extends Controller
         return response()->view('email.unsubscribe', [
             'state' => $state,
             'socio' => $socio,
-            'associazioneNome' => $associazione instanceof \App\Models\Associazione
+            'associazioneNome' => $associazione instanceof Associazione
                 ? $associazione->nome
                 : 'Gestione Associazioni',
         ], $status);

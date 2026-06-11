@@ -37,7 +37,7 @@ class PagamentoQuotaNotification extends Notification implements ShouldQueue
     {
         $importo = number_format((float) $this->quota->importo, 2, ',', '.');
         $dataPagamento = $this->quota->data_pagamento?->format('d/m/Y') ?? now()->format('d/m/Y');
-        $associazione = $this->quota->associazione?->nome ?? 'la tua associazione';
+        $associazione = $this->quota->associazione->nome ?? 'la tua associazione';
 
         return (new MailMessage)
             ->subject("Conferma pagamento quota {$this->quota->anno}")

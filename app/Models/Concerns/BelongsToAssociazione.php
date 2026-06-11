@@ -5,7 +5,6 @@ namespace App\Models\Concerns;
 use App\Models\Associazione;
 use App\Models\Utente;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -28,13 +27,13 @@ trait BelongsToAssociazione
 
             if ($associazioneId !== null) {
                 $builder->where(
-                    $builder->getModel()->getTable().'.associazione_id',
+                    $builder->qualifyColumn('associazione_id'),
                     $associazioneId
                 );
             }
         });
 
-        static::creating(function (Model $model) {
+        static::creating(function (self $model) {
             if (empty($model->associazione_id)) {
                 $model->associazione_id = static::currentAssociazioneId();
             }
@@ -70,6 +69,9 @@ trait BelongsToAssociazione
         return app()->bound('session') ? session('associazione_id') : null;
     }
 
+    /**
+     * @return BelongsTo<Associazione, $this>
+     */
     public function associazione(): BelongsTo
     {
         return $this->belongsTo(Associazione::class, 'associazione_id');
@@ -77,15 +79,20 @@ trait BelongsToAssociazione
 
     /**
      * Query esplicita su un tenant, ignorando lo scope globale.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeForAssociazione(Builder $query, string $associazioneId): Builder
     {
         return $query->withoutGlobalScope('associazione')
-            ->where($this->getTable().'.associazione_id', $associazioneId);
+            ->where($query->qualifyColumn('associazione_id'), $associazioneId);
     }
 
     /**
      * Query senza alcun filtro tenant (solo super_admin / contesti di sistema).
+     *
+     * @return Builder<static>
      */
     public static function allTenants(): Builder
     {

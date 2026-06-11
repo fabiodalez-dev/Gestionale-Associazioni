@@ -49,7 +49,7 @@ class SociExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping
             $socio->telefono,
             $socio->codice_fiscale,
             $socio->data_nascita?->format('d/m/Y'),
-            $socio->data_iscrizione?->format('d/m/Y'),
+            $socio->data_iscrizione->format('d/m/Y'),
             $socio->stato,
             $socio->tipoSocio?->nome,
             $socio->categoriaSocio?->nome,

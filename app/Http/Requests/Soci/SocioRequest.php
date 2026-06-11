@@ -161,7 +161,7 @@ abstract class SocioRequest extends FormRequest
 
     protected function associazioneId(): ?string
     {
-        return $this->socioInModifica()?->associazione_id ?? Socio::currentAssociazioneId();
+        return $this->socioInModifica()->associazione_id ?? Socio::currentAssociazioneId();
     }
 
     /**

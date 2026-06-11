@@ -138,21 +138,33 @@ class Socio extends Authenticatable
         return $this->stato === self::STATO_ATTIVO;
     }
 
+    /**
+     * @return BelongsTo<Sede, $this>
+     */
     public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class, 'sede_id');
     }
 
+    /**
+     * @return BelongsTo<TipoSocio, $this>
+     */
     public function tipoSocio(): BelongsTo
     {
         return $this->belongsTo(TipoSocio::class, 'tipo_socio_id');
     }
 
+    /**
+     * @return BelongsTo<CategoriaSocio, $this>
+     */
     public function categoriaSocio(): BelongsTo
     {
         return $this->belongsTo(CategoriaSocio::class, 'categoria_socio_id');
     }
 
+    /**
+     * @return HasMany<Tessera, $this>
+     */
     public function tessere(): HasMany
     {
         return $this->hasMany(Tessera::class, 'socio_id');
@@ -160,27 +172,41 @@ class Socio extends Authenticatable
 
     /**
      * Ultima tessera emessa (per data di emissione) — usata da lista e filtri.
+     *
+     * @return HasOne<Tessera, $this>
      */
     public function ultimaTessera(): HasOne
     {
         return $this->hasOne(Tessera::class, 'socio_id')->latestOfMany('data_emissione');
     }
 
+    /**
+     * @return HasMany<Quota, $this>
+     */
     public function quote(): HasMany
     {
         return $this->hasMany(Quota::class, 'socio_id');
     }
 
+    /**
+     * @return HasMany<DocumentoSocio, $this>
+     */
     public function documenti(): HasMany
     {
         return $this->hasMany(DocumentoSocio::class, 'socio_id');
     }
 
+    /**
+     * @return HasMany<ValoreCampoPersonalizzato, $this>
+     */
     public function valoriCampiPersonalizzati(): HasMany
     {
         return $this->hasMany(ValoreCampoPersonalizzato::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsToMany<Tag, $this, SocioTag>
+     */
     public function tags(): BelongsToMany
     {
         // Nota: niente withPivot('created_at') — la tabella pivot non ha updated_at
@@ -190,27 +216,42 @@ class Socio extends Authenticatable
             ->using(SocioTag::class);
     }
 
+    /**
+     * @return HasMany<EventoPartecipante, $this>
+     */
     public function partecipazioni(): HasMany
     {
         return $this->hasMany(EventoPartecipante::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsToMany<Evento, $this>
+     */
     public function eventi(): BelongsToMany
     {
         return $this->belongsToMany(Evento::class, 'eventi_partecipanti', 'socio_id', 'evento_id')
             ->withPivot(['stato_partecipazione', 'data_conferma', 'note']);
     }
 
+    /**
+     * @return HasMany<StoricoAttivitaSocio, $this>
+     */
     public function storicoAttivita(): HasMany
     {
         return $this->hasMany(StoricoAttivitaSocio::class, 'socio_id');
     }
 
+    /**
+     * @return HasMany<EmailLog, $this>
+     */
     public function emailLogs(): HasMany
     {
         return $this->hasMany(EmailLog::class, 'socio_id');
     }
 
+    /**
+     * @return HasMany<EmailQueue, $this>
+     */
     public function emailInCoda(): HasMany
     {
         return $this->hasMany(EmailQueue::class, 'socio_id');

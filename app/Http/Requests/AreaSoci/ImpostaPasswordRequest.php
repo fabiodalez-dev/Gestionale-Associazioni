@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\AreaSoci;
 
+use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
@@ -16,7 +17,7 @@ class ImpostaPasswordRequest extends FormRequest
      * Regola legacy: min 8 caratteri + conferma. Password::min(8) consente
      * di irrobustire centralmente in futuro (Password::defaults()).
      *
-     * @return array<string, array<int, \Illuminate\Contracts\Validation\Rule|string>>
+     * @return array<string, array<int, Rule|string>>
      */
     public function rules(): array
     {

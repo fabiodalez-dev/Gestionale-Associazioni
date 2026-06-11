@@ -34,7 +34,7 @@ class SocioListItemData extends Data
             email: $socio->email,
             telefono: $socio->telefono,
             stato: $socio->stato,
-            data_iscrizione: $socio->data_iscrizione?->format('Y-m-d'),
+            data_iscrizione: $socio->data_iscrizione->format('Y-m-d'),
             associazione_id: $globale ? $socio->associazione_id : Optional::create(),
             associazione_nome: $globale ? $socio->associazione?->nome : Optional::create(),
         );

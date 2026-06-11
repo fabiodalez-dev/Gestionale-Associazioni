@@ -7,6 +7,7 @@ use App\Models\EventoPartecipante;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -103,7 +104,7 @@ class DashboardSocioTest extends TestCase
 
     public function test_admin_autenticato_sulla_guard_web_non_accede_al_portale(): void
     {
-        $utente = \App\Models\Utente::factory()->create();
+        $utente = Utente::factory()->create();
 
         $this->actingAs($utente, 'web')
             ->get(route('area-soci.dashboard'))

@@ -31,6 +31,9 @@ class TesseraTemplate extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<TipoSocio, $this>
+     */
     public function tipoSocio(): BelongsTo
     {
         return $this->belongsTo(TipoSocio::class, 'tipo_socio_id');

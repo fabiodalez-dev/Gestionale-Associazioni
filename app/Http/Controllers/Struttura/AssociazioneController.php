@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 
@@ -221,7 +222,7 @@ class AssociazioneController extends Controller
         Gate::authorize('delete', $associazione);
 
         $request->validate(
-            ['conferma_nome' => ['required', 'string', \Illuminate\Validation\Rule::in([$associazione->nome])]],
+            ['conferma_nome' => ['required', 'string', Rule::in([$associazione->nome])]],
             ['conferma_nome.in' => 'Il nome digitato non corrisponde: eliminazione annullata.']
         );
 

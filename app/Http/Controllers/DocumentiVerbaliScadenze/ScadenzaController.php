@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\DocumentiVerbaliScadenze\SalvaScadenzaRequest;
 use App\Models\Scadenza;
 use App\Models\Utente;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -157,7 +158,7 @@ class ScadenzaController extends Controller
                     $scadenza->tipo_scadenza,
                     $scadenza->priorita,
                     $scadenza->stato,
-                    $scadenza->assegnatoA?->nome_completo ?? 'Non assegnato',
+                    $scadenza->assegnatoA->nome_completo ?? 'Non assegnato',
                     $scadenza->promemoria_giorni,
                 ], ';');
             }
@@ -183,8 +184,9 @@ class ScadenzaController extends Controller
 
     /**
      * @param  array{search: string, status: string, type: string, priority: string}  $filtri
+     * @return Builder<Scadenza>
      */
-    private function queryFiltrata(array $filtri): \Illuminate\Database\Eloquent\Builder
+    private function queryFiltrata(array $filtri): Builder
     {
         return Scadenza::query()
             ->when($filtri['search'] !== '', function ($q) use ($filtri) {

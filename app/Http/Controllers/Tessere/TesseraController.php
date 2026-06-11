@@ -56,7 +56,7 @@ class TesseraController extends Controller
             ->orderBy('soci.cognome')
             ->get();
 
-        $sogliaInScadenza = (int) ($associazione?->giorni_notifica_scadenza ?? 30);
+        $sogliaInScadenza = (int) ($associazione->giorni_notifica_scadenza ?? 30);
 
         if ($request->boolean('ajax')) {
             return response()->json([
@@ -87,6 +87,7 @@ class TesseraController extends Controller
             ->selectRaw('SUM(COALESCE(tipi_socio.costo_tessera, associazioni.costo_tessera, 0)) as ricavi')
             ->groupBy('tipo')
             ->orderByDesc('cnt')
+            ->toBase()
             ->get()
             ->map(fn ($r) => [
                 'tipo' => (string) $r->tipo,

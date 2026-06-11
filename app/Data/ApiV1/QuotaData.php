@@ -35,8 +35,8 @@ class QuotaData extends Data
         return new self(
             id: $quota->id,
             anno: $quota->anno,
-            importo: $quota->importo !== null ? (string) $quota->importo : null,
-            data_scadenza: $quota->data_scadenza?->format('Y-m-d'),
+            importo: $quota->importo,
+            data_scadenza: $quota->data_scadenza->format('Y-m-d'),
             data_pagamento: $quota->data_pagamento?->format('Y-m-d'),
             stato: $quota->stato,
             tipo: $quota->tipo,

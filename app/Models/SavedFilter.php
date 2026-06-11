@@ -31,6 +31,9 @@ class SavedFilter extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'user_id');

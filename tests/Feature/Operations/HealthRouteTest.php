@@ -6,6 +6,7 @@ use App\Models\Associazione;
 use App\Models\Utente;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
@@ -48,7 +49,7 @@ class HealthRouteTest extends TestCase
 
     public function test_health_json_non_registrata_senza_secret_token(): void
     {
-        $this->assertFalse(\Illuminate\Support\Facades\Route::has('health.json'));
+        $this->assertFalse(Route::has('health.json'));
 
         $superAdmin = Utente::factory()->superAdmin()->create();
         $superAdmin->assignRole('super_admin');

@@ -78,7 +78,7 @@ class EventoApiController extends Controller
                     'id' => $evento->id,
                     'titolo' => $evento->titolo,
                     'descrizione' => $evento->descrizione,
-                    'data_evento' => $evento->data_evento?->format('Y-m-d H:i:s'),
+                    'data_evento' => $evento->data_evento->format('Y-m-d H:i:s'),
                     'luogo' => $evento->luogo,
                 ];
 
@@ -127,16 +127,18 @@ class EventoApiController extends Controller
                 'id' => $evento->id,
                 'titolo' => $evento->titolo,
                 'descrizione' => $evento->descrizione,
-                'data_evento' => $evento->data_evento?->format('Y-m-d H:i:s'),
+                'data_evento' => $evento->data_evento->format('Y-m-d H:i:s'),
                 'luogo' => $evento->luogo,
             ],
-            'partecipanti' => $partecipanti->map(fn ($p) => [
+            'partecipanti' => $partecipanti->map(fn (EventoPartecipante $p) => [
                 'stato_partecipazione' => $p->stato_partecipazione,
                 'data_conferma' => $p->data_conferma?->format('Y-m-d H:i:s'),
                 'socio_id' => $p->socio_id,
-                'nome' => $p->nome,
-                'cognome' => $p->cognome,
-                'numero_socio' => $p->numero_socio,
+                // nome/cognome/numero_socio arrivano dalla join su soci:
+                // attributi dinamici, non colonne di eventi_partecipanti.
+                'nome' => $p->getAttribute('nome'),
+                'cognome' => $p->getAttribute('cognome'),
+                'numero_socio' => $p->getAttribute('numero_socio'),
             ])->values(),
             'totale_partecipanti' => $partecipanti->count(),
         ]);

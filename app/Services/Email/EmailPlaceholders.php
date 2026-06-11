@@ -87,7 +87,7 @@ class EmailPlaceholders
             $vars['COGNOME'] = $e($socio->cognome);
             $vars['EMAIL'] = $e($socio->email);
             $vars['NUMERO_SOCIO'] = $e($socio->numero_socio);
-            $vars['DATA_ISCRIZIONE'] = $e($socio->data_iscrizione ? \Illuminate\Support\Carbon::parse($socio->data_iscrizione)->format('d/m/Y') : '');
+            $vars['DATA_ISCRIZIONE'] = $e($socio->data_iscrizione->format('d/m/Y'));
             $vars['LINK_DISISCRIZIONE'] = $e(self::unsubscribeUrl($socio));
         }
 

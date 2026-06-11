@@ -23,6 +23,9 @@ class CategoriaSocio extends Model
         'testo_tessera',
     ];
 
+    /**
+     * @return HasMany<Socio, $this>
+     */
     public function soci(): HasMany
     {
         return $this->hasMany(Socio::class, 'categoria_socio_id');

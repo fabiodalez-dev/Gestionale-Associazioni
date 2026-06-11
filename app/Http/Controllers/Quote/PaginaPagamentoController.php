@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Quote;
 
 use App\Http\Controllers\Controller;
+use App\Models\PaymentGatewaySetting;
 use App\Models\Quota;
 use App\Services\Pagamenti\PaymentService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -24,7 +25,7 @@ class PaginaPagamentoController extends Controller
     {
         $quota = $this->resolveQuota($token);
 
-        $config = \App\Models\PaymentGatewaySetting::forTenant($quota->associazione_id);
+        $config = PaymentGatewaySetting::forTenant($quota->associazione_id);
 
         return view('pagamento.show', [
             'quota' => $quota,

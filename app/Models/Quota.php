@@ -65,6 +65,9 @@ class Quota extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
@@ -88,11 +91,11 @@ class Quota extends Model
 
         $oggi = now()->startOfDay();
 
-        if ($this->data_scadenza !== null && $this->data_scadenza->lt($oggi)) {
+        if ($this->data_scadenza->lt($oggi)) {
             return self::STATO_SCADUTA;
         }
 
-        if ($this->data_scadenza !== null && $this->data_scadenza->lte($oggi->copy()->addDays($giorniPreavviso))) {
+        if ($this->data_scadenza->lte($oggi->copy()->addDays($giorniPreavviso))) {
             return self::STATO_IN_SCADENZA;
         }
 

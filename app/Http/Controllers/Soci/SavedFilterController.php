@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Soci;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Soci\SalvaFiltroPresetRequest;
 use App\Models\SavedFilter;
+use App\Models\Socio;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 
@@ -22,7 +23,7 @@ class SavedFilterController extends Controller
 
         $preset = SavedFilter::updateOrCreate(
             [
-                'associazione_id' => \App\Models\Socio::currentAssociazioneId(),
+                'associazione_id' => Socio::currentAssociazioneId(),
                 'user_id' => $request->boolean('condiviso') ? null : $request->user()->id,
                 'scope' => 'soci',
                 'name' => $request->validated('preset_name'),

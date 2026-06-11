@@ -286,7 +286,7 @@ class TesseraIssuer
                 '{ASSOCIAZIONE_NOME}' => (string) $associazione->nome,
                 '{NUMERO_TESSERA}' => (string) $tessera->numero_tessera,
                 '{ANNO_VALIDITA}' => (string) $tessera->anno_validita,
-                '{DATA_SCADENZA}' => $tessera->data_scadenza?->format('d/m/Y') ?? '',
+                '{DATA_SCADENZA}' => $tessera->data_scadenza->format('d/m/Y'),
             ];
 
             EmailQueue::allTenants()->create([

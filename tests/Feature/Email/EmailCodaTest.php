@@ -6,6 +6,7 @@ use App\Models\Associazione;
 use App\Models\EmailLog;
 use App\Models\EmailQueue;
 use App\Services\Email\TenantMailer;
+use Illuminate\Support\Str;
 
 class EmailCodaTest extends EmailTestCase
 {
@@ -13,7 +14,7 @@ class EmailCodaTest extends EmailTestCase
     {
         return EmailQueue::create(array_merge([
             'associazione_id' => $this->associazione->id,
-            'batch_id' => (string) \Illuminate\Support\Str::uuid(),
+            'batch_id' => (string) Str::uuid(),
             'to_email' => 'dest@example.com',
             'to_name' => 'Destinatario',
             'subject' => 'Oggetto in coda',

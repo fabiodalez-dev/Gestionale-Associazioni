@@ -52,6 +52,9 @@ class ApiKey extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Associazione, $this>
+     */
     public function associazione(): BelongsTo
     {
         return $this->belongsTo(Associazione::class, 'associazione_id');

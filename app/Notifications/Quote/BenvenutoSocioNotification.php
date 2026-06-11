@@ -34,7 +34,7 @@ class BenvenutoSocioNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $associazione = $this->socio->associazione?->nome ?? 'la tua associazione';
+        $associazione = $this->socio->associazione->nome ?? 'la tua associazione';
 
         return (new MailMessage)
             ->subject("Benvenuto in {$associazione}!")

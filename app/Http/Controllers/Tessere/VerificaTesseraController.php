@@ -103,7 +103,7 @@ class VerificaTesseraController extends Controller
             $payload['tessera'] = [
                 'numero_tessera' => $tessera->numero_tessera,
                 'anno_validita' => $tessera->anno_validita,
-                'data_scadenza' => $tessera->data_scadenza?->toDateString(),
+                'data_scadenza' => $tessera->data_scadenza->toDateString(),
                 'stato_tessera' => $tessera->stato,
                 'socio_nome' => $tessera->socio?->nome,
                 'socio_cognome' => $tessera->socio?->cognome,

@@ -36,17 +36,26 @@ class Evento extends Model
         ];
     }
 
+    /**
+     * @return HasMany<EventoPartecipante, $this>
+     */
     public function partecipanti(): HasMany
     {
         return $this->hasMany(EventoPartecipante::class, 'evento_id');
     }
 
+    /**
+     * @return BelongsToMany<Socio, $this>
+     */
     public function soci(): BelongsToMany
     {
         return $this->belongsToMany(Socio::class, 'eventi_partecipanti', 'evento_id', 'socio_id')
             ->withPivot(['stato_partecipazione', 'data_conferma', 'note']);
     }
 
+    /**
+     * @return HasMany<Tessera, $this>
+     */
     public function tessereCreate(): HasMany
     {
         return $this->hasMany(Tessera::class, 'evento_creazione_id');

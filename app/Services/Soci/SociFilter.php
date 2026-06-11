@@ -141,7 +141,7 @@ class SociFilter
             $query->whereHas('ultimaTessera', fn (Builder $t) => $t->where('template_tessera', $this->params['tessera_template']));
         }
 
-        $giorniNotifica = (int) ($this->associazione?->giorni_notifica_scadenza ?? 30);
+        $giorniNotifica = (int) ($this->associazione->giorni_notifica_scadenza ?? 30);
 
         if ($this->params['tessera_scadenza'] === 'in_scadenza') {
             $limite = Carbon::today()->addDays($giorniNotifica)->toDateString();

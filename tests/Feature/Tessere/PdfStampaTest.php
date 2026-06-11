@@ -8,6 +8,7 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\TesseraTemplate;
 use App\Models\TipoSocio;
+use App\Services\Tessere\TesseraPdfRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class PdfStampaTest extends TessereTestCase
@@ -74,7 +75,7 @@ class PdfStampaTest extends TessereTestCase
             'associazione_id' => $assoc->id,
             'tipo_socio_id' => $tipo->id,
             'titolo' => 'Template tipo',
-            'contenuto' => "Socio {NOME_COMPLETO} - tessera {NUMERO_TESSERA} valida fino al {DATA_SCADENZA}",
+            'contenuto' => 'Socio {NOME_COMPLETO} - tessera {NUMERO_TESSERA} valida fino al {DATA_SCADENZA}',
             'attivo' => true,
         ]);
 
@@ -149,7 +150,7 @@ class PdfStampaTest extends TessereTestCase
             'attivo' => false,
         ]);
 
-        $renderer = app(\App\Services\Tessere\TesseraPdfRenderer::class);
+        $renderer = app(TesseraPdfRenderer::class);
         $testo = $renderer->testoTessera($tessera, $socio, $assoc, '', '');
         $this->assertStringContainsString('Testo categoria di fallback', $testo);
         $this->assertStringNotContainsString('NON DEVE APPARIRE', $testo);

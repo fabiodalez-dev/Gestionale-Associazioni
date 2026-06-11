@@ -111,26 +111,41 @@ class Utente extends Authenticatable
         return trim($this->nome.' '.$this->cognome);
     }
 
+    /**
+     * @return BelongsTo<Associazione, $this>
+     */
     public function associazione(): BelongsTo
     {
         return $this->belongsTo(Associazione::class, 'associazione_id');
     }
 
+    /**
+     * @return HasMany<SavedFilter, $this>
+     */
     public function savedFilters(): HasMany
     {
         return $this->hasMany(SavedFilter::class, 'user_id');
     }
 
+    /**
+     * @return HasMany<Documento, $this>
+     */
     public function documentiCaricati(): HasMany
     {
         return $this->hasMany(Documento::class, 'caricato_da');
     }
 
+    /**
+     * @return HasMany<Scadenza, $this>
+     */
     public function scadenzeAssegnate(): HasMany
     {
         return $this->hasMany(Scadenza::class, 'assegnato_a');
     }
 
+    /**
+     * @return HasMany<Verbale, $this>
+     */
     public function verbaliApprovati(): HasMany
     {
         return $this->hasMany(Verbale::class, 'approvato_da');

@@ -12,7 +12,6 @@ use App\Services\Email\EmailLayout;
 use App\Services\Email\EmailPlaceholders;
 use App\Services\Email\EmailService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -105,7 +104,7 @@ class EmailsSendReminders extends Command
             $values = EmailPlaceholders::buildValues($associazione, $socio, [
                 'NUMERO_TESSERA' => (string) $tessera->numero_tessera,
                 'ANNO_VALIDITA' => (string) $tessera->anno_validita,
-                'DATA_SCADENZA' => $tessera->data_scadenza ? Carbon::parse($tessera->data_scadenza)->format('d/m/Y') : '',
+                'DATA_SCADENZA' => $tessera->data_scadenza->format('d/m/Y'),
                 'LINK_RINNOVO' => $linkRinnovo,
                 'LINK_PAGAMENTO' => '', // gestito dal modulo pagamenti quando disponibile
             ]);
@@ -172,7 +171,7 @@ class EmailsSendReminders extends Command
             $values = EmailPlaceholders::buildValues($associazione, $socio, [
                 'IMPORTO' => number_format((float) $quota->importo, 2, ',', '.'),
                 'ANNO' => (string) $quota->anno,
-                'DATA_SCADENZA' => $quota->data_scadenza ? Carbon::parse($quota->data_scadenza)->format('d/m/Y') : '',
+                'DATA_SCADENZA' => $quota->data_scadenza->format('d/m/Y'),
                 'LINK_PAGAMENTO' => '',
             ]);
 

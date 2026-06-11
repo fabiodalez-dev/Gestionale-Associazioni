@@ -7,7 +7,7 @@ use App\Models\Tessera;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Tessera>
+ * @extends Factory<Tessera>
  */
 class TesseraFactory extends Factory
 {

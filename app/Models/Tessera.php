@@ -61,11 +61,17 @@ class Tessera extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsTo<Evento, $this>
+     */
     public function eventoCreazione(): BelongsTo
     {
         return $this->belongsTo(Evento::class, 'evento_creazione_id');
@@ -78,7 +84,6 @@ class Tessera extends Model
     public function isValida(): bool
     {
         return $this->stato === self::STATO_ATTIVA
-            && $this->data_scadenza !== null
             && $this->data_scadenza->gte(now()->startOfDay());
     }
 
@@ -87,8 +92,7 @@ class Tessera extends Model
      */
     public function isScadutaEffettiva(): bool
     {
-        return $this->data_scadenza !== null
-            && $this->data_scadenza->lt(now()->startOfDay());
+        return $this->data_scadenza->lt(now()->startOfDay());
     }
 
     /**
@@ -110,8 +114,8 @@ class Tessera extends Model
      */
     public function scopeValide(Builder $query): Builder
     {
-        return $query->where($this->getTable().'.stato', self::STATO_ATTIVA)
-            ->whereDate($this->getTable().'.data_scadenza', '>=', now()->toDateString());
+        return $query->where($query->qualifyColumn('stato'), self::STATO_ATTIVA)
+            ->whereDate($query->qualifyColumn('data_scadenza'), '>=', now()->toDateString());
     }
 
     /**
@@ -119,11 +123,9 @@ class Tessera extends Model
      */
     public function scopeScaduteEffettive(Builder $query): Builder
     {
-        $table = $this->getTable();
-
-        return $query->where(function (Builder $q) use ($table) {
-            $q->where($table.'.stato', self::STATO_SCADUTA)
-                ->orWhereDate($table.'.data_scadenza', '<', now()->toDateString());
+        return $query->where(function (Builder $q) {
+            $q->where($q->qualifyColumn('stato'), self::STATO_SCADUTA)
+                ->orWhereDate($q->qualifyColumn('data_scadenza'), '<', now()->toDateString());
         });
     }
 

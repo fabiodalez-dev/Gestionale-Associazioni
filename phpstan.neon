@@ -1,5 +1,8 @@
 includes:
     - vendor/larastan/larastan/extension.neon
+    # Solo falsi positivi Larastan: il tipo accessorio non-empty-array<string, mixed>
+    # viene rifiutato da array<model property, mixed> anche quando le chiavi sono valide.
+    - phpstan-baseline.neon
 
 parameters:
     level: 5
@@ -9,5 +12,9 @@ parameters:
 
     # Le tabelle di dominio usano UUID CHAR(36): nessun problema con gli id stringa.
     checkModelProperties: true
+
+    # I model dichiarano i cast tramite il metodo casts() (Laravel 11+):
+    # senza questo flag Larastan non li legge e tipizza le date come string.
+    parseModelCastsMethod: true
 
     reportUnmatchedIgnoredErrors: false

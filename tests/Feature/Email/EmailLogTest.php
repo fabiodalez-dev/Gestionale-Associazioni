@@ -4,6 +4,7 @@ namespace Tests\Feature\Email;
 
 use App\Models\Associazione;
 use App\Models\EmailLog;
+use Illuminate\Support\Str;
 
 class EmailLogTest extends EmailTestCase
 {
@@ -11,7 +12,7 @@ class EmailLogTest extends EmailTestCase
     {
         return EmailLog::create(array_merge([
             'associazione_id' => $this->associazione->id,
-            'batch_id' => (string) \Illuminate\Support\Str::uuid(),
+            'batch_id' => (string) Str::uuid(),
             'to_email' => 'dest@example.com',
             'to_name' => 'Destinatario',
             'subject' => 'Oggetto loggato',

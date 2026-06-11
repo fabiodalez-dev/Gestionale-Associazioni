@@ -7,7 +7,7 @@ use App\Models\Socio;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Quota>
+ * @extends Factory<Quota>
  */
 class QuotaFactory extends Factory
 {

@@ -22,6 +22,9 @@ class Tag extends Model
         'colore',
     ];
 
+    /**
+     * @return BelongsToMany<Socio, $this, SocioTag>
+     */
     public function soci(): BelongsToMany
     {
         // Niente withPivot('created_at'): la pivot non ha updated_at (vedi Socio::tags())

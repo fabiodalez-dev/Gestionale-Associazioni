@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToAssociazione;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Coda email applicativa (alto volume: non usa LogsActivity).
@@ -23,11 +24,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $status
  * @property int $attempts
  * @property int $max_attempts
- * @property \Illuminate\Support\Carbon|null $last_attempt_at
- * @property \Illuminate\Support\Carbon|null $next_attempt_at
+ * @property Carbon|null $last_attempt_at
+ * @property Carbon|null $next_attempt_at
  * @property string|null $error_message
- * @property \Illuminate\Support\Carbon|null $sent_at
- * @property \Illuminate\Support\Carbon|null $created_at
+ * @property Carbon|null $sent_at
+ * @property Carbon|null $created_at
  * @property-read Socio|null $socio
  */
 class EmailQueue extends Model

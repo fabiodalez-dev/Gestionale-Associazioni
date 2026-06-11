@@ -3,6 +3,7 @@
 namespace Tests\Feature\Tessere;
 
 use App\Models\Associazione;
+use App\Models\Evento;
 use App\Models\Socio;
 use App\Models\Tessera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -87,7 +88,7 @@ class GenerazioneMassivaTest extends TessereTestCase
         $assocA = Associazione::factory()->create();
         $assocB = Associazione::factory()->create();
         $admin = $this->creaAdmin($assocA);
-        $eventoB = \App\Models\Evento::factory()->create(['associazione_id' => $assocB->id]);
+        $eventoB = Evento::factory()->create(['associazione_id' => $assocB->id]);
 
         $response = $this->actingAs($admin)->post('/tessere/genera-massivo', [
             'anno_validita' => (int) now()->year,

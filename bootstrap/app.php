@@ -1,9 +1,15 @@
 <?php
 
+use App\Http\Middleware\EnsureTenantSelected;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Spatie\Csp\AddCspHeaders;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,16 +20,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'tenant' => \App\Http\Middleware\EnsureTenantSelected::class,
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'tenant' => EnsureTenantSelected::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
         // Security headers + Content-Security-Policy su tutte le risposte web (miglioramento 5)
         $middleware->web(append: [
-            \App\Http\Middleware\SecurityHeaders::class,
-            \Spatie\Csp\AddCspHeaders::class,
+            SecurityHeaders::class,
+            AddCspHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

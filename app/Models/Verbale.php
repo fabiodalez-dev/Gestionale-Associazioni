@@ -49,11 +49,17 @@ class Verbale extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function approvatoDa(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'approvato_da');
     }
 
+    /**
+     * @return HasMany<VerbaleFirmatario, $this>
+     */
     public function firmatari(): HasMany
     {
         return $this->hasMany(VerbaleFirmatario::class, 'verbale_id');

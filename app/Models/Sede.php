@@ -28,6 +28,9 @@ class Sede extends Model
         'responsabile',
     ];
 
+    /**
+     * @return HasMany<Socio, $this>
+     */
     public function soci(): HasMany
     {
         return $this->hasMany(Socio::class, 'sede_id');

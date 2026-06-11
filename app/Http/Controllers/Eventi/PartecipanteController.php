@@ -9,6 +9,7 @@ use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -227,9 +228,9 @@ class PartecipanteController extends Controller
      * Soci Attivi del tenant dell'evento non ancora iscritti, ordinati
      * per cognome e nome.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Socio>
+     * @return Collection<int, Socio>
      */
-    private function sociDisponibili(Evento $evento): \Illuminate\Database\Eloquent\Collection
+    private function sociDisponibili(Evento $evento): Collection
     {
         return Socio::query()
             ->forAssociazione($evento->associazione_id)

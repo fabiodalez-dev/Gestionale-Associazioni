@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Struttura\FakeSuccessSpamResponder;
+use Spatie\Honeypot\SpamProtection;
 
 return [
     /*
@@ -30,7 +31,7 @@ return [
 
     'honeypot_fields_required_for_all_forms' => false,
 
-    'spam_protection' => \Spatie\Honeypot\SpamProtection::class,
+    'spam_protection' => SpamProtection::class,
 
     'with_csp' => env('HONEYPOT_WITH_CSP', false),
 ];

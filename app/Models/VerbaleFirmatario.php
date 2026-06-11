@@ -38,16 +38,25 @@ class VerbaleFirmatario extends Model
         ];
     }
 
+    /**
+     * @return BelongsTo<Verbale, $this>
+     */
     public function verbale(): BelongsTo
     {
         return $this->belongsTo(Verbale::class, 'verbale_id');
     }
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsTo<Utente, $this>
+     */
     public function utente(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'utente_id');

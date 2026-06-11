@@ -17,6 +17,7 @@ use App\Services\Email\EmailLayout;
 use App\Services\Email\EmailPlaceholders;
 use App\Services\Email\EmailService;
 use App\Services\Email\RecipientSelector;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -132,7 +133,7 @@ class ComunicazioniController extends Controller
     /**
      * Ultime 10 aggregazioni per batch dallo storico (sezione "Invii Recenti").
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, EmailLog>
+     * @return Collection<int, EmailLog>
      */
     private function recentBatches()
     {

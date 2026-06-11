@@ -6,6 +6,7 @@ use App\Models\Associazione;
 use App\Models\EmailQueue;
 use App\Models\Socio;
 use App\Models\Tag;
+use Illuminate\Support\Facades\DB;
 
 class ComunicazioniTest extends EmailTestCase
 {
@@ -112,7 +113,7 @@ class ComunicazioniTest extends EmailTestCase
         ]);
 
         $tag = Tag::create(['associazione_id' => $this->associazione->id, 'nome_tag' => 'Volontari']);
-        \Illuminate\Support\Facades\DB::table('socio_tags')->insert([
+        DB::table('socio_tags')->insert([
             'socio_id' => $conTag->id,
             'tag_id' => $tag->id,
             'created_at' => now(),

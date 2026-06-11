@@ -40,6 +40,9 @@ class CampoPersonalizzato extends Model
         ];
     }
 
+    /**
+     * @return HasMany<ValoreCampoPersonalizzato, $this>
+     */
     public function valori(): HasMany
     {
         return $this->hasMany(ValoreCampoPersonalizzato::class, 'campo_id');

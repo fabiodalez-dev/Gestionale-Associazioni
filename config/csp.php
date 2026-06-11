@@ -1,5 +1,8 @@
 <?php
 
+use App\Support\Csp\AppCspPreset;
+use Spatie\Csp\Nonce\RandomString;
+
 return [
 
     /*
@@ -7,7 +10,7 @@ return [
      * classe che implementa `Spatie\Csp\Preset`.
      */
     'presets' => [
-        App\Support\Csp\AppCspPreset::class,
+        AppCspPreset::class,
     ],
 
     /**
@@ -69,7 +72,7 @@ return [
      * Generatore del nonce (non usato: la policy consente 'unsafe-inline'
      * per compatibilità con Bootstrap/TinyMCE/GrapesJS come nel legacy).
      */
-    'nonce_generator' => Spatie\Csp\Nonce\RandomString::class,
+    'nonce_generator' => RandomString::class,
 
     /*
      * Imposta a false per disabilitare il nonce nei contesti in cui non è desiderato.

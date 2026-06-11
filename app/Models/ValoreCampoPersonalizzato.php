@@ -24,11 +24,17 @@ class ValoreCampoPersonalizzato extends Model
         'valore',
     ];
 
+    /**
+     * @return BelongsTo<Socio, $this>
+     */
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
     }
 
+    /**
+     * @return BelongsTo<CampoPersonalizzato, $this>
+     */
     public function campo(): BelongsTo
     {
         return $this->belongsTo(CampoPersonalizzato::class, 'campo_id');

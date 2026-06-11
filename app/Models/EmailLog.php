@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToAssociazione;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Log email append-only di soli esiti definitivi (non usa LogsActivity).
@@ -23,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $status
  * @property string|null $error_message
  * @property string|null $sent_by
- * @property \Illuminate\Support\Carbon|null $sent_at
+ * @property Carbon|null $sent_at
  * @property-read Socio|null $socio
  * @property-read Utente|null $sentBy
  */

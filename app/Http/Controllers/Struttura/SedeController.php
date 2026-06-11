@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Struttura;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Struttura\SalvaSedeRequest;
+use App\Models\Associazione;
 use App\Models\Sede;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,7 +47,7 @@ class SedeController extends Controller
 
     public function destroy(Request $request, string $sede): RedirectResponse
     {
-        $associazione = \App\Models\Associazione::findOrFail(Session::get('associazione_id'));
+        $associazione = Associazione::findOrFail(Session::get('associazione_id'));
         Gate::authorize('manageSettings', $associazione);
 
         $eliminata = Sede::query()

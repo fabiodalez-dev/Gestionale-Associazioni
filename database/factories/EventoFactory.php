@@ -7,7 +7,7 @@ use App\Models\Evento;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Evento>
+ * @extends Factory<Evento>
  */
 class EventoFactory extends Factory
 {

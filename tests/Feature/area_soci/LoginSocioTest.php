@@ -4,6 +4,7 @@ namespace Tests\Feature\AreaSoci;
 
 use App\Models\Associazione;
 use App\Models\Socio;
+use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
@@ -170,7 +171,7 @@ class LoginSocioTest extends TestCase
     {
         // Guard separate: il problema del legacy (sessione condivisa) non esiste
         $associazione = Associazione::factory()->create();
-        $admin = \App\Models\Utente::factory()->create(['associazione_id' => $associazione->id]);
+        $admin = Utente::factory()->create(['associazione_id' => $associazione->id]);
         $socio = Socio::factory()->conAccessoAreaSoci()->create(['associazione_id' => $associazione->id]);
 
         $this->actingAs($admin, 'web')

@@ -92,11 +92,11 @@ class TessereController extends Controller
 
         $oggi = now()->startOfDay();
 
-        if ($tessera->data_scadenza !== null && $tessera->data_scadenza->lt($oggi)) {
+        if ($tessera->data_scadenza->lt($oggi)) {
             return Tessera::STATO_SCADUTA;
         }
 
-        if ($tessera->data_scadenza !== null && $tessera->data_scadenza->lte($oggi->copy()->addDays(30))) {
+        if ($tessera->data_scadenza->lte($oggi->copy()->addDays(30))) {
             return 'In Scadenza';
         }
 

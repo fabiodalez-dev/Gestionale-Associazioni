@@ -20,6 +20,8 @@ class RolesSeeder extends Seeder
         'eventi',
         'email',
         'documenti',
+        'verbali',
+        'scadenze',
         'struttura',
         'api',
     ];
@@ -54,6 +56,8 @@ class RolesSeeder extends Seeder
             'quote.view', 'quote.create', 'quote.update', 'quote.delete',
             'eventi.view', 'eventi.create', 'eventi.update', 'eventi.delete',
             'documenti.view', 'documenti.create',
+            'verbali.view', 'verbali.create', 'verbali.update', 'verbali.delete',
+            'scadenze.view', 'scadenze.create', 'scadenze.update', 'scadenze.delete',
             'email.view',
         ]);
 

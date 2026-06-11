@@ -71,16 +71,15 @@ class ApiDocsPageTest extends TestCase
             ->assertSee('rate_limited');
     }
 
-    public function test_anche_l_operatore_autenticato_vede_la_documentazione(): void
+    public function test_l_operatore_non_accede_alla_documentazione(): void
     {
-        // Nessun gate dedicato sulla guida statica: basta essere autenticati
+        // La guida API richiede il permesso api.view: l'operatore è escluso
         $operatore = Utente::factory()->operatore()->create([
             'associazione_id' => $this->associazione->id,
         ]);
 
         $this->actingAs($operatore)
             ->get('/api-docs')
-            ->assertOk()
-            ->assertSee('Documentazione API v1');
+            ->assertForbidden();
     }
 }

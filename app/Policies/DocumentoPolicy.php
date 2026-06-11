@@ -4,15 +4,22 @@ namespace App\Policies;
 
 use App\Models\Documento;
 use App\Models\Utente;
+use App\Policies\Concerns\AuthorizesModulePermissions;
 
 /**
- * Matrice ruoli (spec §5): tutti gli utenti del tenant vedono e caricano;
- * eliminazione/cestino riservati a admin_associazione e super_admin.
- * Lo scoping tenant hard è garantito dal global scope BelongsToAssociazione;
- * la policy aggiunge il controllo esplicito di appartenenza.
+ * Policy del modulo documenti: abilità mappate sui permessi spatie
+ * (documenti.view / create / delete). L'operatore ha view+create;
+ * eliminazione/cestino richiedono documenti.delete (admin_associazione).
+ * Le abilità sul singolo modello verificano anche l'appartenenza al tenant.
  */
 class DocumentoPolicy
 {
+    use AuthorizesModulePermissions;
+
+    private const FALLBACK_VIEW = ['admin_associazione', 'operatore'];
+
+    private const FALLBACK_ADMIN = ['admin_associazione'];
+
     public function before(Utente $utente): ?bool
     {
         return $utente->isSuperAdmin() ? true : null;
@@ -20,32 +27,36 @@ class DocumentoPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return true;
+        return $this->allowed($utente, 'documenti.view', self::FALLBACK_VIEW);
     }
 
     public function view(Utente $utente, Documento $documento): bool
     {
-        return $this->stessoTenant($utente, $documento);
+        return $this->allowed($utente, 'documenti.view', self::FALLBACK_VIEW)
+            && $this->stessoTenant($utente, $documento);
     }
 
     public function create(Utente $utente): bool
     {
-        return true;
+        return $this->allowed($utente, 'documenti.create', self::FALLBACK_VIEW);
     }
 
     public function delete(Utente $utente, Documento $documento): bool
     {
-        return $utente->isAdminAssociazione() && $this->stessoTenant($utente, $documento);
+        return $this->allowed($utente, 'documenti.delete', self::FALLBACK_ADMIN)
+            && $this->stessoTenant($utente, $documento);
     }
 
     public function restore(Utente $utente, Documento $documento): bool
     {
-        return $utente->isAdminAssociazione() && $this->stessoTenant($utente, $documento);
+        return $this->allowed($utente, 'documenti.delete', self::FALLBACK_ADMIN)
+            && $this->stessoTenant($utente, $documento);
     }
 
     public function forceDelete(Utente $utente, Documento $documento): bool
     {
-        return $utente->isAdminAssociazione() && $this->stessoTenant($utente, $documento);
+        return $this->allowed($utente, 'documenti.delete', self::FALLBACK_ADMIN)
+            && $this->stessoTenant($utente, $documento);
     }
 
     private function stessoTenant(Utente $utente, Documento $documento): bool

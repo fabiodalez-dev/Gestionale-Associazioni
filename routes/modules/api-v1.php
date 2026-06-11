@@ -110,5 +110,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/api-tokens/{tokenId}', [ApiTokenController::class, 'destroy'])->name('api-tokens.destroy');
 
     // Guida statica (la reference OpenAPI interattiva è su /docs/api via Scramble)
-    Route::get('/api-docs', ApiDocsPageController::class)->name('api-docs.index');
+    Route::get('/api-docs', ApiDocsPageController::class)
+        ->middleware('can:viewAny,App\Models\ApiKey')
+        ->name('api-docs.index');
 });

@@ -93,12 +93,10 @@ class ApiKeysPageTest extends TestCase
             ->assertDontSee($chiave->api_key);
     }
 
-    public function test_operatore_accede_alla_pagina_ma_vede_solo_le_chiavi_del_proprio_tenant(): void
+    public function test_l_operatore_non_accede_alle_chiavi_api(): void
     {
-        // viewAny è aperto a tutti gli utenti loggati: lo scoping è nella query
+        // La pagina richiede il permesso api.view: l'operatore è escluso
         $this->creaChiave($this->associazione->id, 'Chiave Tenant Operatore');
-        $this->creaChiave(Associazione::factory()->create()->id, 'Chiave Fuori Tenant');
-        $this->creaChiave(null, 'Chiave Globale Riservata');
 
         $operatore = Utente::factory()->operatore()->create([
             'associazione_id' => $this->associazione->id,
@@ -106,9 +104,6 @@ class ApiKeysPageTest extends TestCase
 
         $this->actingAs($operatore)
             ->get('/api-keys')
-            ->assertOk()
-            ->assertSee('Chiave Tenant Operatore')
-            ->assertDontSee('Chiave Fuori Tenant')
-            ->assertDontSee('Chiave Globale Riservata');
+            ->assertForbidden();
     }
 }

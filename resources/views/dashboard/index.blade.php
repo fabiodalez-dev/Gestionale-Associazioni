@@ -3,138 +3,100 @@
 @section('title', 'Dashboard - '.session('app_name', config('app.name')))
 
 @section('content')
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-end pb-3 mb-4 border-bottom">
         <div>
-            <h1 class="h2">Dashboard</h1>
+            <h1 class="h2 mb-1">Dashboard</h1>
             <p class="text-muted mb-0">
                 @if ($vistaGlobale)
-                    Benvenuto Super Admin. Panoramica globale di tutte le associazioni.
+                    Panoramica globale di tutte le associazioni
                 @else
-                    Panoramica generale di {{ session('associazione_nome', 'Manager') }}
+                    Panoramica di {{ session('associazione_nome', 'Manager') }}
                 @endif
             </p>
         </div>
-        <div class="text-muted small">
-            <i class="bi bi-clock me-1"></i>Ultimo aggiornamento: {{ now()->format('d/m/Y H:i') }}
+        <div class="text-muted small text-nowrap pb-1">
+            Aggiornata alle {{ now()->format('H:i') }} del {{ now()->format('d/m/Y') }}
         </div>
     </div>
 
     @if ($utente->isSuperAdmin())
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <i class="bi bi-buildings me-2"></i>Associazioni
+        <div class="panel mb-4">
+            <div class="panel-header">
+                <span>Associazioni</span>
+                <form method="POST" action="{{ route('tenant.switch') }}" class="m-0">
+                    @csrf
+                    <input type="hidden" name="associazione_id" value="">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm {{ session('associazione_id') ? '' : 'active' }}">
+                        <i class="bi bi-globe2 me-1"></i>Vista globale
+                    </button>
+                </form>
             </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    @foreach ($associazioni as $associazione)
-                        <div class="col-12 col-md-4 col-lg-3">
-                            <div class="card h-100 {{ session('associazione_id') === $associazione->id ? 'border-primary' : '' }}">
-                                <div class="card-body d-flex flex-column">
-                                    <h6 class="card-title mb-3"><i class="bi bi-building me-1"></i>{{ $associazione->nome }}</h6>
-                                    <form method="POST" action="{{ route('tenant.switch') }}" class="mt-auto">
-                                        @csrf
-                                        <input type="hidden" name="associazione_id" value="{{ $associazione->id }}">
-                                        <button type="submit" class="btn btn-sm {{ session('associazione_id') === $associazione->id ? 'btn-primary' : 'btn-outline-primary' }} w-100">
-                                            <i class="bi bi-box-arrow-in-right me-1"></i>Entra
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                    <div class="col-12 col-md-4 col-lg-3">
-                        <div class="card h-100 bg-light">
-                            <div class="card-body d-flex flex-column">
-                                <h6 class="card-title mb-3"><i class="bi bi-globe2 me-1"></i>Tutte le associazioni</h6>
-                                <form method="POST" action="{{ route('tenant.switch') }}" class="mt-auto">
-                                    @csrf
-                                    <input type="hidden" name="associazione_id" value="">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
-                                        <i class="bi bi-eye me-1"></i>Vista Globale
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <ul class="panel-list">
+                @forelse ($associazioni as $associazione)
+                    @php $attiva = session('associazione_id') === $associazione->id; @endphp
+                    <li class="assoc-row {{ $attiva ? 'active' : '' }}">
+                        <span class="assoc-name">
+                            <i class="bi bi-building"></i>{{ $associazione->nome }}
+                            @if ($attiva)<span class="badge bg-primary">Attiva</span>@endif
+                        </span>
+                        @unless ($attiva)
+                            <form method="POST" action="{{ route('tenant.switch') }}" class="m-0">
+                                @csrf
+                                <input type="hidden" name="associazione_id" value="{{ $associazione->id }}">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Entra</button>
+                            </form>
+                        @endunless
+                    </li>
+                @empty
+                    <li class="panel-empty">
+                        <i class="bi bi-buildings"></i>
+                        Nessuna associazione attiva. Creane una da Amministrazione &rsaquo; Associazioni.
+                    </li>
+                @endforelse
+            </ul>
         </div>
     @endif
 
-    <div class="row g-3 mb-4">
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="stat-icon me-3 text-primary"><i class="bi bi-people fs-2"></i></div>
-                    <div>
-                        <div class="fs-3 fw-bold">{{ $stats['total_soci'] }}</div>
-                        <div class="text-muted small">Totale Soci</div>
-                    </div>
-                </div>
-            </div>
+    <div class="metrics-strip mb-4">
+        <div class="metric-cell">
+            <div class="metric-label">Totale soci</div>
+            <div class="metric-value">{{ $stats['total_soci'] }}</div>
         </div>
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="stat-icon me-3 text-success"><i class="bi bi-person-check fs-2"></i></div>
-                    <div>
-                        <div class="fs-3 fw-bold">{{ $stats['soci_attivi'] }}</div>
-                        <div class="text-muted small">Soci Attivi</div>
-                    </div>
-                </div>
-            </div>
+        <div class="metric-cell">
+            <div class="metric-label">Soci attivi</div>
+            <div class="metric-value">{{ $stats['soci_attivi'] }}</div>
         </div>
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="stat-icon me-3 text-warning"><i class="bi bi-exclamation-triangle fs-2"></i></div>
-                    <div>
-                        <div class="fs-3 fw-bold">{{ $stats['scadenze_imminenti'] }}</div>
-                        <div class="text-muted small">Scadenze Imminenti (30 gg)</div>
-                    </div>
-                </div>
-            </div>
+        <div class="metric-cell {{ $stats['scadenze_imminenti'] > 0 ? 'metric-warn' : '' }}">
+            <div class="metric-label">Scadenze 30 giorni</div>
+            <div class="metric-value">{{ $stats['scadenze_imminenti'] }}</div>
         </div>
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="stat-icon me-3 text-info"><i class="bi bi-calendar-event fs-2"></i></div>
-                    <div>
-                        <div class="fs-3 fw-bold">{{ $stats['eventi_mese'] }}</div>
-                        <div class="text-muted small">Eventi questo mese</div>
-                    </div>
-                </div>
-            </div>
+        <div class="metric-cell">
+            <div class="metric-label">Eventi questo mese</div>
+            <div class="metric-value">{{ $stats['eventi_mese'] }}</div>
         </div>
-        <div class="col-12 col-sm-6 col-xl-4">
-            <div class="card stat-card h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="stat-icon me-3" style="color: #FF7B11;"><i class="bi bi-credit-card fs-2"></i></div>
-                    <div>
-                        <div class="fs-3 fw-bold">{{ $stats['quote_pagate'] }}</div>
-                        <div class="text-muted small">Quote pagate {{ now()->year }}</div>
-                    </div>
-                </div>
-            </div>
+        <div class="metric-cell">
+            <div class="metric-label">Quote pagate</div>
+            <div class="metric-value">{{ $stats['quote_pagate'] }}<span class="metric-hint">{{ now()->year }}</span></div>
         </div>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-lg-6">
-            <div class="card h-100">
-                <div class="card-header bg-white">
-                    <i class="bi bi-calendar-event me-2"></i>Prossimi Eventi
-                </div>
-                <div class="card-body">
+            <div class="panel h-100">
+                <div class="panel-header"><span>Prossimi eventi</span></div>
+                <ul class="panel-list">
                     @forelse ($prossimiEventi as $evento)
-                        <div class="d-flex justify-content-between align-items-center py-2 {{ $loop->last ? '' : 'border-bottom' }}">
+                        <li>
                             <span>{{ $evento->titolo }}</span>
-                            <span class="badge bg-primary">{{ $evento->data_evento?->format('d/m/Y') }}</span>
-                        </div>
+                            <span class="text-muted text-nowrap">{{ $evento->data_evento?->format('d/m/Y') }}</span>
+                        </li>
                     @empty
-                        <p class="text-muted mb-0">Nessun evento in programma</p>
+                        <li class="panel-empty">
+                            <i class="bi bi-calendar-event"></i>
+                            Nessun evento in programma. Creane uno da Eventi.
+                        </li>
                     @endforelse
-                </div>
+                </ul>
             </div>
         </div>
     </div>

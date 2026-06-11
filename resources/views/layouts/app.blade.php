@@ -5,9 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', session('app_name', config('app.name', 'Associazione Soci Manager')))</title>
+    <script>
+        // Applica il tema salvato prima del paint per evitare flash
+        (function () {
+            var t = localStorage.getItem('theme');
+            if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-bs-theme', t);
+        })();
+    </script>
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/style.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/css/design-system.css') }}" rel="stylesheet">
     <meta name="theme-color" content="#FF7B11">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -32,20 +40,18 @@
     <div class="sidebar-overlay d-md-none" id="sidebarOverlay"></div>
     @endauth
 
-    <div class="container-fluid">
-        <div class="row">
-            @auth
-                @include('layouts.sidebar')
-            @endauth
+    <div class="app-shell">
+        @auth
+            @include('layouts.sidebar')
+        @endauth
 
-            <!-- Contenuto principale -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content" id="mainContent">
-                <div class="page-container" data-page="{{ \Illuminate\Support\Str::slug(request()->route()?->getName() ?? 'dashboard') }}">
-                    @include('partials.flash')
-                    @yield('content')
-                </div>
-            </main>
-        </div>
+        <!-- Contenuto principale -->
+        <main class="main-content" id="mainContent">
+            <div class="page-container" data-page="{{ \Illuminate\Support\Str::slug(request()->route()?->getName() ?? 'dashboard') }}">
+                @include('partials.flash')
+                @yield('content')
+            </div>
+        </main>
     </div>
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>

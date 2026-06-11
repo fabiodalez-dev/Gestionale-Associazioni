@@ -14,11 +14,11 @@
     $emailActive = request()->routeIs('comunicazioni.*', 'email-templates.*', 'email-coda.*', 'email-log.*', 'email-impostazioni.*');
     $apiActive = request()->routeIs('api-keys.*', 'api-docs.*');
 @endphp
-<nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse" id="mainSidebar">
-    <div class="position-sticky pt-3">
-        <div class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-decoration-none px-3 sidebar-brand">
-            <i class="bi bi-people-fill fs-4 me-2 text-primary"></i>
-            <span class="fs-5 fw-semibold">{{ $associazioneNome }}</span>
+<nav class="sidebar" id="mainSidebar" aria-label="Navigazione principale">
+    <div class="sidebar-inner">
+        <div class="sidebar-brand">
+            <i class="bi bi-people-fill"></i>
+            <span>{{ $associazioneNome }}</span>
         </div>
 
         @if ($isSuperAdmin)
@@ -199,27 +199,31 @@
             @endif
         </ul>
 
-        <hr>
-
-        <div class="px-3 mt-auto">
-            <div class="d-flex align-items-center mb-2">
-                <i class="bi bi-person-circle fs-4 me-2"></i>
-                <div class="d-flex flex-column lh-1">
-                    <span class="small fw-bold">{{ $utente?->nome_completo ?: 'Utente' }}</span>
-                    <span class="small text-muted">{{ $utente->ruolo ?? 'ruolo' }}</span>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <i class="bi bi-person-circle"></i>
+                <div>
+                    <div class="sidebar-user-name">{{ $utente?->nome_completo ?: 'Utente' }}</div>
+                    <div class="sidebar-user-role">{{ $utente->ruolo ?? 'ruolo' }}</div>
                 </div>
             </div>
-            <a href="{{ route('profile.show') }}" class="btn btn-outline-secondary btn-sm w-100 mb-2 {{ request()->routeIs('profile.*') ? 'active' : '' }}">
-                <i class="bi bi-person-gear me-2"></i>
-                Profilo
-            </a>
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="btn btn-outline-danger btn-sm w-100">
-                    <i class="bi bi-box-arrow-right me-2"></i>
-                    Logout
-                </button>
-            </form>
+            <div class="d-flex gap-2">
+                <a href="{{ route('profile.show') }}" class="btn btn-outline-secondary btn-sm flex-fill {{ request()->routeIs('profile.*') ? 'active' : '' }}">
+                    <i class="bi bi-person-gear me-1"></i>Profilo
+                </a>
+                <form method="POST" action="{{ route('logout') }}" class="flex-fill">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-box-arrow-right me-1"></i>Esci
+                    </button>
+                </form>
+            </div>
+            <button type="button" class="theme-toggle" id="themeToggle" aria-label="Cambia tema chiaro/scuro">
+                <i class="bi bi-moon theme-label-light"></i>
+                <i class="bi bi-sun theme-label-dark"></i>
+                <span class="theme-label-light">Tema scuro</span>
+                <span class="theme-label-dark">Tema chiaro</span>
+            </button>
         </div>
     </div>
 </nav>

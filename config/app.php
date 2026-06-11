@@ -16,6 +16,11 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
+    | Abilita il comando e2e:fixture (suite Playwright). Mai true in produzione.
+    */
+    'e2e_fixtures' => (bool) env('E2E_FIXTURES', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------

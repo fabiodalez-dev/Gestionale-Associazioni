@@ -33,3 +33,5 @@ CLAUDE.local.md
 Homestead.json
 Homestead.yaml
 Thumbs.db
+tests/e2e/report/
+test-results/

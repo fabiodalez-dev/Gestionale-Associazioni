@@ -68,6 +68,7 @@ class RichiestaIscrizioneController extends Controller
                 $request->boolean('genera_tessera'),
                 $request->validated('delibera_numero'),
                 $request->validated('delibera_data'),
+                $request->boolean('genera_quota', true),
             );
         } catch (IscrizioneException $e) {
             return redirect()
@@ -78,7 +79,8 @@ class RichiestaIscrizioneController extends Controller
         return redirect()
             ->route('richieste-iscrizione.index')
             ->with('success', 'Richiesta approvata: il socio è ora attivo e collegato all\'account.'
-                .($request->boolean('genera_tessera') ? ' Tessera generata.' : ''));
+                .($request->boolean('genera_tessera') ? ' Tessera generata.' : '')
+                .($request->boolean('genera_quota', true) ? ' Quota associativa dell\'anno creata (se configurata).' : ''));
     }
 
     public function rifiuta(RifiutaRichiestaIscrizioneRequest $request, RichiestaIscrizione $richiesta): RedirectResponse

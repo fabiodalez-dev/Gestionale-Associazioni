@@ -3,6 +3,7 @@
 namespace App\Services\Iscrizioni;
 
 use App\Models\Account;
+use App\Models\Quota;
 use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
@@ -55,11 +56,14 @@ class ApprovazioneIscrizioneService
         bool $generaTessera = false,
         ?string $deliberaNumero = null,
         ?string $deliberaData = null,
+        bool $generaQuota = true,
     ): RichiestaIscrizione {
         /** @var Tessera|null $tessera */
         $tessera = null;
+        /** @var Quota|null $quota */
+        $quota = null;
 
-        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $deliberaNumero, $deliberaData, &$tessera): RichiestaIscrizione {
+        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $generaQuota, $deliberaNumero, $deliberaData, &$tessera, &$quota): RichiestaIscrizione {
             $richiesta = $this->lockRichiesta($richiesta);
 
             if (! $richiesta->isInAttesa()) {
@@ -101,6 +105,13 @@ class ApprovazioneIscrizioneService
                 $tessera = $this->pagamenti->createTesseraForSocio($socio);
             }
 
+            // Coerenza del tesseramento (vedi /quote, campagna rinnovi):
+            // all'ammissione nasce la quota associativa dell'anno, da pagare.
+            // Skippata se l'importo non è configurato o se la quota esiste già.
+            if ($generaQuota) {
+                $quota = $this->creaQuotaAmmissione($socio);
+            }
+
             $richiesta->forceFill([
                 'stato' => RichiestaIscrizione::STATO_APPROVATA,
                 'gestita_da' => $utente->id,
@@ -116,10 +127,71 @@ class ApprovazioneIscrizioneService
         $this->notificaAccount($risultato, new IscrizioneApprovataNotification(
             $risultato,
             $tessera?->numero_tessera,
-            $tessera?->id
+            $tessera?->id,
+            $this->linkPagamentoQuota($quota)
         ));
 
         return $risultato;
+    }
+
+    /**
+     * Quota associativa dell'anno corrente all'ammissione: importo dal
+     * tipo socio (se assegnato e con costo) altrimenti dall'associazione.
+     * Null se l'importo non è configurato o se una quota dell'anno esiste già.
+     */
+    protected function creaQuotaAmmissione(Socio $socio): ?Quota
+    {
+        $importo = $this->importoQuota($socio);
+
+        if ($importo === null || $importo <= 0) {
+            return null;
+        }
+
+        $esiste = Quota::allTenants()
+            ->where('socio_id', $socio->id)
+            ->where('anno', (int) now()->format('Y'))
+            ->exists();
+
+        if ($esiste) {
+            return null;
+        }
+
+        return PaymentService::createQuotaForSocio($socio, $importo);
+    }
+
+    protected function importoQuota(Socio $socio): ?float
+    {
+        $daTipo = $socio->tipo_socio_id !== null
+            ? $socio->tipoSocio()->withoutGlobalScopes()->first()?->costo_tessera
+            : null;
+
+        $importo = $daTipo ?? $socio->associazione()->first()?->costo_tessera;
+
+        return $importo !== null ? (float) $importo : null;
+    }
+
+    /**
+     * Link pubblico di pagamento per la quota appena creata (best-effort:
+     * un errore nella generazione del token non blocca l'approvazione).
+     */
+    protected function linkPagamentoQuota(?Quota $quota): ?string
+    {
+        if ($quota === null) {
+            return null;
+        }
+
+        try {
+            $token = $this->pagamenti->generatePaymentToken($quota);
+
+            return route('pagamento.show', ['token' => $token]);
+        } catch (\Throwable $e) {
+            Log::warning('ApprovazioneIscrizioneService: link pagamento non generato', [
+                'quota_id' => $quota->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     /**

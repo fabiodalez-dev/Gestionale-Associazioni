@@ -30,6 +30,7 @@ class IscrizioneApprovataNotification extends Notification implements ShouldQueu
         public RichiestaIscrizione $richiesta,
         public ?string $numeroTessera = null,
         public ?string $tesseraId = null,
+        public ?string $linkPagamentoQuota = null,
     ) {}
 
     /**
@@ -54,6 +55,11 @@ class IscrizioneApprovataNotification extends Notification implements ShouldQueu
         if (filled($this->numeroTessera)) {
             $message->line('Ti è stata assegnata la tessera numero '
                 .$this->numeroTessera.', disponibile nella tua area riservata.');
+        }
+
+        if (filled($this->linkPagamentoQuota)) {
+            $message->line('Per completare il tesseramento ti chiediamo di versare la quota associativa dell\'anno: puoi pagarla online in un minuto.')
+                ->action('Paga la quota associativa', $this->linkPagamentoQuota);
         }
 
         if ($associazione !== null && filled($associazione->slug) && Route::has('pubblico.account.tessera')) {

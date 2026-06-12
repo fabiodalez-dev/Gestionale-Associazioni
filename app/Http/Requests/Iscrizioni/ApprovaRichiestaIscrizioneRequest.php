@@ -24,6 +24,7 @@ class ApprovaRichiestaIscrizioneRequest extends FormRequest
     {
         return [
             'genera_tessera' => ['nullable', 'boolean'],
+            'genera_quota' => ['nullable', 'boolean'],
             'delibera_numero' => ['nullable', 'string', 'max:50'],
             'delibera_data' => ['nullable', 'date'],
         ];

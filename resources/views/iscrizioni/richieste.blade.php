@@ -242,6 +242,13 @@
                             Genera subito la tessera per l'anno corrente
                         </label>
                     </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="genera_quota" name="genera_quota" value="1" checked>
+                        <label class="form-check-label" for="genera_quota">
+                            Genera la quota associativa {{ now()->year }} (da pagare)
+                            <span class="text-muted d-block small">Importo dal tipo socio o dall'associazione; se non configurato la quota non viene creata. Il link di pagamento viene incluso nell'email di benvenuto.</span>
+                        </label>
+                    </div>
                     {{-- Delibera di ammissione opzionale (f.14): finisce nel libro soci --}}
                     <div class="row">
                         <div class="col-md-6">

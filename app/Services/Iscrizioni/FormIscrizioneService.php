@@ -247,6 +247,20 @@ class FormIscrizioneService
                 $diretta ? ['socio_id' => $socio->id] : []
             ))->save();
 
+            // Modalità diretta: il socio è già attivo, quindi nasce subito
+            // anche la quota associativa dell'anno (coerenza con /quote e
+            // campagna rinnovi). Importo da tipo socio o associazione;
+            // se non configurato la quota non viene creata.
+            if ($diretta) {
+                $importo = $socio->tipo_socio_id !== null
+                    ? ($socio->tipoSocio()->withoutGlobalScopes()->first()?->costo_tessera ?? $associazione->costo_tessera)
+                    : $associazione->costo_tessera;
+
+                if ($importo !== null && (float) $importo > 0) {
+                    \App\Services\Pagamenti\PaymentService::createQuotaForSocio($socio, (float) $importo);
+                }
+            }
+
             return $richiesta;
         });
     }

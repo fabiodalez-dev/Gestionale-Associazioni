@@ -133,7 +133,8 @@ class InstallerController extends Controller
                 'MAIL_PORT' => (string) $dati['smtp_port'],
                 'MAIL_USERNAME' => $dati['smtp_username'] ?? '',
                 'MAIL_PASSWORD' => $dati['smtp_password'] ?? '',
-                'MAIL_SCHEME' => $dati['smtp_encryption'] ?? null,
+                // 'tls' (STARTTLS) usa scheme 'smtp': Symfony accetta solo smtp|smtps
+                'MAIL_SCHEME' => ($dati['smtp_encryption'] ?? null) === 'smtps' ? 'smtps' : 'smtp',
                 'MAIL_FROM_ADDRESS' => $dati['from_address'],
                 'MAIL_FROM_NAME' => $dati['from_name'],
             ], fn ($v) => $v !== null));

@@ -21,6 +21,7 @@
         <!-- dompdf (test PDF tessere) supera i 128M di default della CLI -->
         <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
+        <env name="INSTALLER_ENV_FILE" value="storage/framework/testing/env-installer-test"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

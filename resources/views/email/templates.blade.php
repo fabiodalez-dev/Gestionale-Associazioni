@@ -93,16 +93,32 @@
 @endsection
 
 @push('scripts')
+<link href="{{ asset('assets/css/grapes-theme.css') }}" rel="stylesheet">
 <script src="{{ asset('assets/vendor/grapesjs/grapes.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/grapesjs/grapesjs-preset-newsletter.min.js') }}"></script>
 <script>
 const corpoJson = @json($current?->corpo_json);
 const corpoHtml = @json(old('corpo_html', $current?->corpo_html ?? ''));
 
+const emailCanvasCss = `
+    body {
+        background: #eef0f3;
+        margin: 0;
+        padding: 28px 16px;
+        font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #24292f;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+    }
+    body > * { max-width: 600px; margin-left: auto; margin-right: auto; }
+    h1, h2, h3 { line-height: 1.25; }
+    p { margin: 0 0 12px; }
+`;
 const editor = grapesjs.init({
     container: '#gjs-editor',
-    height: '480px',
+    height: '560px',
     storageManager: false,
+    canvasCss: emailCanvasCss,
     plugins: ['gjs-preset-newsletter'],
     pluginsOpts: { 'gjs-preset-newsletter': {} },
     assetManager: { upload: false }

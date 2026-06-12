@@ -14,7 +14,7 @@ return [
 
     'lock_file' => env('INSTALLER_LOCK_FILE', storage_path('app/installed.lock')),
 
-    'env_file' => base_path('.env'),
+    'env_file' => env('INSTALLER_ENV_FILE') ?: base_path('.env'),
 
     // Nei test l'enforcement è disattivato di default per non interferire
     // con la suite; i test dell'installer lo abilitano esplicitamente.

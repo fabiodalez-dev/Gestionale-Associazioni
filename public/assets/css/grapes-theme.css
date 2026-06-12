@@ -1,0 +1,73 @@
+/* ============================================================================
+   Tema GrapesJS sul design system (editor template email e comunicazioni).
+   Sostituisce il chrome scuro di default con i token --ds-* e dà al canvas
+   l'aspetto di un client di posta. Caricato dopo grapes.min.css implicito.
+   ========================================================================== */
+
+/* Contenitore: card coerente con il resto dell'admin */
+#gjs-editor {
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--ds-shadow-sm);
+}
+
+/* Palette chrome: pannelli, testi, accenti */
+.gjs-one-bg { background-color: var(--ds-surface-2) !important; }
+.gjs-two-color { color: var(--ds-text-2) !important; }
+.gjs-three-bg { background-color: var(--ds-accent) !important; color: #fff !important; }
+.gjs-four-color { color: var(--ds-accent) !important; }
+.gjs-four-color-h:hover { color: var(--ds-accent-hover) !important; }
+
+/* Toolbar superiore e pannelli laterali */
+.gjs-pn-panel { padding: 6px 8px; }
+.gjs-pn-views-container,
+.gjs-pn-views { border-color: var(--ds-border) !important; }
+.gjs-pn-btn {
+    border-radius: 6px;
+    margin: 0 2px;
+    transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+.gjs-pn-btn:hover { background-color: oklch(from var(--ds-border) l c h / 0.5); }
+.gjs-pn-btn.gjs-pn-active {
+    background-color: var(--ds-accent-subtle) !important;
+    color: var(--ds-accent) !important;
+    box-shadow: none;
+}
+
+/* Canvas: cornice tipo client di posta */
+.gjs-cv-canvas { background-color: oklch(94% 0.004 75); }
+[data-bs-theme="dark"] .gjs-cv-canvas { background-color: oklch(22% 0.008 60); }
+
+/* Gestori (settings, style manager, layer, blocchi) */
+.gjs-sm-sector .gjs-sm-sector-title,
+.gjs-block-category .gjs-title,
+.gjs-layer-title,
+.gjs-trt-header {
+    background-color: var(--ds-surface-2) !important;
+    color: var(--ds-text) !important;
+    border-color: var(--ds-border) !important;
+    font-weight: 600;
+}
+.gjs-field, .gjs-field input, .gjs-field select {
+    background-color: var(--ds-surface) !important;
+    color: var(--ds-text) !important;
+    border-radius: 6px;
+}
+.gjs-block {
+    border: 1px solid var(--ds-border);
+    border-radius: var(--ds-radius);
+    background: var(--ds-surface);
+    color: var(--ds-text-2);
+    transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.gjs-block:hover { border-color: var(--ds-accent); box-shadow: var(--ds-shadow-sm); }
+
+/* Badge/selezione componenti dentro il canvas */
+.gjs-badge { background-color: var(--ds-accent) !important; border-radius: 4px; }
+.gjs-toolbar { background-color: var(--ds-accent) !important; border-radius: 6px; }
+.gjs-comp-selected { outline-color: var(--ds-accent) !important; }
+.gjs-resizer-h { border-color: var(--ds-accent) !important; }
+
+/* RTE inline */
+.gjs-rte-toolbar { border-radius: 8px; box-shadow: var(--ds-shadow-md); }

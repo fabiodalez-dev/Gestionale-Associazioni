@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Account;
+use App\Models\Annuncio;
 use App\Models\Associazione;
+use App\Models\Documento;
 use App\Models\Evento;
 use App\Models\FeedbackEvento;
 use App\Models\PaymentGatewaySetting;
@@ -23,7 +25,9 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 /**
  * Fixture per la suite E2E Playwright (tests/e2e). Attivo SOLO con
@@ -38,7 +42,8 @@ class E2eFixtureCommand extends Command
         {--tessera=} {--scaduta=0} {--senza-tessera=0} {--con-quota=0}
         {--aperte=} {--modalita=} {--intro=} {--config=}
         {--genera-tessera=0} {--motivo=}
-        {--solo-soci=0} {--socio=} {--quota=} {--codice-fiscale=} {--data-nascita=} {--quota-scadenza=}';
+        {--solo-soci=0} {--socio=} {--quota=} {--codice-fiscale=} {--data-nascita=} {--quota-scadenza=}
+        {--categoria=}';
 
     protected $description = 'Fixture deterministiche per i test E2E (richiede E2E_FIXTURES=1)';
 
@@ -74,6 +79,8 @@ class E2eFixtureCommand extends Command
             'link-feedback' => $this->linkFeedback(),
             'conta-serie' => $this->contaSerie(),
             'stato-socio' => $this->statoSocio(),
+            'crea-documento-pubblico' => $this->creaDocumentoPubblico(),
+            'crea-convocazione' => $this->creaConvocazione(),
             default => ['error' => 'azione sconosciuta'],
         };
 
@@ -722,6 +729,85 @@ class E2eFixtureCommand extends Command
             'socio_id' => $socio->id,
             'stato' => $socio->stato,
             'numero_socio' => $socio->numero_socio,
+        ];
+    }
+
+    /**
+     * Crea un documento pubblicato sulla pagina Trasparenza del tenant e2e
+     * (addendum): file fisico sul disk 'local' (fallback percorso_file)
+     * con --categoria (default 'bilancio') e --titolo come nome file.
+     *
+     * @return array<string, mixed>
+     */
+    private function creaDocumentoPubblico(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $categoria = (string) ($this->option('categoria') ?: 'bilancio');
+        if (! in_array($categoria, Documento::CATEGORIE_PUBBLICHE, true)) {
+            return ['error' => 'categoria non valida'];
+        }
+
+        $nomeFile = (string) ($this->option('titolo') ?: 'documento-e2e-'.now()->timestamp.'.pdf');
+        $contenuto = '%PDF-1.4 documento fittizio della suite E2E '.now()->timestamp;
+        $percorso = 'e2e-trasparenza/'.Str::uuid().'.pdf';
+
+        Storage::disk('local')->put($percorso, $contenuto);
+
+        $documento = Documento::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'nome_file' => $nomeFile,
+            'percorso_file' => $percorso,
+            'descrizione' => 'Documento di trasparenza generato dalla suite E2E.',
+            'dimensione_kb' => (int) ceil(strlen($contenuto) / 1024),
+            'pubblico' => true,
+            'categoria_pubblica' => $categoria,
+        ]);
+
+        return [
+            'documento_id' => $documento->id,
+            'nome_file' => $documento->nome_file,
+            'categoria' => $categoria,
+        ];
+    }
+
+    /**
+     * Crea una convocazione di assemblea pubblicata con evento collegato
+     * (pubblicato, futuro) per il tenant e2e (addendum).
+     *
+     * @return array<string, mixed>
+     */
+    private function creaConvocazione(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $evento = Evento::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Assemblea E2E '.now()->timestamp,
+            'descrizione' => 'Evento assemblea generato dalla suite E2E.',
+            'data_evento' => now()->addDays(12)->setTime(21, 0),
+            'luogo' => 'Sede E2E',
+            'stato_pubblicazione' => 'pubblicato',
+            'iscrizioni_aperte' => true,
+        ]);
+
+        $annuncio = Annuncio::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'titolo' => (string) ($this->option('titolo') ?: 'Convocazione assemblea E2E '.now()->timestamp),
+            'tipo' => Annuncio::TIPO_CONVOCAZIONE,
+            'corpo_html' => '<p>Si convoca l\'assemblea dei soci (suite E2E).</p>',
+            'data_assemblea' => now()->addDays(12)->setTime(21, 0),
+            'luogo_assemblea' => 'Sede E2E, Via dei Test 1',
+            'ordine_del_giorno' => "1. Bilancio\n2. Varie ed eventuali",
+            'evento_id' => $evento->id,
+            'pubblicato_dal' => now()->subDay(),
+        ]);
+
+        return [
+            'annuncio_id' => $annuncio->id,
+            'titolo' => $annuncio->titolo,
+            'evento_id' => $evento->id,
+            'evento_titolo' => $evento->titolo,
         ];
     }
 

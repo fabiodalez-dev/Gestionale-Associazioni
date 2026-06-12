@@ -35,8 +35,19 @@
                     <tr>
                         <td>
                             <strong>{{ $annuncio->titolo }}</strong>
+                            @if ($annuncio->isConvocazione())
+                                <span class="badge bg-danger ms-1"><i class="bi bi-people me-1"></i>Convocazione</span>
+                            @else
+                                <span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1">Comunicazione</span>
+                            @endif
                             @if ($annuncio->in_evidenza)
                                 <span class="badge bg-warning text-dark ms-1"><i class="bi bi-star-fill me-1"></i>In evidenza</span>
+                            @endif
+                            @if ($annuncio->convocazione_inviata_at)
+                                <span class="badge bg-success-subtle text-success-emphasis border ms-1"
+                                      title="Convocazione inviata il {{ $annuncio->convocazione_inviata_at->format('d/m/Y H:i') }}">
+                                    <i class="bi bi-envelope-check me-1"></i>Inviata
+                                </span>
                             @endif
                         </td>
                         <td>
@@ -69,6 +80,17 @@
                         </td>
                         <td class="text-end text-nowrap">
                             @can('update', $annuncio)
+                                @if ($annuncio->isConvocazione() && $annuncio->isPubblicato())
+                                    <form method="POST" action="{{ route('annunci.invia-convocazione', $annuncio) }}" class="d-inline"
+                                          onsubmit="return confirm(@js($annuncio->convocazione_inviata_at
+                                              ? 'Convocazione già inviata il '.$annuncio->convocazione_inviata_at->format('d/m/Y H:i').'. Inviarla di nuovo a tutti i soci attivi?'
+                                              : 'Inviare la convocazione via email a tutti i soci attivi?'));">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Invia convocazione ai soci">
+                                            <i class="bi bi-send"></i>
+                                        </button>
+                                    </form>
+                                @endif
                                 <a href="{{ route('annunci.edit', $annuncio) }}" class="btn btn-sm btn-outline-warning" title="Modifica">
                                     <i class="bi bi-pencil"></i>
                                 </a>

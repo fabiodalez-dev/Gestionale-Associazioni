@@ -81,6 +81,11 @@
                     <tr>
                         <td>
                             <strong>{{ $documento->nome_file }}</strong>
+                            @if ($documento->pubblico)
+                                <span class="badge bg-success-subtle text-success-emphasis border ms-1">
+                                    <i class="bi bi-globe2 me-1"></i>Pubblico · {{ ucfirst($documento->categoria_pubblica ?? 'altro') }}
+                                </span>
+                            @endif
                             @if ($documento->descrizione)
                                 <br><small class="text-muted">{{ $documento->descrizione }}</small>
                             @endif
@@ -98,6 +103,22 @@
                                     <i class="bi bi-link-45deg"></i>
                                 </button>
                             </form>
+                            @can('update', $documento)
+                                @if ($documento->pubblico)
+                                    <form method="POST" action="{{ route('documenti.trasparenza', $documento) }}" class="d-inline"
+                                          onsubmit="return confirm('Rimuovere questo documento dalla pagina Trasparenza pubblica?');">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-success" title="Rimuovi dalla Trasparenza">
+                                            <i class="bi bi-globe2"></i>
+                                        </button>
+                                    </form>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Pubblica in Trasparenza"
+                                            data-bs-toggle="modal" data-bs-target="#trasparenzaModal-{{ $documento->id }}">
+                                        <i class="bi bi-globe2"></i>
+                                    </button>
+                                @endif
+                            @endcan
                             @can('delete', $documento)
                             <form method="POST" action="{{ route('documenti.destroy', $documento) }}" class="d-inline"
                                   onsubmit="return confirm('Sei sicuro di voler eliminare questo documento?');">
@@ -126,6 +147,49 @@
         </div>
     @endif
 </div>
+
+{{-- Modal Trasparenza per riga (addendum): scelta della categoria pubblica --}}
+@foreach ($documenti as $documento)
+    @can('update', $documento)
+        @unless ($documento->pubblico)
+            <div class="modal fade" id="trasparenzaModal-{{ $documento->id }}" tabindex="-1"
+                 aria-labelledby="trasparenzaModalLabel-{{ $documento->id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ route('documenti.trasparenza', $documento) }}">
+                            @csrf
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="trasparenzaModalLabel-{{ $documento->id }}">
+                                    <i class="bi bi-globe2 me-1"></i>Pubblica in Trasparenza
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="small text-muted mb-3">
+                                    <strong>{{ $documento->nome_file }}</strong> sarà scaricabile da chiunque
+                                    sulla pagina Trasparenza del mini-sito pubblico.
+                                </p>
+                                <label class="form-label" for="categoria_pubblica-{{ $documento->id }}">Categoria *</label>
+                                <select class="form-select" id="categoria_pubblica-{{ $documento->id }}"
+                                        name="categoria_pubblica" required>
+                                    @foreach (\App\Models\Documento::CATEGORIE_PUBBLICHE as $categoriaPubblica)
+                                        <option value="{{ $categoriaPubblica }}">{{ ucfirst($categoriaPubblica) }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-globe2 me-1"></i>Pubblica
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endunless
+    @endcan
+@endforeach
 
 {{-- Modal upload --}}
 <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">

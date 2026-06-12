@@ -63,7 +63,13 @@
                     @if (Route::has('pubblico.novita'))
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('pubblico.novita') ? 'active' : '' }}"
-                               href="{{ route('pubblico.novita', $associazione->slug) }}">Novità</a>
+                               href="{{ route('pubblico.novita', $associazione->slug) }}">Comunicazioni</a>
+                        </li>
+                    @endif
+                    @if (Route::has('pubblico.trasparenza'))
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('pubblico.trasparenza') ? 'active' : '' }}"
+                               href="{{ route('pubblico.trasparenza', $associazione->slug) }}">Trasparenza</a>
                         </li>
                     @endif
                     @if (Route::has('pubblico.dona.show'))

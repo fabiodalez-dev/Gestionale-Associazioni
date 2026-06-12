@@ -14,6 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Annuncio in bacheca (f.7 del piano "Gestione 2"): corpo HTML purificato,
  * finestra di pubblicazione, evidenza e visibilità opzionale solo per i soci
  * (area riservata). Alimenta anche le newsletter (f.8).
+ *
+ * Addendum "Convocazioni assemblee": tipo 'convocazione' con data/luogo/
+ * ordine del giorno, evento collegato opzionale (conferma presenza dal
+ * mini-sito) e invio email ai soci attivi (convocazione_inviata_at).
  */
 class Annuncio extends Model
 {
@@ -22,10 +26,20 @@ class Annuncio extends Model
     use HasFactory;
     use HasUuids;
 
+    public const TIPO_COMUNICAZIONE = 'comunicazione';
+
+    public const TIPO_CONVOCAZIONE = 'convocazione';
+
+    public const TIPI = [
+        self::TIPO_COMUNICAZIONE,
+        self::TIPO_CONVOCAZIONE,
+    ];
+
     protected $table = 'annunci';
 
     /** @var array<string, mixed> */
     protected $attributes = [
+        'tipo' => self::TIPO_COMUNICAZIONE,
         'in_evidenza' => false,
         'solo_soci' => false,
     ];
@@ -33,7 +47,12 @@ class Annuncio extends Model
     protected $fillable = [
         'associazione_id',
         'titolo',
+        'tipo',
         'corpo_html',
+        'data_assemblea',
+        'luogo_assemblea',
+        'ordine_del_giorno',
+        'evento_id',
         'pubblicato_dal',
         'pubblicato_al',
         'in_evidenza',
@@ -44,11 +63,29 @@ class Annuncio extends Model
     protected function casts(): array
     {
         return [
+            'data_assemblea' => 'datetime',
+            'convocazione_inviata_at' => 'datetime',
             'pubblicato_dal' => 'datetime',
             'pubblicato_al' => 'datetime',
             'in_evidenza' => 'boolean',
             'solo_soci' => 'boolean',
         ];
+    }
+
+    /** L'annuncio è una convocazione di assemblea? */
+    public function isConvocazione(): bool
+    {
+        return $this->tipo === self::TIPO_CONVOCAZIONE;
+    }
+
+    /**
+     * Evento collegato alla convocazione (conferma presenza dal mini-sito).
+     *
+     * @return BelongsTo<Evento, $this>
+     */
+    public function evento(): BelongsTo
+    {
+        return $this->belongsTo(Evento::class, 'evento_id');
     }
 
     /**

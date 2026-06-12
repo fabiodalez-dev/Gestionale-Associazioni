@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +32,12 @@ class Documento extends Model implements HasMedia
 
     public const ESTENSIONI_PERMESSE = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png'];
 
+    /**
+     * Categorie ammesse sulla pagina Trasparenza del mini-sito (addendum
+     * "Convocazioni assemblee + Trasparenza"); 'bilancio' è mostrata per prima.
+     */
+    public const CATEGORIE_PUBBLICHE = ['bilancio', 'statuto', 'regolamento', 'verbale', 'altro'];
+
     protected $table = 'documenti';
 
     public const UPDATED_AT = null;
@@ -41,6 +48,8 @@ class Documento extends Model implements HasMedia
         'percorso_file',
         'descrizione',
         'categoria',
+        'pubblico',
+        'categoria_pubblica',
         'dimensione_kb',
         'caricato_da',
     ];
@@ -48,8 +57,20 @@ class Documento extends Model implements HasMedia
     protected function casts(): array
     {
         return [
+            'pubblico' => 'boolean',
             'dimensione_kb' => 'integer',
         ];
+    }
+
+    /**
+     * Documenti pubblicati sulla pagina Trasparenza del mini-sito.
+     *
+     * @param  Builder<Documento>  $query
+     * @return Builder<Documento>
+     */
+    public function scopePubblici(Builder $query): Builder
+    {
+        return $query->where('pubblico', true);
     }
 
     public function registerMediaCollections(): void

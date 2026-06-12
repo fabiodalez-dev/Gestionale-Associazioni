@@ -41,6 +41,16 @@ class DocumentoPolicy
         return $this->allowed($utente, 'documenti.create', self::FALLBACK_VIEW);
     }
 
+    /**
+     * Pubblicazione/rimozione del documento dalla pagina Trasparenza
+     * (addendum): richiede documenti.update (fallback admin del tenant).
+     */
+    public function update(Utente $utente, Documento $documento): bool
+    {
+        return $this->allowed($utente, 'documenti.update', self::FALLBACK_ADMIN)
+            && $this->stessoTenant($utente, $documento);
+    }
+
     public function delete(Utente $utente, Documento $documento): bool
     {
         return $this->allowed($utente, 'documenti.delete', self::FALLBACK_ADMIN)

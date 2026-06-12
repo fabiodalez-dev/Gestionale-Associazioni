@@ -43,6 +43,10 @@ Route::middleware(['auth', 'tenant'])->group(function (): void {
     Route::put('/annunci/{annuncio}', [AnnuncioController::class, 'update'])->name('annunci.update');
     Route::delete('/annunci/{annuncio}', [AnnuncioController::class, 'destroy'])->name('annunci.destroy');
 
+    // Addendum convocazioni — invio email ai soci attivi (notifiche in coda)
+    Route::post('/annunci/{annuncio}/invia-convocazione', [AnnuncioController::class, 'inviaConvocazione'])
+        ->name('annunci.invia-convocazione');
+
     // f.8 — newsletter composta da annunci pubblicati + storico invii
     Route::get('/newsletter', [NewsletterController::class, 'index'])->name('newsletter.index');
     Route::post('/newsletter/anteprima', [NewsletterController::class, 'anteprima'])->name('newsletter.anteprima');

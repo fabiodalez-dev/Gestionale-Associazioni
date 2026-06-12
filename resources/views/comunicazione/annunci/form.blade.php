@@ -27,12 +27,63 @@
                 @error('titolo')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
 
+            @php $tipoCorrente = old('tipo', $annuncio->tipo ?? \App\Models\Annuncio::TIPO_COMUNICAZIONE); @endphp
+            <div class="mb-3">
+                <label class="form-label" for="tipo">Tipo *</label>
+                <select class="form-select @error('tipo') is-invalid @enderror" id="tipo" name="tipo" required>
+                    <option value="{{ \App\Models\Annuncio::TIPO_COMUNICAZIONE }}" @selected($tipoCorrente === \App\Models\Annuncio::TIPO_COMUNICAZIONE)>Comunicazione</option>
+                    <option value="{{ \App\Models\Annuncio::TIPO_CONVOCAZIONE }}" @selected($tipoCorrente === \App\Models\Annuncio::TIPO_CONVOCAZIONE)>Convocazione assemblea</option>
+                </select>
+                @error('tipo')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+
             <div class="mb-3">
                 <label class="form-label" for="corpo_html">Contenuto *</label>
                 <textarea class="form-control @error('corpo_html') is-invalid @enderror"
                           id="corpo_html" name="corpo_html" rows="10" required>{{ old('corpo_html', $annuncio->corpo_html) }}</textarea>
                 <div class="form-text">HTML semplice consentito (paragrafi, liste, link, immagini): viene ripulito al salvataggio.</div>
                 @error('corpo_html')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+
+            {{-- Dettagli convocazione assemblea (visibili solo per tipo 'convocazione') --}}
+            <div id="campiConvocazione" class="border rounded p-3 mb-3 {{ $tipoCorrente === \App\Models\Annuncio::TIPO_CONVOCAZIONE ? '' : 'd-none' }}">
+                <h2 class="h6 mb-3"><i class="bi bi-people me-1"></i>Dettagli assemblea</h2>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="data_assemblea">Data e ora assemblea *</label>
+                        <input type="datetime-local" class="form-control @error('data_assemblea') is-invalid @enderror"
+                               id="data_assemblea" name="data_assemblea"
+                               value="{{ old('data_assemblea', $annuncio->data_assemblea?->format('Y-m-d\TH:i')) }}">
+                        @error('data_assemblea')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="luogo_assemblea">Luogo</label>
+                        <input type="text" class="form-control @error('luogo_assemblea') is-invalid @enderror"
+                               id="luogo_assemblea" name="luogo_assemblea" maxlength="255"
+                               value="{{ old('luogo_assemblea', $annuncio->luogo_assemblea) }}">
+                        @error('luogo_assemblea')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="ordine_del_giorno">Ordine del giorno</label>
+                    <textarea class="form-control @error('ordine_del_giorno') is-invalid @enderror"
+                              id="ordine_del_giorno" name="ordine_del_giorno" rows="5">{{ old('ordine_del_giorno', $annuncio->ordine_del_giorno) }}</textarea>
+                    <div class="form-text">Un punto per riga.</div>
+                    @error('ordine_del_giorno')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="evento_id">Evento collegato (opzionale)</label>
+                    <select class="form-select @error('evento_id') is-invalid @enderror" id="evento_id" name="evento_id">
+                        <option value="">— Nessun evento —</option>
+                        @foreach ($eventiFuturi ?? [] as $evento)
+                            <option value="{{ $evento->id }}" @selected(old('evento_id', $annuncio->evento_id) === $evento->id)>
+                                {{ $evento->titolo }} ({{ $evento->data_evento?->format('d/m/Y H:i') }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Se colleghi un evento pubblicato, i soci potranno confermare la presenza.</div>
+                    @error('evento_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
             </div>
 
             <div class="row g-3 mb-3">
@@ -76,4 +127,18 @@
         </form>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    // Mostra/nasconde i dettagli assemblea in base al tipo selezionato
+    (function () {
+        var tipo = document.getElementById('tipo');
+        var campi = document.getElementById('campiConvocazione');
+        if (!tipo || !campi) return;
+        tipo.addEventListener('change', function () {
+            campi.classList.toggle('d-none', tipo.value !== 'convocazione');
+        });
+    })();
+</script>
+@endpush
 @endsection

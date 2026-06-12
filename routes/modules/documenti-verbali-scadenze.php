@@ -4,6 +4,8 @@ use App\Http\Controllers\DocumentiVerbaliScadenze\DocumentoController;
 use App\Http\Controllers\DocumentiVerbaliScadenze\DocumentoSocioController;
 use App\Http\Controllers\DocumentiVerbaliScadenze\ScadenzaController;
 use App\Http\Controllers\DocumentiVerbaliScadenze\VerbaleController;
+use App\Http\Controllers\FrontendPubblico\TrasparenzaController;
+use App\Http\Middleware\FrontendPubblico\RisolviTenantPubblico;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,6 +30,8 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::delete('{id}/definitivo', [DocumentoController::class, 'eliminaDefinitivamente'])->name('elimina-definitivamente');
         Route::get('{documento}/download', [DocumentoController::class, 'download'])->name('download');
         Route::post('{documento}/link-temporaneo', [DocumentoController::class, 'linkTemporaneo'])->name('link-temporaneo');
+        // Addendum Trasparenza: pubblica/rimuove il documento dal mini-sito
+        Route::post('{documento}/trasparenza', [DocumentoController::class, 'trasparenza'])->name('trasparenza');
         Route::delete('{documento}', [DocumentoController::class, 'destroy'])->name('destroy');
     });
 
@@ -79,3 +83,18 @@ Route::get('condivisi/documenti/{id}', [DocumentoController::class, 'downloadPub
 Route::get('condivisi/documenti-socio/{id}', [DocumentoSocioController::class, 'downloadPubblico'])
     ->middleware('signed')
     ->name('documenti-socio.download-pubblico');
+
+/*
+| Addendum Trasparenza — mini-sito pubblico (/a/{slug}): elenco dei
+| documenti pubblicati dall'admin e download anonimo (SOLO pubblico=true
+| e del tenant; {documento} è un parametro stringa risolto nel controller
+| sotto il tenant dello slug → 404 uniforme).
+*/
+Route::prefix('a/{associazione:slug}')
+    ->name('pubblico.')
+    ->middleware(RisolviTenantPubblico::class)
+    ->group(function (): void {
+        Route::get('/trasparenza', [TrasparenzaController::class, 'index'])->name('trasparenza');
+        Route::get('/trasparenza/{documento}/download', [TrasparenzaController::class, 'download'])
+            ->name('trasparenza.download');
+    });

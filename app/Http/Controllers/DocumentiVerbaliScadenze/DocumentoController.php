@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -109,6 +110,33 @@ class DocumentoController extends Controller
         $this->authorize('view', $documento);
 
         return $this->rispostaDownload($documento);
+    }
+
+    /**
+     * Toggle Trasparenza (addendum "Convocazioni assemblee + Trasparenza"):
+     * pubblica il documento sulla pagina /a/{slug}/trasparenza con la
+     * categoria scelta, oppure lo rimuove se è già pubblico.
+     */
+    public function trasparenza(Request $request, Documento $documento): RedirectResponse
+    {
+        $this->authorize('update', $documento);
+
+        if ($documento->pubblico) {
+            $documento->update(['pubblico' => false, 'categoria_pubblica' => null]);
+
+            return back()->with('success', 'Documento rimosso dalla pagina Trasparenza.');
+        }
+
+        $validated = $request->validate([
+            'categoria_pubblica' => ['required', 'string', Rule::in(Documento::CATEGORIE_PUBBLICHE)],
+        ], [], ['categoria_pubblica' => 'categoria pubblica']);
+
+        $documento->update([
+            'pubblico' => true,
+            'categoria_pubblica' => $validated['categoria_pubblica'],
+        ]);
+
+        return back()->with('success', 'Documento pubblicato sulla pagina Trasparenza.');
     }
 
     /**

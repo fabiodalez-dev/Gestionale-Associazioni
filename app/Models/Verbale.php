@@ -29,6 +29,8 @@ class Verbale extends Model
     protected $fillable = [
         'associazione_id',
         'titolo',
+        'numero',
+        'anno',
         'data_riunione',
         'tipo_riunione',
         'presenti',
@@ -38,15 +40,41 @@ class Verbale extends Model
         'approvato',
         'approvato_da',
         'data_approvazione',
+        'evento_id',
     ];
 
     protected function casts(): array
     {
         return [
+            'numero' => 'integer',
+            'anno' => 'integer',
             'data_riunione' => 'date',
             'approvato' => 'boolean',
             'data_approvazione' => 'date',
         ];
+    }
+
+    /**
+     * Numero di protocollo per anno, es. "3/2026" (f.17);
+     * null se il verbale non è ancora numerato.
+     */
+    public function getNumeroCompletoAttribute(): ?string
+    {
+        if ($this->numero === null || $this->anno === null) {
+            return null;
+        }
+
+        return $this->numero.'/'.$this->anno;
+    }
+
+    /**
+     * Prossimo numero progressivo per l'anno nel tenant corrente (f.17).
+     * Da chiamare dentro una transaction in caso di scritture concorrenti
+     * (unique a DB su associazione+anno+numero come rete di sicurezza).
+     */
+    public static function prossimoNumero(int $anno): int
+    {
+        return (int) static::query()->where('anno', $anno)->max('numero') + 1;
     }
 
     /**
@@ -55,6 +83,16 @@ class Verbale extends Model
     public function approvatoDa(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'approvato_da');
+    }
+
+    /**
+     * Evento collegato (es. assemblea, f.17).
+     *
+     * @return BelongsTo<Evento, $this>
+     */
+    public function evento(): BelongsTo
+    {
+        return $this->belongsTo(Evento::class, 'evento_id');
     }
 
     /**

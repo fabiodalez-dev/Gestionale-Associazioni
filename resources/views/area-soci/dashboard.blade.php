@@ -64,6 +64,9 @@
                             Nessuna tessera attiva. Contatta la tua associazione per maggiori informazioni.
                         </p>
                     @endif
+
+                    {{-- Rinnovo self-service (f.1 piano Vita sociale — modulo rinnovi) --}}
+                    @include('rinnovi.partials.btn-rinnova-area-soci', ['socio' => $socio])
                 </div>
             </div>
         </div>

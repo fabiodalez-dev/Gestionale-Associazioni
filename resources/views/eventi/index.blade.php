@@ -8,9 +8,21 @@
             <h1 class="h2"><i class="bi bi-calendar-event me-2"></i>Eventi</h1>
             <p class="text-muted mb-0">Gestione eventi di {{ session('associazione_nome', 'Manager') }}</p>
         </div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#eventoModal" id="btnNuovoEvento">
-            <i class="bi bi-plus-lg me-1"></i>Nuovo Evento
-        </button>
+        <div class="d-flex gap-2">
+            @if (Route::has('calendario-eventi.index'))
+                <a href="{{ route('calendario-eventi.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-calendar3 me-1"></i>Calendario
+                </a>
+            @endif
+            @if (Route::has('eventi-ricorrenti.create'))
+                <a href="{{ route('eventi-ricorrenti.create') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-repeat me-1"></i>Evento ricorrente
+                </a>
+            @endif
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#eventoModal" id="btnNuovoEvento">
+                <i class="bi bi-plus-lg me-1"></i>Nuovo Evento
+            </button>
+        </div>
     </div>
 
     <form method="GET" action="{{ route('eventi.index') }}" class="row g-2 mb-3">
@@ -48,6 +60,16 @@
                             <tr>
                                 <td>
                                     <span class="fw-semibold">{{ $evento->titolo }}</span>
+                                    @if ($evento->isInSerie() && Route::has('eventi.serie.show'))
+                                        <a href="{{ route('eventi.serie.show', $evento) }}" class="badge bg-info-subtle text-dark text-decoration-none" title="Gestisci la serie ricorrente">
+                                            <i class="bi bi-arrow-repeat"></i> serie
+                                        </a>
+                                    @endif
+                                    @if ($evento->solo_soci)
+                                        <span class="badge bg-warning-subtle text-dark" title="Riservato ai soci attivi">
+                                            <i class="bi bi-person-badge"></i> soci
+                                        </span>
+                                    @endif
                                     @if ($evento->descrizione)
                                         <div class="text-muted small text-truncate" style="max-width: 300px;">{{ $evento->descrizione }}</div>
                                     @endif
@@ -81,6 +103,21 @@
                                         <a href="{{ route('eventi.prenotazioni.index', $evento) }}" class="btn btn-outline-primary" title="Prenotazioni frontend">
                                             <i class="bi bi-ticket-perforated"></i>
                                         </a>
+                                        @if (Route::has('eventi.presenze.index'))
+                                            <a href="{{ route('eventi.presenze.index', $evento) }}" class="btn btn-outline-primary" title="Presenze e foglio firme">
+                                                <i class="bi bi-clipboard-check"></i>
+                                            </a>
+                                        @endif
+                                        @if (Route::has('eventi.feedback.index'))
+                                            <a href="{{ route('eventi.feedback.index', $evento) }}" class="btn btn-outline-primary" title="Feedback post-evento">
+                                                <i class="bi bi-star-half"></i>
+                                            </a>
+                                        @endif
+                                        @if (Route::has('eventi.ics'))
+                                            <a href="{{ route('eventi.ics', $evento) }}" class="btn btn-outline-secondary" title="Esporta .ics">
+                                                <i class="bi bi-calendar-plus"></i>
+                                            </a>
+                                        @endif
                                         @if ($slugAssociazione && $evento->stato_pubblicazione === \App\Models\Evento::STATO_PUBBLICATO)
                                             <a href="{{ route('pubblico.eventi.show', ['associazione' => $slugAssociazione, 'evento' => $evento->id]) }}"
                                                class="btn btn-outline-secondary" title="Anteprima pubblica" target="_blank" rel="noopener">
@@ -286,6 +323,20 @@
                             </div>
                             <div class="form-text">Le prenotazioni restano "in approvazione" (posti riservati) finché non le confermi.</div>
                             @error('richiede_approvazione')<div class="text-danger small">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label class="form-label d-block">Riservato ai soci</label>
+                            <div class="form-check form-switch mt-2">
+                                <input type="hidden" name="solo_soci" value="0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="solo_soci"
+                                       name="solo_soci" value="1"
+                                       @checked(old('solo_soci', $editEvento?->solo_soci ?? false))>
+                                <label class="form-check-label" for="solo_soci">Prenotabile solo da account collegati a un socio attivo</label>
+                            </div>
+                            <div class="form-text">Nel catalogo pubblico l'evento mostra il badge "Riservato ai soci".</div>
+                            @error('solo_soci')<div class="text-danger small">{{ $message }}</div>@enderror
                         </div>
                     </div>
                     <div class="mb-2">

@@ -3,7 +3,14 @@
 @section('title', 'Eventi — '.$associazione->nome)
 
 @section('content')
-    <h1 class="h3 mb-4">Eventi in programma</h1>
+    <div class="d-flex justify-content-between flex-wrap align-items-center mb-4 gap-2">
+        <h1 class="h3 mb-0">Eventi in programma</h1>
+        @if (Route::has('pubblico.calendario'))
+            <a href="{{ route('pubblico.calendario', $associazione->slug) }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-calendar3 me-1"></i>Calendario
+            </a>
+        @endif
+    </div>
 
     @if ($eventi->isEmpty())
         <div class="text-center text-muted py-5">

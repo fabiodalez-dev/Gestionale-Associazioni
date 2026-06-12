@@ -13,6 +13,7 @@
         'campi-obbligatori' => ['bi-ui-checks', 'Campi obbligatori'],
         'tessera-template' => ['bi-postcard', 'Template tessera'],
         'pagamenti' => ['bi-credit-card', 'Pagamenti online'],
+        'invito' => ['bi-qr-code', 'Invita al mini-sito'],
     ];
     if (! array_key_exists($section, $sezioni)) {
         $section = 'info';
@@ -470,6 +471,56 @@
                         </div>
                         <button class="btn btn-primary" type="submit">Salva impostazioni pagamento</button>
                     </form>
+                </div>
+            </div>
+        @endif
+
+        {{-- ============ INVITA AL MINI-SITO (f.22) ============ --}}
+        @if ($section === 'invito')
+            @php
+                $linkIscrizione = \Illuminate\Support\Facades\Route::has('pubblico.iscriviti')
+                    ? route('pubblico.iscriviti', $associazione)
+                    : url('/a/'.$associazione->slug.'/iscriviti');
+                $qrUrl = \Illuminate\Support\Facades\Route::has('configurazioni.invito-qr')
+                    ? route('configurazioni.invito-qr')
+                    : null;
+            @endphp
+            <div class="card">
+                <div class="card-header"><i class="bi bi-qr-code me-2"></i>Invita al tuo mini-sito</div>
+                <div class="card-body">
+                    @unless ($associazione->frontend_pubblico_attivo)
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Il mini-sito pubblico non è attivo: il link e il QR funzioneranno solo dopo l'attivazione.
+                        </div>
+                    @endunless
+
+                    <p class="text-muted">Condividi questo link (o il QR code) per portare le persone direttamente
+                        al modulo di iscrizione del tuo mini-sito <code>/a/{{ $associazione->slug }}</code>.</p>
+
+                    <label class="form-label" for="link_invito">Link di iscrizione</label>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="link_invito" readonly value="{{ $linkIscrizione }}">
+                        <button class="btn btn-outline-primary" type="button" id="btnCopiaInvito"
+                                onclick="navigator.clipboard.writeText(document.getElementById('link_invito').value).then(() => { this.innerHTML = '<i class=&quot;bi bi-check-lg me-1&quot;></i>Copiato!'; setTimeout(() => { this.innerHTML = '<i class=&quot;bi bi-clipboard me-1&quot;></i>Copia link'; }, 2000); });">
+                            <i class="bi bi-clipboard me-1"></i>Copia link
+                        </button>
+                    </div>
+
+                    @if ($qrUrl)
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <img src="{{ $qrUrl }}" alt="QR code iscrizione {{ $associazione->nome }}"
+                                     class="border rounded p-2 bg-white" style="width: 180px; height: 180px;">
+                            </div>
+                            <div class="col">
+                                <p class="mb-2 text-muted">Il QR punta a <code>{{ $linkIscrizione }}</code>: stampalo su volantini e locandine.</p>
+                                <a href="{{ $qrUrl }}?download=1" class="btn btn-primary">
+                                    <i class="bi bi-download me-1"></i>Scarica QR (PNG)
+                                </a>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         @endif

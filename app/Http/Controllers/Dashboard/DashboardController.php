@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Dashboard;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Associazione;
+use App\Models\Carica;
 use App\Models\Evento;
 use App\Models\Prenotazione;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -64,7 +66,28 @@ class DashboardController extends Controller
             'associazioni' => $associazioni,
             'vistaGlobale' => $utente->isSuperAdmin() && blank(session('associazione_id')),
             'kpiPrenotazioni' => $this->kpiPrenotazioni(),
+            'caricheInScadenza' => $this->caricheInScadenza(),
         ]);
+    }
+
+    /**
+     * Mandati degli organi sociali in scadenza nei prossimi 90 giorni
+     * (f.16 del piano vita sociale). Solo in vista tenant: in vista
+     * globale super_admin la sezione non viene mostrata (null).
+     *
+     * @return Collection<int, Carica>|null
+     */
+    private function caricheInScadenza(): ?Collection
+    {
+        if (Carica::currentAssociazioneId() === null) {
+            return null;
+        }
+
+        return Carica::query()
+            ->inScadenza()
+            ->with(['socio' => fn ($q) => $q->withTrashed()])
+            ->orderBy('fine')
+            ->get();
     }
 
     /**

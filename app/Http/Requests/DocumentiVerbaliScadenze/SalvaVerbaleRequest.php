@@ -33,6 +33,12 @@ class SalvaVerbaleRequest extends FormRequest
             'presenti' => ['nullable', 'string'],
             'ordine_del_giorno' => ['nullable', 'string'],
             'deliberazioni' => ['nullable', 'string'],
+            // Collegamento opzionale a un evento del tenant, es. assemblea (f.17)
+            'evento_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('eventi', 'id')->where('associazione_id', session('associazione_id')),
+            ],
         ];
     }
 
@@ -42,6 +48,14 @@ class SalvaVerbaleRequest extends FormRequest
             'titolo' => 'titolo',
             'data_riunione' => 'data riunione',
             'tipo_riunione' => 'tipo riunione',
+            'evento_id' => 'evento collegato',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'evento_id.exists' => 'L\'evento selezionato non appartiene all\'associazione corrente.',
         ];
     }
 }

@@ -12,6 +12,11 @@
         <a href="{{ route('tessere.checkin') }}" class="btn btn-outline-secondary">
             <i class="bi bi-qr-code-scan me-1"></i>Check-in
         </a>
+        {{-- Stampa massiva (f.4 piano Vita sociale — modulo rinnovi): PDF unico con i filtri correnti --}}
+        <a href="{{ route('tessere.stampa-massiva', ['anno' => $anno, 'search' => $search, 'stato' => $stato]) }}"
+           class="btn btn-outline-secondary" target="_blank" rel="noopener">
+            <i class="bi bi-printer me-1"></i>Stampa PDF
+        </a>
         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#generaMassivoModal">
             <i class="bi bi-stack me-1"></i>Genera Tessere {{ $annoCorrente }}
         </button>

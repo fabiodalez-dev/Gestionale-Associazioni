@@ -3,6 +3,7 @@
 namespace App\Notifications\Quote;
 
 use App\Models\Socio;
+use App\Services\Email\TenantNotificationMailer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -36,12 +37,14 @@ class BenvenutoSocioNotification extends Notification implements ShouldQueue
     {
         $associazione = $this->socio->associazione->nome ?? 'la tua associazione';
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject("Benvenuto in {$associazione}!")
             ->greeting("Ciao {$this->socio->nome},")
             ->line("la tua iscrizione a {$associazione} è stata attivata: il pagamento della quota è andato a buon fine.")
             ->line('La tua tessera è stata generata e sarà disponibile nella tua area soci.')
             ->salutation('Benvenuto a bordo!');
+
+        return TenantNotificationMailer::applica($message, $this->socio->associazione, $this->socio);
     }
 
     /**

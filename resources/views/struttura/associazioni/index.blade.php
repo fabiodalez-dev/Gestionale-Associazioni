@@ -91,6 +91,23 @@
                             <input type="email" class="form-control" id="email" name="email" required
                                    value="{{ old('email', $editAssociazione?->email) }}">
                         </div>
+                        {{-- Slug mini-sito editabile (f.22): kebab-case, unique, anteprima URL --}}
+                        <div class="col-md-12">
+                            <label class="form-label" for="slug">Slug mini-sito pubblico</label>
+                            <div class="input-group">
+                                <span class="input-group-text">{{ url('/a') }}/</span>
+                                <input type="text" class="form-control @error('slug') is-invalid @enderror" id="slug" name="slug"
+                                       maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                                       placeholder="{{ $editAssociazione?->slug ?: 'generato dal nome se vuoto' }}"
+                                       value="{{ old('slug', $editAssociazione?->slug) }}"
+                                       oninput="document.getElementById('slugAnteprima').textContent = '{{ url('/a') }}/' + (this.value || '{{ $editAssociazione?->slug ?: '...' }}');">
+                                @error('slug')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="form-text">
+                                Solo minuscole, numeri e trattini (kebab-case). Anteprima:
+                                <span id="slugAnteprima">{{ url('/a') }}/{{ old('slug', $editAssociazione?->slug) ?: '...' }}</span>
+                            </div>
+                        </div>
                         <div class="col-md-4">
                             <label class="form-label" for="partita_iva">Partita IVA</label>
                             <input type="text" class="form-control" id="partita_iva" name="partita_iva" maxlength="20"

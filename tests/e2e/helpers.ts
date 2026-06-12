@@ -39,6 +39,15 @@ export function fixture<T = Record<string, unknown>>(azione: string, opzioni: Re
 export const SLUG = 'e2e';
 export const ACCOUNT_PASSWORD = 'AccountE2e2026';
 export const ADMIN = { email: 'admin-e2e@example.com', password: 'AdminE2e!2026' };
+export const SUPER_ADMIN = { email: 'super-e2e@example.com', password: 'SuperE2e!2026' };
+
+/**
+ * Data a N giorni da oggi in formato YYYY-MM-DD, calcolata in UTC
+ * (coerente con il timezone dell'app Laravel: config('app.timezone')=UTC).
+ */
+export function dataUtc(giorniAvanti: number): string {
+    return new Date(Date.now() + giorniAvanti * 86_400_000).toISOString().slice(0, 10);
+}
 
 /** Email unica per run (evita collisioni tra esecuzioni ripetute della suite). */
 export function emailUnica(prefisso: string): string {
@@ -84,7 +93,7 @@ export async function accountVerificatoLoggato(page: Page, prefisso: string): Pr
 }
 
 /** Crea un evento pubblicato via fixture. Ritorna { evento_id, titolo }. */
-export function creaEvento(opzioni: { titolo?: string; capienza?: number; prezzo?: number; 'posti-prenotati'?: number; passato?: number } = {}): { evento_id: string; titolo: string } {
+export function creaEvento(opzioni: { titolo?: string; capienza?: number; prezzo?: number; 'posti-prenotati'?: number; passato?: number; 'solo-soci'?: number } = {}): { evento_id: string; titolo: string } {
     return fixture('crea-evento', opzioni as Record<string, string | number>);
 }
 
@@ -144,7 +153,7 @@ export type SocioConTessera = {
  */
 export function creaSocioConTessera(
     email: string,
-    opzioni: { password?: string; scaduta?: number; 'senza-tessera'?: number; 'con-quota'?: number } = {},
+    opzioni: { password?: string; scaduta?: number; 'senza-tessera'?: number; 'con-quota'?: number; 'codice-fiscale'?: string; 'data-nascita'?: string } = {},
 ): SocioConTessera {
     return fixture<SocioConTessera>('crea-socio-con-tessera', { email, ...opzioni });
 }

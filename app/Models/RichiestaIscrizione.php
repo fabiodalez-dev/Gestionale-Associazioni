@@ -47,6 +47,8 @@ class RichiestaIscrizione extends Model
         'motivo_rifiuto',
         'gestita_da',
         'gestita_at',
+        'delibera_numero',
+        'delibera_data',
     ];
 
     protected function casts(): array
@@ -54,6 +56,7 @@ class RichiestaIscrizione extends Model
         return [
             'dati_form' => 'array',
             'gestita_at' => 'datetime',
+            'delibera_data' => 'date',
         ];
     }
 

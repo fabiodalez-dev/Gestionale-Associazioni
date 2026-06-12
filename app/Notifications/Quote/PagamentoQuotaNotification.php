@@ -4,6 +4,7 @@ namespace App\Notifications\Quote;
 
 use App\Models\Quota;
 use App\Models\Socio;
+use App\Services\Email\TenantNotificationMailer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -39,7 +40,7 @@ class PagamentoQuotaNotification extends Notification implements ShouldQueue
         $dataPagamento = $this->quota->data_pagamento?->format('d/m/Y') ?? now()->format('d/m/Y');
         $associazione = $this->quota->associazione->nome ?? 'la tua associazione';
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject("Conferma pagamento quota {$this->quota->anno}")
             ->greeting('Ciao '.($notifiable instanceof Socio ? $notifiable->nome : ''))
             ->line("Abbiamo registrato il pagamento della tua quota \"{$this->quota->tipo}\" per l'anno {$this->quota->anno}.")
@@ -47,6 +48,12 @@ class PagamentoQuotaNotification extends Notification implements ShouldQueue
             ->line("Data pagamento: {$dataPagamento}")
             ->line("Grazie da {$associazione}.")
             ->salutation('A presto!');
+
+        return TenantNotificationMailer::applica(
+            $message,
+            $this->quota->associazione,
+            $notifiable instanceof Socio ? $notifiable : null
+        );
     }
 
     /**

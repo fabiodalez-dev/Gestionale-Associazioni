@@ -7,6 +7,7 @@ use App\Models\Associazione;
 use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Honeypot\ProtectAgainstSpam;
 use Tests\TestCase;
 
 /**
@@ -31,7 +32,7 @@ class IscrizioneOspiteTest extends TestCase
             'modalita_iscrizione' => 'preiscrizione',
         ]);
 
-        $this->withoutMiddleware(\Spatie\Honeypot\ProtectAgainstSpam::class);
+        $this->withoutMiddleware(ProtectAgainstSpam::class);
     }
 
     /** @return array<string, mixed> */

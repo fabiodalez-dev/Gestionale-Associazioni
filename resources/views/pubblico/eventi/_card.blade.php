@@ -16,6 +16,11 @@
     <div class="card-body d-flex flex-column">
         <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
             <h3 class="h5 card-title mb-0">{{ $evento->titolo }}</h3>
+            @if ($evento->solo_soci)
+                <span class="badge text-bg-warning text-nowrap" title="Prenotabile solo dai soci attivi">
+                    <i class="bi bi-person-badge me-1"></i>Riservato ai soci
+                </span>
+            @endif
             @if ($esaurito)
                 @if ($evento->lista_attesa_attiva)
                     <span class="badge text-bg-warning text-nowrap">Lista d'attesa</span>

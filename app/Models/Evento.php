@@ -43,6 +43,7 @@ class Evento extends Model
     protected $attributes = [
         'iscrizioni_aperte' => true,
         'richiede_approvazione' => false,
+        'solo_soci' => false,
     ];
 
     protected $fillable = [
@@ -63,6 +64,8 @@ class Evento extends Model
         'lista_attesa_attiva',
         'annullamento_entro_ore',
         'immagine_url',
+        'serie_id',
+        'solo_soci',
     ];
 
     protected function casts(): array
@@ -79,7 +82,35 @@ class Evento extends Model
             'max_posti_per_prenotazione' => 'integer',
             'lista_attesa_attiva' => 'boolean',
             'annullamento_entro_ore' => 'integer',
+            'solo_soci' => 'boolean',
         ];
+    }
+
+    /**
+     * L'evento fa parte di una serie ricorrente (f.8)?
+     */
+    public function isInSerie(): bool
+    {
+        return $this->serie_id !== null;
+    }
+
+    /**
+     * Evento riservato ai soci attivi (f.10)?
+     */
+    public function isRiservatoAiSoci(): bool
+    {
+        return (bool) $this->solo_soci;
+    }
+
+    /**
+     * Le altre occorrenze della stessa serie ricorrente (f.8).
+     *
+     * @param  Builder<Evento>  $query
+     * @return Builder<Evento>
+     */
+    public function scopeDellaSerie(Builder $query, string $serieId): Builder
+    {
+        return $query->where('serie_id', $serieId);
     }
 
     /**
@@ -175,5 +206,25 @@ class Evento extends Model
     public function tessereCreate(): HasMany
     {
         return $this->hasMany(Tessera::class, 'evento_creazione_id');
+    }
+
+    /**
+     * Feedback post-evento dei partecipanti (f.11).
+     *
+     * @return HasMany<FeedbackEvento, $this>
+     */
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(FeedbackEvento::class, 'evento_id');
+    }
+
+    /**
+     * Verbali collegati all'evento (es. assemblea, f.17).
+     *
+     * @return HasMany<Verbale, $this>
+     */
+    public function verbali(): HasMany
+    {
+        return $this->hasMany(Verbale::class, 'evento_id');
     }
 }

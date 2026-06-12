@@ -188,6 +188,11 @@
                                         @if ($richiesta->socio)
                                             <span class="text-muted small d-block">Socio n. {{ $richiesta->socio->numero_socio }}</span>
                                         @endif
+                                        @if (filled($richiesta->delibera_numero))
+                                            <span class="text-muted small d-block">
+                                                Delibera n. {{ $richiesta->delibera_numero }}@if ($richiesta->delibera_data) del {{ $richiesta->delibera_data->format('d/m/Y') }}@endif
+                                            </span>
+                                        @endif
                                     @else
                                         <span class="badge bg-danger">Rifiutata</span>
                                         @if (filled($richiesta->motivo_rifiuto))
@@ -231,11 +236,24 @@
                     <p class="text-muted small mb-3">
                         Il socio preiscritto diventa <strong>Attivo</strong> e l'account del sito viene collegato.
                     </p>
-                    <div class="form-check">
+                    <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="genera_tessera" name="genera_tessera" value="1">
                         <label class="form-check-label" for="genera_tessera">
                             Genera subito la tessera per l'anno corrente
                         </label>
+                    </div>
+                    {{-- Delibera di ammissione opzionale (f.14): finisce nel libro soci --}}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="approva_delibera_numero" class="form-label small mb-1">Delibera di ammissione n. <span class="text-muted">(opzionale)</span></label>
+                            <input type="text" class="form-control form-control-sm" id="approva_delibera_numero"
+                                   name="delibera_numero" maxlength="50" value="{{ old('delibera_numero') }}" placeholder="es. 12/2026">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="approva_delibera_data" class="form-label small mb-1">Data delibera</label>
+                            <input type="date" class="form-control form-control-sm" id="approva_delibera_data"
+                                   name="delibera_data" value="{{ old('delibera_data') }}">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

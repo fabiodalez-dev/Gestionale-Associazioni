@@ -26,6 +26,18 @@ class DocumentoSocio extends Model implements HasMedia
 
     public const COLLEZIONE_FILE = 'file';
 
+    /** Tipi documento suggeriti (la colonna tipo_documento resta una string libera, f.23). */
+    public const TIPI_DOCUMENTO = [
+        'certificato_medico' => 'Certificato medico',
+        'documento_identita' => 'Documento identità',
+        'tessera_sanitaria' => 'Tessera sanitaria',
+        'autocertificazione' => 'Autocertificazione',
+        'altro' => 'Altro',
+    ];
+
+    /** Giorni di preavviso per il promemoria documento in scadenza (f.23). */
+    public const GIORNI_PREAVVISO_SCADENZA = 30;
+
     protected $table = 'documenti_socio';
 
     protected $fillable = [
@@ -34,6 +46,7 @@ class DocumentoSocio extends Model implements HasMedia
         'nome_file',
         'percorso_file',
         'descrizione',
+        'tipo_documento',
         'data_scadenza',
         'caricato_da',
     ];
@@ -43,6 +56,19 @@ class DocumentoSocio extends Model implements HasMedia
         return [
             'data_scadenza' => 'date',
         ];
+    }
+
+    public function isScaduto(): bool
+    {
+        return $this->data_scadenza !== null
+            && $this->data_scadenza->lt(now()->startOfDay());
+    }
+
+    public function isInScadenza(int $giorni = self::GIORNI_PREAVVISO_SCADENZA): bool
+    {
+        return $this->data_scadenza !== null
+            && ! $this->isScaduto()
+            && $this->data_scadenza->lte(now()->startOfDay()->addDays($giorni));
     }
 
     public function registerMediaCollections(): void

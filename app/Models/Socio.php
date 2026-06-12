@@ -242,6 +242,36 @@ class Socio extends Authenticatable
     }
 
     /**
+     * Cessazioni formali registrate per il socio (f.15).
+     *
+     * @return HasMany<Cessazione, $this>
+     */
+    public function cessazioni(): HasMany
+    {
+        return $this->hasMany(Cessazione::class, 'socio_id');
+    }
+
+    /**
+     * Cariche negli organi sociali (f.16).
+     *
+     * @return HasMany<Carica, $this>
+     */
+    public function cariche(): HasMany
+    {
+        return $this->hasMany(Carica::class, 'socio_id');
+    }
+
+    /**
+     * Promemoria inviati al socio (rinnovi, documenti — f.3/f.23).
+     *
+     * @return HasMany<PromemoriaInviato, $this>
+     */
+    public function promemoriaInviati(): HasMany
+    {
+        return $this->hasMany(PromemoriaInviato::class, 'socio_id');
+    }
+
+    /**
      * @return HasMany<EmailLog, $this>
      */
     public function emailLogs(): HasMany

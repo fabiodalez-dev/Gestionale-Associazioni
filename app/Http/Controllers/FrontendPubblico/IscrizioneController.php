@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\RichiestaIscrizione;
 use App\Models\Utente;
+use App\Notifications\Iscrizioni\ConfermaRichiestaInviataNotification;
 use App\Notifications\Iscrizioni\RichiestaIscrizioneRicevutaNotification;
 use App\Services\Iscrizioni\FormIscrizioneService;
 use App\Services\Iscrizioni\IscrizioneException;
@@ -88,6 +89,7 @@ class IscrizioneController extends Controller
         }
 
         $this->notificaAdmin($richiesta);
+        $this->confermaRichiedente($richiesta, $account);
 
         if ($richiesta->isApprovata() && $account !== null) {
             // Modalità diretta con account: già collegato al nuovo socio
@@ -140,6 +142,40 @@ class IscrizioneController extends Controller
             }
         } catch (\Throwable $e) {
             Log::error('Iscrizione: notifica admin fallita', [
+                'richiesta_id' => $richiesta->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Conferma immediata "richiesta ricevuta" al richiedente con il
+     * riepilogo dei dati inviati (f.19 PIANO-VITA-SOCIALE): all'Account
+     * autenticato oppure, per gli ospiti, via mail all'indirizzo del
+     * socio preiscritto. Best-effort: un errore di invio non deve mai
+     * far fallire la richiesta.
+     */
+    protected function confermaRichiedente(RichiestaIscrizione $richiesta, ?Account $account): void
+    {
+        try {
+            if ($account !== null) {
+                $account->notify(new ConfermaRichiestaInviataNotification($richiesta));
+
+                return;
+            }
+
+            $email = $richiesta->socio()
+                ->withoutGlobalScope('associazione')
+                ->withTrashed()
+                ->first()
+                ?->email;
+
+            if (filled($email)) {
+                Notification::route('mail', $email)
+                    ->notify(new ConfermaRichiestaInviataNotification($richiesta));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Iscrizione: conferma al richiedente fallita', [
                 'richiesta_id' => $richiesta->id,
                 'error' => $e->getMessage(),
             ]);

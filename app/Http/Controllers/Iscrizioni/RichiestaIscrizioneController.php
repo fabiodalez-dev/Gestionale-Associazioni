@@ -62,7 +62,13 @@ class RichiestaIscrizioneController extends Controller
         $utente = $request->user();
 
         try {
-            $this->approvazioni->approva($richiesta, $utente, $request->boolean('genera_tessera'));
+            $this->approvazioni->approva(
+                $richiesta,
+                $utente,
+                $request->boolean('genera_tessera'),
+                $request->validated('delibera_numero'),
+                $request->validated('delibera_data'),
+            );
         } catch (IscrizioneException $e) {
             return redirect()
                 ->route('richieste-iscrizione.index')

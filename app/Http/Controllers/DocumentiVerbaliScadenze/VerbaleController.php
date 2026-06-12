@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\DocumentiVerbaliScadenze\SalvaVerbaleRequest;
 use App\Http\Requests\DocumentiVerbaliScadenze\StoreVerbaleFirmatarioRequest;
 use App\Models\Associazione;
+use App\Models\Evento;
 use App\Models\Socio;
 use App\Models\Utente;
 use App\Models\Verbale;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -37,17 +39,24 @@ class VerbaleController extends Controller
 
         $search = trim((string) $request->query('search', ''));
         $type = (string) $request->query('type', 'all');
+        $annoFiltro = is_numeric($request->query('anno')) ? (int) $request->query('anno') : null;
 
         $verbali = Verbale::query()
-            ->with(['approvatoDa', 'firmatari.socio', 'firmatari.utente'])
+            ->with(['approvatoDa', 'firmatari.socio', 'firmatari.utente', 'evento'])
+            // Ricerca full-text sul contenuto del verbale (f.17): titolo,
+            // partecipanti, ordine del giorno e deliberazioni
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('titolo', 'like', "%{$search}%")
-                        ->orWhere('presenti', 'like', "%{$search}%");
+                        ->orWhere('presenti', 'like', "%{$search}%")
+                        ->orWhere('ordine_del_giorno', 'like', "%{$search}%")
+                        ->orWhere('deliberazioni', 'like', "%{$search}%");
                 });
             })
             ->when($type !== '' && $type !== 'all', fn ($q) => $q->where('tipo_riunione', $type))
+            ->when($annoFiltro !== null, fn ($q) => $q->where('anno', $annoFiltro))
             ->orderByDesc('data_riunione')
+            ->orderByDesc('numero')
             ->paginate(25)
             ->withQueryString();
 
@@ -63,22 +72,45 @@ class VerbaleController extends Controller
             ->orderBy('nome')
             ->get(['id', 'nome', 'cognome']);
 
+        // Eventi del tenant per il collegamento opzionale verbale↔evento (f.17)
+        $eventi = Evento::query()
+            ->orderByDesc('data_evento')
+            ->limit(200)
+            ->get(['id', 'titolo', 'data_evento']);
+
         return view('documenti-verbali-scadenze.verbali.index', [
             'verbali' => $verbali,
             'verbaleInModifica' => $verbaleInModifica,
             'search' => $search,
             'type' => $type,
+            'annoFiltro' => $annoFiltro,
+            'anni' => $this->anniDisponibili(),
             'tipiRiunione' => Verbale::TIPI_RIUNIONE,
             'soci' => $soci,
             'utenti' => $utenti,
+            'eventi' => $eventi,
         ]);
     }
 
     public function store(SalvaVerbaleRequest $request): RedirectResponse
     {
-        Verbale::create($request->validated());
+        // Numerazione automatica per anno, es. 3/2026 (f.17): il numero è
+        // assegnato in transazione; l'unique a DB su associazione+anno+numero
+        // protegge dalle scritture concorrenti.
+        $verbale = DB::transaction(function () use ($request): Verbale {
+            $verbale = new Verbale($request->validated());
 
-        return redirect()->route('verbali.index')->with('success', 'Verbale aggiunto con successo!');
+            $anno = (int) $verbale->data_riunione->year;
+            $verbale->anno = $anno;
+            $verbale->numero = Verbale::prossimoNumero($anno);
+            $verbale->save();
+
+            return $verbale;
+        });
+
+        return redirect()
+            ->route('verbali.index')
+            ->with('success', "Verbale n. {$verbale->numero_completo} aggiunto con successo!");
     }
 
     public function update(SalvaVerbaleRequest $request, Verbale $verbale): RedirectResponse
@@ -86,6 +118,13 @@ class VerbaleController extends Controller
         $eraApprovato = (bool) $verbale->approvato;
 
         $verbale->fill($request->validated());
+
+        // Se la data cambia anno, il verbale viene rinumerato nel nuovo anno (f.17)
+        $nuovoAnno = (int) $verbale->data_riunione->year;
+        if ($verbale->anno !== $nuovoAnno) {
+            $verbale->anno = $nuovoAnno;
+            $verbale->numero = Verbale::prossimoNumero($nuovoAnno);
+        }
 
         // Irrigidimento spec §6: la modifica azzera l'approvazione
         if ($eraApprovato) {
@@ -119,6 +158,22 @@ class VerbaleController extends Controller
         ]);
 
         return redirect()->route('verbali.index')->with('success', 'Verbale approvato con successo!');
+    }
+
+    /**
+     * Anni con verbali numerati (per il filtro della lista, f.17).
+     *
+     * @return list<int>
+     */
+    private function anniDisponibili(): array
+    {
+        return Verbale::query()
+            ->whereNotNull('anno')
+            ->distinct()
+            ->orderByDesc('anno')
+            ->pluck('anno')
+            ->map(fn ($anno): int => (int) $anno)
+            ->all();
     }
 
     public function destroy(Verbale $verbale): RedirectResponse
@@ -175,7 +230,7 @@ class VerbaleController extends Controller
     {
         $this->authorize('view', $verbale);
 
-        $verbale->load(['approvatoDa', 'firmatari.socio', 'firmatari.utente']);
+        $verbale->load(['approvatoDa', 'firmatari.socio', 'firmatari.utente', 'evento']);
 
         $associazione = Associazione::query()->find($verbale->associazione_id);
 

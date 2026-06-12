@@ -5,8 +5,9 @@ namespace App\Http\Requests\Iscrizioni;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Approvazione di una richiesta di iscrizione socio: l'unica opzione è
- * la generazione contestuale della tessera (checkbox della modale).
+ * Approvazione di una richiesta di iscrizione socio: generazione
+ * contestuale della tessera (checkbox della modale) e delibera di
+ * ammissione opzionale (numero/data, f.14 del piano vita sociale).
  * L'autorizzazione è gestita dalla RichiestaIscrizionePolicy nel controller.
  */
 class ApprovaRichiestaIscrizioneRequest extends FormRequest
@@ -23,6 +24,8 @@ class ApprovaRichiestaIscrizioneRequest extends FormRequest
     {
         return [
             'genera_tessera' => ['nullable', 'boolean'],
+            'delibera_numero' => ['nullable', 'string', 'max:50'],
+            'delibera_data' => ['nullable', 'date'],
         ];
     }
 }

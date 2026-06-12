@@ -36,8 +36,15 @@
 
     <h2 class="titolo">{{ $verbale->titolo }}</h2>
     <div class="meta">
+        @if ($verbale->numero_completo)
+            <span class="badge">Verbale n. {{ $verbale->numero_completo }}</span>
+            &nbsp;
+        @endif
         <span class="badge">{{ $verbale->tipo_riunione }}</span>
         &nbsp; Data riunione: <strong>{{ $verbale->data_riunione->format('d/m/Y') }}</strong>
+        @if ($verbale->evento)
+            &nbsp; Evento collegato: <strong>{{ $verbale->evento->titolo }}</strong>@if ($verbale->evento->data_evento) ({{ $verbale->evento->data_evento->format('d/m/Y') }})@endif
+        @endif
     </div>
 
     @if ($verbale->presenti)

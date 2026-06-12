@@ -12,6 +12,7 @@ use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
 use App\Notifications\Iscrizioni\IscrizioneRifiutataNotification;
 use App\Services\Pagamenti\PaymentService;
 use Illuminate\Notifications\Notification as NotificationMessage;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -42,14 +43,23 @@ class ApprovazioneIscrizioneService
      * eventualmente generata è esposta in ->tesseraGenerata (null se non
      * richiesta o già esistente per l'anno).
      *
+     * La delibera di ammissione (f.14 del piano vita sociale) è opzionale:
+     * se indicata viene salvata sulla richiesta (e quindi mostrata nel
+     * libro soci) e riportata nello storico attività del socio.
+     *
      * @throws IscrizioneException
      */
-    public function approva(RichiestaIscrizione $richiesta, Utente $utente, bool $generaTessera = false): RichiestaIscrizione
-    {
+    public function approva(
+        RichiestaIscrizione $richiesta,
+        Utente $utente,
+        bool $generaTessera = false,
+        ?string $deliberaNumero = null,
+        ?string $deliberaData = null,
+    ): RichiestaIscrizione {
         /** @var Tessera|null $tessera */
         $tessera = null;
 
-        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, &$tessera): RichiestaIscrizione {
+        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $deliberaNumero, $deliberaData, &$tessera): RichiestaIscrizione {
             $richiesta = $this->lockRichiesta($richiesta);
 
             if (! $richiesta->isInAttesa()) {
@@ -71,7 +81,15 @@ class ApprovazioneIscrizioneService
                 'socio_id' => $socio->id,
                 'tipo_attivita' => 'Approvazione iscrizione',
                 'descrizione' => 'Richiesta di iscrizione dal sito approvata da '
-                    .trim(($utente->nome ?? '').' '.($utente->cognome ?? '')).'.',
+                    .trim(($utente->nome ?? '').' '.($utente->cognome ?? ''))
+                    .(filled($deliberaNumero)
+                        ? sprintf(' (delibera di ammissione n. %s%s)', $deliberaNumero, filled($deliberaData) ? ' del '.Carbon::parse($deliberaData)->format('d/m/Y') : '')
+                        : '')
+                    .'.',
+                'dettagli_json' => filled($deliberaNumero) ? [
+                    'delibera_numero' => $deliberaNumero,
+                    'delibera_data' => $deliberaData,
+                ] : null,
                 'data_attivita' => now(),
             ]);
 
@@ -87,6 +105,9 @@ class ApprovazioneIscrizioneService
                 'stato' => RichiestaIscrizione::STATO_APPROVATA,
                 'gestita_da' => $utente->id,
                 'gestita_at' => now(),
+                // Delibera di ammissione opzionale (f.14): mostrata nel libro soci
+                'delibera_numero' => filled($deliberaNumero) ? $deliberaNumero : null,
+                'delibera_data' => filled($deliberaData) ? $deliberaData : null,
             ])->save();
 
             return $richiesta;
@@ -94,7 +115,8 @@ class ApprovazioneIscrizioneService
 
         $this->notificaAccount($risultato, new IscrizioneApprovataNotification(
             $risultato,
-            $tessera?->numero_tessera
+            $tessera?->numero_tessera,
+            $tessera?->id
         ));
 
         return $risultato;

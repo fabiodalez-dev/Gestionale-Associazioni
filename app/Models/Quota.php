@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Quota extends Model implements Pagabile
 {
@@ -72,6 +73,16 @@ class Quota extends Model implements Pagabile
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
+    }
+
+    /**
+     * Ricevuta di pagamento emessa per la quota (f.21, una sola per quota).
+     *
+     * @return HasOne<Ricevuta, $this>
+     */
+    public function ricevuta(): HasOne
+    {
+        return $this->hasOne(Ricevuta::class, 'quota_id');
     }
 
     public function isPagata(): bool

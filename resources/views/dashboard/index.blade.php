@@ -57,6 +57,22 @@
         </div>
     @endif
 
+    {{-- Alert mandati organi sociali in scadenza (piano vita sociale, f.16) --}}
+    @if (($caricheInScadenza ?? null) !== null && $caricheInScadenza->isNotEmpty())
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>Organi sociali:</strong>
+            {{ $caricheInScadenza->count() }} {{ $caricheInScadenza->count() === 1 ? 'mandato in scadenza' : 'mandati in scadenza' }}
+            nei prossimi {{ \App\Models\Carica::GIORNI_ALERT_SCADENZA }} giorni
+            <ul class="mb-1 mt-1">
+                @foreach ($caricheInScadenza->take(5) as $carica)
+                    <li>{{ $carica->ruolo }} — {{ $carica->socio?->nome_completo ?? 'Socio eliminato' }} (scade il {{ $carica->fine?->format('d/m/Y') }})</li>
+                @endforeach
+            </ul>
+            <a href="{{ route('organi-sociali.index') }}" class="alert-link">Vai agli organi sociali</a>
+        </div>
+    @endif
+
     <div class="metrics-strip mb-4">
         <div class="metric-cell">
             <div class="metric-head">
@@ -176,6 +192,10 @@
                     @endforelse
                 </ul>
             </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            {{-- Top partecipanti agli eventi (f.12 piano Vita sociale) --}}
+            @includeIf('eventi-vita._top-partecipanti')
         </div>
     </div>
 @endsection

@@ -54,6 +54,12 @@
                                                 <i class="bi bi-credit-card me-1"></i> Paga ora
                                             </a>
                                         @endif
+                                        @if ($quota->isPagata() && \Illuminate\Support\Facades\Route::has('area-soci.quote.ricevuta'))
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                               href="{{ route('area-soci.quote.ricevuta', $quota) }}">
+                                                <i class="bi bi-file-earmark-pdf me-1"></i> Ricevuta
+                                            </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

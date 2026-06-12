@@ -72,6 +72,8 @@ class AssociazioneController extends Controller
             $associazione = DB::transaction(function () use ($request, $dati, &$warnings): Associazione {
                 $associazione = Associazione::create([
                     'nome' => $dati['nome'],
+                    // Slug esplicito (f.22); NULL = autogenerato dal nome (hook creating)
+                    'slug' => $dati['slug'] ?? null,
                     'email' => $dati['email'],
                     'partita_iva' => $dati['partita_iva'] ?? null,
                     'codice_fiscale' => $dati['codice_fiscale'] ?? null,
@@ -144,6 +146,8 @@ class AssociazioneController extends Controller
             DB::transaction(function () use ($request, $dati, $associazione, &$warnings): void {
                 $associazione->update([
                     'nome' => $dati['nome'],
+                    // Slug editabile (f.22): vuoto/NULL = slug corrente invariato
+                    'slug' => filled($dati['slug'] ?? null) ? $dati['slug'] : $associazione->slug,
                     'email' => $dati['email'],
                     'partita_iva' => $dati['partita_iva'] ?? null,
                     'codice_fiscale' => $dati['codice_fiscale'] ?? null,

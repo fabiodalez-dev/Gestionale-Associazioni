@@ -12,6 +12,9 @@
             'Sospeso' => 'secondary',
             default => 'danger',
         };
+        // f.23: badge documenti scaduti / in scadenza nella scheda socio
+        $documentiScaduti = $socio->documenti->filter->isScaduto();
+        $documentiInScadenza = $socio->documenti->filter->isInScadenza();
     @endphp
 
     <div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -19,6 +22,12 @@
             <h1 class="h2 mb-1">{{ $socio->nome_completo }}</h1>
             <p class="text-muted mb-1">Socio n. {{ $socio->numero_socio }}
                 <span class="badge bg-{{ $badgeStato }}">{{ $socio->stato }}</span>
+                @if ($documentiScaduti->isNotEmpty())
+                    <span class="badge bg-danger" title="Documenti scaduti"><i class="bi bi-exclamation-triangle me-1"></i>{{ $documentiScaduti->count() }} {{ $documentiScaduti->count() === 1 ? 'documento scaduto' : 'documenti scaduti' }}</span>
+                @endif
+                @if ($documentiInScadenza->isNotEmpty())
+                    <span class="badge bg-warning text-dark" title="Documenti in scadenza"><i class="bi bi-hourglass-split me-1"></i>{{ $documentiInScadenza->count() }} in scadenza</span>
+                @endif
             </p>
             <div>
                 @foreach ($socio->tags as $tag)
@@ -33,7 +42,7 @@
     </div>
 
     <ul class="nav nav-tabs" role="tablist">
-        @foreach (['anagrafica' => 'Anagrafica', 'quote-tessere' => 'Quote e Tessere', 'documenti' => 'Documenti', 'storico' => 'Storico'] as $key => $label)
+        @foreach (['anagrafica' => 'Anagrafica', 'quote-tessere' => 'Quote e Tessere', 'tesseramento' => 'Tesseramento', 'vita-sociale' => 'Vita sociale', 'documenti' => 'Documenti', 'storico' => 'Storico'] as $key => $label)
             <li class="nav-item" role="presentation">
                 <button class="nav-link {{ $tab === $key ? 'active' : '' }}" data-bs-toggle="tab"
                         data-bs-target="#tab-{{ $key }}" type="button" role="tab">{{ $label }}</button>
@@ -131,9 +140,18 @@
                     <label class="form-label" for="doc_file">File *</label>
                     <input type="file" class="form-control" id="doc_file" name="file" required>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label" for="doc_descrizione">Descrizione</label>
                     <input type="text" class="form-control" id="doc_descrizione" name="descrizione" maxlength="1000">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="doc_tipo">Tipo</label>
+                    <select class="form-select" id="doc_tipo" name="tipo_documento">
+                        <option value="">—</option>
+                        @foreach (\App\Models\DocumentoSocio::TIPI_DOCUMENTO as $tipoKey => $tipoLabel)
+                            <option value="{{ $tipoKey }}">{{ $tipoLabel }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label" for="doc_scadenza">Scadenza</label>
@@ -149,13 +167,21 @@
             @else
                 <div class="table-responsive">
                     <table class="table table-sm align-middle">
-                        <thead><tr><th>File</th><th>Descrizione</th><th>Scadenza</th><th>Caricato il</th><th class="text-end">Azioni</th></tr></thead>
+                        <thead><tr><th>File</th><th>Descrizione</th><th>Tipo</th><th>Scadenza</th><th>Caricato il</th><th class="text-end">Azioni</th></tr></thead>
                         <tbody>
                             @foreach ($socio->documenti as $documento)
                                 <tr>
                                     <td>{{ $documento->nome_file }}</td>
                                     <td>{{ $documento->descrizione ?: '—' }}</td>
-                                    <td>{{ $documento->data_scadenza?->format('d/m/Y') ?? '—' }}</td>
+                                    <td>{{ $documento->tipo_documento ? (\App\Models\DocumentoSocio::TIPI_DOCUMENTO[$documento->tipo_documento] ?? $documento->tipo_documento) : '—' }}</td>
+                                    <td>
+                                        {{ $documento->data_scadenza?->format('d/m/Y') ?? '—' }}
+                                        @if ($documento->isScaduto())
+                                            <span class="badge bg-danger">Scaduto</span>
+                                        @elseif ($documento->isInScadenza())
+                                            <span class="badge bg-warning text-dark">In scadenza</span>
+                                        @endif
+                                    </td>
                                     <td>{{ $documento->created_at?->format('d/m/Y H:i') }}</td>
                                     <td class="text-end text-nowrap">
                                         <a href="{{ route('soci.documenti.download', [$socio, $documento]) }}" class="btn btn-sm btn-outline-primary" title="Scarica">
@@ -174,6 +200,16 @@
                     </table>
                 </div>
             @endif
+        </div>
+
+        {{-- Tab Tesseramento (f.6 piano Vita sociale — modulo rinnovi) --}}
+        <div class="tab-pane fade {{ $tab === 'tesseramento' ? 'show active' : '' }}" id="tab-tesseramento" role="tabpanel">
+            @include('rinnovi.partials.tab-tesseramento', ['socio' => $socio])
+        </div>
+
+        {{-- Tab Vita sociale (f.12 piano Vita sociale — modulo eventi-vita) --}}
+        <div class="tab-pane fade {{ $tab === 'vita-sociale' ? 'show active' : '' }}" id="tab-vita-sociale" role="tabpanel">
+            @include('eventi-vita._vita-sociale-socio', ['socio' => $socio])
         </div>
 
         {{-- Tab Storico --}}

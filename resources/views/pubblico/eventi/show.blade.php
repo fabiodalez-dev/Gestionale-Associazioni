@@ -45,6 +45,11 @@
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                         <h1 class="h3 mb-0">{{ $evento->titolo }}</h1>
+                        @if ($evento->solo_soci)
+                            <span class="badge text-bg-warning text-nowrap" title="Prenotabile solo dai soci attivi">
+                                <i class="bi bi-person-badge me-1"></i>Riservato ai soci
+                            </span>
+                        @endif
                         @if ($esaurito)
                             @if ($evento->lista_attesa_attiva)
                                 <span class="badge text-bg-warning">Lista d'attesa</span>
@@ -83,6 +88,13 @@
                         <h2 class="h5">Descrizione</h2>
                         <p class="mb-0" style="white-space: pre-line;">{{ $evento->descrizione }}</p>
                     @endif
+
+                    @if (Route::has('pubblico.eventi.ics'))
+                        <a href="{{ route('pubblico.eventi.ics', ['associazione' => $associazione->slug, 'evento' => $evento->id]) }}"
+                           class="btn btn-outline-secondary btn-sm mt-3">
+                            <i class="bi bi-calendar-plus me-1"></i>Aggiungi al calendario (.ics)
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>
@@ -101,6 +113,12 @@
                             <i class="bi bi-ticket-perforated me-1"></i> Prenota
                         </button>
                     @elseif (! auth('account')->check())
+                        @if ($evento->solo_soci)
+                            <p class="text-muted small mb-2">
+                                <i class="bi bi-person-badge me-1"></i>
+                                Evento riservato ai soci: per prenotare serve un account collegato a un socio attivo.
+                            </p>
+                        @endif
                         <p class="text-muted">Per prenotare devi accedere con il tuo account.</p>
                         <a href="{{ route('pubblico.login', $associazione->slug) }}" class="btn btn-primary w-100 mb-2">
                             <i class="bi bi-box-arrow-in-right me-1"></i> Accedi per prenotare
@@ -108,6 +126,20 @@
                         <a href="{{ route('pubblico.registrazione', $associazione->slug) }}" class="btn btn-outline-secondary w-100">
                             Non hai un account? Registrati
                         </a>
+                    @elseif ($evento->solo_soci && ! \App\Services\EventiVita\VitaSocialeService::accountAbilitatoSoloSoci(auth('account')->user()))
+                        {{-- f.10: CTA spiegata per i non soci --}}
+                        <div class="alert alert-warning small">
+                            <i class="bi bi-person-badge me-1"></i>
+                            <strong>Evento riservato ai soci.</strong>
+                            Può prenotare solo chi ha un account collegato a un socio attivo
+                            dell'associazione. Se sei già socio, chiedi all'associazione di
+                            collegare il tuo account; altrimenti puoi richiedere l'iscrizione.
+                        </div>
+                        @if (Route::has('pubblico.account.diventa-socio'))
+                            <a href="{{ route('pubblico.account.diventa-socio', $associazione->slug) }}" class="btn btn-primary w-100">
+                                <i class="bi bi-person-plus me-1"></i> Diventa socio
+                            </a>
+                        @endif
                     @elseif (Route::has('pubblico.eventi.prenota'))
                         <form method="POST" action="{{ route('pubblico.eventi.prenota', ['associazione' => $associazione->slug, 'evento' => $evento->id]) }}">
                             @csrf

@@ -5,17 +5,23 @@ namespace Database\Seeders;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
+use App\Models\Carica;
 use App\Models\CategoriaSocio;
+use App\Models\Cessazione;
 use App\Models\Evento;
 use App\Models\Prenotazione;
 use App\Models\Quota;
+use App\Models\Ricevuta;
 use App\Models\RichiestaIscrizione;
 use App\Models\Sede;
 use App\Models\Socio;
+use App\Models\StoricoAttivitaSocio;
 use App\Models\Tessera;
 use App\Models\TipoSocio;
 use App\Models\ValoreCampoPersonalizzato;
+use App\Models\Verbale;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
  * Dati dimostrativi per l'installer web: SOLO contenuti (associazione, soci,
@@ -30,6 +36,12 @@ use Illuminate\Database\Seeder;
  * (giulia@account-demo.test / demo1234) ha una richiesta di iscrizione
  * socio in attesa, visibile nella pagina admin "Richieste iscrizione".
  * La "Visita guidata in cantina" è l'evento con approvazione richiesta.
+ *
+ * Vita sociale (PIANO-VITA-SOCIALE): due cariche negli organi sociali
+ * (una in scadenza, alert dashboard), un ex socio con cessazione formale
+ * storica (visibile nel libro soci), un verbale numerato 1/{anno}
+ * collegato all'assemblea, una serie di eventi ricorrenti solo-soci e
+ * una ricevuta numerata 1/{anno} sulla quota pagata.
  */
 class DemoSeeder extends Seeder
 {
@@ -106,6 +118,10 @@ class DemoSeeder extends Seeder
             ['nome' => 'Sara', 'cognome' => 'Russo', 'email' => 'sara.russo@demo.test'],
         ];
 
+        /** @var array<int, Socio> $sociModels */
+        $sociModels = [];
+        $quotaPagata = null;
+
         foreach ($soci as $i => $dati) {
             $socio = Socio::create([
                 'associazione_id' => $associazione->id,
@@ -132,7 +148,7 @@ class DemoSeeder extends Seeder
                 'stato' => 'Attiva',
             ]);
 
-            Quota::create([
+            $quota = Quota::create([
                 'socio_id' => $socio->id,
                 'associazione_id' => $associazione->id,
                 'anno' => $anno,
@@ -142,6 +158,12 @@ class DemoSeeder extends Seeder
                 'stato' => $i === 0 ? 'Pagata' : 'Da Pagare',
                 'data_pagamento' => $i === 0 ? now()->subMonths(1)->toDateString() : null,
             ]);
+
+            $sociModels[] = $socio;
+
+            if ($i === 0) {
+                $quotaPagata = $quota;
+            }
         }
 
         // Evento pubblicato GRATUITO con capienza: prenotabile dal
@@ -275,5 +297,141 @@ class DemoSeeder extends Seeder
         ]);
 
         $accountRichiedente->forceFill(['richiesta_socio_at' => now()])->save();
+
+        /*
+        |------------------------------------------------------------------
+        | Vita sociale (PIANO-VITA-SOCIALE) — dati dimostrativi
+        |------------------------------------------------------------------
+        */
+
+        // f.16 Organi sociali: una carica in scadenza entro 90 giorni
+        // (alimenta l'alert "mandati in scadenza" in dashboard) e una
+        // in corso senza fine mandato
+        Carica::create([
+            'associazione_id' => $associazione->id,
+            'socio_id' => $sociModels[0]->id,
+            'ruolo' => 'Presidente',
+            'inizio' => now()->subYears(3)->addDays(60)->toDateString(),
+            'fine' => now()->addDays(60)->toDateString(),
+            'note' => 'Mandato triennale in scadenza: rinnovo alla prossima assemblea.',
+        ]);
+
+        Carica::create([
+            'associazione_id' => $associazione->id,
+            'socio_id' => $sociModels[1]->id,
+            'ruolo' => 'Segretario',
+            'inizio' => now()->subYear()->toDateString(),
+            'fine' => null,
+        ]);
+
+        // f.15 Cessazione storica: ex socio dimissionario dell'anno scorso,
+        // con tessera annullata e riga nello storico attività — compare nel
+        // libro soci (f.13) con data e motivo di cessazione
+        $exSocio = Socio::create([
+            'associazione_id' => $associazione->id,
+            'sede_id' => $sede->id,
+            'tipo_socio_id' => $tipoSocio->id,
+            'numero_socio' => '005',
+            'nome' => 'Paolo',
+            'cognome' => 'Gallo',
+            'email' => 'paolo.gallo@demo.test',
+            'data_nascita' => now()->subYears(45)->toDateString(),
+            'data_iscrizione' => now()->subYears(3)->toDateString(),
+            'stato' => Socio::STATO_RADIATO,
+            'privacy_consenso' => true,
+        ]);
+
+        Tessera::create([
+            'socio_id' => $exSocio->id,
+            'associazione_id' => $associazione->id,
+            'numero_tessera' => sprintf('%d%04d', $anno - 1, 5),
+            'anno_validita' => $anno - 1,
+            'data_emissione' => now()->subYears(1)->startOfYear()->toDateString(),
+            'data_scadenza' => ($anno - 1).'-12-31',
+            'tipo_scadenza' => 'solare',
+            'stato' => Tessera::STATO_ANNULLATA,
+        ]);
+
+        $cessazione = Cessazione::create([
+            'associazione_id' => $associazione->id,
+            'socio_id' => $exSocio->id,
+            'tipo' => Cessazione::TIPO_DIMISSIONI,
+            'data' => now()->subMonths(4)->toDateString(),
+            'motivo' => 'Dimissioni volontarie per trasferimento all\'estero.',
+            'delibera_numero' => '7/'.($anno - 1),
+            'delibera_data' => now()->subMonths(4)->toDateString(),
+        ]);
+
+        // Specchio di CessazioneService::registra (storico fail-safe)
+        StoricoAttivitaSocio::create([
+            'associazione_id' => $associazione->id,
+            'socio_id' => $exSocio->id,
+            'tipo_attivita' => 'Cessazione',
+            'descrizione' => sprintf(
+                'Cessazione per %s registrata con decorrenza %s (delibera n. %s). Stato aggiornato a "%s", tessere attive annullate.',
+                Cessazione::TIPO_DIMISSIONI,
+                now()->subMonths(4)->format('d/m/Y'),
+                $cessazione->delibera_numero,
+                Socio::STATO_RADIATO
+            ),
+            'dettagli_json' => [
+                'cessazione_id' => $cessazione->id,
+                'tipo' => Cessazione::TIPO_DIMISSIONI,
+                'motivo' => $cessazione->motivo,
+            ],
+            'data_attivita' => now()->subMonths(4),
+        ]);
+
+        // f.17 Verbale numerato (1/{anno}) collegato all'assemblea annuale,
+        // con riferimento alla delibera della cessazione qui sopra
+        Verbale::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Verbale del Consiglio Direttivo — programmazione attività',
+            'numero' => 1,
+            'anno' => $anno,
+            'data_riunione' => now()->subMonths(2)->toDateString(),
+            'tipo_riunione' => 'Consiglio Direttivo',
+            'presenti' => 'Anna Verdi (Presidente), Luca Bianchi (Segretario), Sara Russo',
+            'ordine_del_giorno' => "1. Approvazione programma eventi\n2. Convocazione assemblea annuale\n3. Varie ed eventuali",
+            'deliberazioni' => 'Delibera n. 1/'.$anno.': approvato il calendario eventi e convocata l\'assemblea annuale dei soci.',
+            'approvato' => false,
+            'evento_id' => $eventoGratuito->id,
+        ]);
+
+        // f.8 Evento ricorrente: serie settimanale di 3 occorrenze
+        // (serie_id condiviso) riservata ai soci (f.10: badge "Riservato
+        // ai soci" nel mini-sito, prenotabile solo da account-socio attivi)
+        $serieId = (string) Str::uuid();
+
+        foreach ([1, 2, 3] as $settimana) {
+            Evento::create([
+                'associazione_id' => $associazione->id,
+                'titolo' => 'Serata giochi al circolo',
+                'descrizione' => 'Appuntamento settimanale di socialità: giochi da tavolo e carte in sede.',
+                'data_evento' => now()->addWeeks($settimana)->setTime(21, 0),
+                'luogo' => 'Sede Centrale',
+                'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+                'capienza' => 20,
+                'prezzo' => 0,
+                'max_posti_per_prenotazione' => 2,
+                'lista_attesa_attiva' => false,
+                'annullamento_entro_ore' => 12,
+                'serie_id' => $serieId,
+                'solo_soci' => true,
+            ]);
+        }
+
+        // f.21 Ricevuta numerata (1/{anno}) della quota già pagata di Anna
+        // Verdi, scaricabile da admin (Quote) e dall'area soci
+        if ($quotaPagata !== null) {
+            Ricevuta::create([
+                'associazione_id' => $associazione->id,
+                'quota_id' => $quotaPagata->id,
+                'numero' => 1,
+                'anno' => $anno,
+                'importo' => $quotaPagata->importo,
+                'emessa_at' => now()->subMonths(1),
+            ]);
+        }
     }
 }

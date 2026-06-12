@@ -58,6 +58,10 @@ class EventoRequest extends FormRequest
             'richiede_approvazione' => $this->has('richiede_approvazione')
                 ? $this->boolean('richiede_approvazione')
                 : ($evento->richiede_approvazione ?? false),
+            // f.10 piano Vita sociale: evento riservato ai soci attivi
+            'solo_soci' => $this->has('solo_soci')
+                ? $this->boolean('solo_soci')
+                : ($evento->solo_soci ?? false),
         ]);
     }
 
@@ -84,6 +88,7 @@ class EventoRequest extends FormRequest
             'iscrizioni_aperte' => ['required', 'boolean'],
             'richiede_approvazione' => ['required', 'boolean'],
             'annullamento_entro_ore' => ['required', 'integer', 'min:0', 'max:65535'],
+            'solo_soci' => ['required', 'boolean'],
             'immagine_url' => ['nullable', 'string', 'url:http,https', 'max:2048'],
         ];
     }
@@ -164,6 +169,7 @@ class EventoRequest extends FormRequest
             'iscrizioni_aperte' => 'iscrizioni aperte',
             'richiede_approvazione' => 'approvazione richiesta',
             'annullamento_entro_ore' => 'annullamento entro (ore)',
+            'solo_soci' => 'riservato ai soci',
             'immagine_url' => 'immagine (URL)',
         ];
     }

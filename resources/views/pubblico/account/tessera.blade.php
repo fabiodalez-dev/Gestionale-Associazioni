@@ -33,6 +33,9 @@
                             Nessuna tessera attiva al momento.
                         </p>
                     @endif
+
+                    {{-- Rinnovo self-service (f.1 piano Vita sociale — modulo rinnovi) --}}
+                    @include('rinnovi.partials.btn-rinnova-account', ['associazione' => $associazione, 'socio' => $socio])
                 </div>
             </div>
         </div>
@@ -80,6 +83,12 @@
                                                 @if ($linkPagamento->has($quota->id))
                                                     <a href="{{ $linkPagamento->get($quota->id) }}" class="btn btn-sm btn-primary">
                                                         <i class="bi bi-credit-card me-1"></i>Paga ora
+                                                    </a>
+                                                @endif
+                                                @if ($quota->isPagata() && \Illuminate\Support\Facades\Route::has('pubblico.account.quote.ricevuta'))
+                                                    <a href="{{ route('pubblico.account.quote.ricevuta', ['associazione' => $associazione->slug, 'quota' => $quota->id]) }}"
+                                                       class="btn btn-sm btn-outline-secondary">
+                                                        <i class="bi bi-file-earmark-pdf me-1"></i>Ricevuta
                                                     </a>
                                                 @endif
                                             </td>

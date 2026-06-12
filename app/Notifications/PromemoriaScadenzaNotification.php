@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Scadenza;
+use App\Services\Email\TenantNotificationMailer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -38,7 +39,7 @@ class PromemoriaScadenzaNotification extends Notification
             default => 'scade tra '.$giorni.' '.($giorni === 1 ? 'giorno' : 'giorni'),
         };
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject('Promemoria scadenza: '.$this->scadenza->titolo)
             ->greeting('Ciao!')
             ->line("La scadenza \"{$this->scadenza->titolo}\" {$quando} ({$this->scadenza->data_scadenza->format('d/m/Y')}).")
@@ -46,5 +47,7 @@ class PromemoriaScadenzaNotification extends Notification
             ->lineIf(filled($this->scadenza->descrizione), (string) $this->scadenza->descrizione)
             ->action('Vai alle scadenze', route('scadenze.index'))
             ->salutation('— '.config('app.name'));
+
+        return TenantNotificationMailer::applica($message, $this->scadenza->associazione);
     }
 }

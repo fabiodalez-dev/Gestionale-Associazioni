@@ -41,6 +41,7 @@ class DocumentoSocioController extends Controller
             'nome_file' => $file->getClientOriginalName(),
             'percorso_file' => $percorso,
             'descrizione' => $request->validated('descrizione'),
+            'tipo_documento' => $request->validated('tipo_documento'),
             'data_scadenza' => $request->validated('data_scadenza'),
             'caricato_da' => $request->user()->id,
         ]);

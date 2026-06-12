@@ -17,6 +17,7 @@ use App\Notifications\Prenotazioni\PagamentoScadutoNotification;
 use App\Notifications\Prenotazioni\PromemoriaEventoNotification;
 use App\Notifications\Prenotazioni\PromozioneListaAttesaNotification;
 use App\Notifications\Prenotazioni\RifiutataNotification;
+use App\Services\EventiVita\VitaSocialeService;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use Illuminate\Notifications\Notification as NotificationMessage;
 use Illuminate\Support\Facades\DB;
@@ -93,6 +94,13 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
 
             if (! $evento->isPrenotabile()) {
                 throw PrenotazioneException::eventoNonPrenotabile();
+            }
+
+            // Evento riservato ai soci (f.10 piano Vita sociale): prenotabile
+            // solo da account collegati a un socio Attivo del tenant
+            if ($evento->isRiservatoAiSoci()
+                && ! VitaSocialeService::accountAbilitatoSoloSoci($account)) {
+                throw PrenotazioneException::riservatoAiSoci();
             }
 
             $maxPosti = max(1, (int) $evento->max_posti_per_prenotazione);

@@ -20,6 +20,8 @@ class StoreAssociazioneRequest extends FormRequest
     {
         return [
             'nome' => ['required', 'string', 'max:255'],
+            // Slug mini-sito editabile (f.22): kebab-case, unique; vuoto = autogenerato dal nome
+            'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(-[a-z0-9]+)*$/', Rule::unique('associazioni', 'slug')],
             'email' => ['required', 'email', 'max:255', Rule::unique('associazioni', 'email')],
             'partita_iva' => ['nullable', 'string', 'max:20'],
             'codice_fiscale' => ['nullable', 'string', 'max:16'],
@@ -71,6 +73,8 @@ class StoreAssociazioneRequest extends FormRequest
     {
         return [
             'email.unique' => 'Esiste già un\'associazione con questa email.',
+            'slug.regex' => 'Lo slug deve essere in kebab-case: solo minuscole, numeri e trattini (es. "mia-associazione").',
+            'slug.unique' => 'Questo slug è già usato da un\'altra associazione.',
             'admin_password.min' => 'Admin non creato: la password deve avere almeno 8 caratteri.',
             'admin_email.unique' => 'Admin non creato: email già esistente.',
             'clone_from_assoc_id.required' => 'Seleziona l\'associazione da cui clonare le configurazioni.',
@@ -87,6 +91,12 @@ class StoreAssociazioneRequest extends FormRequest
         // Stringa vuota → NULL (semantica legacy di costo_tessera)
         if ($this->input('costo_tessera') === '') {
             $this->merge(['costo_tessera' => null]);
+        }
+
+        // Slug: trim e stringa vuota → NULL (autogenerazione dal nome)
+        if ($this->has('slug')) {
+            $slug = trim((string) $this->input('slug'));
+            $this->merge(['slug' => $slug === '' ? null : $slug]);
         }
     }
 }

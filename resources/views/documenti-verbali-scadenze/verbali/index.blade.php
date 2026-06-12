@@ -25,18 +25,26 @@
 
 {{-- Filtri unificati (ricerca + tipo nella stessa query string) --}}
 <form method="GET" action="{{ route('verbali.index') }}" class="row g-2 mb-3">
-    <div class="col-md-5">
+    <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" class="form-control" name="search" value="{{ $search }}"
-                   placeholder="Cerca per titolo o partecipanti...">
+                   placeholder="Cerca nel contenuto (titolo, presenti, OdG, deliberazioni)...">
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <select class="form-select" name="type" onchange="this.form.submit()">
             <option value="all" @selected($type === 'all' || $type === '')>Tutti i tipi</option>
             @foreach ($tipiRiunione as $tipo)
                 <option value="{{ $tipo }}" @selected($type === $tipo)>{{ $tipo }}</option>
+            @endforeach
+        </select>
+    </div>
+    <div class="col-md-2">
+        <select class="form-select" name="anno" onchange="this.form.submit()">
+            <option value="">Tutti gli anni</option>
+            @foreach ($anni as $a)
+                <option value="{{ $a }}" @selected($annoFiltro === $a)>{{ $a }}</option>
             @endforeach
         </select>
     </div>
@@ -52,6 +60,7 @@
         <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
+                    <th>N.</th>
                     <th>Titolo</th>
                     <th>Data Riunione</th>
                     <th>Tipo</th>
@@ -64,7 +73,17 @@
                 @forelse ($verbali as $verbale)
                     <tr>
                         <td>
+                            @if ($verbale->numero_completo)
+                                <strong>{{ $verbale->numero_completo }}</strong>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        <td>
                             <strong>{{ $verbale->titolo }}</strong>
+                            @if ($verbale->evento)
+                                <br><small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ $verbale->evento->titolo }}</small>
+                            @endif
                             @if ($verbale->presenti)
                                 <br><small class="text-muted">Partecipanti: {{ \Illuminate\Support\Str::limit($verbale->presenti, 50) }}</small>
                             @endif
@@ -129,7 +148,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
+                        <td colspan="7" class="text-center text-muted py-4">
                             <i class="bi bi-inbox fs-3 d-block mb-2"></i>Nessun verbale trovato.
                         </td>
                     </tr>
@@ -150,7 +169,10 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">{{ $verbale->titolo }}</h5>
+                <h5 class="modal-title">
+                    @if ($verbale->numero_completo)<span class="badge bg-secondary me-1">{{ $verbale->numero_completo }}</span>@endif
+                    {{ $verbale->titolo }}
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
             </div>
             <div class="modal-body">
@@ -158,6 +180,13 @@
                     <div class="col-md-6"><strong>Data Riunione:</strong> {{ $verbale->data_riunione->format('d/m/Y') }}</div>
                     <div class="col-md-6"><strong>Tipo:</strong> {{ $verbale->tipo_riunione }}</div>
                 </div>
+                @if ($verbale->evento)
+                    <div class="mb-2">
+                        <strong>Evento collegato:</strong>
+                        {{ $verbale->evento->titolo }}
+                        @if ($verbale->evento->data_evento)<span class="text-muted small">({{ $verbale->evento->data_evento->format('d/m/Y') }})</span>@endif
+                    </div>
+                @endif
                 @if ($verbale->presenti)
                     <div class="mb-2"><strong>Partecipanti:</strong><br>{!! nl2br(e($verbale->presenti)) !!}</div>
                 @endif
@@ -293,6 +322,19 @@
                             </select>
                             @error('tipo_riunione')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="evento_id" class="form-label">Evento collegato <span class="text-muted small">(opzionale, es. assemblea)</span></label>
+                        <select class="form-select @error('evento_id') is-invalid @enderror" id="evento_id" name="evento_id">
+                            <option value="">Nessun evento</option>
+                            @foreach ($eventi as $evento)
+                                <option value="{{ $evento->id }}"
+                                        @selected(old('evento_id', $verbaleInModifica?->evento_id) === $evento->id)>
+                                    {{ $evento->titolo }}@if ($evento->data_evento) — {{ $evento->data_evento->format('d/m/Y') }}@endif
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('evento_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="mb-3">
                         <label for="presenti" class="form-label">Presenti</label>

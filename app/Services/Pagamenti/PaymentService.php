@@ -12,9 +12,11 @@ use App\Models\Tessera;
 use App\Models\Utente;
 use App\Notifications\Quote\BenvenutoSocioNotification;
 use App\Notifications\Quote\PagamentoQuotaNotification;
+use App\Notifications\Quote\RicevutaQuotaNotification;
 use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
+use App\Services\Tessere\TesseraIssuer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -94,6 +96,9 @@ class PaymentService
 
             $this->notifyBestEffort($socio, new PagamentoQuotaNotification($quota->fresh() ?? $quota));
         }
+
+        // Ricevuta numerata per anno (f.21): emissione + email best-effort
+        $this->emettiRicevutaBestEffort($quota->id);
     }
 
     // ------------------------------------------------------------------
@@ -359,6 +364,8 @@ class PaymentService
 
             $config = PaymentGatewaySetting::forTenant($associazioneId);
 
+            $eraGiaAttivo = $socio->stato === Socio::STATO_ATTIVO;
+
             if ($config !== null && $config->auto_attivazione_pagamento
                 && $socio->stato === Socio::STATO_IN_ATTESA_DI_PAGAMENTO) {
                 $socio->forceFill([
@@ -377,6 +384,22 @@ class PaymentService
                 $notifiche[] = [$socio, new BenvenutoSocioNotification($socio)];
             }
 
+            // Rinnovo self-service (f.1 piano Vita sociale): un socio GIÀ attivo
+            // che paga la quota dell'anno ottiene la tessera dell'anno
+            // emessa/rinnovata se assente (idempotente, best-effort:
+            // un errore di emissione non invalida il pagamento registrato).
+            if ($eraGiaAttivo && ! $socio->trashed()) {
+                try {
+                    app(TesseraIssuer::class)->emettiSeAssente($socio, (int) $quota->anno);
+                } catch (\Throwable $e) {
+                    Log::warning('PaymentService: emissione tessera di rinnovo fallita', [
+                        'socio_id' => $socio->id,
+                        'quota_id' => $quota->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             $notifiche[] = [$socio, new PagamentoQuotaNotification($quota->fresh() ?? $quota)];
 
             return true;
@@ -387,7 +410,49 @@ class PaymentService
             $this->notifyBestEffort($socio, $notification);
         }
 
+        // Ricevuta numerata per anno (f.21): fuori transaction (numerazione
+        // in transazione propria), idempotente sul replay del webhook e
+        // no-op se la quota non risulta pagata
+        $this->emettiRicevutaBestEffort($quotaId);
+
         return $ok;
+    }
+
+    /**
+     * Emette (idempotente) la ricevuta numerata della quota pagata e invia
+     * la notifica con PDF SOLO alla prima emissione (f.21). Best-effort:
+     * nessun errore di ricevuta deve far fallire il flusso di pagamento.
+     */
+    protected function emettiRicevutaBestEffort(string $quotaId): void
+    {
+        try {
+            /** @var Quota|null $quota */
+            $quota = Quota::allTenants()->find($quotaId);
+
+            if ($quota === null) {
+                return;
+            }
+
+            $ricevuta = app(RicevutaService::class)->emettiPerQuota($quota);
+
+            if ($ricevuta === null || ! $ricevuta->wasRecentlyCreated) {
+                // Quota non pagata o ricevuta già emessa in precedenza:
+                // nessuna nuova email
+                return;
+            }
+
+            /** @var Socio|null $socio */
+            $socio = Socio::allTenants()->withTrashed()->find($quota->socio_id);
+
+            if ($socio !== null) {
+                $this->notifyBestEffort($socio, new RicevutaQuotaNotification($ricevuta));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('PaymentService::emettiRicevutaBestEffort', [
+                'quota_id' => $quotaId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

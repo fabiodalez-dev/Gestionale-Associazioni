@@ -148,3 +148,28 @@ Schedule::command('prenotazioni:gestisci-scadenze')
 Schedule::command('prenotazioni:promemoria-eventi')
     ->dailyAt('08:30')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Vita sociale — moduli rinnovi, eventi-vita, anagrafica-pro
+|--------------------------------------------------------------------------
+|
+| rinnovi:promemoria (funz. 3): promemoria multi-step -30/-15/-3 giorni
+| dalla scadenza tessera, step configurabili per tenant, dedup su
+| promemoria_inviati. eventi:invia-feedback (funz. 11): il giorno dopo
+| l'evento invia ai partecipanti con check-in il link firmato al form di
+| valutazione. documenti:promemoria-scadenze (funz. 23): digest per i
+| documenti socio in scadenza (-30 giorni), dedup su promemoria_inviati.
+|
+*/
+Schedule::command('rinnovi:promemoria')
+    ->dailyAt('07:00')
+    ->withoutOverlapping();
+
+Schedule::command('documenti:promemoria-scadenze')
+    ->dailyAt('07:45')
+    ->withoutOverlapping();
+
+Schedule::command('eventi:invia-feedback')
+    ->dailyAt('10:00')
+    ->withoutOverlapping();

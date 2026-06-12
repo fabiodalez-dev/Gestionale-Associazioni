@@ -27,6 +27,12 @@ class Associazione extends Model
         self::MODALITA_DIRETTA,
     ];
 
+    /**
+     * Step di default (giorni prima della scadenza tessera) dei promemoria
+     * rinnovo multi-step (f.3), usati se promemoria_rinnovo_config è NULL.
+     */
+    public const PROMEMORIA_RINNOVO_DEFAULT = [30, 15, 3];
+
     protected $table = 'associazioni';
 
     /**
@@ -64,6 +70,7 @@ class Associazione extends Model
         'iscrizioni_socio_aperte',
         'modalita_iscrizione',
         'iscrizione_form_config',
+        'promemoria_rinnovo_config',
     ];
 
     protected function casts(): array
@@ -76,7 +83,28 @@ class Associazione extends Model
             'campi_obbligatori_config' => 'array',
             'iscrizioni_socio_aperte' => 'boolean',
             'iscrizione_form_config' => 'array',
+            'promemoria_rinnovo_config' => 'array',
         ];
+    }
+
+    /**
+     * Step promemoria rinnovo del tenant (giorni prima della scadenza,
+     * ordinati decrescenti); default PROMEMORIA_RINNOVO_DEFAULT.
+     *
+     * @return list<int>
+     */
+    public function promemoriaRinnovoSteps(): array
+    {
+        $steps = $this->promemoria_rinnovo_config;
+
+        if (! is_array($steps) || $steps === []) {
+            $steps = self::PROMEMORIA_RINNOVO_DEFAULT;
+        }
+
+        $steps = array_values(array_unique(array_map('intval', $steps)));
+        rsort($steps);
+
+        return $steps;
     }
 
     public function isIscrizioneDiretta(): bool
@@ -331,5 +359,45 @@ class Associazione extends Model
     public function richiesteIscrizione(): HasMany
     {
         return $this->hasMany(RichiestaIscrizione::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<PromemoriaInviato, $this>
+     */
+    public function promemoriaInviati(): HasMany
+    {
+        return $this->hasMany(PromemoriaInviato::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<FeedbackEvento, $this>
+     */
+    public function feedbackEventi(): HasMany
+    {
+        return $this->hasMany(FeedbackEvento::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Cessazione, $this>
+     */
+    public function cessazioni(): HasMany
+    {
+        return $this->hasMany(Cessazione::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Carica, $this>
+     */
+    public function cariche(): HasMany
+    {
+        return $this->hasMany(Carica::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Ricevuta, $this>
+     */
+    public function ricevute(): HasMany
+    {
+        return $this->hasMany(Ricevuta::class, 'associazione_id');
     }
 }

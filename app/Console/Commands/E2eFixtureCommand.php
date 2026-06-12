@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Models\FeedbackEvento;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Prenotazione;
 use App\Models\Quota;
@@ -35,7 +36,8 @@ class E2eFixtureCommand extends Command
         {--richiede-approvazione=0} {--iscrizioni-chiuse=0} {--apertura-futura=0}
         {--tessera=} {--scaduta=0} {--senza-tessera=0} {--con-quota=0}
         {--aperte=} {--modalita=} {--intro=} {--config=}
-        {--genera-tessera=0} {--motivo=}';
+        {--genera-tessera=0} {--motivo=}
+        {--solo-soci=0} {--socio=} {--quota=} {--codice-fiscale=} {--data-nascita=}';
 
     protected $description = 'Fixture deterministiche per i test E2E (richiede E2E_FIXTURES=1)';
 
@@ -66,6 +68,11 @@ class E2eFixtureCommand extends Command
             'stato-richiesta' => $this->statoRichiesta(),
             'approva-richiesta' => $this->approvaRichiesta(),
             'rifiuta-richiesta' => $this->rifiutaRichiesta(),
+            'collega-account-socio' => $this->collegaAccountSocio(),
+            'paga-quota' => $this->pagaQuota(),
+            'link-feedback' => $this->linkFeedback(),
+            'conta-serie' => $this->contaSerie(),
+            'stato-socio' => $this->statoSocio(),
             default => ['error' => 'azione sconosciuta'],
         };
 
@@ -185,6 +192,7 @@ class E2eFixtureCommand extends Command
             'prezzo' => (float) $this->option('prezzo'),
             'lista_attesa_attiva' => true,
             'richiede_approvazione' => (bool) $this->option('richiede-approvazione'),
+            'solo_soci' => (bool) $this->option('solo-soci'),
             'iscrizioni_aperte' => ! $this->option('iscrizioni-chiuse'),
             'iscrizioni_dal' => $this->option('apertura-futura') ? now()->addDays(3) : null,
         ]);
@@ -384,6 +392,8 @@ class E2eFixtureCommand extends Command
             'nome' => 'Socio',
             'cognome' => 'E2E',
             'email' => $email,
+            'codice_fiscale' => $this->option('codice-fiscale') ?: null,
+            'data_nascita' => $this->option('data-nascita') ?: null,
             'data_iscrizione' => now()->toDateString(),
             'stato' => Socio::STATO_ATTIVO,
             'privacy_consenso' => true,
@@ -580,6 +590,134 @@ class E2eFixtureCommand extends Command
             ->rifiuta($richiesta, $admin, (string) ($this->option('motivo') ?: 'Motivo di test E2E'));
 
         return ['ok' => true, 'richiesta_id' => $richiesta->id];
+    }
+
+    /**
+     * Collega l'account --email al socio --socio (stesso tenant e2e):
+     * abilita rinnovo dall'area account ed eventi solo_soci.
+     *
+     * @return array<string, mixed>
+     */
+    private function collegaAccountSocio(): array
+    {
+        $account = $this->trovaAccount();
+        if ($account === null) {
+            return ['error' => 'account non trovato'];
+        }
+
+        $socio = Socio::withoutGlobalScopes()->find((string) $this->option('socio'));
+        if ($socio === null) {
+            return ['error' => 'socio non trovato'];
+        }
+
+        $account->forceFill(['socio_id' => $socio->id])->save();
+
+        return ['ok' => true, 'account_id' => $account->id, 'socio_id' => $socio->id];
+    }
+
+    /**
+     * Registra come pagata la quota --quota (data_pagamento oggi, metodo
+     * Contanti), come farebbe la registrazione manuale dell'admin. Serve
+     * ai test sulla ricevuta numerata scaricabile dalle aree riservate.
+     *
+     * @return array<string, mixed>
+     */
+    private function pagaQuota(): array
+    {
+        $quota = Quota::withoutGlobalScopes()->find((string) $this->option('quota'));
+        if ($quota === null) {
+            return ['error' => 'quota non trovata'];
+        }
+
+        $quota->forceFill([
+            'stato' => Quota::STATO_PAGATA,
+            'data_pagamento' => now()->toDateString(),
+            'metodo_pagamento' => 'Contanti',
+        ])->save();
+
+        return ['ok' => true, 'quota_id' => $quota->id];
+    }
+
+    /**
+     * Prepara una richiesta di feedback post-evento per l'account --email
+     * sull'evento --evento: prenotazione confermata + check-in + riga
+     * feedback con token, e ritorna l'URL FIRMATO del form pubblico
+     * (lo stesso link che arriverebbe via email).
+     *
+     * @return array<string, mixed>
+     */
+    private function linkFeedback(): array
+    {
+        $account = $this->trovaAccount();
+        if ($account === null) {
+            return ['error' => 'account non trovato'];
+        }
+
+        $evento = Evento::withoutGlobalScopes()->find((string) $this->option('evento'));
+        if ($evento === null) {
+            return ['error' => 'evento non trovato'];
+        }
+
+        $prenotazione = app(PrenotazioneService::class)->crea($account, $evento, 1);
+        $prenotazione->forceFill(['checkin_at' => now()])->save();
+
+        $feedback = FeedbackEvento::create([
+            'associazione_id' => $prenotazione->associazione_id,
+            'evento_id' => $prenotazione->evento_id,
+            'prenotazione_id' => $prenotazione->id,
+            'token' => FeedbackEvento::generaToken(),
+            'inviato_at' => now(),
+        ]);
+
+        return [
+            'url' => URL::signedRoute('feedback-eventi.show', ['token' => $feedback->token]),
+            'token' => $feedback->token,
+            'prenotazione_id' => $prenotazione->id,
+        ];
+    }
+
+    /**
+     * Occorrenze della serie ricorrente individuata dal --titolo
+     * (assertion E2E sulla generazione bulk, f.8).
+     *
+     * @return array<string, mixed>
+     */
+    private function contaSerie(): array
+    {
+        $eventi = Evento::withoutGlobalScopes()
+            ->where('titolo', (string) $this->option('titolo'))
+            ->orderBy('data_evento')
+            ->get(['id', 'serie_id', 'data_evento']);
+
+        return [
+            'occorrenze' => $eventi->count(),
+            'serie_id' => $eventi->first()?->serie_id,
+            'primo_evento_id' => $eventi->first()?->id,
+            'date' => $eventi->map(fn (Evento $e) => $e->data_evento->toDateString())->all(),
+        ];
+    }
+
+    /**
+     * Stato corrente del socio --email (assertion E2E su cessazioni e merge).
+     *
+     * @return array<string, mixed>
+     */
+    private function statoSocio(): array
+    {
+        $socio = Socio::withoutGlobalScopes()
+            ->where('email', (string) $this->option('email'))
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($socio === null) {
+            return ['error' => 'socio non trovato'];
+        }
+
+        return [
+            'socio_id' => $socio->id,
+            'stato' => $socio->stato,
+            'numero_socio' => $socio->numero_socio,
+        ];
     }
 
     private function richiestaInAttesa(): ?RichiestaIscrizione

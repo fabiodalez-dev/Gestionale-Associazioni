@@ -3,17 +3,21 @@
 namespace App\Notifications\Iscrizioni;
 
 use App\Models\RichiestaIscrizione;
+use App\Models\Tessera;
 use App\Services\Email\TenantNotificationMailer;
+use App\Services\Tessere\TesseraPdfRenderer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 /**
  * Richiesta di iscrizione socio approvata dall'admin: l'account è ora
  * collegato al socio attivo; se l'admin ha generato anche la tessera,
- * il numero viene riportato nell'email.
+ * il numero viene riportato nell'email e il PDF della tessera viene
+ * allegato (f.19 PIANO-VITA-SOCIALE, "benvenuto socio" con prossimi passi).
  *
  * Destinatario: l'Account del frontend pubblico. database + mail per
  * tenant (pattern PagamentoQuotaNotification), invio best-effort.
@@ -25,6 +29,7 @@ class IscrizioneApprovataNotification extends Notification implements ShouldQueu
     public function __construct(
         public RichiestaIscrizione $richiesta,
         public ?string $numeroTessera = null,
+        public ?string $tesseraId = null,
     ) {}
 
     /**
@@ -58,10 +63,54 @@ class IscrizioneApprovataNotification extends Notification implements ShouldQueu
             );
         }
 
+        // Prossimi passi (f.19)
+        $message->line('Prossimi passi: nella tua area riservata trovi tessera, quote ed eventuali pagamenti da completare.')
+            ->line('Per qualsiasi dubbio rispondi a questa email o contatta l\'associazione.');
+
+        $this->allegaTesseraPdf($message);
+
         return TenantNotificationMailer::applica(
             $message->salutation('A presto!'),
             $associazione
         );
+    }
+
+    /**
+     * Allega il PDF della tessera generata in fase di approvazione
+     * (best-effort: se la generazione fallisce l'email parte comunque,
+     * la tessera resta scaricabile dall'area riservata).
+     */
+    protected function allegaTesseraPdf(MailMessage $message): void
+    {
+        if (blank($this->tesseraId)) {
+            return;
+        }
+
+        try {
+            /** @var Tessera|null $tessera */
+            $tessera = Tessera::allTenants()->find($this->tesseraId);
+
+            if ($tessera === null) {
+                return;
+            }
+
+            $pdf = app(TesseraPdfRenderer::class)->render($tessera)->getContent();
+
+            if (! is_string($pdf) || $pdf === '') {
+                return;
+            }
+
+            $message->attachData(
+                $pdf,
+                'tessera-'.($this->numeroTessera ?: 'socio').'.pdf',
+                ['mime' => 'application/pdf']
+            );
+        } catch (\Throwable $e) {
+            Log::error('IscrizioneApprovataNotification: PDF tessera non allegato', [
+                'tessera_id' => $this->tesseraId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

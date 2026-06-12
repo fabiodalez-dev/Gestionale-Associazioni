@@ -32,6 +32,14 @@ class PrenotazioneException extends RuntimeException
         return new self('I posti per questo evento sono esauriti.');
     }
 
+    public static function riservatoAiSoci(): self
+    {
+        return new self(
+            'Questo evento è riservato ai soci: per prenotare il tuo account '
+            .'deve essere collegato a un socio attivo dell\'associazione.'
+        );
+    }
+
     public static function tenantNonCoerente(): self
     {
         return new self('La prenotazione non appartiene a questa associazione.');

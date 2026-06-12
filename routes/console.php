@@ -173,3 +173,29 @@ Schedule::command('documenti:promemoria-scadenze')
 Schedule::command('eventi:invia-feedback')
     ->dailyAt('10:00')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Gestione 2 — moduli operatività, comunicazione, piattaforma
+|--------------------------------------------------------------------------
+|
+| attivita:promemoria (f.4): email all'assegnatario per le attività admin
+| aperte in scadenza oggi (anti-duplicazione via activitylog, rieseguibile).
+| compleanni:auguri (f.9): auguri ai soci attivi che compiono gli anni oggi,
+| solo per i tenant con auguri_automatici attivo (dedup su
+| promemoria_inviati, tipo 'compleanno'). cestino:svuota (f.24): elimina
+| definitivamente i soft-deleted di soci/eventi/documenti/verbali più
+| vecchi di 90 giorni — basta il passaggio settimanale.
+|
+*/
+Schedule::command('attivita:promemoria')
+    ->dailyAt('07:15')
+    ->withoutOverlapping();
+
+Schedule::command('compleanni:auguri')
+    ->dailyAt('08:15')
+    ->withoutOverlapping();
+
+Schedule::command('cestino:svuota')
+    ->weeklyOn(1, '05:00')
+    ->withoutOverlapping();

@@ -11,15 +11,19 @@
     $nav = fn (string $name, array $params = []) => \Illuminate\Support\Facades\Route::has($name) ? route($name, $params) : '#';
     $can = fn (string $permission) => $isSuperAdmin || ($utente?->can($permission) ?? false);
 
-    $emailActive = request()->routeIs('comunicazioni.*', 'email-templates.*', 'email-coda.*', 'email-log.*', 'email-impostazioni.*', 'email-anteprime.*');
+    $emailActive = request()->routeIs('comunicazioni.*', 'email-templates.*', 'email-coda.*', 'email-log.*', 'email-impostazioni.*', 'email-anteprime.*', 'annunci.*', 'newsletter.*', 'sondaggi.*');
     $apiActive = request()->routeIs('api-keys.*', 'api-docs.*');
     $registroActive = request()->routeIs('libro-soci.*', 'cessazioni.*', 'organi-sociali.*');
+    $economiaActive = request()->routeIs('prima-nota.*', 'report-economico.*', 'donazioni.*');
 @endphp
 <nav class="sidebar" id="mainSidebar" aria-label="Navigazione principale">
     <div class="sidebar-inner">
         <div class="sidebar-brand">
             <i class="bi bi-people-fill"></i>
             <span>{{ $associazioneNome }}</span>
+            <button type="button" class="theme-toggle-icon" id="globalSearchBtn" aria-label="Ricerca globale" title="Ricerca globale (Ctrl+K / ⌘K)">
+                <i class="bi bi-search"></i>
+            </button>
             <button type="button" class="theme-toggle-icon" id="themeToggle" aria-label="Cambia tema chiaro/scuro" title="Tema chiaro/scuro">
                 <i class="bi bi-moon theme-label-light"></i>
                 <i class="bi bi-sun theme-label-dark"></i>
@@ -60,6 +64,20 @@
                         Dashboard
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('attivita-admin.*') ? 'active' : '' }}" href="{{ $nav('attivita-admin.index') }}">
+                        <i class="bi bi-check2-square me-2"></i>
+                        Attività
+                    </a>
+                </li>
+                @if ($can('scadenze.view'))
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('scadenzario.*') ? 'active' : '' }}" href="{{ $nav('scadenzario.index') }}">
+                        <i class="bi bi-calendar-check me-2"></i>
+                        Scadenzario
+                    </a>
+                </li>
+                @endif
                 @if ($can('soci.view'))
                 <li class="nav-item">
                     <a class="nav-link {{ request()->routeIs('soci.*') ? 'active' : '' }}" href="{{ $nav('soci.index') }}">
@@ -79,6 +97,21 @@
                         Richieste iscrizione
                         @if ($richiesteIscrizionePendenti > 0)
                             <span class="badge bg-warning text-dark ms-1" title="Richieste di iscrizione da approvare">{{ $richiesteIscrizionePendenti }}</span>
+                        @endif
+                    </a>
+                </li>
+                @php
+                    // Richieste di modifica dati anagrafici in attesa (f.19 — piano "Gestione 2")
+                    $richiesteModifichePendenti = \Illuminate\Support\Facades\Route::has('richieste-modifica-dati.index')
+                        ? \App\Models\RichiestaModificaDati::query()->inAttesa()->count()
+                        : 0;
+                @endphp
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('richieste-modifica-dati.*') ? 'active' : '' }}" href="{{ $nav('richieste-modifica-dati.index') }}">
+                        <i class="bi bi-person-lines-fill me-2"></i>
+                        Richieste modifiche
+                        @if ($richiesteModifichePendenti > 0)
+                            <span class="badge bg-warning text-dark ms-1" title="Richieste di modifica dati da gestire">{{ $richiesteModifichePendenti }}</span>
                         @endif
                     </a>
                 </li>
@@ -140,6 +173,21 @@
                     </div>
                 </li>
                 @endif
+                @if ($can('quote.view'))
+                <li class="nav-item">
+                    <a class="nav-link d-flex justify-content-between align-items-center {{ $economiaActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#economiaSubmenu" role="button" aria-expanded="{{ $economiaActive ? 'true' : 'false' }}">
+                        <span><i class="bi bi-cash-coin me-2"></i>Economia</span>
+                        <i class="bi bi-chevron-down small"></i>
+                    </a>
+                    <div class="collapse {{ $economiaActive ? 'show' : '' }}" id="economiaSubmenu">
+                        <ul class="nav flex-column ms-3">
+                            <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('prima-nota.*') ? 'active' : '' }}" href="{{ $nav('prima-nota.index') }}"><i class="bi bi-journal-text me-2"></i>Prima nota</a></li>
+                            <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('report-economico.*') ? 'active' : '' }}" href="{{ $nav('report-economico.index') }}"><i class="bi bi-graph-up me-2"></i>Report economico</a></li>
+                            <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('donazioni.*') ? 'active' : '' }}" href="{{ $nav('donazioni.index') }}"><i class="bi bi-heart me-2"></i>Donazioni</a></li>
+                        </ul>
+                    </div>
+                </li>
+                @endif
                 @if ($can('email.view'))
                 <li class="nav-item">
                     <a class="nav-link d-flex justify-content-between align-items-center {{ $emailActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#emailSubmenu" role="button" aria-expanded="{{ $emailActive ? 'true' : 'false' }}">
@@ -154,6 +202,9 @@
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-log.*') ? 'active' : '' }}" href="{{ $nav('email-log.index') }}"><i class="bi bi-clock-history me-2"></i>Storico Email</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-impostazioni.*') ? 'active' : '' }}" href="{{ $nav('email-impostazioni.index') }}"><i class="bi bi-gear me-2"></i>Impostazioni SMTP</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-anteprime.*') ? 'active' : '' }}" href="{{ $nav('email-anteprime.index') }}"><i class="bi bi-eye me-2"></i>Anteprime email</a></li>
+                            <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('annunci.*') ? 'active' : '' }}" href="{{ $nav('annunci.index') }}"><i class="bi bi-megaphone me-2"></i>Annunci</a></li>
+                            <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('newsletter.*') ? 'active' : '' }}" href="{{ $nav('newsletter.index') }}"><i class="bi bi-envelope-paper me-2"></i>Newsletter</a></li>
+                            <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('sondaggi.*') ? 'active' : '' }}" href="{{ $nav('sondaggi.index') }}"><i class="bi bi-bar-chart me-2"></i>Sondaggi</a></li>
                         </ul>
                     </div>
                 </li>
@@ -255,6 +306,18 @@
                     @endif
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('registro-modifiche.*') ? 'active' : '' }}" href="{{ $nav('registro-modifiche.index') }}">
+                    <i class="bi bi-clock-history me-2"></i>
+                    Registro modifiche
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('audit-accessi.*') ? 'active' : '' }}" href="{{ $nav('audit-accessi.index') }}">
+                    <i class="bi bi-shield-lock me-2"></i>
+                    Audit accessi
+                </a>
+            </li>
             @endif
             @if ($sidebarHasAssoc && $can('soci.view'))
             <li class="nav-item">
@@ -267,6 +330,12 @@
                 <a class="nav-link {{ request()->routeIs('export-import.*') ? 'active' : '' }}" href="{{ $nav('export-import.index') }}">
                     <i class="bi bi-arrow-down-up me-2"></i>
                     Export/Import
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('cestino.*') ? 'active' : '' }}" href="{{ $nav('cestino.index') }}">
+                    <i class="bi bi-trash3 me-2"></i>
+                    Cestino
                 </a>
             </li>
             @endif

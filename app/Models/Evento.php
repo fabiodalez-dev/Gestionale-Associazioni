@@ -56,6 +56,7 @@ class Evento extends Model
         'stato_pubblicazione',
         'capienza',
         'prezzo',
+        'budget',
         'iscrizioni_dal',
         'iscrizioni_al',
         'iscrizioni_aperte',
@@ -75,6 +76,7 @@ class Evento extends Model
             'data_fine' => 'datetime',
             'capienza' => 'integer',
             'prezzo' => 'decimal:2',
+            'budget' => 'decimal:2',
             'iscrizioni_dal' => 'datetime',
             'iscrizioni_al' => 'datetime',
             'iscrizioni_aperte' => 'boolean',
@@ -226,5 +228,16 @@ class Evento extends Model
     public function verbali(): HasMany
     {
         return $this->hasMany(Verbale::class, 'evento_id');
+    }
+
+    /**
+     * Spese dell'evento (f.17 — piano "Gestione 2"): confrontate con
+     * budget e incassi delle prenotazioni pagate.
+     *
+     * @return HasMany<SpesaEvento, $this>
+     */
+    public function spese(): HasMany
+    {
+        return $this->hasMany(SpesaEvento::class, 'evento_id');
     }
 }

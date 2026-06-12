@@ -16,6 +16,11 @@
 <div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2"><i class="bi bi-credit-card me-2"></i>Quote Associative</h1>
     <div class="btn-toolbar gap-2">
+        @if (Route::has('solleciti-quote.index'))
+            <a href="{{ route('solleciti-quote.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-bell me-1"></i>Solleciti
+            </a>
+        @endif
         @can('gestisciImpostazioni', \App\Models\Quota::class)
             <a href="{{ route('quote.impostazioni.edit') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-gear me-1"></i>Impostazioni Pagamenti
@@ -59,6 +64,11 @@
         </select>
     </div>
 </form>
+
+{{-- Viste salvate (f.5 piano "Gestione 2" — modulo operativita) --}}
+<div class="mb-3">
+    @includeIf('operativita._viste-salvate', ['scope' => 'quote', 'vsRoute' => 'quote.index', 'vsRouteParams' => []])
+</div>
 
 {{-- Tabella desktop --}}
 <div class="table-responsive d-none d-md-block">

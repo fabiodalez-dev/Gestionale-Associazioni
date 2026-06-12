@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Listeners\RegistraAccesso;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\DebugModeCheck;
@@ -26,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerHealthChecks();
+
+        // Audit accessi (f.25 piano "Gestione 2"): Login/Failed/Logout
+        // di tutte le guard registrati best-effort nella tabella accessi
+        Event::subscribe(RegistraAccesso::class);
     }
 
     /**

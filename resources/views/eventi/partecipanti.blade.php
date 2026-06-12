@@ -28,6 +28,13 @@
             </p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+            {{-- Check-in kiosk fullscreen (f.21 piano "Gestione 2" — modulo membri) --}}
+            @if (\Illuminate\Support\Facades\Route::has('checkin-kiosk.show'))
+                <a href="{{ route('checkin-kiosk.show', $evento) }}" class="btn btn-outline-primary"
+                   title="Check-in kiosk fullscreen per totem all'ingresso">
+                    <i class="bi bi-qr-code-scan me-1"></i>Kiosk check-in
+                </a>
+            @endif
             <a href="{{ route('eventi.partecipanti.export', array_filter(['evento' => $evento->id, 'status' => $status !== 'all' ? $status : null])) }}"
                class="btn btn-outline-secondary">
                 <i class="bi bi-download me-1"></i>Esporta CSV

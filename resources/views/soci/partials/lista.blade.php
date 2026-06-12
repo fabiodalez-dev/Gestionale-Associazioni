@@ -20,6 +20,12 @@
         <table class="table table-hover align-middle">
             <thead>
                 <tr>
+                    {{-- Selezione per azioni in blocco (f.2 piano "Gestione 2" — modulo operativita) --}}
+                    @if (\Illuminate\Support\Facades\Route::has('soci.azioni-blocco'))
+                        <th style="width: 2rem">
+                            <input type="checkbox" class="form-check-input" id="selectAllSoci" aria-label="Seleziona tutti i soci">
+                        </th>
+                    @endif
                     <th>Socio</th>
                     @if ($isSuperAdmin)
                         <th>Associazione</th>
@@ -39,11 +45,25 @@
                         $scadenza = $tessera?->data_scadenza;
                     @endphp
                     <tr>
+                        @if (\Illuminate\Support\Facades\Route::has('soci.azioni-blocco'))
+                            <td>
+                                <input type="checkbox" class="form-check-input socio-check" value="{{ $socio->id }}"
+                                       aria-label="Seleziona {{ $socio->cognome }} {{ $socio->nome }}">
+                            </td>
+                        @endif
                         <td>
                             <a href="{{ route('soci.show', $socio) }}" class="fw-semibold text-decoration-none">
                                 {{ $socio->cognome }} {{ $socio->nome }}
                             </a>
-                            <div class="text-muted small">N. {{ $socio->numero_socio }}</div>
+                            @if ($socio->isMinorenne())
+                                <span class="badge bg-info text-dark" title="Socio minorenne">Minorenne</span>
+                            @endif
+                            <div class="text-muted small">
+                                N. {{ $socio->numero_socio }}
+                                @if ($socio->nucleo)
+                                    · <i class="bi bi-house-heart" title="Nucleo familiare"></i> {{ $socio->nucleo->nome }}
+                                @endif
+                            </div>
                         </td>
                         @if ($isSuperAdmin)
                             <td class="small">{{ $socio->associazione?->nome }}</td>
@@ -53,6 +73,8 @@
                             @if ($socio->telefono)
                                 <div><i class="bi bi-telephone me-1"></i>{{ $socio->telefono }}</div>
                             @endif
+                            {{-- Contatti rapidi (f.10 piano Gestione 2 — modulo comunicazione) --}}
+                            <div class="mt-1">@includeIf('comunicazione.soci._contatti-rapidi', ['socio' => $socio])</div>
                         </td>
                         <td><span class="badge bg-{{ $badgeStato($socio->stato) }}">{{ $socio->stato }}</span></td>
                         <td class="small">
@@ -108,6 +130,12 @@
                                 {{ $socio->cognome }} {{ $socio->nome }}
                             </a>
                             <span class="text-muted small">— N. {{ $socio->numero_socio }}</span>
+                            @if ($socio->isMinorenne())
+                                <span class="badge bg-info text-dark" title="Socio minorenne">Minorenne</span>
+                            @endif
+                            @if ($socio->nucleo)
+                                <span class="text-muted small">· <i class="bi bi-house-heart"></i> {{ $socio->nucleo->nome }}</span>
+                            @endif
                         </div>
                         <span class="badge bg-{{ $badgeStato($socio->stato) }}">{{ $socio->stato }}</span>
                     </div>
@@ -116,6 +144,8 @@
                         @if ($socio->telefono)
                             · <i class="bi bi-telephone me-1"></i>{{ $socio->telefono }}
                         @endif
+                        {{-- Contatti rapidi (f.10 piano Gestione 2 — modulo comunicazione) --}}
+                        <span class="ms-1">@includeIf('comunicazione.soci._contatti-rapidi', ['socio' => $socio])</span>
                     </div>
                     @if ($tessera)
                         <div class="small text-muted mt-1">

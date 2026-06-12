@@ -17,6 +17,7 @@ use App\Notifications\Prenotazioni\PagamentoScadutoNotification;
 use App\Notifications\Prenotazioni\PromemoriaEventoNotification;
 use App\Notifications\Prenotazioni\PromozioneListaAttesaNotification;
 use App\Notifications\Prenotazioni\RifiutataNotification;
+use App\Services\Economia\PrimaNotaService;
 use App\Services\EventiVita\VitaSocialeService;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use Illuminate\Notifications\Notification as NotificationMessage;
@@ -626,6 +627,14 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
         });
 
         $this->inviaNotifichePendenti();
+
+        // Prima nota (f.13 piano "Gestione 2"): movimento automatico di
+        // entrata per la prenotazione incassata — idempotente (unique su
+        // origine) e best-effort: non altera mai l'esito del pagamento
+        if ($risultato !== null && $risultato->pagata_at !== null) {
+            app(PrimaNotaService::class)
+                ->registraIncassoPrenotazioneBestEffort($risultato);
+        }
 
         return $risultato;
     }

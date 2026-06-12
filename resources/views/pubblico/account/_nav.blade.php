@@ -35,6 +35,14 @@
             <i class="bi bi-toggles me-1"></i>Preferenze
         </a>
     </li>
+    @if (Route::has('pubblico.account.sondaggi'))
+        <li class="nav-item">
+            <a class="nav-link {{ request()->routeIs('pubblico.account.sondaggi*') ? 'active' : '' }}"
+               href="{{ route('pubblico.account.sondaggi', $associazione->slug) }}">
+                <i class="bi bi-bar-chart me-1"></i>Sondaggi
+            </a>
+        </li>
+    @endif
     <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('pubblico.account.privacy') ? 'active' : '' }}"
            href="{{ route('pubblico.account.privacy', $associazione->slug) }}">
@@ -48,6 +56,14 @@
                 <i class="bi bi-card-heading me-1"></i>Tessera &amp; quote
             </a>
         </li>
+        @if (\Illuminate\Support\Facades\Route::has('pubblico.account.modifica-dati'))
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('pubblico.account.modifica-dati') ? 'active' : '' }}"
+                   href="{{ route('pubblico.account.modifica-dati', $associazione->slug) }}">
+                    <i class="bi bi-pencil-square me-1"></i>Modifica dati
+                </a>
+            </li>
+        @endif
     @else
         <li class="nav-item">
             <a class="nav-link {{ request()->routeIs('pubblico.account.diventa-socio') ? 'active' : '' }}"

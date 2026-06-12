@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Scout\Searchable;
 
 /**
@@ -77,6 +78,10 @@ class Socio extends Authenticatable
         'email_opt_out_token',
         'tipo_socio_id',
         'categoria_socio_id',
+        'nucleo_id',
+        'tutore_nome',
+        'tutore_telefono',
+        'tutore_email',
         'password_hash',
     ];
 
@@ -285,6 +290,62 @@ class Socio extends Authenticatable
     public function emailInCoda(): HasMany
     {
         return $this->hasMany(EmailQueue::class, 'socio_id');
+    }
+
+    /**
+     * Nucleo familiare di appartenenza (f.20 — piano "Gestione 2").
+     *
+     * @return BelongsTo<Nucleo, $this>
+     */
+    public function nucleo(): BelongsTo
+    {
+        return $this->belongsTo(Nucleo::class, 'nucleo_id');
+    }
+
+    /**
+     * Note interne degli admin sulla scheda socio (f.3 — piano "Gestione 2").
+     * Nome distinto dalla colonna `note` (campo testo legacy).
+     *
+     * @return HasMany<NotaSocio, $this>
+     */
+    public function noteInterne(): HasMany
+    {
+        return $this->hasMany(NotaSocio::class, 'socio_id');
+    }
+
+    /**
+     * Richieste di modifica dei dati anagrafici (f.19 — piano "Gestione 2").
+     *
+     * @return HasMany<RichiestaModificaDati, $this>
+     */
+    public function richiesteModificaDati(): HasMany
+    {
+        return $this->hasMany(RichiestaModificaDati::class, 'socio_id');
+    }
+
+    /**
+     * Il socio è minorenne alla data indicata (default: oggi)? (f.22)
+     * False se la data di nascita non è nota.
+     */
+    public function isMinorenne(\DateTimeInterface|string|null $allaData = null): bool
+    {
+        if ($this->data_nascita === null) {
+            return false;
+        }
+
+        $riferimento = $allaData !== null
+            ? Carbon::parse($allaData)
+            : now();
+
+        return $this->data_nascita->diffInYears($riferimento) < 18;
+    }
+
+    /**
+     * Il tutore è valorizzato (soci minorenni, f.22)?
+     */
+    public function hasTutore(): bool
+    {
+        return filled($this->tutore_nome);
     }
 
     /**

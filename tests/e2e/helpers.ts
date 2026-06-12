@@ -150,10 +150,12 @@ export type SocioConTessera = {
 /**
  * Crea via fixture un socio 'Attivo' del tenant e2e con tessera dell'anno
  * (o scaduta / senza tessera / con quota da pagare, a seconda delle opzioni).
+ * Con 'quota-scadenza' (YYYY-MM-DD) la quota da pagare scade alla data
+ * indicata invece che a fine anno.
  */
 export function creaSocioConTessera(
     email: string,
-    opzioni: { password?: string; scaduta?: number; 'senza-tessera'?: number; 'con-quota'?: number; 'codice-fiscale'?: string; 'data-nascita'?: string } = {},
+    opzioni: { password?: string; scaduta?: number; 'senza-tessera'?: number; 'con-quota'?: number; 'codice-fiscale'?: string; 'data-nascita'?: string; 'quota-scadenza'?: string } = {},
 ): SocioConTessera {
     return fixture<SocioConTessera>('crea-socio-con-tessera', { email, ...opzioni });
 }

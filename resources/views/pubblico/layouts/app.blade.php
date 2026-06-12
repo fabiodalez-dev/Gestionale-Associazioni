@@ -60,6 +60,18 @@
                         <a class="nav-link {{ request()->routeIs('pubblico.eventi.*') ? 'active' : '' }}"
                            href="{{ route('pubblico.eventi.index', $associazione->slug) }}">Eventi</a>
                     </li>
+                    @if (Route::has('pubblico.novita'))
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('pubblico.novita') ? 'active' : '' }}"
+                               href="{{ route('pubblico.novita', $associazione->slug) }}">Novità</a>
+                        </li>
+                    @endif
+                    @if (Route::has('pubblico.dona.show'))
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('pubblico.dona.*') ? 'active' : '' }}"
+                               href="{{ route('pubblico.dona.show', $associazione->slug) }}">Sostienici</a>
+                        </li>
+                    @endif
                 </ul>
                 <div class="d-flex align-items-center gap-2 py-2 py-md-0">
                     <button id="themeToggle" type="button" class="btn btn-sm btn-outline-secondary"

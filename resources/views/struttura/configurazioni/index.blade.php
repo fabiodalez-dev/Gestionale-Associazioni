@@ -13,8 +13,13 @@
         'campi-obbligatori' => ['bi-ui-checks', 'Campi obbligatori'],
         'tessera-template' => ['bi-postcard', 'Template tessera'],
         'pagamenti' => ['bi-credit-card', 'Pagamenti online'],
+        'comunicazione' => ['bi-megaphone', 'Comunicazione'],
         'invito' => ['bi-qr-code', 'Invita al mini-sito'],
     ];
+    // Sezione del modulo comunicazione disponibile solo se le rotte sono caricate
+    if (! \Illuminate\Support\Facades\Route::has('configurazioni.comunicazione')) {
+        unset($sezioni['comunicazione']);
+    }
     if (! array_key_exists($section, $sezioni)) {
         $section = 'info';
     }
@@ -523,6 +528,11 @@
                     @endif
                 </div>
             </div>
+        @endif
+
+        {{-- ============ COMUNICAZIONE (f.9 piano Gestione 2 — modulo comunicazione) ============ --}}
+        @if ($section === 'comunicazione')
+            @includeIf('comunicazione.configurazioni._comunicazione', ['associazione' => $associazione])
         @endif
     </div>
 </div>

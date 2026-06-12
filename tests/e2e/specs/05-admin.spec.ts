@@ -92,7 +92,9 @@ test.describe('Gestionale admin', () => {
         // Elenco account: ricerca per email e riga visibile
         await page.goto('/accounts');
         await page.getByPlaceholder(/cerca per nome, cognome o email/i).fill(email);
-        await page.getByRole('button', { name: 'Cerca' }).click();
+        // exact: il bottone "Ricerca globale" della sidebar (command palette ⌘K)
+        // contiene "cerca" e collide col match per sottostringa di getByRole
+        await page.getByRole('button', { name: 'Cerca', exact: true }).click();
 
         const riga = page.locator('tr', { hasText: email });
         await expect(riga).toBeVisible();

@@ -3,6 +3,7 @@
 namespace App\Services\Pagamenti;
 
 use App\Models\Associazione;
+use App\Models\Donazione;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Prenotazione;
 use App\Models\Quota;
@@ -13,6 +14,8 @@ use App\Models\Utente;
 use App\Notifications\Quote\BenvenutoSocioNotification;
 use App\Notifications\Quote\PagamentoQuotaNotification;
 use App\Notifications\Quote\RicevutaQuotaNotification;
+use App\Services\Economia\DonazioneService;
+use App\Services\Economia\PrimaNotaService;
 use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
@@ -99,6 +102,10 @@ class PaymentService
 
         // Ricevuta numerata per anno (f.21): emissione + email best-effort
         $this->emettiRicevutaBestEffort($quota->id);
+
+        // Prima nota (f.13 piano "Gestione 2"): movimento automatico
+        // di entrata, idempotente e best-effort
+        app(PrimaNotaService::class)->registraIncassoQuotaBestEffort($quota->id);
     }
 
     // ------------------------------------------------------------------
@@ -123,6 +130,16 @@ class PaymentService
     public function createPayPalOrderPrenotazione(Prenotazione $prenotazione, string $returnUrl, string $cancelUrl): ?string
     {
         return $this->payPalOrderFor($prenotazione, $returnUrl, $cancelUrl);
+    }
+
+    public function createStripeCheckoutDonazione(Donazione $donazione, string $returnUrl, string $cancelUrl): ?string
+    {
+        return $this->stripeCheckoutFor($donazione, $returnUrl, $cancelUrl);
+    }
+
+    public function createPayPalOrderDonazione(Donazione $donazione, string $returnUrl, string $cancelUrl): ?string
+    {
+        return $this->payPalOrderFor($donazione, $returnUrl, $cancelUrl);
     }
 
     protected function stripeCheckoutFor(Pagabile $pagabile, string $returnUrl, string $cancelUrl): ?string
@@ -191,6 +208,18 @@ class PaymentService
             }
 
             return $this->onPagamentoPrenotazioneCompletato((string) $prenotazioneId, $associazioneId, 'stripe', $transactionId);
+        }
+
+        if ($tipo === Pagabile::TIPO_DONAZIONE) {
+            $donazioneId = data_get($session, 'metadata.pagabile_id');
+
+            if (blank($donazioneId)) {
+                Log::warning('PaymentService: webhook Stripe donazione senza pagabile_id nei metadata');
+
+                return false;
+            }
+
+            return $this->onPagamentoDonazioneCompletato((string) $donazioneId, $associazioneId, 'stripe', $transactionId);
         }
 
         $quotaId = data_get($session, 'metadata.quota_id') ?: data_get($session, 'metadata.pagabile_id');
@@ -265,6 +294,10 @@ class PaymentService
             return $this->onPagamentoPrenotazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId);
         }
 
+        if ($tipo === Pagabile::TIPO_DONAZIONE) {
+            return $this->onPagamentoDonazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId);
+        }
+
         return $this->onPaymentCompleted($pagabileId, $associazioneId, 'paypal', $transactionId);
     }
 
@@ -275,10 +308,12 @@ class PaymentService
      */
     protected function parseCustomId(string $customId): array
     {
-        $prefisso = Pagabile::TIPO_PRENOTAZIONE.':';
+        foreach ([Pagabile::TIPO_PRENOTAZIONE, Pagabile::TIPO_DONAZIONE] as $tipo) {
+            $prefisso = $tipo.':';
 
-        if (str_starts_with($customId, $prefisso)) {
-            return [Pagabile::TIPO_PRENOTAZIONE, substr($customId, strlen($prefisso))];
+            if (str_starts_with($customId, $prefisso)) {
+                return [$tipo, substr($customId, strlen($prefisso))];
+            }
         }
 
         return [Pagabile::TIPO_QUOTA, $customId];
@@ -302,6 +337,21 @@ class PaymentService
         $this->prenotazioni->onPagamentoCompletato($prenotazioneId, $associazioneId, $gateway, $transactionId);
 
         return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Post-pagamento donazione (f.15 piano "Gestione 2")
+    // ------------------------------------------------------------------
+
+    /**
+     * Webhook con tipo=donazione: dispatch a DonazioneService (modulo
+     * economia) — idempotente sul replay come per quote e prenotazioni.
+     * Risolto via container per non toccare il costruttore condiviso.
+     */
+    public function onPagamentoDonazioneCompletato(string $donazioneId, string $associazioneId, string $gateway, string $transactionId): bool
+    {
+        return app(DonazioneService::class)
+            ->onPagamentoCompletato($donazioneId, $associazioneId, $gateway, $transactionId);
     }
 
     // ------------------------------------------------------------------
@@ -414,6 +464,11 @@ class PaymentService
         // in transazione propria), idempotente sul replay del webhook e
         // no-op se la quota non risulta pagata
         $this->emettiRicevutaBestEffort($quotaId);
+
+        // Prima nota (f.13 piano "Gestione 2"): movimento automatico di
+        // entrata — idempotente (unique su origine) e best-effort, quindi
+        // sicuro anche sul replay del webhook
+        app(PrimaNotaService::class)->registraIncassoQuotaBestEffort($quotaId);
 
         return $ok;
     }

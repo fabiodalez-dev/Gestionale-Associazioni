@@ -5,6 +5,11 @@
 @section('content')
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2">Il Mio Profilo</h1>
+        @if (\Illuminate\Support\Facades\Route::has('area-soci.modifica-dati'))
+            <a href="{{ route('area-soci.modifica-dati') }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil-square me-1"></i>Richiedi modifica dati
+            </a>
+        @endif
     </div>
 
     <div class="row g-4">

@@ -32,6 +32,10 @@ class SociExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping
             'Codice Fiscale', 'Data di Nascita', 'Data Iscrizione', 'Stato',
             'Tipo Socio', 'Categoria', 'Sede', 'Indirizzo', 'Città', 'Provincia', 'CAP',
             'Numero Tessera', 'Scadenza Tessera', 'Tags', 'Note',
+            // f.22 (piano "Gestione 2"): soci minorenni e tutore
+            'Minorenne', 'Tutore', 'Telefono Tutore', 'Email Tutore',
+            // f.20 (piano "Gestione 2"): nucleo familiare
+            'Nucleo Familiare',
         ];
     }
 
@@ -62,6 +66,11 @@ class SociExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping
             $socio->ultimaTessera?->data_scadenza?->format('d/m/Y'),
             $socio->tags->pluck('nome_tag')->implode(', '),
             $socio->note,
+            $socio->isMinorenne() ? 'Sì' : 'No',
+            $socio->tutore_nome,
+            $socio->tutore_telefono,
+            $socio->tutore_email,
+            $socio->nucleo?->nome,
         ];
     }
 }

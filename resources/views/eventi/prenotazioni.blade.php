@@ -99,6 +99,11 @@
         </div>
     </form>
 
+    {{-- Viste salvate (f.5 piano "Gestione 2" — modulo operativita) --}}
+    <div class="mb-3">
+        @includeIf('operativita._viste-salvate', ['scope' => 'prenotazioni', 'vsRoute' => 'eventi.prenotazioni.index', 'vsRouteParams' => ['evento' => $evento->id]])
+    </div>
+
     <div class="card">
         <div class="card-body p-0">
             <div class="table-responsive">

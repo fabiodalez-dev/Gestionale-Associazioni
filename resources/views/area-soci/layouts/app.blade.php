@@ -71,6 +71,22 @@
                                 Le Mie Tessere
                             </a>
                         </li>
+                        @if (Route::has('area-soci.bacheca'))
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('area-soci.bacheca') ? 'active' : '' }}" href="{{ route('area-soci.bacheca') }}">
+                                    <i class="bi bi-megaphone me-2"></i>
+                                    Bacheca
+                                </a>
+                            </li>
+                        @endif
+                        @if (Route::has('area-soci.sondaggi'))
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('area-soci.sondaggi') ? 'active' : '' }}" href="{{ route('area-soci.sondaggi') }}">
+                                    <i class="bi bi-bar-chart me-2"></i>
+                                    Sondaggi
+                                </a>
+                            </li>
+                        @endif
                     </ul>
 
                     <hr>

@@ -29,8 +29,15 @@ class IscrizioneSocioRequest extends FormRequest
     {
         $associazione = $this->associazioneCorrente();
 
+        $dataNascita = $this->input('data_nascita');
+
         return $associazione !== null
-            ? $form->rules($associazione, ospite: $this->user('account') === null)
+            ? $form->rules(
+                $associazione,
+                ospite: $this->user('account') === null,
+                // f.22: tutore obbligatorio se l'età dichiarata è < 18
+                dataNascita: is_string($dataNascita) ? $dataNascita : null,
+            )
             : [];
     }
 

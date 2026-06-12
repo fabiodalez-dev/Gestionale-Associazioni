@@ -71,6 +71,7 @@ class Associazione extends Model
         'modalita_iscrizione',
         'iscrizione_form_config',
         'promemoria_rinnovo_config',
+        'auguri_automatici',
     ];
 
     protected function casts(): array
@@ -84,6 +85,7 @@ class Associazione extends Model
             'iscrizioni_socio_aperte' => 'boolean',
             'iscrizione_form_config' => 'array',
             'promemoria_rinnovo_config' => 'array',
+            'auguri_automatici' => 'boolean',
         ];
     }
 
@@ -399,5 +401,101 @@ class Associazione extends Model
     public function ricevute(): HasMany
     {
         return $this->hasMany(Ricevuta::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<NotaSocio, $this>
+     */
+    public function noteSocio(): HasMany
+    {
+        return $this->hasMany(NotaSocio::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<AttivitaAdmin, $this>
+     */
+    public function attivitaAdmin(): HasMany
+    {
+        return $this->hasMany(AttivitaAdmin::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Annuncio, $this>
+     */
+    public function annunci(): HasMany
+    {
+        return $this->hasMany(Annuncio::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<NewsletterInviata, $this>
+     */
+    public function newsletterInviate(): HasMany
+    {
+        return $this->hasMany(NewsletterInviata::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Sondaggio, $this>
+     */
+    public function sondaggi(): HasMany
+    {
+        return $this->hasMany(Sondaggio::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<CategoriaMovimento, $this>
+     */
+    public function categorieMovimento(): HasMany
+    {
+        return $this->hasMany(CategoriaMovimento::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Movimento, $this>
+     */
+    public function movimenti(): HasMany
+    {
+        return $this->hasMany(Movimento::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Donazione, $this>
+     */
+    public function donazioni(): HasMany
+    {
+        return $this->hasMany(Donazione::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<SpesaEvento, $this>
+     */
+    public function speseEvento(): HasMany
+    {
+        return $this->hasMany(SpesaEvento::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<RichiestaModificaDati, $this>
+     */
+    public function richiesteModificaDati(): HasMany
+    {
+        return $this->hasMany(RichiestaModificaDati::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Nucleo, $this>
+     */
+    public function nuclei(): HasMany
+    {
+        return $this->hasMany(Nucleo::class, 'associazione_id');
+    }
+
+    /**
+     * @return HasMany<Accesso, $this>
+     */
+    public function accessi(): HasMany
+    {
+        return $this->hasMany(Accesso::class, 'associazione_id');
     }
 }

@@ -26,6 +26,11 @@
             <a href="{{ route('soci.import') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-upload me-1"></i>Importa
             </a>
+            @if (\Illuminate\Support\Facades\Route::has('nuclei.index'))
+                <a href="{{ route('nuclei.index') }}" class="btn btn-outline-secondary" title="Vista raggruppata per nucleo familiare">
+                    <i class="bi bi-house-heart me-1"></i>Per nucleo
+                </a>
+            @endif
             <a href="{{ route('soci.cestino') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-trash me-1"></i>Cestino
                 @if ($cestinoCount > 0)
@@ -133,6 +138,18 @@
                             @endforeach
                         </select>
                     </div>
+                    {{-- Filtro nucleo familiare (f.20 piano "Gestione 2" — modulo membri) --}}
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="nucleo">Nucleo familiare</label>
+                        <select class="form-select form-select-sm" id="nucleo" name="nucleo">
+                            <option value="all" @selected(($filtri['nucleo'] ?? 'all') === 'all')>Tutti</option>
+                            <option value="con" @selected(($filtri['nucleo'] ?? '') === 'con')>Con nucleo</option>
+                            <option value="senza" @selected(($filtri['nucleo'] ?? '') === 'senza')>Senza nucleo</option>
+                            @foreach (\App\Models\Nucleo::query()->orderBy('nome')->get(['id', 'nome']) as $nucleoOpzione)
+                                <option value="{{ $nucleoOpzione->id }}" @selected(($filtri['nucleo'] ?? '') === $nucleoOpzione->id)>{{ $nucleoOpzione->nome }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="col-6 col-md-2">
                         <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel me-1"></i>Filtra</button>
                     </div>
@@ -185,6 +202,9 @@
             </div>
         </div>
     </div>
+
+    {{-- Barra azioni in blocco (f.2 piano "Gestione 2" — modulo operativita) --}}
+    @includeIf('operativita._azioni-blocco')
 
     <div id="sociResults">
         @include('soci.partials.lista', ['soci' => $soci, 'associazione' => $associazione, 'isSuperAdmin' => $isSuperAdmin])

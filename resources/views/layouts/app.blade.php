@@ -57,6 +57,10 @@
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
+    @auth
+        {{-- Ricerca globale ⌘K (f.1 piano "Gestione 2" — modulo operativita) --}}
+        @includeIf('operativita._global-search')
+    @endauth
     @stack('scripts')
 </body>
 </html>

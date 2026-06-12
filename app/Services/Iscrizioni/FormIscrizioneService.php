@@ -9,7 +9,9 @@ use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\ValoreCampoPersonalizzato;
+use App\Services\Pagamenti\PaymentService;
 use App\Services\Soci\NumeroProgressivoService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -67,6 +69,10 @@ class FormIscrizioneService
         'citta' => 'Città',
         'provincia' => 'Provincia',
         'cap' => 'CAP',
+        // f.22 (piano "Gestione 2"): tutore per i soci minorenni
+        'tutore_nome' => 'Nome del tutore',
+        'tutore_telefono' => 'Telefono del tutore',
+        'tutore_email' => 'Email del tutore',
     ];
 
     public function __construct(
@@ -102,7 +108,7 @@ class FormIscrizioneService
      *
      * @return array<string, list<mixed>>
      */
-    public function rules(Associazione $associazione, bool $ospite = false): array
+    public function rules(Associazione $associazione, bool $ospite = false, ?string $dataNascita = null): array
     {
         $schema = $this->schema($associazione);
         $rules = [];
@@ -124,6 +130,17 @@ class FormIscrizioneService
                 $riga['obbligatorio'] ? ['required'] : ['nullable'],
                 $this->regoleCampoStandard($riga['campo'])
             );
+        }
+
+        // f.22 (piano "Gestione 2"): se il form raccoglie la data di nascita
+        // e l'età dichiarata è < 18, il tutore diventa obbligatorio
+        // (validazione dinamica sul valore inviato).
+        if ($this->raccoglieDataNascita($schema)) {
+            $tutoreObbligatorio = $this->isMinorenne($dataNascita);
+
+            $rules['tutore_nome'] = [$tutoreObbligatorio ? 'required' : 'nullable', 'string', 'max:150'];
+            $rules['tutore_telefono'] = [$tutoreObbligatorio ? 'required' : 'nullable', 'string', 'max:30', 'phone:INTERNATIONAL,IT'];
+            $rules['tutore_email'] = [$tutoreObbligatorio ? 'required' : 'nullable', 'email', 'max:255'];
         }
 
         $rules['custom_field'] = ['nullable', 'array'];
@@ -253,11 +270,11 @@ class FormIscrizioneService
             // se non configurato la quota non viene creata.
             if ($diretta) {
                 $importo = $socio->tipo_socio_id !== null
-                    ? ($socio->tipoSocio()->withoutGlobalScopes()->first()?->costo_tessera ?? $associazione->costo_tessera)
+                    ? ($socio->tipoSocio()->withoutGlobalScopes()->first()->costo_tessera ?? $associazione->costo_tessera)
                     : $associazione->costo_tessera;
 
                 if ($importo !== null && (float) $importo > 0) {
-                    \App\Services\Pagamenti\PaymentService::createQuotaForSocio($socio, (float) $importo);
+                    PaymentService::createQuotaForSocio($socio, (float) $importo);
                 }
             }
 
@@ -371,6 +388,38 @@ class FormIscrizioneService
         };
     }
 
+    /**
+     * Lo schema del form raccoglie la data di nascita? (f.22)
+     *
+     * @param  array{campi_standard: list<array{campo: string, visibile: bool, obbligatorio: bool}>}  $schema
+     */
+    public function raccoglieDataNascita(array $schema): bool
+    {
+        foreach ($schema['campi_standard'] as $riga) {
+            if ($riga['campo'] === 'data_nascita' && $riga['visibile']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * La data di nascita dichiarata corrisponde a un'età < 18? (f.22)
+     */
+    public function isMinorenne(?string $dataNascita): bool
+    {
+        if ($dataNascita === null || trim($dataNascita) === '') {
+            return false;
+        }
+
+        try {
+            return Carbon::parse($dataNascita)->diffInYears(now()) < 18;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     // ------------------------------------------------------------------
     // Persistenza
     // ------------------------------------------------------------------
@@ -405,6 +454,16 @@ class FormIscrizioneService
             }
 
             $anagrafica[$campo] = $valore;
+        }
+
+        // f.22: tutore dei soci minorenni (presente solo se lo schema
+        // raccoglie la data di nascita — vedi rules())
+        foreach (['tutore_nome', 'tutore_telefono', 'tutore_email'] as $campoTutore) {
+            $valore = $dati[$campoTutore] ?? null;
+
+            if (is_string($valore) && trim($valore) !== '') {
+                $anagrafica[$campoTutore] = trim($valore);
+            }
         }
 
         return $anagrafica;

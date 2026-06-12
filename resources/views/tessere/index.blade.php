@@ -57,6 +57,11 @@
     </div>
 </form>
 
+{{-- Viste salvate (f.5 piano "Gestione 2" — modulo operativita) --}}
+<div class="mb-3">
+    @includeIf('operativita._viste-salvate', ['scope' => 'tessere', 'vsRoute' => 'tessere.index', 'vsRouteParams' => []])
+</div>
+
 {{-- Grafici aggregati --}}
 @if ($aggregati->isNotEmpty())
 <div class="row mb-3">

@@ -134,6 +134,71 @@
     </div>
 </div>
 
+{{-- Tutore per soci minorenni (f.22 piano "Gestione 2" — modulo membri):
+     mostrato/obbligatorio dinamicamente quando la data di nascita indica età < 18 --}}
+<div class="card mb-3 {{ ($socio ?? null)?->isMinorenne() || filled(old('tutore_nome', $socio->tutore_nome ?? null)) ? '' : 'd-none' }}" id="cardTutore">
+    <div class="card-header bg-white">
+        <i class="bi bi-person-exclamation me-1"></i>Tutore
+        <span class="badge bg-info text-dark ms-1">Socio minorenne</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">Il socio è minorenne: nome, telefono ed email del tutore sono obbligatori.</p>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="tutore_nome">Nome del tutore <span class="tutore-req">*</span></label>
+                <input type="text" class="form-control" id="tutore_nome" name="tutore_nome" maxlength="150"
+                       value="{{ old('tutore_nome', $socio->tutore_nome ?? '') }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="tutore_telefono">Telefono del tutore <span class="tutore-req">*</span></label>
+                <input type="tel" class="form-control" id="tutore_telefono" name="tutore_telefono" maxlength="30"
+                       value="{{ old('tutore_telefono', $socio->tutore_telefono ?? '') }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="tutore_email">Email del tutore <span class="tutore-req">*</span></label>
+                <input type="email" class="form-control" id="tutore_email" name="tutore_email" maxlength="255"
+                       value="{{ old('tutore_email', $socio->tutore_email ?? '') }}">
+            </div>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+(function () {
+    var dataNascita = document.getElementById('data_nascita');
+    var card = document.getElementById('cardTutore');
+    if (!dataNascita || !card) return;
+
+    var campi = ['tutore_nome', 'tutore_telefono', 'tutore_email'].map(function (id) {
+        return document.getElementById(id);
+    });
+
+    function isMinorenne() {
+        if (!dataNascita.value) return false;
+        var nascita = new Date(dataNascita.value);
+        if (isNaN(nascita.getTime())) return false;
+        var oggi = new Date();
+        var eta = oggi.getFullYear() - nascita.getFullYear();
+        var m = oggi.getMonth() - nascita.getMonth();
+        if (m < 0 || (m === 0 && oggi.getDate() < nascita.getDate())) eta--;
+        return eta < 18;
+    }
+
+    function aggiorna() {
+        var minore = isMinorenne();
+        var haValori = campi.some(function (c) { return c && c.value.trim() !== ''; });
+        card.classList.toggle('d-none', !minore && !haValori);
+        campi.forEach(function (c) { if (c) c.required = minore; });
+    }
+
+    dataNascita.addEventListener('change', aggiorna);
+    dataNascita.addEventListener('input', aggiorna);
+    aggiorna();
+})();
+</script>
+@endpush
+
 @if ($campiPersonalizzati->isNotEmpty())
     <div class="card mb-3">
         <div class="card-header bg-white"><i class="bi bi-journal-plus me-1"></i>Dati Personalizzati</div>

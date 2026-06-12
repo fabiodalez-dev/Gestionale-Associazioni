@@ -3,23 +3,31 @@
 namespace Database\Seeders;
 
 use App\Models\Account;
+use App\Models\Annuncio;
 use App\Models\Associazione;
+use App\Models\AttivitaAdmin;
 use App\Models\CampoPersonalizzato;
 use App\Models\Carica;
+use App\Models\CategoriaMovimento;
 use App\Models\CategoriaSocio;
 use App\Models\Cessazione;
+use App\Models\Donazione;
 use App\Models\Evento;
+use App\Models\Movimento;
+use App\Models\Nucleo;
 use App\Models\Prenotazione;
 use App\Models\Quota;
 use App\Models\Ricevuta;
 use App\Models\RichiestaIscrizione;
 use App\Models\Sede;
 use App\Models\Socio;
+use App\Models\Sondaggio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\Tessera;
 use App\Models\TipoSocio;
 use App\Models\ValoreCampoPersonalizzato;
 use App\Models\Verbale;
+use App\Services\Economia\PrimaNotaService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -42,6 +50,13 @@ use Illuminate\Support\Str;
  * storica (visibile nel libro soci), un verbale numerato 1/{anno}
  * collegato all'assemblea, una serie di eventi ricorrenti solo-soci e
  * una ricevuta numerata 1/{anno} sulla quota pagata.
+ *
+ * Gestione 2 (PIANO-GESTIONE-2): un annuncio pubblicato in evidenza (f.7),
+ * un sondaggio aperto (f.11), prima nota con categorie seedate e tre
+ * movimenti — incasso quota e donazione generati dagli hook automatici
+ * idempotenti di PrimaNotaService + un'uscita manuale (f.13), una
+ * donazione pagata (f.15), il nucleo familiare "Verdi-Bianchi" (f.20)
+ * e un'attività admin aperta collegata all'assemblea (f.4).
  */
 class DemoSeeder extends Seeder
 {
@@ -433,5 +448,99 @@ class DemoSeeder extends Seeder
                 'emessa_at' => now()->subMonths(1),
             ]);
         }
+
+        /*
+        |------------------------------------------------------------------
+        | Gestione 2 (PIANO-GESTIONE-2) — dati dimostrativi
+        |------------------------------------------------------------------
+        */
+
+        // f.7 Annuncio pubblicato in evidenza: visibile nella sezione
+        // "Novità" del mini-sito pubblico, nella bacheca dell'area soci
+        // e selezionabile per le newsletter (f.8)
+        Annuncio::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Aperte le iscrizioni alla stagione '.$anno,
+            'corpo_html' => '<p>Da oggi è possibile rinnovare la tessera e iscriversi '
+                .'ai nuovi corsi della stagione. Passa in segreteria o usa il '
+                .'modulo online: ti aspettiamo!</p>',
+            'pubblicato_dal' => now()->subDays(7),
+            'pubblicato_al' => null,
+            'in_evidenza' => true,
+            'solo_soci' => false,
+        ]);
+
+        // f.11 Sondaggio aperto: votabile dall'area soci e dall'area
+        // account del mini-sito (un voto per votante)
+        Sondaggio::create([
+            'associazione_id' => $associazione->id,
+            'domanda' => 'Quale attività vorresti per la prossima stagione?',
+            'opzioni' => ['Corso di cucina', 'Gite culturali', 'Tornei di giochi da tavolo'],
+            'aperto_dal' => now()->subDays(3),
+            'aperto_al' => now()->addMonth(),
+            'solo_soci' => false,
+        ]);
+
+        // f.15 Donazione online già pagata: compare nell'elenco admin
+        // "Donazioni" e genera il movimento automatico in prima nota
+        $donazione = Donazione::create([
+            'associazione_id' => $associazione->id,
+            'donatore_nome' => 'Carla Fontana',
+            'donatore_email' => 'carla.fontana@demo.test',
+            'importo' => 50.00,
+            'anonimo' => false,
+            'stato' => Donazione::STATO_PAGATA,
+            'pagata_at' => now()->subDays(10),
+        ]);
+
+        // f.13 Prima nota: categorie di default del tenant + tre movimenti.
+        // Gli incassi (quota pagata, donazione) passano dagli stessi hook
+        // automatici idempotenti usati a runtime; l'uscita è manuale.
+        $primaNota = app(PrimaNotaService::class);
+        $primaNota->seedCategorie($associazione->id);
+
+        if ($quotaPagata !== null) {
+            $primaNota->registraIncassoQuotaBestEffort($quotaPagata->id);
+        }
+
+        $primaNota->registraDonazioneBestEffort($donazione);
+
+        Movimento::create([
+            'associazione_id' => $associazione->id,
+            'tipo' => Movimento::TIPO_USCITA,
+            'importo' => 180.00,
+            'data' => now()->subDays(15)->toDateString(),
+            'categoria_id' => $primaNota->categoria(
+                $associazione->id,
+                'Utenze e affitti',
+                CategoriaMovimento::TIPO_USCITA
+            )?->id,
+            'descrizione' => 'Affitto sede — mensilità corrente',
+            'metodo' => 'bonifico',
+        ]);
+
+        // f.20 Nucleo familiare: Anna Verdi capofamiglia, Luca Bianchi
+        // membro — visibile nella scheda socio e nella vista "per nucleo"
+        $nucleo = Nucleo::create([
+            'associazione_id' => $associazione->id,
+            'nome' => 'Famiglia Verdi-Bianchi',
+            'capofamiglia_id' => $sociModels[0]->id,
+        ]);
+
+        $sociModels[0]->update(['nucleo_id' => $nucleo->id]);
+        $sociModels[1]->update(['nucleo_id' => $nucleo->id]);
+
+        // f.4 Attività admin aperta collegata all'assemblea annuale:
+        // compare nella pagina "Attività" e nel widget della dashboard
+        // (assegnatario assente: il seeder non crea utenti amministratori)
+        AttivitaAdmin::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Preparare i materiali per l\'assemblea annuale',
+            'descrizione' => 'Stampare il foglio presenze, predisporre il verbale e verificare la capienza della sala.',
+            'scadenza' => now()->addDays(7)->toDateString(),
+            'notabile_type' => $eventoGratuito->getMorphClass(),
+            'notabile_id' => $eventoGratuito->id,
+            'stato' => AttivitaAdmin::STATO_APERTA,
+        ]);
     }
 }

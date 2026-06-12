@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 /**
  * Prenotazione di un evento dal frontend pubblico.
@@ -144,6 +145,17 @@ class Prenotazione extends Model implements Pagabile
     public function approvataDa(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'approvata_da');
+    }
+
+    /**
+     * Movimento di prima nota generato dall'incasso della prenotazione
+     * (f.13 — piano "Gestione 2", hook idempotente del modulo).
+     *
+     * @return MorphOne<Movimento, $this>
+     */
+    public function movimento(): MorphOne
+    {
+        return $this->morphOne(Movimento::class, 'origine');
     }
 
     /**

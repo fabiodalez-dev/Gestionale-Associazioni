@@ -17,6 +17,8 @@ interface Pagabile
 
     public const TIPO_PRENOTAZIONE = 'prenotazione';
 
+    public const TIPO_DONAZIONE = 'donazione';
+
     /**
      * Id (UUID) dell'entità da pagare.
      */

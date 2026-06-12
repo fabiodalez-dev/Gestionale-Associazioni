@@ -113,6 +113,11 @@
                                                 <i class="bi bi-star-half"></i>
                                             </a>
                                         @endif
+                                        @if (Route::has('eventi.economia.show'))
+                                            <a href="{{ route('eventi.economia.show', $evento) }}" class="btn btn-outline-primary" title="Economia evento (budget, spese e incassi)">
+                                                <i class="bi bi-cash-stack"></i>
+                                            </a>
+                                        @endif
                                         @if (Route::has('eventi.ics'))
                                             <a href="{{ route('eventi.ics', $evento) }}" class="btn btn-outline-secondary" title="Esporta .ics">
                                                 <i class="bi bi-calendar-plus"></i>

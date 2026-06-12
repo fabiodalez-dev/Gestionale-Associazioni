@@ -13,6 +13,7 @@ use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
+use App\Services\Economia\PrimaNotaService;
 use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
 use App\Services\Prenotazioni\BigliettoService;
 use App\Services\Prenotazioni\PrenotazioneService;
@@ -37,7 +38,7 @@ class E2eFixtureCommand extends Command
         {--tessera=} {--scaduta=0} {--senza-tessera=0} {--con-quota=0}
         {--aperte=} {--modalita=} {--intro=} {--config=}
         {--genera-tessera=0} {--motivo=}
-        {--solo-soci=0} {--socio=} {--quota=} {--codice-fiscale=} {--data-nascita=}';
+        {--solo-soci=0} {--socio=} {--quota=} {--codice-fiscale=} {--data-nascita=} {--quota-scadenza=}';
 
     protected $description = 'Fixture deterministiche per i test E2E (richiede E2E_FIXTURES=1)';
 
@@ -423,7 +424,7 @@ class E2eFixtureCommand extends Command
                 'socio_id' => $socio->id,
                 'anno' => now()->year,
                 'importo' => 25.00,
-                'data_scadenza' => now()->endOfYear()->toDateString(),
+                'data_scadenza' => $this->option('quota-scadenza') ?: now()->endOfYear()->toDateString(),
                 'stato' => Quota::STATO_DA_PAGARE,
                 'tipo' => 'Quota Annuale',
             ]);
@@ -619,6 +620,8 @@ class E2eFixtureCommand extends Command
      * Registra come pagata la quota --quota (data_pagamento oggi, metodo
      * Contanti), come farebbe la registrazione manuale dell'admin. Serve
      * ai test sulla ricevuta numerata scaricabile dalle aree riservate.
+     * Come in produzione (PaymentService), il pagamento genera anche il
+     * movimento automatico di prima nota (f.13), idempotente.
      *
      * @return array<string, mixed>
      */
@@ -635,7 +638,9 @@ class E2eFixtureCommand extends Command
             'metodo_pagamento' => 'Contanti',
         ])->save();
 
-        return ['ok' => true, 'quota_id' => $quota->id];
+        $movimento = app(PrimaNotaService::class)->registraIncassoQuotaBestEffort($quota->id);
+
+        return ['ok' => true, 'quota_id' => $quota->id, 'movimento_id' => $movimento?->id];
     }
 
     /**

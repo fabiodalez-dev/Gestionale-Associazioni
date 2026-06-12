@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Quota extends Model implements Pagabile
 {
@@ -83,6 +84,17 @@ class Quota extends Model implements Pagabile
     public function ricevuta(): HasOne
     {
         return $this->hasOne(Ricevuta::class, 'quota_id');
+    }
+
+    /**
+     * Movimento di prima nota generato dal pagamento della quota
+     * (f.13 — piano "Gestione 2", hook idempotente del modulo).
+     *
+     * @return MorphOne<Movimento, $this>
+     */
+    public function movimento(): MorphOne
+    {
+        return $this->morphOne(Movimento::class, 'origine');
     }
 
     public function isPagata(): bool

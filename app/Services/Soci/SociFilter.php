@@ -34,6 +34,8 @@ class SociFilter
         'tessera_template' => 'all',
         'tessera_scadenza' => 'all',
         'gruppo_id' => 'all',
+        // f.20 (piano "Gestione 2"): 'all' | 'con' | 'senza' | uuid nucleo
+        'nucleo' => 'all',
     ];
 
     /** @var array<string, mixed> */
@@ -66,7 +68,7 @@ class SociFilter
     public function build(): Builder
     {
         $query = Socio::query()
-            ->with(['tipoSocio', 'categoriaSocio', 'sede', 'tags', 'ultimaTessera', 'associazione'])
+            ->with(['tipoSocio', 'categoriaSocio', 'sede', 'tags', 'ultimaTessera', 'associazione', 'nucleo'])
             ->orderBy('cognome')
             ->orderBy('nome');
 
@@ -113,6 +115,17 @@ class SociFilter
 
         if ($categoriaIds !== []) {
             $query->whereIn('categoria_socio_id', $categoriaIds);
+        }
+
+        // Filtro nucleo familiare (f.20 — piano "Gestione 2")
+        $nucleo = (string) $this->params['nucleo'];
+
+        if ($nucleo === 'con') {
+            $query->whereNotNull('nucleo_id');
+        } elseif ($nucleo === 'senza') {
+            $query->whereNull('nucleo_id');
+        } elseif ($nucleo !== 'all' && $nucleo !== '') {
+            $query->where('nucleo_id', $nucleo);
         }
 
         if ($this->params['has_tessera'] === 'yes') {

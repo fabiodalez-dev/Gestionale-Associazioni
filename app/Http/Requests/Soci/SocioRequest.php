@@ -7,6 +7,7 @@ use App\Models\CampoPersonalizzato;
 use App\Models\Socio;
 use App\Services\Soci\RequiredFieldsConfig;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Propaganistas\LaravelPhone\Rules\Phone;
 
@@ -92,11 +93,38 @@ abstract class SocioRequest extends FormRequest
             'genera_tessera' => ['nullable', 'boolean'],
         ];
 
+        // f.22 (piano "Gestione 2"): tutore obbligatorio per i soci minorenni
+        // (validazione dinamica sulla data di nascita inviata; saltata per
+        // gli stati pending, come gli altri campi obbligatori configurabili)
+        $tutoreObbligatorio = $this->isMinorenneInInput() && ! $this->isStatoPending();
+
+        $rules['tutore_nome'] = [$tutoreObbligatorio ? 'required' : 'nullable', 'string', 'max:150'];
+        $rules['tutore_telefono'] = [$tutoreObbligatorio ? 'required' : 'nullable', 'string', 'max:30', (new Phone)->country(['IT'])->lenient()];
+        $rules['tutore_email'] = [$tutoreObbligatorio ? 'required' : 'nullable', 'email', 'max:255'];
+
         if (! $this->isStatoPending()) {
             $rules = $this->applicaCampiObbligatoriConfigurabili($rules);
         }
 
         return array_merge($rules, $this->regoleCampiPersonalizzati());
+    }
+
+    /**
+     * Il socio è minorenne in base alla data di nascita inviata? (f.22)
+     */
+    public function isMinorenneInInput(): bool
+    {
+        $dataNascita = $this->input('data_nascita');
+
+        if (blank($dataNascita) || ! is_string($dataNascita)) {
+            return false;
+        }
+
+        try {
+            return Carbon::parse($dataNascita)->diffInYears(now()) < 18;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -111,6 +139,9 @@ abstract class SocioRequest extends FormRequest
             'data_iscrizione' => 'Data di Iscrizione',
             'numero_socio' => 'Numero Socio',
             'stato' => 'Stato',
+            'tutore_nome' => 'Nome del tutore',
+            'tutore_telefono' => 'Telefono del tutore',
+            'tutore_email' => 'Email del tutore',
         ]);
     }
 
@@ -122,6 +153,9 @@ abstract class SocioRequest extends FormRequest
         return [
             'codice_fiscale.unique' => 'Esiste già un socio con lo stesso Codice Fiscale in questa associazione.',
             'codice_fiscale.codice_fiscale' => 'Il Codice Fiscale non è valido.',
+            'tutore_nome.required' => 'Il socio è minorenne: indica il nome del tutore.',
+            'tutore_telefono.required' => 'Il socio è minorenne: indica il telefono del tutore.',
+            'tutore_email.required' => 'Il socio è minorenne: indica l\'email del tutore.',
         ];
     }
 

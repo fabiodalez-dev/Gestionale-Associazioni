@@ -57,6 +57,9 @@
         </div>
     @endif
 
+    {{-- Card onboarding admin: checklist configurazione tenant (piano Gestione 2, f.23) --}}
+    @includeIf('piattaforma._onboarding-card')
+
     {{-- Alert mandati organi sociali in scadenza (piano vita sociale, f.16) --}}
     @if (($caricheInScadenza ?? null) !== null && $caricheInScadenza->isNotEmpty())
         <div class="alert alert-warning">
@@ -196,6 +199,17 @@
         <div class="col-12 col-lg-6">
             {{-- Top partecipanti agli eventi (f.12 piano Vita sociale) --}}
             @includeIf('eventi-vita._top-partecipanti')
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 col-lg-6">
+            {{-- Le mie attività (f.4 piano "Gestione 2" — modulo operativita) --}}
+            @includeIf('operativita._widget-attivita')
+        </div>
+        <div class="col-12 col-lg-6">
+            {{-- Compleanni del mese (f.9 piano "Gestione 2" — modulo comunicazione) --}}
+            @includeIf('comunicazione.dashboard._compleanni')
         </div>
     </div>
 @endsection

@@ -22,6 +22,9 @@
             <h1 class="h2 mb-1">{{ $socio->nome_completo }}</h1>
             <p class="text-muted mb-1">Socio n. {{ $socio->numero_socio }}
                 <span class="badge bg-{{ $badgeStato }}">{{ $socio->stato }}</span>
+                @if ($socio->isMinorenne())
+                    <span class="badge bg-info text-dark" title="Socio minorenne (f.22)"><i class="bi bi-person-exclamation me-1"></i>Minorenne</span>
+                @endif
                 @if ($documentiScaduti->isNotEmpty())
                     <span class="badge bg-danger" title="Documenti scaduti"><i class="bi bi-exclamation-triangle me-1"></i>{{ $documentiScaduti->count() }} {{ $documentiScaduti->count() === 1 ? 'documento scaduto' : 'documenti scaduti' }}</span>
                 @endif
@@ -35,14 +38,25 @@
                 @endforeach
             </div>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            {{-- Contatti rapidi (f.10) + email diretta (f.12) — modulo comunicazione --}}
+            @includeIf('comunicazione.soci._contatti-rapidi', ['socio' => $socio, 'dimensione' => 'md'])
+            @includeIf('comunicazione.soci._invia-email', ['socio' => $socio])
             <a href="{{ route('soci.edit', $socio) }}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Modifica</a>
             <a href="{{ route('soci.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Lista</a>
         </div>
     </div>
 
+    @php
+        $tabs = ['anagrafica' => 'Anagrafica', 'quote-tessere' => 'Quote e Tessere', 'tesseramento' => 'Tesseramento', 'vita-sociale' => 'Vita sociale', 'documenti' => 'Documenti'];
+        // Tab Note interne (f.3 piano "Gestione 2" — modulo operativita)
+        if (\Illuminate\Support\Facades\Route::has('soci.note.store')) {
+            $tabs['note'] = 'Note';
+        }
+        $tabs['storico'] = 'Storico';
+    @endphp
     <ul class="nav nav-tabs" role="tablist">
-        @foreach (['anagrafica' => 'Anagrafica', 'quote-tessere' => 'Quote e Tessere', 'tesseramento' => 'Tesseramento', 'vita-sociale' => 'Vita sociale', 'documenti' => 'Documenti', 'storico' => 'Storico'] as $key => $label)
+        @foreach ($tabs as $key => $label)
             <li class="nav-item" role="presentation">
                 <button class="nav-link {{ $tab === $key ? 'active' : '' }}" data-bs-toggle="tab"
                         data-bs-target="#tab-{{ $key }}" type="button" role="tab">{{ $label }}</button>
@@ -58,6 +72,14 @@
                 <dt class="col-sm-3">Telefono</dt><dd class="col-sm-9">{{ $socio->telefono ?: 'N/D' }}</dd>
                 <dt class="col-sm-3">Codice Fiscale</dt><dd class="col-sm-9">{{ $socio->codice_fiscale ?: 'N/D' }}</dd>
                 <dt class="col-sm-3">Data di Nascita</dt><dd class="col-sm-9">{{ $socio->data_nascita?->format('d/m/Y') ?? 'N/D' }}</dd>
+                @if ($socio->isMinorenne() || $socio->hasTutore())
+                    <dt class="col-sm-3">Tutore</dt>
+                    <dd class="col-sm-9">
+                        {{ $socio->tutore_nome ?: 'N/D' }}
+                        @if ($socio->tutore_telefono)<span class="text-muted">· <i class="bi bi-telephone me-1"></i>{{ $socio->tutore_telefono }}</span>@endif
+                        @if ($socio->tutore_email)<span class="text-muted">· <i class="bi bi-envelope me-1"></i>{{ $socio->tutore_email }}</span>@endif
+                    </dd>
+                @endif
                 <dt class="col-sm-3">Data Iscrizione</dt><dd class="col-sm-9">{{ $socio->data_iscrizione?->format('d/m/Y') ?? 'N/D' }}</dd>
                 <dt class="col-sm-3">Indirizzo</dt>
                 <dd class="col-sm-9">{{ trim(($socio->indirizzo ?? '').' '.($socio->cap ?? '').' '.($socio->citta ?? '').' '.($socio->provincia ?? '')) ?: 'N/D' }}</dd>
@@ -75,6 +97,11 @@
                     @endif
                 @endforeach
             </dl>
+
+            {{-- Nucleo familiare (f.20 piano "Gestione 2" — modulo membri) --}}
+            @if (\Illuminate\Support\Facades\Route::has('nuclei.store'))
+                @include('membri.partials.nucleo-socio', ['socio' => $socio])
+            @endif
         </div>
 
         {{-- Tab Quote e Tessere --}}
@@ -211,6 +238,13 @@
         <div class="tab-pane fade {{ $tab === 'vita-sociale' ? 'show active' : '' }}" id="tab-vita-sociale" role="tabpanel">
             @include('eventi-vita._vita-sociale-socio', ['socio' => $socio])
         </div>
+
+        {{-- Tab Note interne (f.3 piano "Gestione 2" — modulo operativita) --}}
+        @if (\Illuminate\Support\Facades\Route::has('soci.note.store'))
+            <div class="tab-pane fade {{ $tab === 'note' ? 'show active' : '' }}" id="tab-note" role="tabpanel">
+                @includeIf('operativita._tab-note', ['socio' => $socio])
+            </div>
+        @endif
 
         {{-- Tab Storico --}}
         <div class="tab-pane fade {{ $tab === 'storico' ? 'show active' : '' }}" id="tab-storico" role="tabpanel">

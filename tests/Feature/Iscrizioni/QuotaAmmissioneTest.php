@@ -13,6 +13,7 @@ use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
 use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Spatie\Honeypot\ProtectAgainstSpam;
 use Tests\TestCase;
 
 /**
@@ -148,7 +149,7 @@ class QuotaAmmissioneTest extends TestCase
     public function test_iscrizione_diretta_da_ospite_crea_subito_la_quota(): void
     {
         $this->associazione->update(['modalita_iscrizione' => 'diretta']);
-        $this->withoutMiddleware(\Spatie\Honeypot\ProtectAgainstSpam::class);
+        $this->withoutMiddleware(ProtectAgainstSpam::class);
 
         $this->post('/a/quote-coerenti/iscriviti', [
             'nome' => 'Paolo', 'cognome' => 'Riva', 'email' => 'paolo.riva@example.com',

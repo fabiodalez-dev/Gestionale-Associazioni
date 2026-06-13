@@ -1,9 +1,10 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "fabiodalez-dev/gestione-associazioni",
+    "version": "0.1.0",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Piattaforma SaaS multi-tenant per la gestione completa di associazioni.",
+    "keywords": ["laravel", "associazioni", "crm", "multi-tenant"],
     "license": "MIT",
     "require": {
         "php": "^8.3",

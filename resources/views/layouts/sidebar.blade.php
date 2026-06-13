@@ -289,6 +289,12 @@
                     Associazioni
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('aggiornamenti.*') ? 'active' : '' }}" href="{{ $nav('aggiornamenti.index') }}">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Aggiornamenti
+                </a>
+            </li>
             @endif
             @if ($sidebarHasAssoc && $can('struttura.view'))
             <li class="nav-item">

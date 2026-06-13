@@ -157,8 +157,8 @@ PHP 8.3+ (consigliato 8.4) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl` · M
 ### Installazione
 
 ```bash
-git clone <repository> gestione-associazioni-laravel
-cd gestione-associazioni-laravel
+git clone <repository> gestionale-associazioni
+cd gestionale-associazioni
 
 composer install
 cp .env.example .env

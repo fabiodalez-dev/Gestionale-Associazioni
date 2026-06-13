@@ -1,4 +1,4 @@
-# Gestione Associazioni
+# Gestionale Associazioni
 
 Piattaforma **SaaS multi-tenant** per la gestione completa della vita di un'associazione: soci e tesseramento, eventi con prenotazioni online, quote e pagamenti, registro ufficiale e governance, comunicazione, economia, volontari e organizzazione interna. Ogni associazione ha il proprio mini-sito pubblico brandizzato dove i cittadini si iscrivono e prenotano gli eventi.
 
@@ -132,8 +132,8 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 ### Installer web (consigliato)
 
 ```bash
-git clone https://github.com/fabiodalez-dev/gestione-associazioni-laravel.git
-cd gestione-associazioni-laravel
+git clone https://github.com/fabiodalez-dev/gestionale-associazioni.git
+cd gestionale-associazioni
 composer install --no-dev
 cp .env.example .env
 ```

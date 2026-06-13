@@ -16,7 +16,7 @@ return [
 
     'github' => [
         'owner' => env('UPDATE_GITHUB_OWNER', 'fabiodalez-dev'),
-        'repo' => env('UPDATE_GITHUB_REPO', 'gestione-associazioni-laravel'),
+        'repo' => env('UPDATE_GITHUB_REPO', 'gestionale-associazioni'),
         // Token opzionale per alzare il rate limit GitHub (60 → 5000/h) e
         // accedere a repo privati. Mai committato: solo via env.
         'token' => env('UPDATE_GITHUB_TOKEN'),

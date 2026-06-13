@@ -9,15 +9,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Tracking dei promemoria inviati (anti-duplicazione, f.3 e f.23 del piano):
- * un record per (socio, tessera, tipo, step) — unique a livello DB.
+ * Tracking dei promemoria inviati (anti-duplicazione, f.3/f.6/f.20/f.23 del
+ * piano): un record per (socio, tessera, riferimento, tipo, step) — unique a
+ * livello DB.
  *
- * step = giorni prima della scadenza (es. 30, 15, 3).
+ * step: significato dipendente dal tipo — giorni prima della scadenza
+ * (rinnovo/documento, es. 30/15/3), anno (adempimento), o anno tessera.
  * tessera_id NULL per i promemoria non legati a una tessera (es. documenti).
+ * riferimento_id: id dell'entità di riferimento quando la deduplica deve
+ * distinguere fra entità diverse (turno_id, adempimento_id); NULL altrimenti.
+ * socio_id NULL per i promemoria non legati a un socio (es. adempimenti agli
+ * admin del tenant).
  *
- * NB: con tessera_id NULL l'unique a DB non scatta (NULL distinti in
- * MySQL/SQLite): per quei promemoria la deduplicazione va fatta
- * applicativamente (whereNull('tessera_id') prima dell'insert).
+ * NB: con tessera_id/riferimento_id NULL l'unique a DB non scatta (NULL
+ * distinti in MySQL/SQLite): per quei promemoria la deduplicazione va fatta
+ * applicativamente (whereNull(...) prima dell'insert).
  */
 class PromemoriaInviato extends Model
 {
@@ -31,9 +37,17 @@ class PromemoriaInviato extends Model
     /** Promemoria documento socio in scadenza (f.23). */
     public const TIPO_DOCUMENTO_SCADENZA = 'documento_scadenza';
 
+    /** Promemoria turno in programma domani (f.6). */
+    public const TIPO_TURNO = 'turno';
+
+    /** Promemoria mensile di un adempimento ricorrente (f.20). */
+    public const TIPO_ADEMPIMENTO = 'adempimento';
+
     public const TIPI = [
         self::TIPO_RINNOVO_TESSERA,
         self::TIPO_DOCUMENTO_SCADENZA,
+        self::TIPO_TURNO,
+        self::TIPO_ADEMPIMENTO,
     ];
 
     protected $table = 'promemoria_inviati';
@@ -42,6 +56,7 @@ class PromemoriaInviato extends Model
         'associazione_id',
         'socio_id',
         'tessera_id',
+        'riferimento_id',
         'tipo',
         'step',
         'inviato_at',

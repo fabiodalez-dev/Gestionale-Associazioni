@@ -156,12 +156,14 @@ class RiunioneController extends Controller
             $riunione->forceFill(['convocazione_inviata_at' => now()])->save();
         });
 
-        // Notifica i partecipanti soci (carica) + utenti admin del tenant
+        // Notifica i partecipanti soci (carica) + utenti admin del tenant.
+        // withTrashed() serve solo a risolvere la relazione (i nomi storici);
+        // i soci soft-deleted vanno comunque esclusi dai destinatari email.
         $riunione->load(['partecipanti.socio' => fn ($q) => $q->withTrashed()]);
 
         $sociDestinatari = $riunione->partecipanti
             ->pluck('socio')
-            ->filter(fn ($socio) => $socio !== null && filled($socio->email));
+            ->filter(fn ($socio) => $socio !== null && ! $socio->trashed() && filled($socio->email));
 
         $utentiAdmin = Utente::query()
             ->where('associazione_id', $riunione->associazione_id)

@@ -2,7 +2,6 @@
 
 namespace App\Services\Progetti;
 
-use App\Models\CategoriaMovimento;
 use App\Models\Movimento;
 use App\Models\Progetto;
 use App\Models\TurnoAssegnazione;
@@ -110,19 +109,5 @@ class ProgettoReportService
             'totale' => (float) $assegnazioni->sum('ore_effettive'),
             'perSocio' => $perSocio,
         ];
-    }
-
-    /**
-     * Categorie di movimento del tenant per la select "imputa al progetto"
-     * nella prima nota (f.13).
-     *
-     * @return Collection<int, CategoriaMovimento>
-     */
-    public function categorieTenant(): Collection
-    {
-        return CategoriaMovimento::query()
-            ->orderBy('tipo')
-            ->orderBy('nome')
-            ->get();
     }
 }

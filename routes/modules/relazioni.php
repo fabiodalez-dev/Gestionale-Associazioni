@@ -5,6 +5,7 @@ use App\Http\Controllers\Relazioni\ContattoEsternoController;
 use App\Http\Controllers\Relazioni\GalleriaEventoController;
 use App\Http\Controllers\Relazioni\SponsorController;
 use App\Http\Controllers\Relazioni\StatisticheAnnualiController;
+use App\Http\Middleware\FrontendPubblico\RisolviTenantPubblico;
 use App\Support\Relazioni\RelazioniPublicComposer;
 use App\Support\Relazioni\RelazioniReferral;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +57,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->name('eventi.galleria.index');
     Route::post('/eventi/{evento}/galleria', [GalleriaEventoController::class, 'store'])
         ->name('eventi.galleria.store');
+    // Serve dal disco privato nel tab admin (eventi.view); ?conv=thumb per la miniatura.
+    Route::get('/eventi/{evento}/galleria/{media}/file', [GalleriaEventoController::class, 'servi'])
+        ->name('eventi.galleria.file');
     Route::delete('/eventi/{evento}/galleria/{media}', [GalleriaEventoController::class, 'destroy'])
         ->name('eventi.galleria.destroy');
     Route::post('/eventi/{evento}/galleria/visibilita', [GalleriaEventoController::class, 'toggleVisibilita'])
@@ -67,6 +71,21 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/statistiche-annuali/pdf', [StatisticheAnnualiController::class, 'pdf'])
         ->name('statistiche-annuali.pdf');
 });
+
+/*
+ * f.24 — Serve PUBBLICO delle foto galleria dal disco privato. Vive sotto il
+ * prefix a/{associazione:slug} con RisolviTenantPubblico (stesso gruppo di
+ * pubblico.eventi.show): nessuna auth, ma il controller consente il download
+ * SOLO se l'evento è pubblicato, del tenant e con galleria_pubblica attiva.
+ * Nome rotta: pubblico.eventi.galleria.file. ?conv=thumb per la miniatura.
+ */
+Route::prefix('a/{associazione:slug}')
+    ->name('pubblico.')
+    ->middleware(RisolviTenantPubblico::class)
+    ->group(function (): void {
+        Route::get('/eventi/{evento}/galleria/{media}/file', [GalleriaEventoController::class, 'serviPubblico'])
+            ->name('eventi.galleria.file');
+    });
 
 /*
  * Hook trasversali (registrati al boot, nessun file di altri moduli toccato):

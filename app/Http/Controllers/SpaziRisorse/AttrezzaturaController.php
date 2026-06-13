@@ -9,6 +9,7 @@ use App\Models\Spazio;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -77,9 +78,33 @@ class AttrezzaturaController extends Controller
 
         $validated = $request->validated();
 
-        // La quantità non può scendere sotto il totale già in prestito
-        $inPrestito = $attrezzatura->quantitaInPrestito();
-        if ((int) $validated['quantita'] < $inPrestito) {
+        // Check (quantità non sotto i pezzi in prestito) + save DENTRO una
+        // transazione con lock applicativo sulla riga attrezzatura: un prestito
+        // concorrente non può aumentare i pezzi in prestito tra check e save
+        // lasciando quantita < pezzi in prestito (variante della race sui prestiti).
+        $inPrestito = DB::transaction(function () use ($attrezzatura, $validated): int {
+            $bloccata = Attrezzatura::query()
+                ->whereKey($attrezzatura->id)
+                ->when(
+                    DB::connection()->getDriverName() !== 'sqlite',
+                    fn ($q) => $q->lockForUpdate()
+                )
+                ->first() ?? $attrezzatura;
+
+            $inPrestito = $bloccata->quantitaInPrestito();
+
+            // Sopra il totale in prestito: aborta senza scrivere, l'esito è
+            // segnalato dal valore ritornato (mantiene la UX withErrors).
+            if ((int) $validated['quantita'] < $inPrestito) {
+                return $inPrestito;
+            }
+
+            $attrezzatura->update($validated);
+
+            return -1; // sentinella: aggiornamento avvenuto
+        });
+
+        if ($inPrestito >= 0) {
             return redirect()
                 ->back()
                 ->withInput()
@@ -88,8 +113,6 @@ class AttrezzaturaController extends Controller
                         ."ci sono {$inPrestito} pezzi attualmente in prestito.",
                 ]);
         }
-
-        $attrezzatura->update($validated);
 
         return redirect()
             ->route('attrezzature.index')

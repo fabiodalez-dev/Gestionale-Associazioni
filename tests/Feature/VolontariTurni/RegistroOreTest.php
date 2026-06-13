@@ -172,6 +172,95 @@ class RegistroOreTest extends TestCase
         Notification::assertSentToTimes($socio, PromemoriaTurnoNotification::class, 1);
     }
 
+    public function test_destroy_voce_con_socio_soft_deleted_passa_dalla_policy(): void
+    {
+        // Voce del registro su un turno reale, poi il socio viene soft-deleted:
+        // socio() risolve null (il cascade DB non scatta sul soft delete).
+        // La cancellazione deve passare dalla policy dedicata (delete →
+        // soci.update) senza derivare il permesso dalla presenza della
+        // relazione (#8).
+        $socio = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'volontario_attivo' => true,
+        ]);
+        $turno = Turno::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'data' => now()->toDateString(),
+        ]);
+        $assegnazione = TurnoAssegnazione::factory()->confermata()->create([
+            'associazione_id' => $this->associazione->id,
+            'turno_id' => $turno->id,
+            'socio_id' => $socio->id,
+            'ore_effettive' => 5,
+        ]);
+
+        $socio->delete();
+
+        $this->assertNull($assegnazione->fresh()->socio);
+
+        $this->actingAs($this->admin)
+            ->delete("/registro-ore/{$assegnazione->id}")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        // Turno reale (non manuale): la voce viene azzerata, non eliminata
+        $this->assertNull($assegnazione->fresh()->ore_effettive);
+    }
+
+    public function test_destroy_voce_negato_agli_ospiti(): void
+    {
+        $assegnazione = TurnoAssegnazione::factory()->confermata()->create([
+            'associazione_id' => $this->associazione->id,
+            'ore_effettive' => 3,
+        ]);
+
+        $this->delete("/registro-ore/{$assegnazione->id}")->assertRedirect('/login');
+    }
+
+    public function test_promemoria_dedup_per_turno_non_collide_tra_turni_diversi(): void
+    {
+        // Stesso socio confermato su DUE turni distinti domani: deve ricevere
+        // un promemoria per ciascuno (dedup robusta su turno_id, non su hash
+        // troncato che potrebbe collidere) — fix #15.
+        $domani = now()->addDay()->toDateString();
+
+        $socio = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'email' => 'doppio@example.test', 'email_opt_out' => false,
+        ]);
+
+        $turnoA = Turno::factory()->create([
+            'associazione_id' => $this->associazione->id, 'data' => $domani,
+        ]);
+        $turnoB = Turno::factory()->create([
+            'associazione_id' => $this->associazione->id, 'data' => $domani,
+        ]);
+
+        foreach ([$turnoA, $turnoB] as $turno) {
+            TurnoAssegnazione::factory()->confermata()->create([
+                'associazione_id' => $this->associazione->id,
+                'turno_id' => $turno->id, 'socio_id' => $socio->id,
+            ]);
+        }
+
+        $this->artisan('turni:promemoria')->assertSuccessful();
+
+        // Due record distinti, uno per turno (riferimento_id = turno_id)
+        $this->assertSame(2, PromemoriaInviato::where('socio_id', $socio->id)
+            ->where('tipo', 'turno')->count());
+        $this->assertDatabaseHas('promemoria_inviati', [
+            'socio_id' => $socio->id, 'tipo' => 'turno', 'riferimento_id' => $turnoA->id,
+        ]);
+        $this->assertDatabaseHas('promemoria_inviati', [
+            'socio_id' => $socio->id, 'tipo' => 'turno', 'riferimento_id' => $turnoB->id,
+        ]);
+
+        // Re-run: nessun nuovo invio (idempotenza per turno)
+        $this->artisan('turni:promemoria')->assertSuccessful();
+        $this->assertSame(2, PromemoriaInviato::where('socio_id', $socio->id)
+            ->where('tipo', 'turno')->count());
+    }
+
     public function test_attestato_di_socio_altro_tenant_da_404(): void
     {
         $altra = Associazione::factory()->create();

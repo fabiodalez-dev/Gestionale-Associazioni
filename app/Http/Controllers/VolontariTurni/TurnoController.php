@@ -13,11 +13,13 @@ use App\Models\Spazio;
 use App\Models\Turno;
 use App\Models\TurnoAssegnazione;
 use App\Services\VolontariTurni\CandidaturaService;
+use App\Services\VolontariTurni\PostiTurnoService;
 use App\Services\VolontariTurni\RegistroOreService;
 use App\Services\VolontariTurni\SuggerimentiVolontari;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -34,6 +36,7 @@ class TurnoController extends Controller
         private readonly SuggerimentiVolontari $suggerimenti,
         private readonly RegistroOreService $registro,
         private readonly CandidaturaService $candidature,
+        private readonly PostiTurnoService $posti,
     ) {}
 
     public function index(Request $request): View
@@ -146,25 +149,23 @@ class TurnoController extends Controller
             return back()->with('error', 'Socio non valido.');
         }
 
-        if ($turno->postiDisponibili() < 1) {
-            return back()->with('error', 'Non ci sono posti disponibili.');
-        }
-
         $stato = $request->boolean('conferma')
             ? TurnoAssegnazione::STATO_CONFERMATO
             : TurnoAssegnazione::STATO_PROPOSTO;
 
-        $esistente = $turno->assegnazioni()->where('socio_id', $validated['socio_id'])->first();
-
-        if ($esistente !== null) {
-            $esistente->update(['stato' => $stato, 'motivo_rinuncia' => null]);
-        } else {
-            TurnoAssegnazione::create([
-                'associazione_id' => $turno->associazione_id,
-                'turno_id' => $turno->id,
-                'socio_id' => $validated['socio_id'],
-                'stato' => $stato,
-            ]);
+        // Check posti + create/update serializzati sul mutex per-turno
+        // (stesso helper dell'auto-candidatura): niente sovra-assegnazione
+        // se due operatori — o un operatore e un socio — agiscono in parallelo.
+        try {
+            $this->posti->occupa(
+                $turno,
+                $validated['socio_id'],
+                $stato,
+                richiediApertura: false,
+                aggiornaSeAttivo: true,
+            );
+        } catch (ValidationException $e) {
+            return back()->with('error', $e->validator->errors()->first('turno') ?: 'Non ci sono posti disponibili.');
         }
 
         return redirect()
@@ -180,11 +181,13 @@ class TurnoController extends Controller
         $this->authorize('update', $turno);
         abort_unless($assegnazione->turno_id === $turno->id, 404);
 
-        if ($turno->postiDisponibili() < 1 && ! $assegnazione->isConfermata()) {
-            return back()->with('error', 'Non ci sono posti disponibili per confermare.');
+        // Conferma serializzata sul mutex per-turno: il ricontrollo posti
+        // avviene DENTRO il lock (vedi PostiTurnoService::conferma).
+        try {
+            $this->posti->conferma($turno, $assegnazione);
+        } catch (ValidationException $e) {
+            return back()->with('error', $e->validator->errors()->first('turno') ?: 'Non ci sono posti disponibili per confermare.');
         }
-
-        $assegnazione->update(['stato' => TurnoAssegnazione::STATO_CONFERMATO]);
 
         return back()->with('success', 'Candidatura confermata.');
     }

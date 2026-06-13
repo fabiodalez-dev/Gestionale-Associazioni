@@ -85,12 +85,11 @@ class RegistroOreController extends Controller
      */
     public function destroy(TurnoAssegnazione $assegnazione): RedirectResponse
     {
-        $socio = $assegnazione->socio;
-        if ($socio !== null) {
-            $this->authorize('update', $socio);
-        } else {
-            $this->authorize('viewAny', Socio::class);
-        }
+        // Permesso esplicito (soci.update) via policy dedicata, coerente e
+        // indipendente dalla presenza della relazione socio: un'assegnazione
+        // legata a un socio soft-deleted (socio() risolverebbe null) non deve
+        // essere cancellabile col solo permesso di lettura.
+        $this->authorize('delete', $assegnazione);
 
         $assegnazione->loadMissing('turno');
 

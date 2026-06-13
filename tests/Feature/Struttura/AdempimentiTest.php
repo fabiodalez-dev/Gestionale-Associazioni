@@ -5,6 +5,7 @@ namespace Tests\Feature\Struttura;
 use App\Models\Adempimento;
 use App\Models\AdempimentoAnno;
 use App\Models\Associazione;
+use App\Models\PromemoriaInviato;
 use App\Models\Utente;
 use App\Notifications\Struttura\PromemoriaAdempimentoNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -211,6 +212,38 @@ class AdempimentiTest extends TestCase
             return $notification->adempimento->id === $daFare->id;
         });
         Notification::assertSentTimes(PromemoriaAdempimentoNotification::class, 1);
+    }
+
+    public function test_comando_promemoria_idempotente_su_re_run(): void
+    {
+        Notification::fake();
+
+        $mese = (int) now()->format('n');
+
+        $adempimento = Adempimento::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'titolo' => 'Rinnovo polizza',
+            'mese_scadenza' => $mese,
+            'attivo' => true,
+        ]);
+
+        // Primo run: invia e traccia in promemoria_inviati
+        $this->artisan('adempimenti:promemoria')->assertSuccessful();
+
+        $this->assertDatabaseHas('promemoria_inviati', [
+            'riferimento_id' => $adempimento->id,
+            'tipo' => 'adempimento',
+            'socio_id' => null,
+        ]);
+        $this->assertSame(1, PromemoriaInviato::where('riferimento_id', $adempimento->id)
+            ->where('tipo', 'adempimento')->count());
+
+        // Re-run nello stesso mese: nessun nuovo invio (idempotenza #14)
+        $this->artisan('adempimenti:promemoria')->assertSuccessful();
+
+        $this->assertSame(1, PromemoriaInviato::where('riferimento_id', $adempimento->id)
+            ->where('tipo', 'adempimento')->count());
+        Notification::assertSentToTimes($this->admin, PromemoriaAdempimentoNotification::class, 1);
     }
 
     public function test_comando_promemoria_rifiuta_mese_invalido(): void

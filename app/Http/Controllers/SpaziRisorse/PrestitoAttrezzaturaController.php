@@ -10,6 +10,8 @@ use App\Models\Socio;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -61,11 +63,57 @@ class PrestitoAttrezzaturaController extends Controller
     {
         $this->authorize('create', PrestitoAttrezzatura::class);
 
-        PrestitoAttrezzatura::create($request->validated());
+        $validated = $request->validated();
+        $attrezzaturaId = (string) $validated['attrezzatura_id'];
+        $richiesta = (int) $validated['quantita'];
+
+        // Ricontrollo della disponibilità DENTRO la transazione con lock
+        // applicativo sulla riga attrezzatura: serializza i prestiti concorrenti
+        // sulla stessa attrezzatura, così che la somma dei pezzi in prestito non
+        // superi la quantità totale (la validazione del Form Request è un
+        // check-then-act non atomico aggirabile sotto concorrenza).
+        DB::transaction(function () use ($validated, $attrezzaturaId, $richiesta): void {
+            $attrezzatura = $this->lockAttrezzatura($attrezzaturaId);
+
+            if ($attrezzatura === null) {
+                return; // già coperto da exists nel Form Request
+            }
+
+            $disponibile = $attrezzatura->quantitaDisponibile();
+
+            if ($richiesta > $disponibile) {
+                throw ValidationException::withMessages([
+                    'quantita' => sprintf(
+                        'Disponibilità insufficiente: richiesti %d pezzi ma solo %d disponibili (su %d totali).',
+                        $richiesta,
+                        $disponibile,
+                        (int) $attrezzatura->quantita,
+                    ),
+                ]);
+            }
+
+            PrestitoAttrezzatura::create($validated);
+        });
 
         return redirect()
             ->route('prestiti.index')
             ->with('success', 'Prestito registrato con successo.');
+    }
+
+    /**
+     * Lock applicativo sulla riga attrezzatura (mutex per-attrezzatura). Su
+     * sqlite (test) lockForUpdate è un no-op ma la transazione serializza
+     * comunque; su MySQL (produzione) il lock chiude la race sui prestiti.
+     */
+    private function lockAttrezzatura(string $attrezzaturaId): ?Attrezzatura
+    {
+        return Attrezzatura::query()
+            ->whereKey($attrezzaturaId)
+            ->when(
+                DB::connection()->getDriverName() !== 'sqlite',
+                fn ($q) => $q->lockForUpdate()
+            )
+            ->first();
     }
 
     /**

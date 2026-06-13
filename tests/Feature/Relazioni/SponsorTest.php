@@ -184,9 +184,19 @@ class SponsorTest extends TestCase
             'associazione_id' => $this->associazione->id,
         ]);
 
-        // Senza permessi seedati, l'operatore ricade sul fallback ruolo:
-        // l'operatore È nel fallback struttura.*, quindi può vedere.
-        // Verifichiamo invece che un super_admin senza tenant venga respinto.
-        $this->actingAs($operatore)->get('/sponsor')->assertOk();
+        // Anche senza permessi seedati, il fallback delle policy struttura.*
+        // (Sponsor/ContattoEsterno) è admin-only, coerente con RolesSeeder che
+        // NON assegna struttura.* a operatore: l'operatore viene negato (#12).
+        $this->actingAs($operatore)->get('/sponsor')->assertForbidden();
+    }
+
+    public function test_operatore_non_puo_gestire_contatti_esterni_senza_permesso(): void
+    {
+        $operatore = Utente::factory()->operatore()->create([
+            'associazione_id' => $this->associazione->id,
+        ]);
+
+        // Stesso fallback admin-only per ContattoEsternoPolicy (#12).
+        $this->actingAs($operatore)->get('/contatti-esterni')->assertForbidden();
     }
 }

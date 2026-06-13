@@ -289,12 +289,16 @@ class Evento extends Model implements HasMedia
 
     /**
      * Galleria foto dell'evento (f.24): max GALLERIA_MAX_FOTO immagini su
-     * disco pubblico, mostrate sulla pagina pubblica se galleria_pubblica.
+     * disco PRIVATO (media_private), fuori da public/. I file NON sono serviti
+     * staticamente: sono raggiungibili solo via route autorizzata
+     * (GalleriaEventoController::servi / serviPubblico) che verifica l'auth
+     * admin o il flag galleria_pubblica. Disattivare/occultare la galleria
+     * rende quindi effettivamente non scaricabili le foto (privacy/GDPR).
      */
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection(self::COLLEZIONE_GALLERIA)
-            ->useDisk('public')
+            ->useDisk('media_private')
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
             ->onlyKeepLatest(self::GALLERIA_MAX_FOTO);
     }

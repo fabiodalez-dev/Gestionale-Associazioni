@@ -70,7 +70,7 @@
                     @foreach ($foto as $immagine)
                         <div class="col-6 col-md-4">
                             <div class="card h-100">
-                                <img src="{{ $immagine->hasGeneratedConversion('thumb') ? $immagine->getUrl('thumb') : $immagine->getUrl() }}"
+                                <img src="{{ route('eventi.galleria.file', ['evento' => $evento, 'media' => $immagine->id, 'conv' => $immagine->hasGeneratedConversion('thumb') ? 'thumb' : null]) }}"
                                      alt="Foto galleria" class="card-img-top" style="aspect-ratio: 4/3; object-fit: cover;">
                                 <div class="card-body p-2 text-end">
                                     <form method="POST" action="{{ route('eventi.galleria.destroy', ['evento' => $evento, 'media' => $immagine->id]) }}"

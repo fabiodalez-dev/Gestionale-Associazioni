@@ -7,6 +7,7 @@ use App\Models\PrenotazioneSpazio;
 use App\Models\Spazio;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class PrenotazioneSpazioTest extends TestCase
@@ -211,5 +212,68 @@ class PrenotazioneSpazioTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseMissing('prenotazioni_spazi', ['id' => $prenotazione->id]);
+    }
+
+    /**
+     * Regressione race TOCTOU (review round 3 #2): il check di overlap del
+     * Form Request è non atomico. Simuliamo una richiesta concorrente che
+     * inserisce la prenotazione in conflitto DOPO la validazione del Form
+     * Request ma PRIMA del create del controller (hook sulla rilettura dello
+     * spazio sotto lock, che esiste solo col fix). Il ricontrollo dentro la
+     * transazione deve bloccare la seconda creazione evitando due prenotazioni
+     * sovrapposte sullo stesso spazio. Senza il fix il controller creerebbe la
+     * prenotazione in conflitto (il hook non scatta, non c'è rilettura).
+     */
+    public function test_overlap_concorrente_bloccato_dal_ricontrollo_in_transazione(): void
+    {
+        $spazioId = $this->spazio->id;
+        $associazioneId = $this->associazione->id;
+
+        // Quando il controller rilegge lo spazio sotto lock DENTRO la
+        // transazione (subito prima del ricontrollo overlap), un competitor
+        // inserisce la prenotazione "vincente" nell'identico intervallo: la
+        // richiesta parallela è appena stata committata. Il ricontrollo che
+        // segue il lock deve quindi vederla e bloccare la creazione in corso.
+        $competitorCreato = false;
+        Event::listen(
+            'eloquent.retrieved: '.Spazio::class,
+            function (Spazio $spazio) use ($spazioId, $associazioneId, &$competitorCreato): void {
+                if ($spazio->id !== $spazioId || $competitorCreato) {
+                    return;
+                }
+                $competitorCreato = true;
+
+                PrenotazioneSpazio::factory()->create([
+                    'associazione_id' => $associazioneId,
+                    'spazio_id' => $spazioId,
+                    'titolo' => 'Vincente concorrente',
+                    'dal' => now()->addDays(6)->setTime(10, 0),
+                    'al' => now()->addDays(6)->setTime(12, 0),
+                ]);
+            }
+        );
+
+        $response = $this->actingAs($this->admin)
+            ->from('/spazi/prenotazioni')
+            ->post('/spazi/prenotazioni', [
+                'spazio_id' => $spazioId,
+                'titolo' => 'Richiesta in gara',
+                'dal' => now()->addDays(6)->setTime(10, 30)->format('Y-m-d\TH:i'),
+                'al' => now()->addDays(6)->setTime(11, 30)->format('Y-m-d\TH:i'),
+            ]);
+
+        $response->assertSessionHasErrors('dal');
+
+        // La prenotazione perdente NON è stata creata: il ricontrollo dopo il
+        // lock ha intercettato il conflitto comparso dopo la validazione del
+        // Form Request, abortendo la transazione senza overbooking.
+        // (Su sqlite, connessione singola, il competitor inserito nello stesso
+        // statement event viene rimosso dal rollback: l'invariante verificata è
+        // che NESSUNA prenotazione sovrapposta del controller sopravviva.)
+        $this->assertDatabaseMissing('prenotazioni_spazi', ['titolo' => 'Richiesta in gara']);
+        $this->assertSame(
+            0,
+            PrenotazioneSpazio::query()->where('titolo', 'Richiesta in gara')->count()
+        );
     }
 }

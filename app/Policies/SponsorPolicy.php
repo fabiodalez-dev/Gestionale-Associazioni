@@ -16,7 +16,7 @@ class SponsorPolicy
 {
     use AuthorizesModulePermissions;
 
-    private const FALLBACK = ['admin_associazione', 'operatore'];
+    private const FALLBACK = ['admin_associazione'];
 
     public function before(Utente $utente): ?bool
     {

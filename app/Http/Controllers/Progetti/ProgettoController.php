@@ -29,7 +29,12 @@ class ProgettoController extends Controller
     {
         $this->authorize('viewAny', Progetto::class);
 
-        $query = Progetto::query()->withCount(['milestones', 'eventi', 'turni']);
+        $query = Progetto::query()->withCount([
+            'milestones',
+            'milestones as milestones_completate_count' => fn ($q) => $q->whereNotNull('completata_at'),
+            'eventi',
+            'turni',
+        ]);
 
         $search = trim((string) $request->query('search', ''));
         if ($search !== '') {

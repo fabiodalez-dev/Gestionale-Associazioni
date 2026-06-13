@@ -14,17 +14,17 @@ use Illuminate\Console\Command;
  * in programma domani.
  *
  * Anti-duplicazione: un record in promemoria_inviati per (socio, turno,
- * tipo 'turno') — il turno_id è memorizzato in 'step' (intero) ricavato in
- * modo deterministico, e il controllo include la data del turno. Con
- * tessera_id NULL l'unique a DB non scatta, quindi la deduplica è
- * applicativa (whereNull('tessera_id') + tipo + step).
+ * tipo 'turno'), con il turno_id memorizzato direttamente in
+ * 'riferimento_id'. La chiave non usa più hash troncati (niente collisioni
+ * tra turni diversi). Con tessera_id NULL l'unique a DB non scatta, quindi
+ * la deduplica è applicativa (riferimento_id + tipo + socio_id).
  *
  * NON registrato nello scheduler: la pianificazione giornaliera in
  * routes/console.php è demandata alla fase Rifiniture.
  */
 class TurniPromemoria extends Command
 {
-    public const TIPO = 'turno';
+    public const TIPO = PromemoriaInviato::TIPO_TURNO;
 
     protected $signature = 'turni:promemoria';
 
@@ -43,8 +43,6 @@ class TurniPromemoria extends Command
             ->get();
 
         foreach ($turni as $turno) {
-            $step = $this->stepDaTurno($turno);
-
             foreach ($turno->assegnazioni as $assegnazione) {
                 $socio = $assegnazione->socio;
 
@@ -52,7 +50,7 @@ class TurniPromemoria extends Command
                     continue;
                 }
 
-                if ($this->giaInviato($turno, $socio->id, $step)) {
+                if ($this->giaInviato($turno, $socio->id)) {
                     continue;
                 }
 
@@ -62,8 +60,9 @@ class TurniPromemoria extends Command
                     'associazione_id' => $turno->associazione_id,
                     'socio_id' => $socio->id,
                     'tessera_id' => null,
+                    'riferimento_id' => $turno->id,
                     'tipo' => self::TIPO,
-                    'step' => $step,
+                    'step' => 0,
                     'inviato_at' => now(),
                 ]);
 
@@ -76,22 +75,13 @@ class TurniPromemoria extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * Intero deterministico (0..) derivato dall'uuid del turno, usato come
-     * 'step' per la deduplica (la colonna è unsignedInteger).
-     */
-    private function stepDaTurno(Turno $turno): int
-    {
-        return (int) (hexdec(substr(md5((string) $turno->id), 0, 7)));
-    }
-
-    private function giaInviato(Turno $turno, string $socioId, int $step): bool
+    private function giaInviato(Turno $turno, string $socioId): bool
     {
         return PromemoriaInviato::query()
             ->where('associazione_id', $turno->associazione_id)
             ->where('socio_id', $socioId)
             ->where('tipo', self::TIPO)
-            ->where('step', $step)
+            ->where('riferimento_id', $turno->id)
             ->whereNull('tessera_id')
             ->exists();
     }

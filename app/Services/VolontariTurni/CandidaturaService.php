@@ -19,6 +19,10 @@ use Illuminate\Validation\ValidationException;
  */
 class CandidaturaService
 {
+    public function __construct(
+        private readonly PostiTurnoService $posti = new PostiTurnoService,
+    ) {}
+
     /**
      * Il socio si candida a un turno aperto e compatibile.
      * Con turno.auto_conferma → confermato subito; altrimenti proposto
@@ -29,47 +33,17 @@ class CandidaturaService
      */
     public function candidati(Turno $turno, Socio $socio): TurnoAssegnazione
     {
-        if (! $turno->isAperto()) {
-            throw ValidationException::withMessages([
-                'turno' => 'Questo turno non accetta candidature.',
-            ]);
-        }
-
-        $esistente = $turno->assegnazioni()->where('socio_id', $socio->id)->first();
-
-        if ($esistente !== null && $esistente->stato !== TurnoAssegnazione::STATO_RINUNCIATO) {
-            throw ValidationException::withMessages([
-                'turno' => 'Risulti già candidato a questo turno.',
-            ]);
-        }
-
-        if ($turno->postiDisponibili() < 1) {
-            throw ValidationException::withMessages([
-                'turno' => 'Non ci sono più posti disponibili per questo turno.',
-            ]);
-        }
-
         $stato = $turno->auto_conferma
             ? TurnoAssegnazione::STATO_CONFERMATO
             : TurnoAssegnazione::STATO_PROPOSTO;
 
-        if ($esistente !== null) {
-            $esistente->update([
-                'stato' => $stato,
-                'motivo_rinuncia' => null,
-                'ore_effettive' => null,
-            ]);
-            $assegnazione = $esistente->fresh();
-        } else {
-            $assegnazione = TurnoAssegnazione::create([
-                'associazione_id' => $turno->associazione_id,
-                'turno_id' => $turno->id,
-                'socio_id' => $socio->id,
-                'stato' => $stato,
-            ]);
-        }
+        // Tutto il check-then-act (turno aperto, già candidato, posti
+        // disponibili, create/update) è serializzato sul mutex per-turno:
+        // due soci che si auto-candidano in parallelo all'ultimo posto non
+        // sovra-riempiono più il turno (vedi PostiTurnoService).
+        $assegnazione = $this->posti->occupa($turno, $socio->id, $stato, richiediApertura: true);
 
-        if ($stato === TurnoAssegnazione::STATO_PROPOSTO) {
+        if ($assegnazione->stato === TurnoAssegnazione::STATO_PROPOSTO) {
             $this->avvisaAdmin($assegnazione, new CandidaturaTurnoNotification($assegnazione));
         }
 

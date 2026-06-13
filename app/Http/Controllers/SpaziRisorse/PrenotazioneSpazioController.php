@@ -11,6 +11,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -90,17 +92,30 @@ class PrenotazioneSpazioController extends Controller
     {
         $this->authorize('create', PrenotazioneSpazio::class);
 
-        PrenotazioneSpazio::create([
-            'spazio_id' => $request->validated('spazio_id'),
-            'titolo' => $request->validated('titolo'),
-            'dal' => $request->validated('dal'),
-            'al' => $request->validated('al'),
-            'note' => $request->validated('note'),
-            'richiedente_id' => $request->user()?->id,
-        ]);
+        $spazioId = (string) $request->validated('spazio_id');
+        $dal = $request->date('dal');
+        $al = $request->date('al');
+
+        // Ricontrollo dell'overlap DENTRO la transazione con lock applicativo
+        // sulla riga spazio: serializza le richieste concorrenti per lo stesso
+        // spazio così che due prenotazioni sovrapposte non passino entrambe
+        // (la validazione del Form Request è solo un check-then-act non atomico).
+        DB::transaction(function () use ($request, $spazioId, $dal, $al): void {
+            $this->lockSpazio($spazioId);
+            $this->assertNessunConflitto($spazioId, $dal, $al);
+
+            PrenotazioneSpazio::create([
+                'spazio_id' => $spazioId,
+                'titolo' => $request->validated('titolo'),
+                'dal' => $dal,
+                'al' => $al,
+                'note' => $request->validated('note'),
+                'richiedente_id' => $request->user()?->id,
+            ]);
+        });
 
         return redirect()
-            ->route('spazi.prenotazioni.index', ['spazio' => $request->input('spazio_id')])
+            ->route('spazi.prenotazioni.index', ['spazio' => $spazioId])
             ->with('success', 'Prenotazione registrata con successo.');
     }
 
@@ -108,11 +123,75 @@ class PrenotazioneSpazioController extends Controller
     {
         $this->authorize('update', $prenotazione);
 
-        $prenotazione->update($request->validated());
+        $validated = $request->validated();
+        $spazioId = (string) $validated['spazio_id'];
+        $dal = $request->date('dal');
+        $al = $request->date('al');
+
+        // Stesso ricontrollo atomico dello store, escludendo la prenotazione
+        // corrente dal confronto (un edit non va in conflitto con sé stessa).
+        DB::transaction(function () use ($prenotazione, $validated, $spazioId, $dal, $al): void {
+            $this->lockSpazio($spazioId);
+            $this->assertNessunConflitto($spazioId, $dal, $al, $prenotazione->id);
+
+            $prenotazione->update($validated);
+        });
 
         return redirect()
             ->route('spazi.prenotazioni.index', ['spazio' => $prenotazione->spazio_id])
             ->with('success', 'Prenotazione aggiornata con successo.');
+    }
+
+    /**
+     * Lock applicativo sulla riga spazio (mutex per-spazio). Su sqlite (test)
+     * lockForUpdate è un no-op, ma la transazione serializza comunque le
+     * scritture; su MySQL (produzione) il lock impedisce la race di overlap.
+     */
+    private function lockSpazio(string $spazioId): void
+    {
+        // Su sqlite (test) lockForUpdate è un no-op: la riga viene comunque
+        // riletta come punto di sincronizzazione esplicito della transazione.
+        Spazio::query()
+            ->whereKey($spazioId)
+            ->when(
+                DB::connection()->getDriverName() !== 'sqlite',
+                fn ($q) => $q->lockForUpdate()
+            )
+            ->first();
+    }
+
+    /**
+     * Rilancia l'errore di conflitto overlap (stesso messaggio del Form
+     * Request) se un'altra prenotazione si sovrappone all'intervallo: usato
+     * DENTRO la transazione, dopo il lock, come barriera anti-race.
+     *
+     * @throws ValidationException
+     */
+    private function assertNessunConflitto(
+        string $spazioId,
+        ?Carbon $dal,
+        ?Carbon $al,
+        ?string $ignoraId = null
+    ): void {
+        if ($dal === null || $al === null) {
+            return;
+        }
+
+        $conflitto = PrenotazioneSpazio::query()
+            ->inConflittoCon($spazioId, $dal, $al, $ignoraId)
+            ->orderBy('dal')
+            ->first();
+
+        if ($conflitto !== null) {
+            throw ValidationException::withMessages([
+                'dal' => sprintf(
+                    'Lo spazio è già prenotato per "%s" dal %s al %s. Scegli un altro orario.',
+                    $conflitto->titolo,
+                    $conflitto->dal->format('d/m/Y H:i'),
+                    $conflitto->al->format('d/m/Y H:i'),
+                ),
+            ]);
+        }
     }
 
     public function destroy(PrenotazioneSpazio $prenotazione): RedirectResponse

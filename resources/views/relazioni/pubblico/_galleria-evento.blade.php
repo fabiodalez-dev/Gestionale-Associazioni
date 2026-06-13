@@ -6,8 +6,8 @@
         <div class="row g-2">
             @foreach ($galleriaPubblica as $foto)
                 <div class="col-6 col-md-4 col-lg-3">
-                    <a href="{{ $foto->getUrl() }}" target="_blank" rel="noopener" class="d-block">
-                        <img src="{{ $foto->hasGeneratedConversion('thumb') ? $foto->getUrl('thumb') : $foto->getUrl() }}"
+                    <a href="{{ route('pubblico.eventi.galleria.file', ['associazione' => $associazione, 'evento' => $evento, 'media' => $foto->id]) }}" target="_blank" rel="noopener" class="d-block">
+                        <img src="{{ route('pubblico.eventi.galleria.file', ['associazione' => $associazione, 'evento' => $evento, 'media' => $foto->id, 'conv' => $foto->hasGeneratedConversion('thumb') ? 'thumb' : null]) }}"
                              alt="Foto evento" class="img-fluid rounded shadow-sm w-100"
                              style="aspect-ratio: 4/3; object-fit: cover;" loading="lazy">
                     </a>

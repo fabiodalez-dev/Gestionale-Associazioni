@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Progetto dell'associazione (f.12 del piano "Organizzazione 3"): periodo,
  * responsabile, stato e budget; aggrega movimenti di prima nota (f.13),
  * eventi e turni collegati (f.14) e milestone (f.16) per il report PDF (f.15).
+ *
+ * @property-read int<0, max>|null $milestones_completate_count alias withCount() (vedi ProgettoController)
  */
 class Progetto extends Model
 {
@@ -68,9 +70,27 @@ class Progetto extends Model
 
     /**
      * Percentuale di milestone completate (barra avanzamento, f.16).
+     *
+     * Usa i contatori già caricati via withCount() (`milestones_count` e
+     * `milestones_completate_count`) per evitare N+1 nelle liste; ricade su una
+     * query solo quando i contatori non sono stati eager-loaded.
      */
     public function percentualeAvanzamento(): int
     {
+        if (array_key_exists('milestones_count', $this->getAttributes())) {
+            $totale = (int) $this->milestones_count;
+
+            if ($totale === 0) {
+                return 0;
+            }
+
+            $completate = array_key_exists('milestones_completate_count', $this->getAttributes())
+                ? (int) $this->milestones_completate_count
+                : $this->milestones()->whereNotNull('completata_at')->count();
+
+            return (int) round($completate / $totale * 100);
+        }
+
         $totale = $this->milestones()->count();
 
         if ($totale === 0) {

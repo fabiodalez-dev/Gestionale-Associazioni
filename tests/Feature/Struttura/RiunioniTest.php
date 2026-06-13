@@ -178,6 +178,44 @@ class RiunioniTest extends TestCase
         $this->assertSame(1, $riunione->partecipanti()->count());
     }
 
+    public function test_convocazione_non_inviata_a_socio_soft_deleted(): void
+    {
+        Notification::fake();
+
+        // Socio con carica attiva ma anagrafica cancellata (soft delete):
+        // il cascade DB non scatta sul soft delete, la carica resta attiva,
+        // ma il socio NON deve ricevere la convocazione (#10).
+        $exMembro = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'email' => 'ex@example.test',
+        ]);
+        Carica::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $exMembro->id,
+            'ruolo' => 'Tesoriere',
+        ]);
+        $exMembro->delete();
+
+        $attivo = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'email' => 'attivo@example.test',
+        ]);
+        Carica::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $attivo->id,
+            'ruolo' => 'Presidente',
+        ]);
+
+        $riunione = Riunione::factory()->create(['associazione_id' => $this->associazione->id]);
+
+        $this->actAsAdmin()
+            ->post(route('riunioni.convoca', $riunione))
+            ->assertRedirect(route('riunioni.show', $riunione));
+
+        Notification::assertSentTo($attivo, ConvocazioneRiunioneNotification::class);
+        Notification::assertNotSentTo($exMembro, ConvocazioneRiunioneNotification::class);
+    }
+
     public function test_aggiorna_presenza_partecipante(): void
     {
         $riunione = Riunione::factory()->create(['associazione_id' => $this->associazione->id]);

@@ -47,6 +47,20 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Disco PRIVATO per i media non serviti staticamente (es. galleria
+         * foto eventi, f.24): i file vivono fuori da public/ e sono raggiungibili
+         * SOLO via route autorizzata che verifica galleria_pubblica (pubblico)
+         * o l'auth admin (gestione). Nessun symlink in public/, nessun URL diretto.
+         */
+        'media_private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/media-private'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

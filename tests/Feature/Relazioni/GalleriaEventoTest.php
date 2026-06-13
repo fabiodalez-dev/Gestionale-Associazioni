@@ -29,7 +29,9 @@ class GalleriaEventoTest extends TestCase
     {
         parent::setUp();
 
-        Storage::fake('public');
+        // La galleria vive su disco PRIVATO (media_private): i file non sono
+        // serviti staticamente ma solo via route autorizzata.
+        Storage::fake('media_private');
 
         $this->associazione = Associazione::factory()->create([
             'frontend_pubblico_attivo' => true,
@@ -155,6 +157,146 @@ class GalleriaEventoTest extends TestCase
         // media appartiene ad altroEvento, non a $this->evento → 404
         $this->actingAs($this->admin)
             ->delete('/eventi/'.$this->evento->id.'/galleria/'.$mediaAltrui->id)
+            ->assertNotFound();
+    }
+
+    /**
+     * Findings #5/#11 — la galleria vive su disco PRIVATO: nessun symlink in
+     * public/, nessun URL diretto. Le foto sono raggiungibili solo via route
+     * autorizzata.
+     */
+    public function test_le_foto_galleria_usano_il_disco_privato(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('privata.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+        $this->assertNotNull($media);
+        $this->assertSame('media_private', $media->disk);
+
+        // Il file fisico è sul disco privato, NON sul disco public.
+        Storage::disk('media_private')->assertExists($media->getPathRelativeToRoot());
+    }
+
+    /**
+     * Finding #5 — il file NON è scaricabile dal pubblico quando
+     * galleria_pubblica = false (revoca effettiva, privacy/GDPR).
+     */
+    public function test_foto_non_scaricabile_dal_pubblico_se_galleria_privata(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('segreta.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        $this->assertFalse($this->evento->fresh()->galleria_pubblica);
+
+        $this->get('/a/'.$this->associazione->slug.'/eventi/'.$this->evento->id
+            .'/galleria/'.$media->id.'/file')
+            ->assertNotFound();
+    }
+
+    /**
+     * Finding #11 — disattivare galleria_pubblica revoca davvero l'accesso:
+     * lo stesso URL che funzionava torna 404.
+     */
+    public function test_revoca_visibilita_rende_la_foto_non_scaricabile(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('andata.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        $this->evento->update(['galleria_pubblica' => true]);
+        $url = '/a/'.$this->associazione->slug.'/eventi/'.$this->evento->id
+            .'/galleria/'.$media->id.'/file';
+
+        // Pubblica → scaricabile
+        $this->get($url)->assertOk();
+
+        // Revoca → 404
+        $this->evento->update(['galleria_pubblica' => false]);
+        $this->get($url)->assertNotFound();
+    }
+
+    public function test_foto_scaricabile_dal_pubblico_se_galleria_pubblica(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('vista.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        $this->evento->update(['galleria_pubblica' => true]);
+
+        $response = $this->get('/a/'.$this->associazione->slug.'/eventi/'.$this->evento->id
+            .'/galleria/'.$media->id.'/file');
+
+        $response->assertOk();
+        $this->assertSame($media->mime_type, $response->headers->get('Content-Type'));
+    }
+
+    public function test_serve_pubblico_404_se_evento_non_pubblicato(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('bozza.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        $this->evento->update([
+            'galleria_pubblica' => true,
+            'stato_pubblicazione' => Evento::STATO_BOZZA,
+        ]);
+
+        $this->get('/a/'.$this->associazione->slug.'/eventi/'.$this->evento->id
+            .'/galleria/'.$media->id.'/file')
+            ->assertNotFound();
+    }
+
+    public function test_admin_puo_scaricare_la_foto_dal_tab_gestione(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('admin.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        // anche con galleria privata, l'admin (eventi.view) accede via tab gestione
+        $this->actingAs($this->admin)
+            ->get('/eventi/'.$this->evento->id.'/galleria/'.$media->id.'/file')
+            ->assertOk();
+    }
+
+    public function test_serve_admin_richiede_autenticazione(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('noauth.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        // guest sulla rotta admin → redirect al login (non 200)
+        $response = $this->get('/eventi/'.$this->evento->id.'/galleria/'.$media->id.'/file');
+        $this->assertTrue(in_array($response->getStatusCode(), [302, 401, 403], true));
+    }
+
+    public function test_serve_thumb_ritorna_200_quando_la_conversione_esiste(): void
+    {
+        $this->evento->addMedia(UploadedFile::fake()->image('conv.jpg', 800, 600))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        if (! $media->hasGeneratedConversion('thumb')) {
+            $this->markTestSkipped('GD non ha generato la conversione thumb in questo ambiente.');
+        }
+
+        $this->actingAs($this->admin)
+            ->get('/eventi/'.$this->evento->id.'/galleria/'.$media->id.'/file?conv=thumb')
+            ->assertOk();
+    }
+
+    public function test_serve_admin_404_per_media_di_altro_evento(): void
+    {
+        $altroEvento = Evento::factory()->create([
+            'associazione_id' => $this->associazione->id,
+        ]);
+        $altroEvento->addMedia(UploadedFile::fake()->image('altrui.jpg'))
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+        $mediaAltrui = $altroEvento->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+
+        $this->actingAs($this->admin)
+            ->get('/eventi/'.$this->evento->id.'/galleria/'.$mediaAltrui->id.'/file')
             ->assertNotFound();
     }
 }

@@ -8,6 +8,7 @@ use App\Models\PrestitoAttrezzatura;
 use App\Models\Socio;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class PrestitoAttrezzaturaTest extends TestCase
@@ -167,6 +168,78 @@ class PrestitoAttrezzaturaTest extends TestCase
             ->assertRedirect(route('prestiti.index'));
 
         $this->assertDatabaseMissing('prestiti_attrezzature', ['id' => $prestito->id]);
+    }
+
+    /**
+     * Regressione race TOCTOU (review round 3 #3): la validazione della
+     * disponibilità nel Form Request è non atomica.
+     *
+     * Iniettiamo un prestito concorrente che consuma i pezzi residui DOPO la
+     * validazione del Form Request ma PRIMA del persist del controller (hook
+     * one-shot sulla rilettura dell'attrezzatura). Il hook è indipendente dal
+     * fix: senza il ricontrollo in transazione il controller creerebbe comunque
+     * i 4 pezzi richiesti (overbooking, 7/5 in prestito); col fix la disponibilità
+     * viene ricalcolata e il secondo prestito è bloccato.
+     */
+    public function test_disponibilita_concorrente_bloccata_dal_ricontrollo_in_transazione(): void
+    {
+        // 5 pezzi totali, nessuno in prestito → la validazione iniziale vede 5 liberi
+        $attrezzaturaId = $this->attrezzatura->id;
+        $associazioneId = $this->associazione->id;
+        $socioId = $this->socio->id;
+
+        // La PRIMA rilettura è la validazione disponibilità del Form Request
+        // (vede 5 liberi → passa). Il competitor viene iniettato alla SECONDA
+        // rilettura, cioè quando il controller rilegge l'attrezzatura sotto lock
+        // dentro la transazione: senza il fix questa seconda lettura non esiste
+        // e il prestito da 4 verrebbe creato (overbooking 7/5).
+        $letture = 0;
+        Event::listen(
+            'eloquent.retrieved: '.Attrezzatura::class,
+            function (Attrezzatura $att) use ($attrezzaturaId, $associazioneId, $socioId, &$letture): void {
+                if ($att->id !== $attrezzaturaId) {
+                    return;
+                }
+                $letture++;
+                if ($letture !== 2) {
+                    return;
+                }
+
+                // Prestito parallelo: prende 3 dei 5 pezzi.
+                PrestitoAttrezzatura::factory()->create([
+                    'associazione_id' => $associazioneId,
+                    'attrezzatura_id' => $attrezzaturaId,
+                    'socio_id' => $socioId,
+                    'quantita' => 3,
+                ]);
+            }
+        );
+
+        // Richiesti 4: validazione iniziale ok (5 liberi), ma il competitor ne
+        // prende 3 → disponibili 2 < 4 al ricontrollo in transazione.
+        $response = $this->actingAs($this->admin)
+            ->from('/prestiti')
+            ->post('/prestiti', [
+                'attrezzatura_id' => $attrezzaturaId,
+                'socio_id' => $socioId,
+                'quantita' => 4,
+                'dal' => now()->toDateString(),
+                'restituzione_prevista' => now()->addWeek()->toDateString(),
+            ]);
+
+        $response->assertSessionHasErrors('quantita');
+
+        // Il prestito da 4 pezzi NON è stato creato: il ricontrollo sotto lock
+        // ha intercettato la disponibilità ridotta dal competitor, abortendo la
+        // transazione (su sqlite, connessione singola, anche il competitor
+        // inserito nella stessa transazione viene rimosso dal rollback). Senza il
+        // fix il prestito da 4 verrebbe creato → overbooking 7/5.
+        $this->assertDatabaseMissing('prestiti_attrezzature', ['quantita' => 4]);
+        $this->assertLessThanOrEqual(
+            (int) $this->attrezzatura->fresh()->quantita,
+            $this->attrezzatura->fresh()->quantitaInPrestito(),
+            'I pezzi in prestito non devono mai superare la quantità totale.'
+        );
     }
 
     public function test_storico_prestiti_nella_scheda_socio(): void

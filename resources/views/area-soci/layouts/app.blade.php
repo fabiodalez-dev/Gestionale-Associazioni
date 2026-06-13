@@ -87,6 +87,14 @@
                                 </a>
                             </li>
                         @endif
+                        @if (Route::has('area-soci.volontariato'))
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('area-soci.volontariato*') ? 'active' : '' }}" href="{{ route('area-soci.volontariato') }}">
+                                    <i class="bi bi-person-raised-hand me-2"></i>
+                                    Volontariato
+                                </a>
+                            </li>
+                        @endif
                     </ul>
 
                     <hr>

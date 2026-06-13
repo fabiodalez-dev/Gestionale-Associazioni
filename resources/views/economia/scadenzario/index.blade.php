@@ -85,4 +85,9 @@
         </tbody>
     </table>
 </div>
+
+{{-- Adempimenti ricorrenti (f.20 — piano "Organizzazione 3"): checklist per
+     anno dentro lo Scadenzario esistente. La sezione è autonoma e si carica
+     solo se il modulo riunioni-decisioni è presente. --}}
+@includeIf('struttura.adempimenti._scadenzario_section')
 @endsection

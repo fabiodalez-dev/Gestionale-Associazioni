@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Eventi\EventoRequest;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Services\SpaziRisorse\ConflittoSpazioEvento;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -68,11 +69,12 @@ class EventoController extends Controller
     {
         $this->authorize('create', Evento::class);
 
-        Evento::create($request->validated());
+        $evento = Evento::create($request->validated());
 
-        return redirect()
-            ->route('eventi.index')
-            ->with('success', 'Evento creato con successo.');
+        return $this->conConflittiSpazio(
+            redirect()->route('eventi.index')->with('success', 'Evento creato con successo.'),
+            $evento
+        );
     }
 
     public function update(EventoRequest $request, Evento $evento): RedirectResponse
@@ -81,9 +83,31 @@ class EventoController extends Controller
 
         $evento->update($request->validated());
 
-        return redirect()
-            ->route('eventi.index')
-            ->with('success', 'Evento aggiornato con successo.');
+        return $this->conConflittiSpazio(
+            redirect()->route('eventi.index')->with('success', 'Evento aggiornato con successo.'),
+            $evento->refresh()
+        );
+    }
+
+    /**
+     * f.11 piano "Organizzazione 3": se l'evento ha uno spazio assegnato e
+     * questo è in conflitto con prenotazioni interne o altri eventi nello
+     * stesso orario, allega un WARNING NON bloccante al redirect (l'evento è
+     * già stato salvato). Senza spazio o senza conflitti, redirect invariato.
+     */
+    private function conConflittiSpazio(RedirectResponse $redirect, Evento $evento): RedirectResponse
+    {
+        $conflitti = app(ConflittoSpazioEvento::class)->perEvento($evento);
+
+        if ($conflitti === []) {
+            return $redirect;
+        }
+
+        return $redirect->with(
+            'warning',
+            'Attenzione: lo spazio scelto risulta già occupato. Conflitti: '
+            .implode('; ', $conflitti).'.'
+        );
     }
 
     /**

@@ -3,18 +3,34 @@
 namespace App\Console\Commands;
 
 use App\Models\Account;
+use App\Models\Adempimento;
 use App\Models\Annuncio;
 use App\Models\Associazione;
+use App\Models\Attrezzatura;
+use App\Models\Carica;
+use App\Models\ContattoEsterno;
 use App\Models\Documento;
 use App\Models\Evento;
 use App\Models\FeedbackEvento;
+use App\Models\Mansione;
+use App\Models\Movimento;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Prenotazione;
+use App\Models\PrenotazioneSpazio;
+use App\Models\PrestitoAttrezzatura;
+use App\Models\Progetto;
 use App\Models\Quota;
 use App\Models\RichiestaIscrizione;
+use App\Models\Riunione;
+use App\Models\RiunionePartecipante;
 use App\Models\Socio;
+use App\Models\Spazio;
+use App\Models\Sponsor;
 use App\Models\Tessera;
+use App\Models\Turno;
+use App\Models\TurnoAssegnazione;
 use App\Models\Utente;
+use App\Models\VotazioneRiunione;
 use App\Services\Economia\PrimaNotaService;
 use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
 use App\Services\Prenotazioni\BigliettoService;
@@ -43,7 +59,12 @@ class E2eFixtureCommand extends Command
         {--aperte=} {--modalita=} {--intro=} {--config=}
         {--genera-tessera=0} {--motivo=}
         {--solo-soci=0} {--socio=} {--quota=} {--codice-fiscale=} {--data-nascita=} {--quota-scadenza=}
-        {--categoria=}';
+        {--categoria=}
+        {--turno=} {--auto-conferma=0} {--posti=} {--mansione=} {--spazio=}
+        {--quantita=} {--tutto-in-prestito=0}
+        {--progetto=} {--importo=} {--tipo=} {--budget=}
+        {--riunione=} {--svolta=0} {--con-carica=0}
+        {--tag=} {--anno=} {--mese=} {--livello=} {--visibile=1}';
 
     protected $description = 'Fixture deterministiche per i test E2E (richiede E2E_FIXTURES=1)';
 
@@ -81,6 +102,23 @@ class E2eFixtureCommand extends Command
             'stato-socio' => $this->statoSocio(),
             'crea-documento-pubblico' => $this->creaDocumentoPubblico(),
             'crea-convocazione' => $this->creaConvocazione(),
+            // ---- Organizzazione 3 (round 3) ----
+            'crea-mansione' => $this->creaMansione(),
+            'crea-turno' => $this->creaTurno(),
+            'stato-turno' => $this->statoTurno(),
+            'marca-volontario' => $this->marcaVolontario(),
+            'crea-spazio' => $this->creaSpazio(),
+            'crea-prenotazione-spazio' => $this->creaPrenotazioneSpazio(),
+            'crea-attrezzatura' => $this->creaAttrezzatura(),
+            'crea-progetto' => $this->creaProgetto(),
+            'crea-movimento-progetto' => $this->creaMovimentoProgetto(),
+            'crea-riunione' => $this->creaRiunione(),
+            'stato-riunione' => $this->statoRiunione(),
+            'seed-adempimenti' => $this->seedAdempimenti(),
+            'crea-contatto-esterno' => $this->creaContattoEsterno(),
+            'crea-sponsor' => $this->creaSponsor(),
+            'referral-socio' => $this->referralSocio(),
+            'crea-evento-galleria' => $this->creaEventoGalleria(),
             default => ['error' => 'azione sconosciuta'],
         };
 
@@ -555,6 +593,7 @@ class E2eFixtureCommand extends Command
             'socio_stato' => $socio?->stato,
             'numero_socio' => $socio?->numero_socio,
             'account_socio_id' => $account->fresh()?->socio_id,
+            'referral_codice' => $richiesta->referral_codice,
         ];
     }
 
@@ -808,6 +847,522 @@ class E2eFixtureCommand extends Command
             'titolo' => $annuncio->titolo,
             'evento_id' => $evento->id,
             'evento_titolo' => $evento->titolo,
+        ];
+    }
+
+    /* =====================================================================
+     | Organizzazione 3 (round 3) — fixture per i moduli A–E
+     ===================================================================== */
+
+    /** Crea una mansione del tenant e2e. @return array<string, mixed> */
+    private function creaMansione(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $mansione = Mansione::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'nome' => (string) ($this->option('titolo') ?: 'Mansione E2E '.now()->timestamp),
+            'descrizione' => 'Mansione generata dalla suite E2E.',
+        ]);
+
+        return ['mansione_id' => $mansione->id, 'nome' => $mansione->nome];
+    }
+
+    /**
+     * Crea un turno aperto futuro del tenant e2e (f.3). Opzioni:
+     * --titolo, --posti (default 2), --auto-conferma=1, --mansione=ID,
+     * --spazio=ID, --progetto=ID.
+     *
+     * @return array<string, mixed>
+     */
+    private function creaTurno(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $turno = Turno::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'titolo' => (string) ($this->option('titolo') ?: 'Turno E2E '.now()->timestamp),
+            'data' => now()->addDays(5)->toDateString(),
+            'ora_inizio' => '09:00',
+            'ora_fine' => '12:00',
+            'posti' => $this->option('posti') !== null ? (int) $this->option('posti') : 2,
+            'mansione_id' => $this->option('mansione') ?: null,
+            'spazio_id' => $this->option('spazio') ?: null,
+            'progetto_id' => $this->option('progetto') ?: null,
+            'note' => 'Turno generato dalla suite E2E.',
+            'stato' => Turno::STATO_APERTO,
+            'auto_conferma' => (bool) $this->option('auto-conferma'),
+        ]);
+
+        return ['turno_id' => $turno->id, 'titolo' => $turno->titolo];
+    }
+
+    /**
+     * Stato delle assegnazioni del turno --turno (assertion E2E su
+     * candidatura/conferma e ore registrate).
+     *
+     * @return array<string, mixed>
+     */
+    private function statoTurno(): array
+    {
+        $turno = Turno::withoutGlobalScopes()->find((string) $this->option('turno'));
+        if ($turno === null) {
+            return ['error' => 'turno non trovato'];
+        }
+
+        $assegnazioni = TurnoAssegnazione::withoutGlobalScopes()
+            ->where('turno_id', $turno->id)
+            ->with(['socio' => fn ($q) => $q->withoutGlobalScopes()])
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (TurnoAssegnazione $a) => [
+                'socio_email' => $a->socio?->email,
+                'stato' => $a->stato,
+                'ore_effettive' => $a->ore_effettive,
+                'motivo_rinuncia' => $a->motivo_rinuncia,
+            ])
+            ->all();
+
+        return [
+            'turno_id' => $turno->id,
+            'stato' => $turno->stato,
+            'assegnazioni' => $assegnazioni,
+        ];
+    }
+
+    /**
+     * Marca il socio --email come volontario attivo con disponibilità piena
+     * (così compare tra i suggeriti, f.1/f.3).
+     *
+     * @return array<string, mixed>
+     */
+    private function marcaVolontario(): array
+    {
+        $socio = Socio::withoutGlobalScopes()
+            ->where('email', (string) $this->option('email'))
+            ->first();
+        if ($socio === null) {
+            return ['error' => 'socio non trovato'];
+        }
+
+        $socio->forceFill([
+            'volontario_attivo' => true,
+            'disponibilita' => [
+                'lun' => ['mattina', 'pomeriggio', 'sera'],
+                'mar' => ['mattina', 'pomeriggio', 'sera'],
+                'mer' => ['mattina', 'pomeriggio', 'sera'],
+                'gio' => ['mattina', 'pomeriggio', 'sera'],
+                'ven' => ['mattina', 'pomeriggio', 'sera'],
+                'sab' => ['mattina', 'pomeriggio', 'sera'],
+                'dom' => ['mattina', 'pomeriggio', 'sera'],
+            ],
+        ])->save();
+
+        if ($this->option('mansione')) {
+            $socio->mansioni()->syncWithoutDetaching([(string) $this->option('mansione')]);
+        }
+
+        return ['ok' => true, 'socio_id' => $socio->id];
+    }
+
+    /** Crea uno spazio attivo del tenant e2e (f.7). @return array<string, mixed> */
+    private function creaSpazio(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $spazio = Spazio::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'nome' => (string) ($this->option('titolo') ?: 'Sala E2E '.now()->timestamp),
+            'descrizione' => 'Spazio generato dalla suite E2E.',
+            'capienza' => 30,
+            'attivo' => true,
+        ]);
+
+        return ['spazio_id' => $spazio->id, 'nome' => $spazio->nome];
+    }
+
+    /**
+     * Crea una prenotazione esistente sullo spazio --spazio in un orario
+     * noto (per testare il conflitto di overlap, f.8). Ritorna l'orario.
+     *
+     * @return array<string, mixed>
+     */
+    private function creaPrenotazioneSpazio(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+        $spazio = Spazio::withoutGlobalScopes()->find((string) $this->option('spazio'));
+        if ($spazio === null) {
+            return ['error' => 'spazio non trovato'];
+        }
+
+        // Slot fisso: domani 10:00–12:00 (locale app), così il test può
+        // tentare un overlap 11:00–13:00.
+        $dal = now()->addDay()->setTime(10, 0);
+        $al = now()->addDay()->setTime(12, 0);
+
+        $prenotazione = PrenotazioneSpazio::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'spazio_id' => $spazio->id,
+            'titolo' => (string) ($this->option('titolo') ?: 'Prova Coro'),
+            'dal' => $dal,
+            'al' => $al,
+            'note' => 'Prenotazione esistente generata dalla suite E2E.',
+        ]);
+
+        return [
+            'prenotazione_id' => $prenotazione->id,
+            'titolo' => $prenotazione->titolo,
+            'dal' => $dal->format('Y-m-d\TH:i'),
+            'al' => $al->format('Y-m-d\TH:i'),
+            // Overlap suggerito per il test (11:00–13:00 dello stesso giorno)
+            'overlap_dal' => now()->addDay()->setTime(11, 0)->format('Y-m-d\TH:i'),
+            'overlap_al' => now()->addDay()->setTime(13, 0)->format('Y-m-d\TH:i'),
+        ];
+    }
+
+    /**
+     * Crea un'attrezzatura in inventario (f.9). Con --tutto-in-prestito=1
+     * registra un prestito attivo che esaurisce la disponibilità (f.10):
+     * il form prestiti la mostrerà come 0 disponibili. Serve un --socio.
+     *
+     * @return array<string, mixed>
+     */
+    private function creaAttrezzatura(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+        $quantita = $this->option('quantita') !== null ? (int) $this->option('quantita') : 2;
+
+        $attrezzatura = Attrezzatura::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'nome' => (string) ($this->option('titolo') ?: 'Proiettore E2E '.now()->timestamp),
+            'descrizione' => 'Attrezzatura generata dalla suite E2E.',
+            'quantita' => $quantita,
+            'stato' => Attrezzatura::STATO_BUONO,
+        ]);
+
+        if ($this->option('tutto-in-prestito')) {
+            $socio = Socio::withoutGlobalScopes()->find((string) $this->option('socio'));
+            if ($socio === null) {
+                return ['error' => 'serve --socio per --tutto-in-prestito'];
+            }
+
+            PrestitoAttrezzatura::withoutGlobalScopes()->create([
+                'associazione_id' => $associazione->id,
+                'attrezzatura_id' => $attrezzatura->id,
+                'socio_id' => $socio->id,
+                'quantita' => $quantita,
+                'dal' => now()->toDateString(),
+                'restituzione_prevista' => now()->addWeek()->toDateString(),
+                'note' => 'Prestito che esaurisce la disponibilità (E2E).',
+            ]);
+        }
+
+        return [
+            'attrezzatura_id' => $attrezzatura->id,
+            'nome' => $attrezzatura->nome,
+            'disponibile' => $attrezzatura->fresh()->quantitaDisponibile(),
+        ];
+    }
+
+    /**
+     * Crea un progetto del tenant e2e (f.12). Con --budget imposta il budget.
+     *
+     * @return array<string, mixed>
+     */
+    private function creaProgetto(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+        $admin = Utente::where('email', 'admin-e2e@example.com')->firstOrFail();
+
+        $progetto = Progetto::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'nome' => (string) ($this->option('titolo') ?: 'Progetto E2E '.now()->timestamp),
+            'descrizione' => 'Progetto generato dalla suite E2E.',
+            'dal' => now()->startOfYear()->toDateString(),
+            'al' => now()->endOfYear()->toDateString(),
+            'responsabile_id' => $admin->id,
+            'stato' => Progetto::STATO_ATTIVO,
+            'budget' => $this->option('budget') !== null ? (float) $this->option('budget') : null,
+        ]);
+
+        return ['progetto_id' => $progetto->id, 'nome' => $progetto->nome];
+    }
+
+    /**
+     * Aggiunge un movimento di prima nota imputato al progetto --progetto
+     * (f.13). --tipo=entrata|uscita (default entrata), --importo (default 100).
+     *
+     * @return array<string, mixed>
+     */
+    private function creaMovimentoProgetto(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+        $progetto = Progetto::withoutGlobalScopes()->find((string) $this->option('progetto'));
+        if ($progetto === null) {
+            return ['error' => 'progetto non trovato'];
+        }
+
+        $tipo = in_array($this->option('tipo'), [Movimento::TIPO_ENTRATA, Movimento::TIPO_USCITA], true)
+            ? (string) $this->option('tipo')
+            : Movimento::TIPO_ENTRATA;
+
+        $movimento = Movimento::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'tipo' => $tipo,
+            'importo' => $this->option('importo') !== null ? (float) $this->option('importo') : 100.0,
+            'data' => now()->toDateString(),
+            'progetto_id' => $progetto->id,
+            'descrizione' => (string) ($this->option('titolo') ?: 'Contributo progetto E2E'),
+            'metodo' => 'Contanti',
+        ]);
+
+        return ['movimento_id' => $movimento->id, 'progetto_id' => $progetto->id, 'tipo' => $tipo];
+    }
+
+    /**
+     * Crea una riunione del direttivo (f.17-18). Con --svolta=1 lo stato è
+     * "svolta" (abilita votazioni e bozza verbale) e, con un partecipante
+     * confermato, la generazione del verbale include i presenti. Con
+     * --con-carica=1 crea un socio con carica attiva (per testare la
+     * convocazione che genera partecipanti dagli intestatari delle cariche).
+     *
+     * @return array<string, mixed>
+     */
+    private function creaRiunione(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+        $svolta = (bool) $this->option('svolta');
+
+        $riunione = Riunione::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'titolo' => (string) ($this->option('titolo') ?: 'Direttivo E2E '.now()->timestamp),
+            'data_ora' => $svolta ? now()->subDay()->setTime(21, 0) : now()->addDays(7)->setTime(21, 0),
+            'luogo' => 'Sede E2E',
+            'odg' => [
+                ['punto' => 'Approvazione bilancio', 'descrizione' => 'Voto sul bilancio annuale.'],
+                ['punto' => 'Varie ed eventuali', 'descrizione' => ''],
+            ],
+            'stato' => $svolta ? Riunione::STATO_SVOLTA : Riunione::STATO_PIANIFICATA,
+        ]);
+
+        $caricaSocioId = null;
+        if ($this->option('con-carica') || $svolta) {
+            $socio = Socio::withoutGlobalScopes()->create([
+                'associazione_id' => $associazione->id,
+                'numero_socio' => app(NumeroProgressivoService::class)->prossimoNumeroSocio($associazione->id),
+                'nome' => 'Presidente',
+                'cognome' => 'E2E',
+                'email' => 'presidente-'.now()->timestamp.'@example.com',
+                'data_iscrizione' => now()->toDateString(),
+                'stato' => Socio::STATO_ATTIVO,
+                'privacy_consenso' => true,
+            ]);
+            $caricaSocioId = $socio->id;
+
+            Carica::withoutGlobalScopes()->create([
+                'associazione_id' => $associazione->id,
+                'socio_id' => $socio->id,
+                'ruolo' => Carica::RUOLI[0],
+                'inizio' => now()->subMonth()->toDateString(),
+                'fine' => null,
+            ]);
+
+            if ($svolta) {
+                // Partecipante confermato → presente nel verbale generato
+                RiunionePartecipante::withoutGlobalScopes()->create([
+                    'associazione_id' => $associazione->id,
+                    'riunione_id' => $riunione->id,
+                    'socio_id' => $socio->id,
+                    'carica_ruolo' => Carica::RUOLI[0],
+                    'stato' => RiunionePartecipante::STATO_CONFERMATO,
+                ]);
+            }
+        }
+
+        return [
+            'riunione_id' => $riunione->id,
+            'titolo' => $riunione->titolo,
+            'stato' => $riunione->stato,
+            'carica_socio_id' => $caricaSocioId,
+        ];
+    }
+
+    /**
+     * Stato della riunione --riunione: presenza/assenza di verbale e
+     * conteggio votazioni (assertion E2E su bozza verbale, f.18).
+     *
+     * @return array<string, mixed>
+     */
+    private function statoRiunione(): array
+    {
+        $riunione = Riunione::withoutGlobalScopes()
+            ->with('verbale')
+            ->find((string) $this->option('riunione'));
+        if ($riunione === null) {
+            return ['error' => 'riunione non trovata'];
+        }
+
+        $votazioni = VotazioneRiunione::withoutGlobalScopes()
+            ->where('riunione_id', $riunione->id)
+            ->count();
+
+        return [
+            'riunione_id' => $riunione->id,
+            'stato' => $riunione->stato,
+            'verbale_id' => $riunione->verbale_id,
+            'verbale_numero' => $riunione->verbale?->numero_completo,
+            'votazioni' => $votazioni,
+            'partecipanti' => RiunionePartecipante::withoutGlobalScopes()->where('riunione_id', $riunione->id)->count(),
+        ];
+    }
+
+    /**
+     * Crea un adempimento ricorrente attivo del tenant e2e (f.20).
+     * --mese (1-12, default mese corrente).
+     *
+     * @return array<string, mixed>
+     */
+    private function seedAdempimenti(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $adempimento = Adempimento::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'titolo' => (string) ($this->option('titolo') ?: 'Assicurazione volontari E2E '.now()->timestamp),
+            'descrizione' => 'Adempimento generato dalla suite E2E.',
+            'mese_scadenza' => $this->option('mese') !== null ? (int) $this->option('mese') : (int) now()->format('n'),
+            'attivo' => true,
+        ]);
+
+        return ['adempimento_id' => $adempimento->id, 'titolo' => $adempimento->titolo];
+    }
+
+    /**
+     * Crea un contatto esterno (mini-CRM, f.21). --tipo (default fornitore),
+     * --tag (CSV, opzionale).
+     *
+     * @return array<string, mixed>
+     */
+    private function creaContattoEsterno(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $tipo = in_array($this->option('tipo'), ContattoEsterno::TIPI, true)
+            ? (string) $this->option('tipo')
+            : ContattoEsterno::TIPO_FORNITORE;
+
+        $tag = null;
+        if (is_string($this->option('tag')) && $this->option('tag') !== '') {
+            $tag = array_values(array_filter(array_map('trim', explode(',', (string) $this->option('tag')))));
+        }
+
+        $contatto = ContattoEsterno::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'tipo' => $tipo,
+            'nome' => (string) ($this->option('titolo') ?: 'Contatto E2E '.now()->timestamp),
+            'referente' => 'Mario Rossi',
+            'email' => 'contatto-'.now()->timestamp.'@example.com',
+            'telefono' => '0123456789',
+            'note' => 'Contatto generato dalla suite E2E.',
+            'tag' => $tag,
+        ]);
+
+        return ['contatto_id' => $contatto->id, 'nome' => $contatto->nome, 'tipo' => $tipo];
+    }
+
+    /**
+     * Crea uno sponsor visibile sul sito e nel periodo (f.22), così da
+     * comparire in "I nostri sostenitori" sulla home pubblica.
+     * --livello (default oro), --visibile (default 1).
+     *
+     * @return array<string, mixed>
+     */
+    private function creaSponsor(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $livello = in_array($this->option('livello'), Sponsor::LIVELLI, true)
+            ? (string) $this->option('livello')
+            : Sponsor::LIVELLO_ORO;
+
+        $sponsor = Sponsor::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'nome' => (string) ($this->option('titolo') ?: 'Sponsor E2E '.now()->timestamp),
+            'livello' => $livello,
+            'dal' => now()->subMonth()->toDateString(),
+            'al' => now()->addMonth()->toDateString(),
+            'visibile_sul_sito' => $this->option('visibile') === null || (bool) (int) $this->option('visibile'),
+            'sito_url' => 'https://example.com',
+        ]);
+
+        return ['sponsor_id' => $sponsor->id, 'nome' => $sponsor->nome, 'livello' => $livello];
+    }
+
+    /**
+     * Restituisce il codice referral del socio --socio (f.23), per
+     * costruire il link /a/{slug}/iscriviti?ref=CODICE.
+     *
+     * @return array<string, mixed>
+     */
+    private function referralSocio(): array
+    {
+        $socio = Socio::withoutGlobalScopes()->find((string) $this->option('socio'));
+        if ($socio === null) {
+            return ['error' => 'socio non trovato'];
+        }
+
+        return [
+            'socio_id' => $socio->id,
+            'codice_referral' => $socio->codice_referral,
+        ];
+    }
+
+    /**
+     * Crea un evento (passato) con galleria pubblica attiva e una foto
+     * caricata via medialibrary (f.24): la pagina pubblica dell'evento
+     * mostrerà la griglia "Galleria foto".
+     *
+     * @return array<string, mixed>
+     */
+    private function creaEventoGalleria(): array
+    {
+        $associazione = Associazione::where('slug', 'e2e')->firstOrFail();
+
+        $evento = Evento::withoutGlobalScopes()->create([
+            'associazione_id' => $associazione->id,
+            'titolo' => (string) ($this->option('titolo') ?: 'Festa E2E '.now()->timestamp),
+            'descrizione' => 'Evento con galleria generato dalla suite E2E.',
+            'data_evento' => now()->subDays(10)->setTime(21, 0),
+            'luogo' => 'Sala E2E',
+            'stato_pubblicazione' => 'pubblicato',
+            'iscrizioni_aperte' => false,
+            'galleria_pubblica' => true,
+        ]);
+
+        // PNG reale 600x400 generato con GD: dimensioni sufficienti perché la
+        // conversione 'thumb' (width 400, non-queued) vada a buon fine.
+        $tmp = tempnam(sys_get_temp_dir(), 'e2e_galleria').'.png';
+        if (function_exists('imagecreatetruecolor')) {
+            $img = imagecreatetruecolor(600, 400);
+            $colore = imagecolorallocate($img, 255, 123, 17); // brand orange
+            imagefilledrectangle($img, 0, 0, 600, 400, $colore);
+            imagepng($img, $tmp);
+            imagedestroy($img);
+        } else {
+            // Fallback: PNG 1x1 (la vista pubblica ripiega sull'originale)
+            file_put_contents($tmp, base64_decode(
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+            ));
+        }
+
+        $evento->addMedia($tmp)
+            ->usingFileName('foto-e2e-'.now()->timestamp.'.png')
+            ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+
+        return [
+            'evento_id' => $evento->id,
+            'titolo' => $evento->titolo,
+            'foto' => $evento->getMedia(Evento::COLLEZIONE_GALLERIA)->count(),
         ];
     }
 

@@ -71,6 +71,19 @@
             @endforeach
         </select>
     </div>
+    @if (isset($progetti) && $progetti->isNotEmpty())
+        <div class="col-auto">
+            <label for="filtroProgetto" class="form-label mb-0 small text-muted">Progetto</label>
+            <select name="progetto_id" id="filtroProgetto" class="form-select">
+                <option value="">Tutti</option>
+                @foreach ($progetti as $progetto)
+                    <option value="{{ $progetto->id }}" @selected(($filtri['progetto_id'] ?? null) === $progetto->id)>
+                        {{ $progetto->nome }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+    @endif
     <div class="col-auto align-self-end">
         <button type="submit" class="btn btn-outline-primary"><i class="bi bi-funnel me-1"></i>Filtra</button>
         <a href="{{ route('prima-nota.index') }}" class="btn btn-outline-secondary">Azzera</a>
@@ -101,6 +114,9 @@
                         @if ($movimento->origine_id !== null)
                             <span class="badge bg-secondary ms-1" title="Generato automaticamente dal pagamento">auto</span>
                         @endif
+                        @if ($movimento->progetto)
+                            <span class="badge bg-info-subtle text-info-emphasis ms-1" title="Progetto"><i class="bi bi-kanban"></i> {{ $movimento->progetto->nome }}</span>
+                        @endif
                     </td>
                     <td>{{ $movimento->metodo ?: '—' }}</td>
                     <td class="text-end text-success">
@@ -123,7 +139,8 @@
                                         data-data="{{ $movimento->data?->format('Y-m-d') }}"
                                         data-categoria="{{ $movimento->categoria_id }}"
                                         data-descrizione="{{ $movimento->descrizione }}"
-                                        data-metodo="{{ $movimento->metodo }}">
+                                        data-metodo="{{ $movimento->metodo }}"
+                                        data-progetto="{{ $movimento->progetto_id }}">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                             @endcan
@@ -205,6 +222,17 @@
                     <input type="text" name="metodo" id="campoMetodo" class="form-control" maxlength="50"
                            placeholder="contanti, bonifico, POS, ..." value="{{ old('metodo') }}">
                 </div>
+                @if (isset($progetti) && $progetti->isNotEmpty())
+                    <div class="mb-3">
+                        <label for="campoProgetto" class="form-label">Progetto</label>
+                        <select name="progetto_id" id="campoProgetto" class="form-select">
+                            <option value="">— Nessuno —</option>
+                            @foreach ($progetti as $progetto)
+                                <option value="{{ $progetto->id }}" @selected(old('progetto_id') === $progetto->id)>{{ $progetto->nome }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
@@ -270,6 +298,8 @@
             document.getElementById('campoData').value = btn.dataset.data || '';
             document.getElementById('campoDescrizione').value = btn.dataset.descrizione || '';
             document.getElementById('campoMetodo').value = btn.dataset.metodo || '';
+            var campoProgetto = document.getElementById('campoProgetto');
+            if (campoProgetto) campoProgetto.value = btn.dataset.progetto || '';
             if (modal) modal.show();
         });
     });

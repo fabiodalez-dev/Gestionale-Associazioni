@@ -40,6 +40,12 @@ class SalvaMovimentoRequest extends FormRequest
             ],
             'descrizione' => ['nullable', 'string', 'max:500'],
             'metodo' => ['nullable', 'string', 'max:50'],
+            // f.13 piano "Organizzazione 3": imputazione opzionale a un progetto del tenant
+            'progetto_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('progetti', 'id')->where('associazione_id', $tenantId),
+            ],
         ];
     }
 

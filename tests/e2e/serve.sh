@@ -19,4 +19,7 @@ export DEBUGBAR_ENABLED=false
 export TELESCOPE_ENABLED=false
 
 php artisan config:clear --quiet || true
+# Symlink public/storage → storage/app/public: serve le immagini caricate via
+# medialibrary (es. galleria foto eventi, f.24) dal disco 'public'.
+php artisan storage:link --quiet || true
 exec php artisan serve --host=127.0.0.1 --port=8011

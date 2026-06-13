@@ -181,4 +181,7 @@
             </div>
         </div>
     </div>
+
+    {{-- Galleria foto pubblica dell'evento (f.24 piano "Organizzazione 3" — modulo relazioni) --}}
+    @includeIf('relazioni.pubblico._galleria-evento')
 @endsection

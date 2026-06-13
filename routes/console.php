@@ -199,3 +199,31 @@ Schedule::command('compleanni:auguri')
 Schedule::command('cestino:svuota')
     ->weeklyOn(1, '05:00')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Organizzazione 3 — volontari/turni, spazi/risorse, riunioni/adempimenti
+|--------------------------------------------------------------------------
+|
+| turni:promemoria (f.6): il giorno prima del turno invia l'email ai
+| volontari confermati, con tracking in promemoria_inviati tipo 'turno'.
+| Run giornaliero alle 17:00 (i turni si pianificano il giorno per il
+| successivo: invio una volta sola per turno grazie al dedup).
+| prestiti:promemoria (f.10): promemoria di ritardo per i prestiti
+| attrezzature non restituiti oltre la restituzione_prevista; run alle
+| 09:00. adempimenti:promemoria (f.20): promemoria mensile degli
+| adempimenti ricorrenti in scadenza nel mese; gira il primo giorno del
+| mese alle 08:00 (il comando usa di default il mese corrente).
+|
+*/
+Schedule::command('turni:promemoria')
+    ->dailyAt('17:00')
+    ->withoutOverlapping();
+
+Schedule::command('prestiti:promemoria')
+    ->dailyAt('09:00')
+    ->withoutOverlapping();
+
+Schedule::command('adempimenti:promemoria')
+    ->monthlyOn(1, '08:00')
+    ->withoutOverlapping();

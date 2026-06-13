@@ -186,6 +186,7 @@ export type StatoRichiesta = {
     socio_stato: string | null;
     numero_socio: string | null;
     account_socio_id: string | null;
+    referral_codice: string | null;
 };
 
 /** Ultima richiesta di iscrizione dell'account (via fixture). */

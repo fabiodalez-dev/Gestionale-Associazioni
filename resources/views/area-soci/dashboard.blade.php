@@ -96,5 +96,8 @@
                 </div>
             </div>
         </div>
+
+        {{-- Porta un amico (f.23 piano "Organizzazione 3" — modulo relazioni) --}}
+        @includeIf('relazioni.area-soci._referral-card', ['socio' => $socio])
     </div>
 @endsection

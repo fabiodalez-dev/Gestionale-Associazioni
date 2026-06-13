@@ -49,6 +49,7 @@ class RichiestaIscrizione extends Model
         'gestita_at',
         'delibera_numero',
         'delibera_data',
+        'referral_codice',
     ];
 
     protected function casts(): array
@@ -83,6 +84,17 @@ class RichiestaIscrizione extends Model
      *
      * @return BelongsTo<Utente, $this>
      */
+    /**
+     * Socio "ambasciatore" che ha invitato il richiedente con il proprio
+     * codice referral (f.23 — piano "Organizzazione 3").
+     *
+     * @return BelongsTo<Socio, $this>
+     */
+    public function socioReferente(): BelongsTo
+    {
+        return $this->belongsTo(Socio::class, 'referral_codice', 'codice_referral');
+    }
+
     public function gestore(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'gestita_da');

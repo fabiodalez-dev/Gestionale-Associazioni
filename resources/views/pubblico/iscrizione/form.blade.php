@@ -42,6 +42,8 @@
                     <form method="POST" action="{{ route('pubblico.iscriviti.store', $associazione->slug) }}" novalidate>
                         @csrf
                         <x-honeypot />
+                        {{-- Referral "porta un amico" (f.23 piano "Organizzazione 3" — modulo relazioni) --}}
+                        @includeIf('relazioni._referral-hidden')
 
                         <div class="row g-3">
                             {{-- Ospite senza account: anagrafica dal form --}}

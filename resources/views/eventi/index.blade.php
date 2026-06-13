@@ -118,6 +118,11 @@
                                                 <i class="bi bi-cash-stack"></i>
                                             </a>
                                         @endif
+                                        @if (Route::has('eventi.galleria.index'))
+                                            <a href="{{ route('eventi.galleria.index', $evento) }}" class="btn btn-outline-primary" title="Galleria foto (f.24)">
+                                                <i class="bi bi-images"></i>
+                                            </a>
+                                        @endif
                                         @if (Route::has('eventi.ics'))
                                             <a href="{{ route('eventi.ics', $evento) }}" class="btn btn-outline-secondary" title="Esporta .ics">
                                                 <i class="bi bi-calendar-plus"></i>
@@ -213,6 +218,22 @@
                                value="{{ old('luogo', $editEvento?->luogo) }}" maxlength="255">
                         @error('luogo')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
+                    {{-- f.11 piano "Organizzazione 3": spazio dell'evento (opzionale).
+                         Conflitti con prenotazioni/altri eventi = warning NON bloccante al salvataggio. --}}
+                    @php $spaziDisponibili = \App\Models\Spazio::query()->attivi()->orderBy('nome')->get(); @endphp
+                    @if ($spaziDisponibili->isNotEmpty())
+                        <div class="mb-3">
+                            <label for="spazio_id" class="form-label">Spazio</label>
+                            <select class="form-select @error('spazio_id') is-invalid @enderror" id="spazio_id" name="spazio_id">
+                                <option value="">— Nessuno —</option>
+                                @foreach ($spaziDisponibili as $sp)
+                                    <option value="{{ $sp->id }}" @selected(old('spazio_id', $editEvento?->spazio_id) === $sp->id)>{{ $sp->nome }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Se occupato nello stesso orario, riceverai un avviso (non bloccante).</div>
+                            @error('spazio_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    @endif
                     <div class="mb-3">
                         <label for="descrizione" class="form-label">Descrizione</label>
                         <textarea class="form-control @error('descrizione') is-invalid @enderror" id="descrizione"
@@ -351,6 +372,23 @@
                                value="{{ old('immagine_url', $editEvento?->immagine_url) }}" maxlength="2048">
                         @error('immagine_url')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
+                    {{-- f.14 piano "Organizzazione 3": progetto collegato all'evento (opzionale).
+                         Lista risolta inline (global scope sul tenant) per non accoppiarsi al controller. --}}
+                    @php($progettiEvento = $progetti ?? \App\Models\Progetto::query()->orderBy('nome')->get(['id', 'nome']))
+                    @if ($progettiEvento->isNotEmpty())
+                        <div class="mb-2">
+                            <label for="progetto_id" class="form-label">Progetto</label>
+                            <select class="form-select @error('progetto_id') is-invalid @enderror" id="progetto_id" name="progetto_id">
+                                <option value="">— Nessuno —</option>
+                                @foreach ($progettiEvento as $progettoOpt)
+                                    <option value="{{ $progettoOpt->id }}" @selected(old('progetto_id', $editEvento?->progetto_id) === $progettoOpt->id)>
+                                        {{ $progettoOpt->nome }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('progetto_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>

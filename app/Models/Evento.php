@@ -8,16 +8,21 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Evento extends Model
+class Evento extends Model implements HasMedia
 {
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use InteractsWithMedia;
     use SoftDeletes;
 
     public const STATO_BOZZA = 'bozza';
@@ -32,6 +37,12 @@ class Evento extends Model
         self::STATO_ARCHIVIATO,
     ];
 
+    /** Galleria foto dell'evento (f.24 — piano "Organizzazione 3"). */
+    public const COLLEZIONE_GALLERIA = 'galleria';
+
+    /** Numero massimo di foto nella galleria (f.24). */
+    public const GALLERIA_MAX_FOTO = 20;
+
     protected $table = 'eventi';
 
     /**
@@ -44,6 +55,7 @@ class Evento extends Model
         'iscrizioni_aperte' => true,
         'richiede_approvazione' => false,
         'solo_soci' => false,
+        'galleria_pubblica' => false,
     ];
 
     protected $fillable = [
@@ -67,6 +79,9 @@ class Evento extends Model
         'immagine_url',
         'serie_id',
         'solo_soci',
+        'spazio_id',
+        'progetto_id',
+        'galleria_pubblica',
     ];
 
     protected function casts(): array
@@ -85,6 +100,7 @@ class Evento extends Model
             'lista_attesa_attiva' => 'boolean',
             'annullamento_entro_ore' => 'integer',
             'solo_soci' => 'boolean',
+            'galleria_pubblica' => 'boolean',
         ];
     }
 
@@ -239,5 +255,55 @@ class Evento extends Model
     public function spese(): HasMany
     {
         return $this->hasMany(SpesaEvento::class, 'evento_id');
+    }
+
+    /**
+     * Spazio in cui si svolge l'evento (f.11 — piano "Organizzazione 3").
+     *
+     * @return BelongsTo<Spazio, $this>
+     */
+    public function spazio(): BelongsTo
+    {
+        return $this->belongsTo(Spazio::class, 'spazio_id');
+    }
+
+    /**
+     * Progetto a cui l'evento contribuisce (f.14 — piano "Organizzazione 3").
+     *
+     * @return BelongsTo<Progetto, $this>
+     */
+    public function progetto(): BelongsTo
+    {
+        return $this->belongsTo(Progetto::class, 'progetto_id');
+    }
+
+    /**
+     * Turni di volontariato collegati all'evento (f.3 — piano "Organizzazione 3").
+     *
+     * @return HasMany<Turno, $this>
+     */
+    public function turni(): HasMany
+    {
+        return $this->hasMany(Turno::class, 'evento_id');
+    }
+
+    /**
+     * Galleria foto dell'evento (f.24): max GALLERIA_MAX_FOTO immagini su
+     * disco pubblico, mostrate sulla pagina pubblica se galleria_pubblica.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::COLLEZIONE_GALLERIA)
+            ->useDisk('public')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->onlyKeepLatest(self::GALLERIA_MAX_FOTO);
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->performOnCollections(self::COLLEZIONE_GALLERIA)
+            ->nonQueued()
+            ->width(400);
     }
 }

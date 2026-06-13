@@ -41,6 +41,7 @@ class Movimento extends Model
         'importo',
         'data',
         'categoria_id',
+        'progetto_id',
         'descrizione',
         'metodo',
         'origine_type',
@@ -102,6 +103,16 @@ class Movimento extends Model
     public function categoria(): BelongsTo
     {
         return $this->belongsTo(CategoriaMovimento::class, 'categoria_id');
+    }
+
+    /**
+     * Progetto a cui il movimento è imputato (f.13 — piano "Organizzazione 3").
+     *
+     * @return BelongsTo<Progetto, $this>
+     */
+    public function progetto(): BelongsTo
+    {
+        return $this->belongsTo(Progetto::class, 'progetto_id');
     }
 
     /**

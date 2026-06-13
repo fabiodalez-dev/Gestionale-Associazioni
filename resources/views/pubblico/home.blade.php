@@ -39,6 +39,9 @@
     {{-- Novità in bacheca (f.7 piano Gestione 2 — modulo comunicazione) --}}
     @includeIf('comunicazione.pubblico._novita-home')
 
+    {{-- I nostri sostenitori (f.22 piano "Organizzazione 3" — modulo relazioni) --}}
+    @includeIf('relazioni.pubblico._sostenitori-home')
+
     {{-- Prossimi eventi --}}
     <section>
         <div class="d-flex justify-content-between align-items-center mb-3">

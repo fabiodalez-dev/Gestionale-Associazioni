@@ -4,6 +4,8 @@ namespace App\Http\Requests\Eventi;
 
 use App\Models\Evento;
 use App\Models\Prenotazione;
+use App\Models\Progetto;
+use App\Models\Spazio;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -90,6 +92,24 @@ class EventoRequest extends FormRequest
             'annullamento_entro_ore' => ['required', 'integer', 'min:0', 'max:65535'],
             'solo_soci' => ['required', 'boolean'],
             'immagine_url' => ['nullable', 'string', 'url:http,https', 'max:2048'],
+            // f.11 piano "Organizzazione 3": spazio dell'evento (opzionale).
+            // exists scopato sul tenant (Spazio ha il global scope). Il conflitto
+            // con prenotazioni/altri eventi è solo un warning NON bloccante,
+            // calcolato nel controller dopo il salvataggio.
+            'spazio_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists((new Spazio)->getTable(), 'id')
+                    ->where('associazione_id', Evento::currentAssociazioneId()),
+            ],
+            // f.14 piano "Organizzazione 3": progetto a cui l'evento contribuisce
+            // (opzionale). exists scopato sul tenant (Progetto ha il global scope).
+            'progetto_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists((new Progetto)->getTable(), 'id')
+                    ->where('associazione_id', Evento::currentAssociazioneId()),
+            ],
         ];
     }
 

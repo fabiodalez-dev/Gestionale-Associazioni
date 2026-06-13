@@ -31,6 +31,8 @@
                 @if ($documentiInScadenza->isNotEmpty())
                     <span class="badge bg-warning text-dark" title="Documenti in scadenza"><i class="bi bi-hourglass-split me-1"></i>{{ $documentiInScadenza->count() }} in scadenza</span>
                 @endif
+                {{-- Contatore "porta un amico" (f.23 piano "Organizzazione 3" — modulo relazioni) --}}
+                @includeIf('relazioni.soci._referral-badge', ['socio' => $socio])
             </p>
             <div>
                 @foreach ($socio->tags as $tag)
@@ -52,6 +54,14 @@
         // Tab Note interne (f.3 piano "Gestione 2" — modulo operativita)
         if (\Illuminate\Support\Facades\Route::has('soci.note.store')) {
             $tabs['note'] = 'Note';
+        }
+        // Tab Volontariato (f.1/f.2/f.5 piano "Organizzazione 3" — modulo volontari-turni)
+        if (\Illuminate\Support\Facades\Route::has('volontari.profilo.update')) {
+            $tabs['volontariato'] = 'Volontariato';
+        }
+        // Tab Prestiti attrezzature (f.10 piano "Organizzazione 3" — modulo spazi-risorse)
+        if (\Illuminate\Support\Facades\Route::has('prestiti.index')) {
+            $tabs['prestiti'] = 'Prestiti';
         }
         $tabs['storico'] = 'Storico';
     @endphp
@@ -243,6 +253,20 @@
         @if (\Illuminate\Support\Facades\Route::has('soci.note.store'))
             <div class="tab-pane fade {{ $tab === 'note' ? 'show active' : '' }}" id="tab-note" role="tabpanel">
                 @includeIf('operativita._tab-note', ['socio' => $socio])
+            </div>
+        @endif
+
+        {{-- Tab Prestiti attrezzature (f.10 piano "Organizzazione 3" — modulo spazi-risorse) --}}
+        @if (\Illuminate\Support\Facades\Route::has('prestiti.index'))
+            <div class="tab-pane fade {{ $tab === 'prestiti' ? 'show active' : '' }}" id="tab-prestiti" role="tabpanel">
+                @includeIf('spazi-risorse.partials.prestiti-socio', ['socio' => $socio])
+            </div>
+        @endif
+
+        {{-- Tab Volontariato (f.1/f.2/f.5 piano "Organizzazione 3" — modulo volontari-turni) --}}
+        @if (\Illuminate\Support\Facades\Route::has('volontari.profilo.update'))
+            <div class="tab-pane fade {{ $tab === 'volontariato' ? 'show active' : '' }}" id="tab-volontariato" role="tabpanel">
+                @includeIf('volontari-turni.partials._tab-volontariato', ['socio' => $socio])
             </div>
         @endif
 

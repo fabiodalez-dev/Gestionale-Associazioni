@@ -3,30 +3,45 @@
 namespace Database\Seeders;
 
 use App\Models\Account;
+use App\Models\Adempimento;
 use App\Models\Annuncio;
 use App\Models\Associazione;
 use App\Models\AttivitaAdmin;
+use App\Models\Attrezzatura;
 use App\Models\CampoPersonalizzato;
 use App\Models\Carica;
 use App\Models\CategoriaMovimento;
 use App\Models\CategoriaSocio;
 use App\Models\Cessazione;
+use App\Models\ContattoEsterno;
 use App\Models\Donazione;
 use App\Models\Evento;
+use App\Models\Mansione;
+use App\Models\MilestoneProgetto;
 use App\Models\Movimento;
 use App\Models\Nucleo;
 use App\Models\Prenotazione;
+use App\Models\PrenotazioneSpazio;
+use App\Models\PrestitoAttrezzatura;
+use App\Models\Progetto;
 use App\Models\Quota;
 use App\Models\Ricevuta;
 use App\Models\RichiestaIscrizione;
+use App\Models\Riunione;
+use App\Models\RiunionePartecipante;
 use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Sondaggio;
+use App\Models\Spazio;
+use App\Models\Sponsor;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\Tessera;
 use App\Models\TipoSocio;
+use App\Models\Turno;
+use App\Models\TurnoAssegnazione;
 use App\Models\ValoreCampoPersonalizzato;
 use App\Models\Verbale;
+use App\Models\VotazioneRiunione;
 use App\Services\Economia\PrimaNotaService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -541,6 +556,224 @@ class DemoSeeder extends Seeder
             'notabile_type' => $eventoGratuito->getMorphClass(),
             'notabile_id' => $eventoGratuito->id,
             'stato' => AttivitaAdmin::STATO_APERTA,
+        ]);
+
+        /*
+        |------------------------------------------------------------------
+        | Organizzazione 3 (PIANO-ORGANIZZAZIONE-3) — dati dimostrativi
+        |------------------------------------------------------------------
+        */
+
+        // f.2 Mansione/competenza del tenant, assegnata ad Anna Verdi (pivot
+        // socio_mansioni): alimenta i suggerimenti volontari per i turni e il
+        // filtro "per mansione" nel libro soci
+        $mansione = Mansione::create([
+            'associazione_id' => $associazione->id,
+            'nome' => 'Accoglienza',
+            'descrizione' => 'Reception ospiti, gestione iscrizioni in loco e info point.',
+        ]);
+
+        $sociModels[0]->mansioni()->attach($mansione->id);
+
+        // f.7 Spazio interno prenotabile (sala riunioni in sede)
+        $spazio = Spazio::create([
+            'associazione_id' => $associazione->id,
+            'nome' => 'Sala Riunioni',
+            'descrizione' => 'Sala polivalente al primo piano della sede.',
+            'capienza' => 25,
+            'sede_id' => $sede->id,
+            'attivo' => true,
+        ]);
+
+        // f.8 Prenotazione interna dello spazio (domani 10:00–12:00): la vista
+        // calendario settimanale la mostra e il rilevatore di conflitti la usa
+        // come riferimento per gli overlap
+        PrenotazioneSpazio::create([
+            'associazione_id' => $associazione->id,
+            'spazio_id' => $spazio->id,
+            'titolo' => 'Prova del coro',
+            'dal' => now()->addDay()->setTime(10, 0),
+            'al' => now()->addDay()->setTime(12, 0),
+            'note' => 'Prenotazione dimostrativa della sala riunioni.',
+        ]);
+
+        // f.3 Turno di volontariato (domani mattina) con mansione e spazio
+        // collegati; f.4-5 Anna Verdi assegnata e confermata (compare nei
+        // confermati per il promemoria turni:promemoria)
+        $turno = Turno::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Accoglienza assemblea',
+            'data' => now()->addDay()->toDateString(),
+            'ora_inizio' => '09:00',
+            'ora_fine' => '13:00',
+            'posti' => 3,
+            'mansione_id' => $mansione->id,
+            'evento_id' => $eventoGratuito->id,
+            'spazio_id' => $spazio->id,
+            'note' => 'Accoglienza soci e ospiti all\'ingresso.',
+            'stato' => Turno::STATO_APERTO,
+            'auto_conferma' => false,
+        ]);
+
+        TurnoAssegnazione::create([
+            'associazione_id' => $associazione->id,
+            'turno_id' => $turno->id,
+            'socio_id' => $sociModels[0]->id,
+            'stato' => TurnoAssegnazione::STATO_CONFERMATO,
+        ]);
+
+        // f.9 Attrezzatura in inventario (proiettore) e f.10 un prestito attivo
+        // a Luca Bianchi non ancora restituito: riduce la disponibilità e
+        // alimenta lo storico prestiti nella scheda socio
+        $attrezzatura = Attrezzatura::create([
+            'associazione_id' => $associazione->id,
+            'nome' => 'Proiettore Full HD',
+            'descrizione' => 'Videoproiettore con telecomando e cavo HDMI.',
+            'quantita' => 2,
+            'valore_unitario' => 320.00,
+            'stato' => Attrezzatura::STATO_BUONO,
+            'spazio_id' => $spazio->id,
+        ]);
+
+        PrestitoAttrezzatura::create([
+            'associazione_id' => $associazione->id,
+            'attrezzatura_id' => $attrezzatura->id,
+            'socio_id' => $sociModels[1]->id,
+            'quantita' => 1,
+            'dal' => now()->subDays(3)->toDateString(),
+            'restituzione_prevista' => now()->addWeek()->toDateString(),
+            'restituito_at' => null,
+            'note' => 'Prestito per proiezione serata informativa.',
+        ]);
+
+        // f.12 Progetto attivo con budget (responsabile assente: il seeder non
+        // crea utenti amministratori), f.16 milestone (una completata, una in
+        // scadenza) e f.13 un movimento di prima nota imputato al progetto
+        $progetto = Progetto::create([
+            'associazione_id' => $associazione->id,
+            'nome' => 'Festa di quartiere '.$anno,
+            'descrizione' => 'Organizzazione della festa annuale aperta alla cittadinanza.',
+            'dal' => now()->startOfYear()->toDateString(),
+            'al' => now()->endOfYear()->toDateString(),
+            'responsabile_id' => null,
+            'stato' => Progetto::STATO_ATTIVO,
+            'budget' => 3000.00,
+        ]);
+
+        MilestoneProgetto::create([
+            'associazione_id' => $associazione->id,
+            'progetto_id' => $progetto->id,
+            'titolo' => 'Richiesta autorizzazioni al Comune',
+            'scadenza' => now()->subMonth()->toDateString(),
+            'completata_at' => now()->subWeeks(3),
+            'ordine' => 1,
+        ]);
+
+        MilestoneProgetto::create([
+            'associazione_id' => $associazione->id,
+            'progetto_id' => $progetto->id,
+            'titolo' => 'Allestimento e logistica',
+            'scadenza' => now()->addMonth()->toDateString(),
+            'completata_at' => null,
+            'ordine' => 2,
+        ]);
+
+        Movimento::create([
+            'associazione_id' => $associazione->id,
+            'tipo' => Movimento::TIPO_USCITA,
+            'importo' => 250.00,
+            'data' => now()->subDays(5)->toDateString(),
+            'categoria_id' => $primaNota->categoria(
+                $associazione->id,
+                'Utenze e affitti',
+                CategoriaMovimento::TIPO_USCITA
+            )?->id,
+            'progetto_id' => $progetto->id,
+            'descrizione' => 'Noleggio service audio per la festa di quartiere',
+            'metodo' => 'bonifico',
+        ]);
+
+        // f.17 Riunione del direttivo già SVOLTA (abilita votazioni e bozza
+        // verbale), con OdG strutturato; un partecipante confermato (Anna
+        // Verdi, intestataria di carica) e f.18 una votazione approvata sul
+        // primo punto dell'OdG (confluisce nell'Archivio decisioni, f.19)
+        $riunione = Riunione::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Consiglio Direttivo di programmazione',
+            'data_ora' => now()->subDays(2)->setTime(21, 0),
+            'luogo' => 'Sede Centrale',
+            'spazio_id' => $spazio->id,
+            'odg' => [
+                ['punto' => 'Approvazione calendario eventi', 'descrizione' => 'Voto sul programma della stagione.'],
+                ['punto' => 'Varie ed eventuali', 'descrizione' => ''],
+            ],
+            'stato' => Riunione::STATO_SVOLTA,
+        ]);
+
+        RiunionePartecipante::create([
+            'associazione_id' => $associazione->id,
+            'riunione_id' => $riunione->id,
+            'socio_id' => $sociModels[0]->id,
+            'carica_ruolo' => 'Presidente',
+            'stato' => RiunionePartecipante::STATO_CONFERMATO,
+        ]);
+
+        VotazioneRiunione::create([
+            'associazione_id' => $associazione->id,
+            'riunione_id' => $riunione->id,
+            'punto_indice' => 0,
+            'esito' => VotazioneRiunione::ESITO_APPROVATO,
+            'favorevoli' => 5,
+            'contrari' => 0,
+            'astenuti' => 1,
+            'note' => 'Calendario eventi approvato a larga maggioranza.',
+        ]);
+
+        // f.20 Adempimenti ricorrenti del tenant: due voci con mese di scadenza
+        // diverso, alimentano la nuova sezione dello Scadenzario e il
+        // promemoria mensile adempimenti:promemoria
+        Adempimento::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Rinnovo assicurazione volontari',
+            'descrizione' => 'Rinnovo della polizza infortuni e RC per i volontari.',
+            'mese_scadenza' => 1,
+            'attivo' => true,
+        ]);
+
+        Adempimento::create([
+            'associazione_id' => $associazione->id,
+            'titolo' => 'Approvazione bilancio annuale',
+            'descrizione' => 'Predisposizione e approvazione del bilancio consuntivo in assemblea.',
+            'mese_scadenza' => 4,
+            'attivo' => true,
+        ]);
+
+        // f.21 Contatto esterno (mini-CRM): un fornitore con tag e referente,
+        // ricercabile e filtrabile per tipo nella pagina Contatti
+        $contattoSponsor = ContattoEsterno::create([
+            'associazione_id' => $associazione->id,
+            'tipo' => ContattoEsterno::TIPO_SPONSOR,
+            'nome' => 'Caffè del Borgo S.r.l.',
+            'referente' => 'Marco Bianchi',
+            'email' => 'marco@caffedelborgo.test',
+            'telefono' => '0212345678',
+            'note' => 'Sponsor storico della festa di quartiere.',
+            'tag' => ['ristorazione', 'sponsor-locale'],
+        ]);
+
+        // f.22 Sponsor visibile sul mini-sito (livello oro, periodo in corso):
+        // compare nella sezione "I nostri sostenitori" della home pubblica,
+        // collegato al contatto esterno qui sopra
+        Sponsor::create([
+            'associazione_id' => $associazione->id,
+            'contatto_esterno_id' => $contattoSponsor->id,
+            'nome' => 'Caffè del Borgo',
+            'logo_url' => null,
+            'livello' => Sponsor::LIVELLO_ORO,
+            'dal' => now()->startOfYear()->toDateString(),
+            'al' => now()->endOfYear()->toDateString(),
+            'visibile_sul_sito' => true,
+            'sito_url' => 'https://caffedelborgo.test',
         ]);
     }
 }

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
 
 /**
@@ -82,6 +83,9 @@ class Socio extends Authenticatable
         'tutore_nome',
         'tutore_telefono',
         'tutore_email',
+        'disponibilita',
+        'volontario_attivo',
+        'codice_referral',
         'password_hash',
     ];
 
@@ -106,10 +110,37 @@ class Socio extends Authenticatable
             'data_iscrizione' => 'date',
             'privacy_consenso' => 'boolean',
             'email_opt_out' => 'boolean',
+            'disponibilita' => 'array',
+            'volontario_attivo' => 'boolean',
             'password_hash' => 'hashed',
             'password_reset_expires' => 'datetime',
             'rinnovo_token_expires' => 'datetime',
         ];
+    }
+
+    /**
+     * Genera automaticamente il codice referral personale alla creazione
+     * (f.23 — piano "Organizzazione 3", "porta un amico").
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $socio) {
+            if (empty($socio->codice_referral)) {
+                $socio->codice_referral = self::generaCodiceReferral();
+            }
+        });
+    }
+
+    /**
+     * Slug univoco (globale) usato nel link di invito /a/{slug}/iscriviti?ref=CODICE.
+     */
+    public static function generaCodiceReferral(): string
+    {
+        do {
+            $codice = strtolower(Str::random(10));
+        } while (self::allTenants()->withTrashed()->where('codice_referral', $codice)->exists());
+
+        return $codice;
     }
 
     /**
@@ -264,6 +295,48 @@ class Socio extends Authenticatable
     public function cariche(): HasMany
     {
         return $this->hasMany(Carica::class, 'socio_id');
+    }
+
+    /**
+     * Mansioni/competenze del volontario (f.2 — piano "Organizzazione 3").
+     *
+     * @return BelongsToMany<Mansione, $this>
+     */
+    public function mansioni(): BelongsToMany
+    {
+        return $this->belongsToMany(Mansione::class, 'socio_mansioni', 'socio_id', 'mansione_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Assegnazioni ai turni di volontariato (f.3 — piano "Organizzazione 3").
+     *
+     * @return HasMany<TurnoAssegnazione, $this>
+     */
+    public function turniAssegnazioni(): HasMany
+    {
+        return $this->hasMany(TurnoAssegnazione::class, 'socio_id');
+    }
+
+    /**
+     * Prestiti di attrezzature (f.10 — piano "Organizzazione 3").
+     *
+     * @return HasMany<PrestitoAttrezzatura, $this>
+     */
+    public function prestitiAttrezzature(): HasMany
+    {
+        return $this->hasMany(PrestitoAttrezzatura::class, 'socio_id');
+    }
+
+    /**
+     * Richieste di iscrizione arrivate con il codice referral del socio
+     * (classifica "ambasciatori", f.23 — piano "Organizzazione 3").
+     *
+     * @return HasMany<RichiestaIscrizione, $this>
+     */
+    public function iscrizioniReferral(): HasMany
+    {
+        return $this->hasMany(RichiestaIscrizione::class, 'referral_codice', 'codice_referral');
     }
 
     /**

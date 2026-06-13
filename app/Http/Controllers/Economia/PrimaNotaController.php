@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Economia\SalvaMovimentoRequest;
 use App\Models\CategoriaMovimento;
 use App\Models\Movimento;
+use App\Models\Progetto;
 use App\Services\Economia\PrimaNotaService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -38,7 +39,7 @@ class PrimaNotaController extends Controller
         }
 
         $query = $this->applicaFiltri(Movimento::query(), $request)
-            ->with(['categoria', 'origine'])
+            ->with(['categoria', 'origine', 'progetto'])
             ->orderByDesc('data')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
@@ -76,11 +77,14 @@ class PrimaNotaController extends Controller
             'totaleEntrate' => (float) $this->applicaFiltri(Movimento::query(), $request)->entrate()->sum('importo'),
             'totaleUscite' => (float) $this->applicaFiltri(Movimento::query(), $request)->uscite()->sum('importo'),
             'categorie' => CategoriaMovimento::query()->orderBy('tipo')->orderBy('nome')->get(),
+            // f.13 piano "Organizzazione 3": progetti del tenant per select e filtro
+            'progetti' => Progetto::query()->orderBy('nome')->get(['id', 'nome']),
             'filtri' => [
                 'dal' => $request->query('dal'),
                 'al' => $request->query('al'),
                 'tipo' => $request->query('tipo'),
                 'categoria_id' => $request->query('categoria_id'),
+                'progetto_id' => $request->query('progetto_id'),
             ],
         ]);
     }
@@ -96,6 +100,7 @@ class PrimaNotaController extends Controller
             'categoria_id' => $request->validated('categoria_id'),
             'descrizione' => $request->validated('descrizione'),
             'metodo' => $request->validated('metodo'),
+            'progetto_id' => $request->validated('progetto_id'),
             'registrato_da' => $request->user()?->id,
         ]);
 
@@ -155,6 +160,11 @@ class PrimaNotaController extends Controller
 
         if (filled($request->query('categoria_id'))) {
             $query->where('categoria_id', (string) $request->query('categoria_id'));
+        }
+
+        // f.13 piano "Organizzazione 3": filtro per progetto imputato
+        if (filled($request->query('progetto_id'))) {
+            $query->where('progetto_id', (string) $request->query('progetto_id'));
         }
 
         return $query;

@@ -1,44 +1,144 @@
-# Gestione Associazioni — Laravel
+# Gestione Associazioni
 
-Piattaforma SaaS multi-tenant per la gestione completa di associazioni: soci, tessere
-(con QR code e verifica pubblica), quote e pagamenti online (Stripe/PayPal), eventi con
-check-in, comunicazioni email, documenti, verbali e scadenze, area soci dedicata e
-API REST documentate.
+Piattaforma **SaaS multi-tenant** per la gestione completa della vita di un'associazione: soci e tesseramento, eventi con prenotazioni online, quote e pagamenti, registro ufficiale e governance, comunicazione, economia, volontari e organizzazione interna. Ogni associazione ha il proprio mini-sito pubblico brandizzato dove i cittadini si iscrivono e prenotano gli eventi.
 
-È la riscrittura in **Laravel 12** dell'app PHP procedurale `gestione-associazioni`,
-con piena compatibilità con i dati esistenti: stesse tabelle, chiavi **UUID CHAR(36)**
-e isolamento multi-tenant per `associazione_id` (global scope a livello framework).
+Costruita in **Laravel 12 / PHP 8.4**, con isolamento multi-tenant a livello di framework, un'area pubblica per ogni associazione, un'area riservata per i soci, API REST documentate e oltre **1.700 test automatici** (PHPUnit + Playwright E2E).
 
-- Piano di migrazione: [docs/PIANO-MIGRAZIONE.md](docs/PIANO-MIGRAZIONE.md)
-- I 25 miglioramenti rispetto all'app legacy: [docs/MIGLIORAMENTI.md](docs/MIGLIORAMENTI.md)
-- Schema dati di riferimento (dump reale MySQL): [docs/schema-reale-mysql.sql](docs/schema-reale-mysql.sql)
+![Dashboard](docs/screenshots/dashboard.png)
+
+---
+
+## Indice
+
+- [Caratteristiche principali](#caratteristiche-principali)
+- [Screenshot](#screenshot)
+- [Funzionalità in dettaglio](#funzionalità-in-dettaglio)
+- [Architettura](#architettura)
+- [Stack e librerie](#stack-e-librerie)
+- [Requisiti](#requisiti)
+- [Installazione](#installazione)
+- [Aggiornamenti in-app](#aggiornamenti-in-app)
+- [Test](#test)
+- [Licenza](#licenza)
+
+---
+
+## Caratteristiche principali
+
+- 🏢 **Multi-tenant** — una sola installazione serve molte associazioni, con isolamento dei dati garantito da un global scope a livello di framework.
+- 🌐 **Mini-sito pubblico per associazione** — catalogo eventi, iscrizione soci, prenotazioni, area riservata, pagina trasparenza, sezione sostenitori, a `/a/{slug}`.
+- 🎫 **Tesseramento** — tessere con QR, verifica pubblica, rinnovi self-service, campagna rinnovi, stampa massiva, apertura anno sociale.
+- 🗓️ **Eventi e prenotazioni** — pubblicazione, capienza con lista d'attesa e promozione automatica, eventi a pagamento (Stripe/PayPal), check-in con QR, calendario, ricorrenze, feedback post-evento.
+- 👤 **Account ospite e soci** — registrazione pubblica, verifica email, area riservata ricca (prenotazioni, tessera, quote, GDPR), promozione a socio.
+- 💶 **Economia** — quote e ricevute numerate, prima nota con movimenti automatici, donazioni online, report economici, budget eventi.
+- 📋 **Registro e governance** — libro soci ufficiale, cessazioni formali, organi sociali, verbali numerati, riunioni del direttivo con votazioni e bozza verbale.
+- 🤝 **Organizzazione** — volontari e turni con registro ore, spazi e prenotazioni interne, inventario e prestiti, progetti con rendicontazione.
+- ✉️ **Comunicazione** — email brandizzate per tenant, template, newsletter, annunci, convocazioni assemblea, sondaggi, compleanni.
+- 🔐 **Sicurezza** — 2FA, ruoli e permessi granulari, audit trail, rate limiting, CSP, honeypot, backup pianificati.
+- 🔄 **Aggiornamenti dalla dashboard** — il super admin aggiorna l'applicazione con un clic, con backup automatico e rollback.
+
+---
+
+## Screenshot
+
+### Dashboard amministrativa
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Anagrafica soci
+![Soci](docs/screenshots/soci.png)
+
+### Eventi
+![Eventi](docs/screenshots/eventi.png)
+
+### Statistiche annuali (l'anno in cifre)
+![Statistiche annuali](docs/screenshots/statistiche.png)
+
+### Prima nota economica
+![Prima nota](docs/screenshots/prima-nota.png)
+
+### Mini-sito pubblico dell'associazione
+![Frontend pubblico](docs/screenshots/frontend-eventi.png)
+
+### Login
+![Login](docs/screenshots/login.png)
+
+---
+
+## Funzionalità in dettaglio
+
+Il sistema è stato costruito in round successivi. Ogni area è coperta da test automatici.
+
+### Base — gestione associativa
+Anagrafica soci con campi personalizzati, tag, gruppi dinamici, filtri salvati, ricerca full-text, import/export Excel. Tessere con QR, template, PDF, verifica pubblica e scanner. Quote e pagamenti online (Stripe/PayPal). Eventi e partecipanti. Email per tenant (template, coda, log, SMTP dedicato). Documenti, verbali, scadenze. Gestione associazioni, sedi, amministratori, configurazioni. API REST v1 con Sanctum e documentazione OpenAPI.
+
+### Prenotazioni eventi (frontend pubblico)
+Mini-sito brandizzato per ogni associazione: catalogo eventi, **account ospite** con verifica email, prenotazioni con **capienza e lista d'attesa** (promozione FIFO automatica), **eventi a pagamento** con Stripe/PayPal, **biglietto con QR** e PDF, **check-in** dallo scanner admin. Area riservata account completa: prenotazioni, storico, profilo, preferenze, **export e cancellazione GDPR**.
+
+### Iscrizioni e preiscrizioni
+**Form di iscrizione personalizzabile** per ogni associazione (campi configurabili, validazione codice fiscale e telefono), aperto anche agli **ospiti senza account**. Modalità preiscrizione (con approvazione) o diretta. Preiscrizione anche alle prenotazioni evento. Gestione delle richieste lato admin con approvazione, tessera e quota automatiche.
+
+### Vita sociale (25 funzionalità)
+Rinnovi self-service, campagna rinnovi, promemoria multi-step, apertura anno sociale. Calendario eventi con export ICS, eventi ricorrenti, feedback post-evento, eventi riservati ai soci. **Libro soci ufficiale**, cessazioni formali, organi sociali, verbali numerati. Layout email brandizzato, ricevute quote PDF, centro anteprime email. Slug editabile con QR di invito, documenti con scadenza, rilevazione duplicati, export multi-foglio.
+
+### Gestione semplificata (25 funzionalità)
+**Ricerca globale ⌘K**, azioni in blocco sui soci, note interne, attività admin, registro modifiche. Bacheca annunci, newsletter, sondaggi, compleanni, contatti rapidi. **Prima nota** con movimenti automatici da quote e prenotazioni, report economico, **donazioni online**, solleciti quote, scadenzario unificato. Richieste modifica dati, nuclei familiari, **kiosk check-in**, soci minorenni con tutore. Onboarding, cestino unificato, audit accessi.
+
+### Organizzazione (25 funzionalità)
+**Volontari e turni** con disponibilità, mansioni, auto-candidatura, registro ore e attestato PDF. **Spazi** con prenotazioni e rilevazione conflitti, **inventario e prestiti** attrezzature. **Progetti** con milestone, rendicontazione e report PDF. **Riunioni del direttivo** con ordine del giorno, votazioni e generazione bozza verbale, archivio decisioni, adempimenti ricorrenti. **Mini-CRM** contatti esterni, sponsor con sezione pubblica, **referral porta-un-amico**, galleria foto eventi, **statistiche annuali** con confronto anno-su-anno ed export PDF.
+
+### Convocazioni e trasparenza
+Annunci di tipo **convocazione assemblea** (data, luogo, ordine del giorno, invio email ai soci) e sezione pubblica **Trasparenza** dove pubblicare bilanci, statuto e documenti per categoria.
+
+---
+
+## Architettura
+
+| Aspetto | Implementazione |
+|---|---|
+| **Multi-tenancy** | Trait `BelongsToAssociazione` → global scope su `associazione_id`; middleware `tenant`; il super_admin opera sull'associazione selezionata |
+| **Chiavi** | UUID (`HasUuids`) su tutte le entità di dominio |
+| **Autenticazione** | Fortify + 2FA per gli admin (`utenti`); guard `socio` per l'area soci; guard `account` per il frontend pubblico; Sanctum per le API |
+| **Autorizzazione** | Policy + permessi granulari spatie/permission (ruoli `super_admin`, `admin_associazione`, `operatore`) |
+| **Audit** | spatie/activitylog su tutti i modelli |
+| **Frontend pubblico** | Per associazione su `/a/{slug}`, risolto da `RisolviTenantPubblico` senza sessione admin |
+| **Pagamenti** | Interfaccia `Pagabile` (quote, prenotazioni, donazioni) con dispatch webhook per tipo |
+| **Code & scheduler** | Driver `database`; scheduler in `routes/console.php` monitorato |
+
+Convenzioni: rotte per modulo in `routes/modules/`, controller in `app/Http/Controllers/<Modulo>/`, validazione via Form Request, viste sul design system condiviso (Bootstrap 5.3, tema chiaro/scuro, brand `#FF7B11`).
+
+A colpo d'occhio: **68 modelli**, **159 controller**, **232 rotte**, **58 migration**, **1.716 test**.
+
+---
+
+## Stack e librerie
+
+**Laravel 12 · PHP 8.4 · MySQL 8** (test su SQLite in-memory).
+
+Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activitylog, backup, medialibrary, query-builder, data, settings, csp, honeypot, health, schedule-monitor), maatwebsite/excel, barryvdh/laravel-dompdf, chillerlan/php-qrcode, propaganistas/laravel-phone, robertogallea/laravel-codicefiscale, mews/purifier, dedoc/scramble, stripe/stripe-php, srmklive/paypal, larastan, debugbar.
+
+---
 
 ## Requisiti
 
-- PHP **8.3+** (consigliato 8.4) con estensioni `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`
-- **MySQL 8** (i test girano su SQLite in-memory, nessun setup richiesto)
-- Composer 2
-- Node.js 20+ e npm (asset Vite)
-- `mysqldump` nel PATH (necessario per i backup del database)
+- PHP **8.3+** (consigliato 8.4) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`, `curl`, `openssl`
+- **MySQL 8** (o MariaDB compatibile)
+- Composer 2, Node.js 20+ e npm
+- `mysqldump` nel PATH (per i backup)
+
+---
 
 ## Installazione
 
 ### Installer web (consigliato)
 
 ```bash
-git clone <repository> gestione-associazioni-laravel
+git clone https://github.com/fabiodalez-dev/gestione-associazioni-laravel.git
 cd gestione-associazioni-laravel
-
 composer install --no-dev
 cp .env.example .env
 ```
 
-Poi apri **`/install`** nel browser: il wizard guida in 5 passi
-(requisiti → database → super admin → email facoltativa → fine), con test di connessione, protezione contro database non vuoti e dati demo opzionali. L'`APP_KEY` viene generata
-automaticamente, le credenziali MySQL vengono scritte nel `.env`, lo schema
-viene migrato e i ruoli seedati. Al termine viene creato
-`storage/app/installed.lock` che disattiva l'installer (eliminalo per
-reinstallare).
+Apri **`/install`** nel browser: il wizard in 5 passi (requisiti → database → super admin → email → fine) genera l'`APP_KEY`, scrive il `.env`, migra lo schema e crea il primo super admin. Al termine l'installer si blocca da solo.
 
 ### Installazione manuale (CLI)
 
@@ -46,160 +146,39 @@ reinstallare).
 composer install
 cp .env.example .env
 php artisan key:generate
-```
-
-Configura nel `.env` la connessione MySQL (`DB_*`) e, se devi importare i dati
-della vecchia app, anche le variabili `LEGACY_DB_*`. Il lock di installazione
-viene creato automaticamente alla prima richiesta se esiste già un super admin
-nel database. Poi:
-
-```bash
-php artisan migrate --seed     # schema + ruoli/permessi + dati demo
-npm install && npm run build   # asset frontend (Vite)
+# configura DB_* nel .env
+php artisan migrate --seed
+npm install && npm run build
 php artisan storage:link
 ```
 
-Il seeder crea gli utenti demo:
-
-| Utente | Email | Ruolo |
-|---|---|---|
-| Super Admin | `superadmin@example.com` | `super_admin` (tutti i tenant) |
-| Mario Rossi | `admin@associazione-demo.test` | `admin_associazione` |
-| Operatore | `operatore@associazione-demo.test` | `operatore` |
-
-### Queue worker (obbligatorio per email e job)
-
-La coda usa il driver `database` (compatibile anche con shared hosting):
+### Avvio
 
 ```bash
-php artisan queue:work --tries=3
+php artisan serve            # applicazione
+php artisan queue:work       # coda email e job (obbligatorio)
+# cron: * * * * * php artisan schedule:run
 ```
 
-In produzione tieni vivo il worker con supervisor/systemd, ad esempio:
+---
 
-```ini
-[program:gestione-associazioni-worker]
-command=php /percorso/app/artisan queue:work --tries=3 --max-time=3600
-autostart=true
-autorestart=true
-```
+## Aggiornamenti in-app
 
-### Scheduler (cron)
+Il **super admin** trova in `/aggiornamenti` una pagina che controlla le GitHub Releases e mostra versione installata vs ultima disponibile. Con un clic l'applicazione si aggiorna da sola: backup automatico del database, download della release con verifica SHA256, modalità manutenzione, sovrascrittura dei file (preservando `.env` e `storage/`), `migrate`, pulizia cache e riavvio della coda — con **rollback automatico** dei file in caso di errore e storico completo degli aggiornamenti.
 
-Tutti i job pianificati (coda email, promemoria scadenze, backup, health check,
-pulizia log) sono definiti in `routes/console.php` e monitorati da
-spatie/laravel-schedule-monitor. Serve **una sola riga di cron**:
+---
 
-```cron
-* * * * * cd /percorso/app && php artisan schedule:run >> /dev/null 2>&1
-```
-
-Dopo ogni deploy registra i task nel monitoraggio: `php artisan schedule-monitor:sync`.
-
-In sviluppo basta `composer dev` (serve + queue + log + Vite in parallelo)
-oppure `php artisan schedule:work` per il solo scheduler.
-
-### Import dei dati dalla vecchia app
-
-Lo schema è identico (stesse tabelle, stessi UUID), quindi l'import è una copia
-1:1 limitata alle colonne comuni. Configura `LEGACY_DB_*` nel `.env` e:
+## Test
 
 ```bash
-php artisan app:import-legacy --dry-run   # anteprima senza scrivere
-php artisan app:import-legacy             # import vero e proprio
-php artisan app:import-legacy --tables=soci,tessere --force
+php artisan test            # ~1.716 test PHPUnit (SQLite in-memory)
+npm run test:e2e            # 109 test E2E Playwright (DB dedicato, server automatico)
+vendor/bin/pint             # code style
+vendor/bin/phpstan analyse --memory-limit=1G   # analisi statica livello 5
 ```
 
-Il comando importa le tabelle in ordine FK-safe, salta quelle non vuote
-(se non usi `--force`) e sincronizza i ruoli spatie/permission con la colonna
-`utenti.ruolo`.
-
-## Struttura dei moduli
-
-Ogni area funzionale è un modulo autonomo con convenzioni fisse:
-
-| Componente | Percorso |
-|---|---|
-| Rotte | `routes/modules/<modulo>.php` (caricate automaticamente da `web.php`) |
-| Controller | `app/Http/Controllers/<Modulo>/` |
-| Form Request (validazione) | `app/Http/Requests/<Modulo>/` |
-| Policy (autorizzazione) | `app/Policies/` |
-| Viste Blade | `resources/views/<modulo>/` (layout `layouts.app`, Bootstrap 5.3, brand `#FF7B11`) |
-| Test feature | `tests/Feature/<Modulo>/` (RefreshDatabase su SQLite in-memory) |
-
-Moduli presenti: **auth** (Fortify + 2FA), **dashboard**, **soci** (ricerca Scout,
-filtri salvati, import/export Excel), **tessere** (PDF, QR, verifica pubblica,
-scanner/check-in), **quote-pagamenti** (Stripe + PayPal con webhook),
-**eventi** (partecipanti e check-in), **email** (template, coda, log, SMTP
-per-tenant), **documenti-verbali-scadenze** (MediaLibrary, promemoria),
-**struttura** (associazioni, sedi, amministratori, configurazioni),
-**area-soci** (guard `socio` dedicata), **api-v1** (Sanctum + api_keys legacy,
-docs OpenAPI su `/docs/api`), **operations** (health check su `/health`).
-
-Architettura trasversale:
-
-- **Multi-tenancy**: trait `App\Models\Concerns\BelongsToAssociazione` applica un
-  global scope su `associazione_id` (il `super_admin` non è limitato); middleware `tenant`.
-- **UUID**: trait `HasUuids` su tutti i modelli di dominio.
-- **Autorizzazione**: Policy + permessi granulari spatie/permission
-  (ruoli `super_admin`, `admin_associazione`, `operatore`).
-- **Audit**: spatie/laravel-activitylog su tutti i modelli (utente, IP, diff campi).
-
-## Le 25 librerie e i 25 miglioramenti
-
-Il progetto integra 25 pacchetti scelti per coprire sicurezza, dati, operazioni e
-API — l'elenco completo con il ruolo di ciascuno è in
-[docs/PIANO-MIGRAZIONE.md](docs/PIANO-MIGRAZIONE.md#le-25-librerie-laravel)
-(Fortify, Sanctum, Scout, la suite spatie — permission, activitylog, backup,
-medialibrary, query-builder, data, settings, csp, honeypot, health,
-schedule-monitor —, maatwebsite/excel, dompdf, php-qrcode, laravel-phone,
-laravel-codicefiscale, purifier, Scramble, Stripe, PayPal, Larastan, Debugbar).
-
-I 25 miglioramenti funzionali rispetto all'app legacy (2FA, audit trail,
-rate limiting, CSP, soft delete con cestino, import Excel, ricerca full-text,
-backup pianificati, health check, API documentate, notifiche unificate, ecc.)
-sono descritti uno per uno in [docs/MIGLIORAMENTI.md](docs/MIGLIORAMENTI.md).
-
-## Comandi utili
-
-```bash
-# Import dati dalla vecchia app (vedi sezione dedicata)
-php artisan app:import-legacy [--dry-run] [--tables=...] [--force]
-
-# Backup database + file (spatie/laravel-backup, anche pianificato alle 02:00)
-php artisan backup:run
-php artisan backup:list
-php artisan backup:clean
-
-# Test (SQLite in-memory)
-php artisan test
-php artisan test --filter=NomeTest
-
-# Code style (Laravel Pint)
-vendor/bin/pint
-vendor/bin/pint --test          # solo verifica, senza modificare
-
-# Analisi statica (Larastan, livello 5 su app/ — vedi phpstan.neon)
-vendor/bin/phpstan analyse --memory-limit=1G
-
-# Documentazione API OpenAPI (Scramble)
-php artisan scramble:export     # esporta api.json
-# UI interattiva: http://localhost:8000/docs/api
-
-# Operazioni
-php artisan schedule-monitor:sync   # registra i task pianificati (a ogni deploy)
-php artisan queue:work              # worker della coda
-```
-
-## Sviluppo
-
-```bash
-composer dev    # serve + queue + pail + vite in parallelo
-```
-
-Health check su `/health` (DB, coda, scheduler, spazio disco, debug mode);
-Debugbar attiva automaticamente con `APP_DEBUG=true` in locale.
+---
 
 ## Licenza
 
-Distribuito con licenza [MIT](LICENSE).
+[MIT](LICENSE).

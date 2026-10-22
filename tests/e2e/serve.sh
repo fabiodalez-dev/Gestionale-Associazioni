@@ -12,6 +12,8 @@ export QUEUE_CONNECTION=sync
 export CACHE_STORE=file
 export SESSION_DRIVER=file
 export E2E_FIXTURES=1
+# Iscrizione autonoma delle associazioni con approvazione (spec 20)
+export REGISTRAZIONE_ASSOCIAZIONI=revisione
 # Honeypot attivo ma senza soglia temporale: Playwright compila i form
 # più in fretta di un umano e il fake-success renderebbe i test flaky.
 export HONEYPOT_SECONDS=0

@@ -47,6 +47,9 @@ fi
 rm -rf "$STAGING/public/build"
 cp -R "$ROOT/public/build" "$STAGING/public/build"
 
+echo "==> Diniego Apache anche in vendor/ (le altre cartelle hanno il .htaccess nel repo)"
+cp "$STAGING/app/.htaccess" "$STAGING/vendor/.htaccess"
+
 echo "==> Cartelle di runtime"
 (cd "$STAGING" && mkdir -p storage/app/private storage/app/public storage/app/purifier \
     storage/framework/cache/data storage/framework/sessions storage/framework/views storage/framework/testing \
@@ -55,7 +58,7 @@ echo "==> Cartelle di runtime"
     && rm -f .env)
 
 echo "==> Controlli"
-for f in vendor/autoload.php public/build/manifest.json public/index.php index.php .htaccess .env.example VERSION artisan database/installer/schema.sql; do
+for f in vendor/autoload.php vendor/.htaccess public/build/manifest.json public/index.php index.php .htaccess .env.example VERSION artisan database/installer/schema.sql storage/.htaccess; do
     [ -e "$STAGING/$f" ] || { echo "Nel pacchetto manca $f" >&2; exit 1; }
 done
 [ ! -e "$STAGING/.env" ] || { echo "Il pacchetto contiene un .env" >&2; exit 1; }

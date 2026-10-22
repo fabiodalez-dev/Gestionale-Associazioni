@@ -137,7 +137,7 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 4. Apri il sito nel browser: parte da solo il wizard `/install`, che crea `.env` e chiave dell'applicazione, verifica i requisiti, inietta lo schema nel database e crea il primo super admin.
 5. Alla fine il wizard mostra il comando per il cron (cPanel → Cron Jobs, ogni minuto): manda le email in coda, i promemoria e i backup.
 
-Il `.htaccess` nella radice del progetto fa passare tutte le richieste da `public/`, quindi `app/`, `storage/`, `vendor/` e `.env` non sono raggiungibili dal browser. Se puoi scegliere la document root (VPS, hosting che lo permette), puntala direttamente a `public/`. Il pacchetto si costruisce con `bash bin/build-release.sh` (lo fa la GitHub Action a ogni tag `v*`, e l'aggiornatore in-app scarica lo stesso pacchetto).
+Il `.htaccess` nella radice del progetto fa passare tutte le richieste da `public/`, quindi `app/`, `storage/`, `vendor/` e `.env` non sono raggiungibili dal browser; ogni cartella non pubblica ha inoltre un proprio `.htaccess` di diniego, che vale anche se l'hosting non ha mod_rewrite (in quel caso l'app risponde su `/public/`). Se puoi scegliere la document root (VPS, hosting che lo permette), puntala direttamente a `public/`. Il pacchetto si costruisce con `bash bin/build-release.sh` (lo fa la GitHub Action a ogni tag `v*`, e l'aggiornatore in-app scarica lo stesso pacchetto).
 
 ### Installer web da sorgenti
 

@@ -71,6 +71,10 @@ class InstallerTest extends TestCase
             $contenuto = (string) file_get_contents($env);
             $this->assertStringContainsString('DB_CONNECTION=mysql', $contenuto, 'Parte da .env.example');
             $this->assertMatchesRegularExpression('/^APP_KEY="?base64:[A-Za-z0-9+\/=]+"?$/m', $contenuto);
+            // Creato dal wizard = sito in produzione, non la copia di sviluppo
+            $this->assertMatchesRegularExpression('/^APP_ENV=production$/m', $contenuto);
+            $this->assertMatchesRegularExpression('/^APP_DEBUG=false$/m', $contenuto);
+            $this->assertMatchesRegularExpression('/^LOG_LEVEL=warning$/m', $contenuto);
             $this->assertStringStartsWith('base64:', (string) config('app.key'), 'La chiave vale già in questa richiesta');
         } finally {
             File::deleteDirectory($cartella);

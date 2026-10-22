@@ -55,6 +55,12 @@ class InstallerService
             }
             copy($esempio, $env);
             @chmod($env, 0600);
+
+            // .env.example è pensato per lo sviluppo: un sito creato dal
+            // wizard è in produzione (niente stack trace pubblici, URL
+            // generati da APP_URL e non dall'Host della richiesta)
+            $this->writeEnv(['APP_ENV' => 'production', 'APP_DEBUG' => 'false', 'LOG_LEVEL' => 'warning']);
+            config(['app.env' => 'production', 'app.debug' => false]);
         }
 
         if (blank(config('app.key')) && is_writable($env)) {

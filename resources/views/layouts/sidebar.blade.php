@@ -308,6 +308,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('job-falliti.*') ? 'active' : '' }}" href="{{ $nav('job-falliti.index') }}">
+                    <i class="bi bi-exclamation-octagon me-2"></i>
+                    Job falliti
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('impostazioni-sistema.*') ? 'active' : '' }}" href="{{ $nav('impostazioni-sistema.index') }}">
                     <i class="bi bi-gear-wide-connected me-2"></i>
                     Impostazioni di sistema

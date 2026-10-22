@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Health\JobFallitiCheck;
 use App\Listeners\RegistraAccesso;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
@@ -45,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
      * - coda attiva (heartbeat: health:queue-check-heartbeat);
      * - scheduler attivo (heartbeat: health:schedule-check-heartbeat);
      * - spazio disco usato (warning oltre 70%, errore oltre 90%);
+     * - job falliti nelle ultime 24 ore (warning da 1, errore oltre 10);
      * - debug mode spento — registrato solo in produzione, dove
      *   APP_DEBUG=true sarebbe un problema di sicurezza.
      */
@@ -57,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
             UsedDiskSpaceCheck::new()
                 ->warnWhenUsedSpaceIsAbovePercentage(70)
                 ->failWhenUsedSpaceIsAbovePercentage(90),
+            JobFallitiCheck::new()->label('Job falliti (24 ore)')->failWhenMoreThan(10),
         ];
 
         if ($this->app->environment('production')) {

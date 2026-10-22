@@ -205,9 +205,11 @@ class ImpostazioniSistemaController extends Controller
             'backup' => [
                 'titolo' => 'Backup e aggiornamenti',
                 'icona' => 'bi-cloud-arrow-down',
-                'descrizione' => 'Notifiche e cifratura dei backup, accesso a GitHub per gli aggiornamenti in-app.',
+                'descrizione' => 'Notifiche di backup, salute e job falliti, cifratura dei backup, accesso a GitHub per gli aggiornamenti in-app.',
                 'campi' => [
                     'BACKUP_NOTIFICATION_MAIL' => ['label' => 'Email notifiche backup e salute', 'tipo' => 'email', 'rules' => ['nullable', 'email', 'max:255']],
+                    'FAILED_JOB_EMAILS' => ['label' => 'Email avvisi job falliti', 'tipo' => 'text', 'rules' => ['nullable', 'string', 'max:500', $this->elencoEmail()], 'placeholder' => 'admin@tuodominio.it, tecnico@tuodominio.it', 'help' => 'Separate da virgola. Vuoto = email notifiche backup. Al massimo un avviso ogni 15 minuti per tipo di job.'],
+                    'FAILED_JOB_MONITOR_ENABLED' => ['label' => 'Avvisi job falliti attivi', 'tipo' => 'bool', 'rules' => $bool, 'default' => 'true'],
                     'BACKUP_ARCHIVE_PASSWORD' => ['label' => 'Password archivi di backup', 'tipo' => 'password', 'segreto' => true, 'rules' => ['nullable', 'string', 'max:255'], 'help' => 'Se impostata, gli zip di backup vengono cifrati. Conservala altrove: senza non potrai ripristinarli.'],
                     'UPDATE_GITHUB_TOKEN' => ['label' => 'Token GitHub', 'tipo' => 'password', 'segreto' => true, 'rules' => ['nullable', 'string', 'max:255'], 'help' => 'Facoltativo: evita il limite di 60 richieste/ora di GitHub nel controllo aggiornamenti.'],
                     'UPDATE_SELF_ENABLED' => ['label' => 'Aggiornamento in-app abilitato', 'tipo' => 'bool', 'rules' => $bool, 'default' => 'true'],
@@ -335,6 +337,18 @@ class ImpostazioniSistemaController extends Controller
             ],
             'altre' => array_keys($altre),
         ];
+    }
+
+    /** Regola: elenco di email separate da virgola. */
+    private function elencoEmail(): \Closure
+    {
+        return function (string $attributo, mixed $valore, \Closure $fail): void {
+            foreach (array_filter(array_map('trim', explode(',', (string) $valore))) as $email) {
+                if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                    $fail("\"{$email}\" non è un indirizzo email valido.");
+                }
+            }
+        };
     }
 
     private function soloSuperAdmin(Request $request): void

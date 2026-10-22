@@ -62,3 +62,11 @@ Correzione di sicurezza (Fase 2): Formello registra di default la rotta `POST /f
 - Segreteria: pulsante "Dati personali" nella scheda socio (permesso `soci.update`, solo nella propria associazione) che genera e scarica subito lo ZIP, per le richieste arrivate via email o di persona.
 - Registro attività: richiesta, download ed export della segreteria. Pulizia giornaliera `personal-data-export:clean` alle 03:30; disco privato `storage/app/private/personal-data-exports`.
 - Esito: **1763/1763 test verdi** (5 nuovi in `DatiPersonaliTest`: contenuto completo e privo di segreti e note interne, limite di una richiesta al giorno, download solo per il titolare con firma valida e archivio esistente, flusso account, export della segreteria con isolamento tra associazioni), PHPStan pulito.
+
+## Fase 5 — Job falliti
+
+- `spatie/laravel-failed-job-monitor` 4.5 (solo il pacchetto). Avviso email al fallimento definitivo di un job, con notifica dell'app al posto di quella del pacchetto: classe, coda, messaggio d'errore e link alla pagina, **senza il payload del job** (può contenere dati personali serializzati) né lo stack trace. Invio con l'SMTP di sistema; se fallisce anche la posta l'errore va nel log e il worker continua.
+- Destinatari da Impostazioni di sistema → Backup: nuovo campo `FAILED_JOB_EMAILS` (elenco separato da virgola, validato), vuoto = `BACKUP_NOTIFICATION_MAIL`; interruttore `FAILED_JOB_MONITOR_ENABLED`. Al massimo un avviso ogni 15 minuti per classe di job (`FAILED_JOB_THROTTLE_MINUTES`), così una coda che fallisce in massa non inonda la casella; senza destinatari nessun invio.
+- Pagina **Job falliti** (`/job-falliti`, menu del super_admin): contatori (ultime 24 ore, job in attesa, destinatari degli avvisi), elenco paginato con filtro per coda, dettaglio con eccezione completa, riprova ed elimina singoli o tutti tramite `queue:retry`, `queue:forget`, `queue:flush`.
+- laravel-health: nuovo controllo "Job falliti (24 ore)", avviso da 1, errore oltre 10.
+- Esito: **1771/1771 test verdi** (8 nuovi in `JobFallitiTest`: accesso solo super_admin, elenco/filtro/dettaglio/riprova/eliminazione, operazioni su tutti, contenuto dell'avviso e limite per tipo di job con scadenza, nessun invio senza destinatari, errore di posta che non blocca il worker, controllo di salute, validazione dei destinatari), PHPStan pulito.

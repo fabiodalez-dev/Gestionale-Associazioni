@@ -23,3 +23,9 @@
         <button type="submit" class="btn-login">Accedi</button>
     </form>
 @endsection
+
+@if (\App\Models\RichiestaRegistrazione::modalita() !== 'disattivata')
+    @section('footer')
+        <a href="{{ route('registrazione.create') }}" class="login-footer-link">La tua associazione non è ancora iscritta? <strong>Iscrivila</strong></a>
+    @endsection
+@endif

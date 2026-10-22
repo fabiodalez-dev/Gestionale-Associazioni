@@ -351,6 +351,17 @@
                     <i class="bi bi-buildings"></i>Associazioni
                 </a>
             </li>
+            @php
+                $richiesteRegistrazione = \App\Models\RichiestaRegistrazione::query()->inAttesa()->count();
+            @endphp
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('richieste-registrazione.*') ? 'active' : '' }}" href="{{ $nav('richieste-registrazione.index') }}">
+                    <i class="bi bi-inbox"></i>Richieste di iscrizione
+                    @if ($richiesteRegistrazione > 0)
+                        <span class="badge bg-danger ms-1" title="Associazioni in attesa di approvazione">{{ $richiesteRegistrazione }}</span>
+                    @endif
+                </a>
+            </li>
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('impostazioni-sistema.*') ? 'active' : '' }}" href="{{ $nav('impostazioni-sistema.index') }}">
                     <i class="bi bi-sliders"></i>Impostazioni di sistema

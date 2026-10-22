@@ -3,7 +3,10 @@
 use App\Http\Controllers\Piattaforma\AuditAccessiController;
 use App\Http\Controllers\Piattaforma\CestinoController;
 use App\Http\Controllers\Piattaforma\OnboardingController;
+use App\Http\Controllers\Piattaforma\RegistrazioneAssociazioneController;
+use App\Http\Controllers\Piattaforma\RichiesteRegistrazioneController;
 use Illuminate\Support\Facades\Route;
+use Spatie\Honeypot\ProtectAgainstSpam;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,4 +42,24 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/audit-accessi', [AuditAccessiController::class, 'index'])
         ->name('audit-accessi.index');
+});
+
+/*
+ * Iscrizione autonoma delle associazioni alla piattaforma (pubblica) e
+ * gestione delle richieste da parte del super admin.
+ */
+Route::middleware('guest')->group(function (): void {
+    Route::get('/registrati', [RegistrazioneAssociazioneController::class, 'create'])
+        ->name('registrazione.create');
+    Route::post('/registrati', [RegistrazioneAssociazioneController::class, 'store'])
+        ->middleware([ProtectAgainstSpam::class, 'throttle:5,1'])
+        ->name('registrazione.store');
+    Route::get('/registrati/inviata', [RegistrazioneAssociazioneController::class, 'inviata'])
+        ->name('registrazione.inviata');
+});
+
+Route::middleware('auth')->prefix('richieste-registrazione')->name('richieste-registrazione.')->group(function (): void {
+    Route::get('/', [RichiesteRegistrazioneController::class, 'index'])->name('index');
+    Route::post('/{richiesta}/approva', [RichiesteRegistrazioneController::class, 'approva'])->name('approva');
+    Route::post('/{richiesta}/rifiuta', [RichiesteRegistrazioneController::class, 'rifiuta'])->name('rifiuta');
 });

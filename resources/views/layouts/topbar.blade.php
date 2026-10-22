@@ -26,6 +26,12 @@
             }
         }
     }
+    if ($utente->isSuperAdmin()) {
+        $n = \App\Models\RichiestaRegistrazione::query()->inAttesa()->count();
+        if ($n > 0) {
+            $daGestire->prepend(['n' => $n, 'testo' => $n === 1 ? 'associazione chiede di iscriversi' : 'associazioni chiedono di iscriversi', 'icona' => 'bi-buildings', 'tono' => 'tone-0', 'url' => route('richieste-registrazione.index')]);
+        }
+    }
     $totaleDaGestire = $daGestire->sum('n');
     $inizialiUtente = mb_strtoupper(mb_substr((string) $utente->nome, 0, 1).mb_substr((string) $utente->cognome, 0, 1)) ?: 'U';
 @endphp

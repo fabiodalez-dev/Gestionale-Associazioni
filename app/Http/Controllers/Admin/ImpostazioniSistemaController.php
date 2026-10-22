@@ -190,6 +190,19 @@ class ImpostazioniSistemaController extends Controller
                     'ACTIVITYLOG_ENABLED' => ['label' => 'Registro attività', 'tipo' => 'bool', 'rules' => $bool, 'default' => 'true'],
                 ],
             ],
+            'registrazione' => [
+                'titolo' => 'Registrazione associazioni',
+                'icona' => 'bi-buildings',
+                'descrizione' => 'Come entrano nuove associazioni nella piattaforma: le crei solo tu, si iscrivono da sole con la tua approvazione, oppure si iscrivono e sono subito attive.',
+                'campi' => [
+                    'REGISTRAZIONE_ASSOCIAZIONI' => ['label' => 'Iscrizione delle associazioni', 'tipo' => 'select', 'opzioni' => [
+                        'disattivata' => 'Solo il super admin crea le associazioni',
+                        'revisione' => 'Iscrizione autonoma con approvazione del super admin',
+                        'automatica' => 'Iscrizione autonoma, attiva subito',
+                    ], 'rules' => ['required', Rule::in(['disattivata', 'revisione', 'automatica'])], 'default' => 'disattivata', 'help' => 'Il modulo pubblico è all\'indirizzo /registrati; le richieste si gestiscono in Amministrazione → Richieste di iscrizione.'],
+                    'REGISTRAZIONE_NOTIFICA_EMAIL' => ['label' => 'Email da avvisare per le nuove richieste', 'tipo' => 'text', 'rules' => ['nullable', 'string', 'max:500', $this->elencoEmail()], 'placeholder' => 'admin@tuodominio.it', 'help' => 'Separate da virgola. Vuoto = tutti i super admin.'],
+                ],
+            ],
             'database' => [
                 'titolo' => 'Database',
                 'icona' => 'bi-database',

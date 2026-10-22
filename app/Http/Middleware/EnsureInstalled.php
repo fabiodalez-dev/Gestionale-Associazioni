@@ -5,14 +5,13 @@ namespace App\Http\Middleware;
 use App\Services\Installer\InstallerService;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Guardia dell'installer:
  * - app NON installata → tutte le rotte web reindirizzano a /install
- *   (e l'APP_KEY mancante viene generata al volo, così il wizard funziona
- *   anche senza accesso al terminale);
+ *   (il .env mancante viene creato da .env.example e l'APP_KEY generata al
+ *   volo, così il wizard funziona anche senza accesso al terminale);
  * - app installata → /install* non è più raggiungibile.
  *
  * Registrato in PREPEND al gruppo web: deve agire prima di EncryptCookies.
@@ -39,16 +38,14 @@ class EnsureInstalled
             return $next($request);
         }
 
-        // Non installata: garantisce l'APP_KEY prima che EncryptCookies la richieda
-        if (blank(config('app.key')) && is_writable(config('installer.env_file'))) {
-            Artisan::call('key:generate', ['--force' => true]);
-        }
+        // Non installata: crea il .env se manca e garantisce l'APP_KEY prima
+        // che EncryptCookies la richieda (primo avvio senza terminale)
+        $installer = app(InstallerService::class);
+        $installer->preparaEnv();
 
         if ($request->is('up')) {
             return $next($request);
         }
-
-        $installer = app(InstallerService::class);
         $rottaInstaller = $request->is('install', 'install/*');
 
         if ($installer->adminExists()) {

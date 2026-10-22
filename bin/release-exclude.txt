@@ -1,0 +1,68 @@
+# Percorsi esclusi dal pacchetto di release (rsync --exclude-from).
+# Cartelle di lavoro e dipendenze: vendor e public/build vengono ricostruiti
+# dallo script, tutto il resto non serve in produzione.
+# I pattern con la barra iniziale valgono solo nella radice del progetto:
+# resources/views/vendor e public/assets/vendor devono restare.
+/.git/
+/.github/
+/.claude/
+/.codex/
+/.cursor/
+/.idea/
+/.vscode/
+/.zed/
+/.nova/
+/node_modules/
+/vendor/
+/build/
+/releases/
+/tests/
+/docs/
+/test-results/
+/public/build/
+/public/hot
+/public/storage
+# Configurazione e dati locali: mai nel pacchetto
+# (rsync --exclude-from non ha regole di inclusione: .env.example resta
+# perché non è elencato qui)
+.env
+.env.backup
+.env.local
+.env.production
+.env.staging
+.env.testing
+/auth.json
+database/database.sqlite
+storage/app/private/*
+storage/app/public/*
+storage/app/purifier/*
+storage/app/updates/
+storage/app/installed.lock
+storage/app/installer-in-corso
+storage/logs/*
+storage/debugbar/
+storage/pail/
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+storage/media-library/temp/*
+bootstrap/cache/*.php
+# File di sviluppo
+.phpunit.cache/
+.phpunit.result.cache
+/phpunit.xml
+phpstan.neon
+phpstan-baseline.neon
+playwright.config.*
+.phpactor.json
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+.editorconfig
+.prettierrc*
+*.log
+.DS_Store
+Thumbs.db
+CLAUDE.md
+CLAUDE.local.md

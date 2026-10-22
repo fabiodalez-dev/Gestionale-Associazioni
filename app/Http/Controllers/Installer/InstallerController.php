@@ -98,7 +98,9 @@ class InstallerController extends Controller
             'DB_DATABASE' => $cfg['database'],
             'DB_USERNAME' => $cfg['username'],
             'DB_PASSWORD' => (string) ($cfg['password'] ?? ''),
-            'APP_URL' => $request->getSchemeAndHttpHost(),
+            // root() include l'eventuale sottocartella (es. /public o
+            // /gestionale/public): gli URL generati devono partire da lì
+            'APP_URL' => rtrim($request->root(), '/'),
         ]);
 
         // Token in cookie HttpOnly (non cifrato: il middleware EnsureInstalled
@@ -196,6 +198,9 @@ class InstallerController extends Controller
 
         $this->installer->markInstalled();
 
-        return view('installer.done', ['step' => 5]);
+        return view('installer.done', [
+            'step' => 5,
+            'storageCollegato' => $this->installer->collegaStorage(),
+        ]);
     }
 }

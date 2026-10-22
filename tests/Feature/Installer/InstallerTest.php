@@ -57,6 +57,26 @@ class InstallerTest extends TestCase
         $this->get('/dashboard')->assertRedirect('/install');
     }
 
+    public function test_primo_avvio_senza_env_lo_crea_da_env_example_con_la_chiave(): void
+    {
+        $cartella = sys_get_temp_dir().'/installer_test_'.uniqid();
+        mkdir($cartella);
+        $env = $cartella.'/.env';
+        config(['installer.env_file' => $env, 'app.key' => '']);
+
+        try {
+            $this->get('/install')->assertOk();
+
+            $this->assertFileExists($env);
+            $contenuto = (string) file_get_contents($env);
+            $this->assertStringContainsString('DB_CONNECTION=mysql', $contenuto, 'Parte da .env.example');
+            $this->assertMatchesRegularExpression('/^APP_KEY="?base64:[A-Za-z0-9+\/=]+"?$/m', $contenuto);
+            $this->assertStringStartsWith('base64:', (string) config('app.key'), 'La chiave vale già in questa richiesta');
+        } finally {
+            File::deleteDirectory($cartella);
+        }
+    }
+
     public function test_pagina_requisiti_raggiungibile_quando_non_installata(): void
     {
         $this->get('/install')
@@ -103,13 +123,16 @@ class InstallerTest extends TestCase
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => '8.0.36']);
             $mock->shouldReceive('installaSchema')->once()->ordered()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
-            $mock->shouldReceive('writeEnv')->once()->ordered()->withArgs(fn (array $v) => ($v['DB_DATABASE'] ?? null) === 'demo');
+            $mock->shouldReceive('writeEnv')->once()->ordered()->withArgs(fn (array $v) => ($v['DB_DATABASE'] ?? null) === 'demo'
+                && ($v['APP_URL'] ?? null) === 'http://localhost/gestionale/public');
         });
 
-        $this->post('/install/database', [
+        // App servita da una sottocartella (hosting condiviso): APP_URL la include
+        $this->call('POST', 'http://localhost/gestionale/public/install/database', [
             'host' => '127.0.0.1', 'port' => 3306,
             'database' => 'demo', 'username' => 'root', 'password' => '',
-        ])->assertRedirect(route('installer.admin'))->assertSessionHas('success')->assertCookie('installer_token');
+        ], [], [], ['SCRIPT_NAME' => '/gestionale/public/index.php', 'SCRIPT_FILENAME' => '/var/www/gestionale/public/index.php', 'PHP_SELF' => '/gestionale/public/index.php'])
+            ->assertRedirect(route('installer.admin'))->assertSessionHas('success')->assertCookie('installer_token');
 
         $this->assertFileExists($this->inCorsoFile, 'Dopo lo schema il wizard segna che è in corso');
     }
@@ -205,9 +228,15 @@ class InstallerTest extends TestCase
     {
         $this->wizardInCorso();
 
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('collegaStorage')->once()->andReturnFalse();
+        });
+
         $this->get('/install/done')
             ->assertOk()
-            ->assertSee('Installazione completata');
+            ->assertSee('Installazione completata')
+            ->assertSee('Cron Jobs')
+            ->assertSee('storage:link');
 
         $this->assertFileExists($this->lockFile);
         $this->assertFileDoesNotExist($this->inCorsoFile);

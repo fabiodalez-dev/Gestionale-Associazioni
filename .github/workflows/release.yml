@@ -1,0 +1,63 @@
+name: Release
+
+# Al push di un tag v* costruisce il pacchetto installabile (vendor e asset
+# inclusi) con bin/build-release.sh e lo pubblica come asset della GitHub
+# Release, insieme al suo SHA256. L'aggiornatore in-app (/aggiornamenti)
+# scarica esattamente questo asset: <repo>-<tag>.zip e <repo>-<tag>.zip.sha256.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  pacchetto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP 8.3 (versione minima supportata dall'app)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, gd, zip, pdo_mysql, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Il tag deve coincidere con il file VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          versione="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag" != "$versione" ]; then
+            echo "Tag v$tag ma VERSION contiene $versione: allinea il file VERSION prima di taggare." >&2
+            exit 1
+          fi
+
+      - name: Costruisci il pacchetto
+        run: bash bin/build-release.sh
+
+      - name: Verifica il pacchetto
+        run: |
+          zip="releases/gestionale-associazioni-${GITHUB_REF_NAME}.zip"
+          test -f "$zip"
+          (cd releases && shasum -a 256 -c "$(basename "$zip").sha256")
+          unzip -l "$zip" | grep -q "gestionale-associazioni/vendor/autoload.php"
+          unzip -l "$zip" | grep -q "gestionale-associazioni/public/build/manifest.json"
+          unzip -l "$zip" | grep -q "gestionale-associazioni/index.php"
+          ! unzip -l "$zip" | grep -q "gestionale-associazioni/.env$"
+
+      - name: Pubblica la release con il pacchetto
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --title "$GITHUB_REF_NAME" --generate-notes
+          fi

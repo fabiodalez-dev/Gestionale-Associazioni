@@ -6,6 +6,7 @@ use App\Models\Associazione;
 use App\Models\Utente;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RolesSeeder;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -35,6 +36,50 @@ class InstallerService
         $envFile = config('installer.env_file');
         if (file_exists($envFile)) {
             @chmod($envFile, 0600);
+        }
+    }
+
+    /**
+     * Primo avvio senza terminale (pacchetto caricato via FTP): crea il .env
+     * da .env.example se manca e genera APP_KEY se è vuota, prima che
+     * EncryptCookies la richieda. Non fa nulla se non può scrivere.
+     */
+    public function preparaEnv(): void
+    {
+        $env = (string) config('installer.env_file');
+
+        if (! file_exists($env)) {
+            $esempio = base_path('.env.example');
+            if (! is_file($esempio) || ! is_writable(dirname($env))) {
+                return;
+            }
+            copy($esempio, $env);
+            @chmod($env, 0600);
+        }
+
+        if (blank(config('app.key')) && is_writable($env)) {
+            $chiave = 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher', 'AES-256-CBC')));
+            $this->writeEnv(['APP_KEY' => $chiave]);
+            config(['app.key' => $chiave]);
+        }
+    }
+
+    /**
+     * Collegamento public/storage → storage/app/public (immagini caricate):
+     * senza terminale lo fa l'installer a fine wizard. Ritorna false se il
+     * link non si può creare (si rimedia dopo con php artisan storage:link).
+     */
+    public function collegaStorage(): bool
+    {
+        $link = public_path('storage');
+        if (is_link($link) || file_exists($link)) {
+            return true;
+        }
+
+        try {
+            return Artisan::call('storage:link', ['--force' => true]) === 0;
+        } catch (\Throwable) {
+            return false;
         }
     }
 

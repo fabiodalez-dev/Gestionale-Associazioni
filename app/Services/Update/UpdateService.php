@@ -17,8 +17,9 @@ use ZipArchive;
  * Flusso performUpdate():
  *  1. lock distribuito (Cache::lock) → niente update concorrenti;
  *  2. backup del database (spatie/laravel-backup);
- *  3. download dello zip della release da GitHub + verifica SHA256 (se l'asset
- *     .sha256 è presente nella release) + anti zip-slip;
+ *  3. download del pacchetto della release (asset <repo>-<tag>.zip, con
+ *     vendor e asset frontend; in mancanza lo zipball dei sorgenti) +
+ *     verifica SHA256 dell'asset .sha256 + anti zip-slip;
  *  4. maintenance mode (artisan down), sovrascrittura file applicativi
  *     (preservando .env/storage/VERSION), aggiornamento del file VERSION;
  *  5. php artisan migrate --force, allineamento ruoli/permessi, pulizia cache, queue:restart, artisan up;
@@ -247,16 +248,21 @@ class UpdateService
         File::ensureDirectoryExists($tmp);
         $zipPath = $tmp.'/release_'.$versione.'.zip';
 
-        // zipball ufficiale GitHub della tag
-        $url = "https://api.github.com/repos/{$owner}/{$repo}/zipball/{$tag}";
+        // Pacchetto completo pubblicato dalla release (vendor e asset
+        // inclusi, lo stesso che si installa via FTP); se la release non lo
+        // ha, zipball dei sorgenti (richiede composer e npm sul server)
+        $archivio = $this->archivioRelease($tag);
         $resp = Http::withHeaders($this->headerGitHub())
             ->timeout((int) config('update.download_timeout', 300))
-            ->get($url);
+            ->get($archivio['url']);
         abort_unless($resp->successful(), 502, 'Download release fallito: '.$resp->status());
         File::put($zipPath, $resp->body());
 
-        // Verifica SHA256 se la release pubblica un asset <repo>-<tag>.zip.sha256
-        $this->verificaChecksum($owner, $repo, $tag, $zipPath);
+        // Lo SHA256 pubblicato è quello del pacchetto: lo zipball dei
+        // sorgenti non può corrispondere, per quello basta HTTPS
+        if ($archivio['asset']) {
+            $this->verificaChecksum($owner, $repo, $tag, $zipPath);
+        }
 
         $estrazione = $tmp.'/extract_'.$versione;
         File::deleteDirectory($estrazione);
@@ -277,11 +283,43 @@ class UpdateService
         $zip->close();
         File::delete($zipPath);
 
-        // GitHub zipball ha una sola cartella radice <owner>-<repo>-<sha>/
+        // Una sola cartella radice: gestionale-associazioni/ nel pacchetto,
+        // <owner>-<repo>-<sha>/ nello zipball GitHub
         $dirs = File::directories($estrazione);
         abort_unless(count($dirs) === 1, 500, 'Struttura zip release inattesa.');
 
         return $dirs[0];
+    }
+
+    /**
+     * URL da scaricare per una tag: l'asset <repo>-<tag>.zip della release se
+     * pubblicato (pacchetto completo di bin/build-release.sh), altrimenti lo
+     * zipball dei sorgenti.
+     *
+     * @return array{url: string, asset: bool}
+     */
+    public function archivioRelease(string $tag): array
+    {
+        $owner = config('update.github.owner');
+        $repo = config('update.github.repo');
+        $nomeAsset = "{$repo}-{$tag}.zip";
+
+        try {
+            $resp = Http::withHeaders($this->headerGitHub())->timeout(15)
+                ->get("https://api.github.com/repos/{$owner}/{$repo}/releases/tags/{$tag}");
+
+            if ($resp->successful()) {
+                foreach ((array) $resp->json('assets', []) as $asset) {
+                    if (($asset['name'] ?? null) === $nomeAsset && filled($asset['browser_download_url'] ?? null)) {
+                        return ['url' => (string) $asset['browser_download_url'], 'asset' => true];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::info('UpdateService: elenco asset della release non letto', ['error' => $e->getMessage()]);
+        }
+
+        return ['url' => "https://api.github.com/repos/{$owner}/{$repo}/zipball/{$tag}", 'asset' => false];
     }
 
     private function verificaChecksum(string $owner, string $repo, string $tag, string $zipPath): void

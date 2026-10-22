@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\FrontendPubblico;
 
+use App\Support\LimiteAccessi;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -54,7 +55,7 @@ class LoginAccountRequest extends FormRequest
         ];
 
         if (! Auth::guard('account')->attempt($credenziali, $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), LimiteAccessi::secondiBlocco());
 
             throw ValidationException::withMessages([
                 'email' => 'Credenziali non valide.',
@@ -84,8 +85,8 @@ class LoginAccountRequest extends FormRequest
 
     public function throttleKey(): string
     {
-        return 'pubblico-login|'.Str::transliterate(
+        return LimiteAccessi::chiave('pubblico-login|'.Str::transliterate(
             Str::lower($this->string('email')->toString()).'|'.$this->ip()
-        );
+        ));
     }
 }

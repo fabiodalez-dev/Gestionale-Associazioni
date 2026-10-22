@@ -116,6 +116,23 @@
                         </div>
                     </div>
                 @endif
+                @if ($attiva === 'sicurezza')
+                    <div class="card mb-4">
+                        <div class="card-header"><h5 class="card-title mb-0"><i class="bi bi-shield-exclamation me-1"></i>Azioni di sicurezza</h5></div>
+                        <div class="card-body d-flex flex-column gap-3">
+                            <form method="POST" action="{{ route('impostazioni-sistema.revoca-accessi') }}" class="m-0" onsubmit="return confirm('Disconnettere tutti gli utenti da tutti i dispositivi?');">
+                                @csrf
+                                <p class="small text-muted mb-2">Annulla tutti i "Ricordami" e chiude le sessioni aperte: utile se un dispositivo è stato perso o una password è stata compromessa.</p>
+                                <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-box-arrow-right"></i>Revoca tutti gli accessi</button>
+                            </form>
+                            <form method="POST" action="{{ route('impostazioni-sistema.azzera-tentativi') }}" class="m-0">
+                                @csrf
+                                <p class="small text-muted mb-2">Sblocca subito chi ha superato i tentativi di accesso consentiti.</p>
+                                <button type="submit" class="btn btn-outline-secondary w-100"><i class="bi bi-unlock"></i>Azzera i tentativi di accesso</button>
+                            </form>
+                        </div>
+                    </div>
+                @endif
                 <div class="card">
                     <div class="card-body small text-muted">
                         <p class="mb-2"><i class="bi bi-shield-check me-1"></i>Ogni salvataggio crea un backup del file <code>.env</code> in <code>storage/app/private/env-backups</code>, fuori dalla cartella pubblica.</p>

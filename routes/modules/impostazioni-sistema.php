@@ -18,6 +18,8 @@ Route::middleware(['auth'])->prefix('impostazioni-sistema')->name('impostazioni-
     Route::match(['post', 'put'], '/database/test', [ImpostazioniSistemaController::class, 'testDatabase'])
         ->middleware('throttle:10,1')
         ->name('test-database');
+    Route::post('/sicurezza/revoca-accessi', [ImpostazioniSistemaController::class, 'revocaAccessi'])->name('revoca-accessi');
+    Route::post('/sicurezza/azzera-tentativi', [ImpostazioniSistemaController::class, 'azzeraTentativi'])->name('azzera-tentativi');
     Route::get('/{sezione?}', [ImpostazioniSistemaController::class, 'index'])->name('index');
     Route::put('/{sezione}', [ImpostazioniSistemaController::class, 'update'])
         ->middleware('throttle:20,1')

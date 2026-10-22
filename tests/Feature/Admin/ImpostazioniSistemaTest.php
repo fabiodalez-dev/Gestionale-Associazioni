@@ -159,7 +159,7 @@ class ImpostazioniSistemaTest extends TestCase
     {
         $this->actingAs($this->superAdmin())
             ->put('/impostazioni-sistema/sicurezza', [
-                'AUTH_LOGIN_ATTEMPTS' => '10', 'AUTH_REMEMBER_DAYS' => '14', 'AUTH_RESET_MINUTES' => '30',
+                'AUTH_LOGIN_ATTEMPTS' => '10', 'AUTH_LOCKOUT_MINUTES' => '15', 'AUTH_REMEMBER_DAYS' => '14', 'AUTH_RESET_MINUTES' => '30',
                 'ZXCVBN_MIN_SCORE' => '4', 'SESSION_LIFETIME' => '60', 'SESSION_ENCRYPT' => '1',
                 'HONEYPOT_ENABLED' => '1', 'CSP_ENABLED' => '1', 'ACTIVITYLOG_ENABLED' => '0',
             ])
@@ -167,6 +167,7 @@ class ImpostazioniSistemaTest extends TestCase
 
         $env = $this->env();
         $this->assertSame('14', $env['AUTH_REMEMBER_DAYS']);
+        $this->assertSame('15', $env['AUTH_LOCKOUT_MINUTES']);
         $this->assertSame('4', $env['ZXCVBN_MIN_SCORE']);
         $this->assertSame('true', $env['SESSION_ENCRYPT']);
         $this->assertSame('false', $env['ACTIVITYLOG_ENABLED']);

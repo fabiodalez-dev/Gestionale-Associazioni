@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Models\Utente;
+use App\Support\LimiteAccessi;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -105,7 +106,9 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $email = Str::lower((string) $request->input(Fortify::username()));
 
-            return Limit::perMinute(max(1, (int) config('auth.login_max_attempts', 5)))->by($email.'|'.$request->ip());
+            // Durata del blocco e azzeramento dal super admin: App\Support\LimiteAccessi
+            return Limit::perMinutes(LimiteAccessi::minutiBlocco(), max(1, (int) config('auth.login_max_attempts', 5)))
+                ->by(LimiteAccessi::chiave($email.'|'.$request->ip()));
         });
 
         // Rate limiting sulla challenge 2FA: 5 tentativi al minuto per sessione di login

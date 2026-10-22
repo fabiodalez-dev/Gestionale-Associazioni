@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\Utente;
 use App\Services\Sistema\EnvEditor;
+use App\Support\LimiteAccessi;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -123,6 +125,39 @@ class ImpostazioniSistemaController extends Controller
     /**
      * Verifica la connessione al database con i valori del form, senza salvarli.
      */
+    /**
+     * Esce da tutti i dispositivi: annulla i "Ricordami" di utenti e account e
+     * chiude le sessioni aperte (tranne quella di chi esegue l'azione).
+     */
+    public function revocaAccessi(Request $request): RedirectResponse
+    {
+        $this->soloSuperAdmin($request);
+
+        $utenti = Utente::query()->whereNotNull('remember_token')->update(['remember_token' => null]);
+        $account = Account::query()->withoutGlobalScopes()->whereNotNull('remember_token')->update(['remember_token' => null]);
+        $sessioni = 0;
+        if (config('session.driver') === 'database') {
+            $sessioni = DB::table((string) config('session.table', 'sessions'))->where('id', '!=', $request->session()->getId())->delete();
+        }
+
+        activity('sicurezza')->causedBy($request->user())->withProperties(['ricordami' => $utenti + $account, 'sessioni' => $sessioni])->log('Revocati tutti gli accessi ricordati');
+
+        return back()->with('success', 'Accessi revocati: '.($utenti + $account).' "Ricordami" annullati'.(config('session.driver') === 'database' ? ', '.$sessioni.' sessioni chiuse' : '').'. Tutti dovranno accedere di nuovo.');
+    }
+
+    /**
+     * Sblocca chi ha superato i tentativi di accesso (tutti i login).
+     */
+    public function azzeraTentativi(Request $request): RedirectResponse
+    {
+        $this->soloSuperAdmin($request);
+        LimiteAccessi::azzera();
+
+        activity('sicurezza')->causedBy($request->user())->log('Azzerati i tentativi di accesso');
+
+        return back()->with('success', 'Tentativi di accesso azzerati: chi era bloccato può riprovare subito.');
+    }
+
     public function testDatabase(Request $request): RedirectResponse
     {
         $this->soloSuperAdmin($request);
@@ -180,6 +215,7 @@ class ImpostazioniSistemaController extends Controller
                 'descrizione' => 'Login, "Ricordami", recupero password, robustezza delle password e protezioni dei form.',
                 'campi' => [
                     'AUTH_LOGIN_ATTEMPTS' => ['label' => 'Tentativi di login al minuto', 'tipo' => 'number', 'rules' => $int(3, 30), 'default' => '5', 'help' => 'Per combinazione email + IP; superata la soglia il login si blocca per un minuto.'],
+                    'AUTH_LOCKOUT_MINUTES' => ['label' => 'Durata del blocco dopo troppi tentativi (minuti)', 'tipo' => 'number', 'rules' => $int(1, 1440), 'default' => '1', 'help' => 'Vale per pannello, area soci e sito pubblico.'],
                     'AUTH_REMEMBER_DAYS' => ['label' => 'Durata "Ricordami" (giorni)', 'tipo' => 'number', 'rules' => $int(1, 365), 'default' => '30'],
                     'AUTH_RESET_MINUTES' => ['label' => 'Validità link di recupero (minuti)', 'tipo' => 'number', 'rules' => $int(5, 1440), 'default' => '60'],
                     'ZXCVBN_MIN_SCORE' => ['label' => 'Robustezza minima delle password', 'tipo' => 'select', 'opzioni' => ['2' => '2 — sufficiente', '3' => '3 — buona (consigliata)', '4' => '4 — molto alta'], 'rules' => ['required', Rule::in(['2', '3', '4'])], 'default' => '3', 'help' => 'Punteggio zxcvbn richiesto per amministratori, soci e account pubblici.'],

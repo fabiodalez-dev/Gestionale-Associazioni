@@ -5,6 +5,7 @@ namespace Tests\Feature\AreaSoci;
 use App\Models\Associazione;
 use App\Models\Socio;
 use App\Models\Utente;
+use App\Support\LimiteAccessi;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
@@ -145,7 +146,7 @@ class LoginSocioTest extends TestCase
             'password' => 'password123',
         ])->assertRedirect(route('area-soci.dashboard'));
 
-        $this->assertSame(0, RateLimiter::attempts('area-soci-login|socio@example.com|127.0.0.1'));
+        $this->assertSame(0, RateLimiter::attempts(LimiteAccessi::chiave('area-soci-login|socio@example.com|127.0.0.1')));
     }
 
     public function test_logout_socio(): void

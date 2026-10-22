@@ -108,6 +108,9 @@ return [
     // Tentativi di login al minuto per email+IP (FortifyServiceProvider)
     'login_max_attempts' => (int) env('AUTH_LOGIN_ATTEMPTS', 5),
 
+    // Durata del blocco dopo troppi tentativi di accesso (minuti)
+    'login_lockout_minutes' => (int) env('AUTH_LOCKOUT_MINUTES', 1),
+
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
 ];

@@ -13,6 +13,7 @@
         .verify-card { max-width: 480px; margin: 60px auto; }
         .status-icon { font-size: 4rem; }
     </style>
+    @include('partials.pwa')
 </head>
 <body>
     <div class="container">

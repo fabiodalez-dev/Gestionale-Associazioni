@@ -45,11 +45,7 @@
     @else
         <meta name="theme-color" content="#0D9488">
     @endif
-    <link rel="manifest" href="{{ asset('manifest.json') }}">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="apple-touch-icon" href="{{ asset('assets/icons/icon-192.png') }}">
+    @include('partials.pwa')
     @stack('styles')
 </head>
 <body class="area-soci">
@@ -149,14 +145,6 @@
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
-    <script>
-        // PWA: registrazione service worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('{{ asset('service-worker.js') }}').catch(function () {});
-            });
-        }
-    </script>
     @stack('scripts')
 </body>
 </html>

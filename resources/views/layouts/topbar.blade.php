@@ -25,6 +25,12 @@
                 $daGestire->push(['n' => $n, 'testo' => $n === 1 ? 'tessera in scadenza entro 30 giorni' : 'tessere in scadenza entro 30 giorni', 'icona' => 'bi-hourglass-split', 'tono' => 'tone-3', 'url' => route('campagna-rinnovi.index')]);
             }
         }
+        if (\Illuminate\Support\Facades\Route::has('quote.index') && ($utente->isSuperAdmin() || $utente->can('quote.view'))) {
+            $n = \App\Models\Quota::query()->whereNull('data_pagamento')->whereDate('data_scadenza', '<', now()->startOfDay())->count();
+            if ($n > 0) {
+                $daGestire->push(['n' => $n, 'testo' => $n === 1 ? 'quota scaduta non pagata' : 'quote scadute non pagate', 'icona' => 'bi-exclamation-triangle', 'tono' => 'tone-danger', 'url' => route('quote.index', ['status' => \App\Models\Quota::STATO_SCADUTA])]);
+            }
+        }
     }
     if ($utente->isSuperAdmin()) {
         $n = \App\Models\RichiestaRegistrazione::query()->daEsaminare()->count();

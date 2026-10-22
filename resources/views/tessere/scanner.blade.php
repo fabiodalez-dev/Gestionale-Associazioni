@@ -29,6 +29,7 @@
         .result-expired { border-left: 4px solid #dc3545; }
         .result-notfound { border-left: 4px solid #ffc107; }
     </style>
+    @include('partials.pwa')
 </head>
 <body>
     <div class="scanner-header">

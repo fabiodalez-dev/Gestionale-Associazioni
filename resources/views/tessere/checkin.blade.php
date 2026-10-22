@@ -48,6 +48,7 @@
         .recent-item .ri-name { flex: 1; font-weight: 500; }
         .recent-item .ri-time { color: #888; font-size: .85rem; }
     </style>
+    @include('partials.pwa')
 </head>
 <body>
 

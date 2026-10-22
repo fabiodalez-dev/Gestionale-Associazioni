@@ -60,6 +60,7 @@
         .kiosk-result.err { background: #dc3545; color: #fff; }
         @keyframes kioskFade { from { opacity: 0; } to { opacity: 1; } }
     </style>
+    @include('partials.pwa')
 </head>
 <body>
 

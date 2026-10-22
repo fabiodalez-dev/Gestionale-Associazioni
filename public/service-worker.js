@@ -1,15 +1,16 @@
 /**
  * Service Worker - Gestione Associazioni PWA (Laravel)
- * Strategies: cache-first (static), network-first (navigation), network-only (API)
+ * Strategie: cache-first per i file statici in /assets, rete per tutto il resto.
+ * Le pagine NON vengono mai salvate in cache (contengono dati personali e
+ * resterebbero sul dispositivo dopo il logout): senza rete si mostra offline.html.
  *
  * Path adattati alla webroot Laravel (public/): URL assoluti dalla root.
  * Bump CACHE_VERSION ad ogni release degli asset.
  */
 'use strict';
 
-var CACHE_VERSION = 'v1';
+var CACHE_VERSION = 'v2';
 var STATIC_CACHE = 'static-' + CACHE_VERSION;
-var DYNAMIC_CACHE = 'dynamic-' + CACHE_VERSION;
 
 var PRECACHE_URLS = [
     '/offline.html',
@@ -17,6 +18,8 @@ var PRECACHE_URLS = [
     '/assets/vendor/bootstrap/js/bootstrap.bundle.min.js',
     '/assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css',
     '/assets/css/style.css',
+    '/assets/css/design-system.css',
+    '/assets/fonts/PublicSansVariable.woff2',
     '/assets/js/main.js',
     '/assets/icons/icon.svg',
     '/assets/icons/icon-192.png',
@@ -41,7 +44,7 @@ self.addEventListener('activate', function(event) {
         caches.keys().then(function(cacheNames) {
             return Promise.all(
                 cacheNames.filter(function(name) {
-                    return name !== STATIC_CACHE && name !== DYNAMIC_CACHE;
+                    return name !== STATIC_CACHE;
                 }).map(function(name) {
                     return caches.delete(name);
                 })
@@ -66,20 +69,11 @@ self.addEventListener('fetch', function(event) {
     // Network-only for API endpoints (dati sempre freschi: check-in, verify, ...)
     if (url.pathname.indexOf('/api/') !== -1) return;
 
-    // Navigation requests: network-first with offline fallback
+    // Navigazione: sempre dalla rete, offline.html se non c'è connessione (nessuna pagina in cache)
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request).then(function(response) {
-                // Cache successful navigation for offline
-                var responseClone = response.clone();
-                caches.open(DYNAMIC_CACHE).then(function(cache) {
-                    cache.put(request, responseClone);
-                });
-                return response;
-            }).catch(function() {
-                return caches.match(request).then(function(cached) {
-                    return cached || caches.match('/offline.html');
-                });
+            fetch(request).catch(function() {
+                return caches.match('/offline.html');
             })
         );
         return;
@@ -109,6 +103,6 @@ self.addEventListener('fetch', function(event) {
 });
 
 function isStaticAsset(pathname) {
-    return /\.(css|js|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico|webp|json)(\?.*)?$/.test(pathname)
-        || pathname.indexOf('/assets/') !== -1;
+    // Solo i file pubblicati dell'app: niente foto, documenti o risposte JSON degli utenti
+    return pathname.indexOf('/assets/') === 0 || pathname === '/manifest.json' || pathname === '/offline.html';
 }

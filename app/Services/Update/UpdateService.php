@@ -32,6 +32,9 @@ class UpdateService
 {
     private const LOCK_KEY = 'app.update';
 
+    /** Cartelle salvate prima della sovrascrittura e ripristinate dal rollback. */
+    private const DIR_BACKUP = ['app', 'bootstrap', 'config', 'database', 'lang', 'routes', 'resources', 'vendor', 'bin', 'public/assets', 'public/build'];
+
     public function versioneCorrente(): string
     {
         return (string) config('update.version', '0.1.0');
@@ -324,26 +327,29 @@ class UpdateService
 
     private function verificaChecksum(string $owner, string $repo, string $tag, string $zipPath): void
     {
+        // Solo l'errore di rete sul download del checksum è tollerato: un
+        // checksum presente ma discordante deve bloccare l'aggiornamento
         try {
             $assetUrl = "https://github.com/{$owner}/{$repo}/releases/download/{$tag}/{$repo}-{$tag}.zip.sha256";
             $resp = Http::timeout(15)->get($assetUrl);
-
-            if (! $resp->successful()) {
-                return; // nessun checksum pubblicato: si procede (zipball GitHub via HTTPS)
-            }
-
-            $atteso = trim(explode(' ', trim($resp->body()))[0]);
-            $reale = hash_file('sha256', $zipPath);
-
-            abort_if(
-                $atteso !== '' && ! hash_equals($atteso, (string) $reale),
-                500,
-                'Checksum SHA256 della release non corrispondente: download corrotto o manomesso.'
-            );
         } catch (\Throwable $e) {
-            // Un errore di rete sul solo checksum non deve bloccare; logghiamo
             Log::info('UpdateService: checksum non verificato', ['error' => $e->getMessage()]);
+
+            return;
         }
+
+        if (! $resp->successful()) {
+            return; // nessun checksum pubblicato: si procede (HTTPS)
+        }
+
+        $atteso = trim(explode(' ', trim($resp->body()))[0]);
+        $reale = hash_file('sha256', $zipPath);
+
+        abort_if(
+            $atteso !== '' && ! hash_equals($atteso, (string) $reale),
+            500,
+            'Checksum SHA256 della release non corrispondente: download corrotto o manomesso.'
+        );
     }
 
     private function sovrascriviFile(string $sorgente): void
@@ -391,7 +397,8 @@ class UpdateService
         File::ensureDirectoryExists($backupDir);
 
         // Backup delle directory di codice che l'update può sovrascrivere
-        foreach (['app', 'config', 'database', 'routes', 'resources', 'public/assets', 'bootstrap'] as $dir) {
+        // (il pacchetto della release contiene anche vendor e public/build)
+        foreach (self::DIR_BACKUP as $dir) {
             $src = base_path($dir);
             if (File::isDirectory($src)) {
                 File::copyDirectory($src, $backupDir.'/'.$dir);
@@ -406,13 +413,14 @@ class UpdateService
 
     private function ripristinaFile(string $backupDir): void
     {
-        foreach (File::directories($backupDir) as $dir) {
-            $name = basename($dir);
-            File::copyDirectory($dir, base_path($name));
-        }
-        // public/assets è annidato
-        if (File::isDirectory($backupDir.'/public/assets')) {
-            File::copyDirectory($backupDir.'/public/assets', base_path('public/assets'));
+        // Sostituzione completa: le dipendenze o le classi arrivate con il
+        // pacchetto nuovo non devono restare accanto al codice ripristinato
+        foreach (self::DIR_BACKUP as $dir) {
+            if (! File::isDirectory($backupDir.'/'.$dir)) {
+                continue;
+            }
+            File::deleteDirectory(base_path($dir));
+            File::copyDirectory($backupDir.'/'.$dir, base_path($dir));
         }
         if (File::exists($backupDir.'/composer.json')) {
             File::copy($backupDir.'/composer.json', base_path('composer.json'));

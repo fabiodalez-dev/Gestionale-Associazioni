@@ -56,8 +56,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Un tag con trattino (v1.2.3-rc.1) è una prerelease: non deve
+          # diventare "Latest", altrimenti il canale stabile dell'updater
+          # (/releases/latest) la proporrebbe a tutte le installazioni
+          extra=""
+          case "$GITHUB_REF_NAME" in *-*) extra="--prerelease" ;; esac
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --clobber
           else
-            gh release create "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --title "$GITHUB_REF_NAME" --generate-notes
+            gh release create "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --title "$GITHUB_REF_NAME" --generate-notes $extra
           fi

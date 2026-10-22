@@ -206,32 +206,41 @@
             <div class="row g-3">
                 @foreach ($campiPersonalizzati as $campo)
                     @php
-                        $valore = old("custom_field.{$campo->id}", $valoriCampi[$campo->id] ?? '');
+                        $valore = (string) old("custom_field.{$campo->id}", $valoriCampi[$campo->id] ?? '');
                         $name = "custom_field[{$campo->id}]";
+                        $chiaveErrore = "custom_field.{$campo->id}";
+                        $classeErrore = $errors->has($chiaveErrore) ? ' is-invalid' : '';
+                        $opzioniSelect = array_values(array_filter(array_map('trim', explode("\n", (string) $campo->opzioni))));
+                        // Valore salvato prima che l'opzione fosse rinominata o rimossa: resta visibile e selezionato
+                        $valoreFuoriOpzioni = $campo->tipo_campo === 'select' && $valore !== '' && ! in_array($valore, $opzioniSelect, true);
                     @endphp
                     <div class="col-md-4">
                         <label class="form-label" for="campo_{{ $campo->id }}">
                             {{ $campo->nome_campo }}{{ $campo->obbligatorio ? ' *' : '' }}
                         </label>
                         @if ($campo->tipo_campo === 'textarea')
-                            <textarea class="form-control" id="campo_{{ $campo->id }}" name="{{ $name }}" rows="2"
+                            <textarea class="form-control{{ $classeErrore }}" id="campo_{{ $campo->id }}" name="{{ $name }}" rows="2"
                                       @required($campo->obbligatorio)>{{ $valore }}</textarea>
                         @elseif ($campo->tipo_campo === 'select')
-                            <select class="form-select" id="campo_{{ $campo->id }}" name="{{ $name }}" @required($campo->obbligatorio)>
+                            <select class="form-select{{ $classeErrore }}" id="campo_{{ $campo->id }}" name="{{ $name }}" @required($campo->obbligatorio)>
                                 <option value="">— Seleziona —</option>
-                                @foreach (array_filter(array_map('trim', explode("\n", (string) $campo->opzioni))) as $opzione)
+                                @foreach ($opzioniSelect as $opzione)
                                     <option value="{{ $opzione }}" @selected($valore === $opzione)>{{ $opzione }}</option>
                                 @endforeach
+                                @if ($valoreFuoriOpzioni)
+                                    <option value="{{ $valore }}" selected>{{ $valore }} (valore salvato, non più tra le opzioni)</option>
+                                @endif
                             </select>
                         @elseif ($campo->tipo_campo === 'checkbox')
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="campo_{{ $campo->id }}"
+                                <input class="form-check-input{{ $classeErrore }}" type="checkbox" id="campo_{{ $campo->id }}"
                                        name="{{ $name }}" value="1" @checked($valore === '1')>
                             </div>
                         @else
-                            <input type="{{ $campo->tipo_campo }}" class="form-control" id="campo_{{ $campo->id }}"
+                            <input type="{{ $campo->tipo_campo }}" class="form-control{{ $classeErrore }}" id="campo_{{ $campo->id }}"
                                    name="{{ $name }}" value="{{ $valore }}" @required($campo->obbligatorio)>
                         @endif
+                        @error($chiaveErrore)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         @if ($campo->descrizione)
                             <div class="form-text">{{ $campo->descrizione }}</div>
                         @endif

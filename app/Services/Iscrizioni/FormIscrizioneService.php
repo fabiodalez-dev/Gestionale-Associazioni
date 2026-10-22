@@ -15,6 +15,7 @@ use App\Services\Soci\NumeroProgressivoService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Mews\Purifier\Facades\Purifier;
 
@@ -280,7 +281,15 @@ class FormIscrizioneService
                     : $associazione->costo_tessera;
 
                 if ($importo !== null && (float) $importo > 0) {
-                    PaymentService::createQuotaForSocio($socio, (float) $importo);
+                    $quota = PaymentService::createQuotaForSocio($socio, (float) $importo);
+
+                    // Come all'approvazione admin: senza token la pagina tessera
+                    // mostrerebbe "Da pagare" senza il pulsante "Paga ora"
+                    try {
+                        app(PaymentService::class)->generatePaymentToken($quota);
+                    } catch (\Throwable $e) {
+                        Log::warning('FormIscrizioneService: link pagamento non generato', ['quota_id' => $quota->id, 'error' => $e->getMessage()]);
+                    }
                 }
             }
 

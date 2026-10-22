@@ -119,11 +119,17 @@ class PostiTurnoService
                 ->firstOrFail();
 
             // Già confermata → idempotente, nessun posto in più consumato.
-            // Altrimenti (proposto/rinunciato → confermato) ricontrolliamo i
-            // posti DENTRO il lock prima di promuovere, replicando la guardia
-            // originale del controller ma serializzata sul mutex di turno.
-            if (! $assegnazione->isConfermata()
-                && $this->postiDisponibiliLocked($turno) < 1) {
+            // Una proposta occupa GIÀ il suo posto (postiDisponibiliLocked
+            // conta proposti e confermati): promuoverla non ne consuma uno
+            // nuovo, altrimenti l'ultimo posto di un turno pieno non sarebbe
+            // mai confermabile. Solo la riattivazione di una rinunciata
+            // ricontrolla i posti DENTRO il lock, serializzata sul mutex.
+            $occupaGiaUnPosto = in_array($assegnazione->stato, [
+                TurnoAssegnazione::STATO_PROPOSTO,
+                TurnoAssegnazione::STATO_CONFERMATO,
+            ], true);
+
+            if (! $occupaGiaUnPosto && $this->postiDisponibiliLocked($turno) < 1) {
                 throw ValidationException::withMessages([
                     'turno' => 'Non ci sono posti disponibili per confermare.',
                 ]);

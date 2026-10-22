@@ -20,10 +20,17 @@ class CampoPersonalizzatoRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'obbligatorio' => $this->boolean('obbligatorio'),
-            'obbligatorio_preiscrizione' => $this->boolean('obbligatorio_preiscrizione'),
-        ]);
+        $merge = ['obbligatorio' => $this->boolean('obbligatorio')];
+
+        // Il flag "obbligatorio in preiscrizione" si imposta dalla pagina
+        // Configurazioni → Campi obbligatori: il form di /config-campi non lo
+        // invia, quindi se manca resta com'è invece di essere azzerato a ogni
+        // modifica di nome/descrizione/tipo.
+        if ($this->has('obbligatorio_preiscrizione')) {
+            $merge['obbligatorio_preiscrizione'] = $this->boolean('obbligatorio_preiscrizione');
+        }
+
+        $this->merge($merge);
     }
 
     /**

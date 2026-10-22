@@ -120,6 +120,32 @@ class Account extends Authenticatable implements ExportsPersonalData, MustVerify
      */
     public function anonimizza(): void
     {
+        // Una richiesta di iscrizione ancora in attesa ha creato un socio
+        // preiscritto con i dati in chiaro: va eliminato (definitivamente,
+        // come al rifiuto) e la richiesta chiusa senza dati, altrimenti la
+        // cancellazione GDPR lascerebbe l'anagrafica nella tabella soci e
+        // bloccherebbe una futura iscrizione con la stessa email.
+        RichiestaIscrizione::withoutGlobalScopes()
+            ->where('account_id', $this->id)
+            ->where('stato', RichiestaIscrizione::STATO_IN_ATTESA)
+            ->get()
+            ->each(function (RichiestaIscrizione $richiesta): void {
+                $socioId = $richiesta->socio_id;
+                $richiesta->forceFill([
+                    'stato' => RichiestaIscrizione::STATO_RIFIUTATA,
+                    'motivo_rifiuto' => 'Account cancellato dall\'interessato',
+                    'socio_id' => null,
+                    'dati_form' => [],
+                    'gestita_at' => now(),
+                ])->save();
+                if ($socioId !== null) {
+                    $socio = Socio::withoutGlobalScopes()->withTrashed()->find($socioId);
+                    if ($socio !== null && $socio->stato === Socio::STATO_IN_ATTESA) {
+                        $socio->forceDelete();
+                    }
+                }
+            });
+
         $this->forceFill([
             'nome' => 'Account',
             'cognome' => 'Anonimizzato',

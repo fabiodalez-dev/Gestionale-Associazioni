@@ -45,7 +45,7 @@ class QuotePageTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('quote.index');
-        $response->assertSee('Quote Associative');
+        $response->assertSee('Quote e pagamenti');
     }
 
     public function test_isolamento_tenant_le_quote_dell_altra_associazione_non_sono_visibili(): void

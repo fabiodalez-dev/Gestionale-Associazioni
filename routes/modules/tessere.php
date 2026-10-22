@@ -28,6 +28,7 @@ use Spatie\Csp\AddCspHeaders;
 
 Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/tessere', [TesseraController::class, 'index'])->name('tessere.index');
+    Route::get('/tessere/export', [TesseraController::class, 'export'])->name('tessere.export');
     Route::post('/tessere', [TesseraController::class, 'store'])->name('tessere.store');
     Route::post('/tessere/genera-massivo', [TesseraController::class, 'generaMassivo'])->name('tessere.genera-massivo');
 

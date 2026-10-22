@@ -1635,3 +1635,30 @@ a.metric-cell:hover { box-shadow: var(--ds-shadow-md); transform: translateY(-1p
 .checks li.is-pending > .bi { background: var(--ds-surface-3); color: var(--ds-text-subtle); }
 .checks li.is-pending > .bi::before { content: '\F309'; }
 .checks li.is-error span { color: var(--ds-danger-ink); }
+
+/* ----------------------------------------------------------------------------
+   18. QUOTE E PAGAMENTI
+---------------------------------------------------------------------------- */
+.kpi-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--ds-surface); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-sm); }
+.kpi-cell { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 22px 24px; }
+.kpi-cell + .kpi-cell { border-left: 1px solid var(--ds-line); }
+.kpi-big { font-size: 1.625rem; font-weight: 600; color: var(--ds-text); letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.kpi-name { color: var(--ds-text-2); margin-top: 4px; }
+.kpi-note { font-size: 0.8125rem; font-weight: 500; margin-top: 8px; }
+.kpi-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 991.98px) {
+    .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpi-cell:nth-child(3) { border-left: 0; }
+    .kpi-cell:nth-child(n + 3) { border-top: 1px solid var(--ds-line); }
+}
+@media (max-width: 575.98px) {
+    .kpi-strip { grid-template-columns: 1fr; }
+    .kpi-cell + .kpi-cell { border-left: 0; border-top: 1px solid var(--ds-line); }
+}
+.method-tag { display: inline-block; font-family: var(--ds-mono); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.02em; padding: 2px 5px; border: 1px solid var(--ds-border); border-radius: 4px; color: var(--ds-text-2); vertical-align: 1px; }
+.method-tile { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--ds-surface-2); border: 1px solid var(--ds-line); font-size: 0.6875rem; font-weight: 700; color: var(--ds-text); }
+.price-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--ds-line); border-radius: 10px; }
+.price-row .price { font-weight: 600; color: var(--ds-text); white-space: nowrap; }
+.segmented .badge-count { background: transparent; padding: 0 0 0 2px; color: var(--ds-text-muted); }
+.segmented .active .badge-count { color: var(--ds-accent-ink); }
+.table td.mono, .table .who-cell .who-name { white-space: nowrap; }

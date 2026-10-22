@@ -28,6 +28,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::delete('/quote/{quota}', [QuotaController::class, 'destroy'])->name('quote.destroy');
 
     Route::get('/quote/soci-search', [QuotaController::class, 'sociSearch'])->name('quote.soci-search');
+    Route::get('/quote/export', [QuotaController::class, 'export'])->name('quote.export');
 
     Route::post('/quote/{quota}/pagamento', [PagamentoQuotaController::class, 'store'])->name('quote.pagamento');
     Route::post('/quote/{quota}/payment-link', [PagamentoQuotaController::class, 'paymentLink'])->name('quote.payment-link');

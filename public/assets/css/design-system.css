@@ -1714,3 +1714,45 @@ details.card > summary { cursor: pointer; list-style: none; }
 details.card > summary::-webkit-details-marker { display: none; }
 details.card > summary::after { content: '\F282'; font-family: 'bootstrap-icons'; float: right; transition: transform 200ms; }
 details.card[open] > summary::after { transform: rotate(180deg); }
+
+/* ----------------------------------------------------------------------------
+   21. COSTRUTTORE DEI MODULI PUBBLICI
+---------------------------------------------------------------------------- */
+.builder { display: grid; grid-template-columns: 280px minmax(0, 1fr) 360px; gap: 22px; align-items: start; }
+@media (max-width: 1399.98px) { .builder { grid-template-columns: 260px minmax(0, 1fr); } .builder-preview { grid-column: 1 / -1; } }
+@media (max-width: 991.98px) { .builder { grid-template-columns: 1fr; } }
+.builder-side { display: flex; flex-direction: column; gap: 22px; }
+.builder-preview { position: sticky; top: 96px; }
+.palette { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.palette-item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border: 1px solid var(--ds-line); border-radius: 10px; background: var(--ds-surface); color: var(--ds-text-2); font-size: 0.78125rem; transition: border-color 150ms, color 150ms, background-color 150ms; }
+.palette-item .bi { font-size: 1.125rem; color: var(--ds-accent); }
+.palette-item:hover { border-color: var(--ds-accent); background: var(--ds-accent-softer); color: var(--ds-text); }
+.other-form { display: block; padding: 10px 12px; border-radius: 9px; color: var(--ds-text-2); }
+.other-form + .other-form { margin-top: 4px; }
+.other-form b { display: block; color: var(--ds-text); font-weight: 500; }
+.other-form small { color: var(--ds-text-muted); font-size: 0.75rem; }
+.other-form:hover { background: var(--ds-hover); color: var(--ds-text-2); }
+.other-form.is-current { background: var(--ds-accent-softer); }
+.field-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.field-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--ds-line); border-radius: 10px; background: var(--ds-surface); transition: opacity 150ms, border-color 150ms; }
+.field-row:hover { border-color: var(--ds-border); }
+.field-row.is-off { opacity: 0.55; background: var(--ds-surface-2); }
+.field-list.is-locked .field-row { background: var(--ds-surface-2); }
+.field-grip { color: var(--ds-text-subtle); cursor: grab; padding: 4px 2px; }
+.is-locked .field-grip { cursor: default; }
+.field-icon { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--ds-surface-3); color: var(--ds-text-2); }
+.field-name { flex: 1; min-width: 0; line-height: 1.3; }
+.field-name b { display: block; font-weight: 500; color: var(--ds-text); }
+.field-name small { color: var(--ds-text-muted); font-size: 0.75rem; }
+.field-name .req { color: var(--ds-danger); }
+.field-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78125rem; color: var(--ds-text-2); white-space: nowrap; cursor: pointer; }
+@media (max-width: 575.98px) { .field-row { flex-wrap: wrap; } .field-toggle { margin-left: 46px; } }
+.link-box { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 4px 0 12px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius); background: var(--ds-surface); max-width: 360px; font-size: 0.8125rem; }
+.link-box .bi { color: var(--ds-text-muted); }
+.preview-frame { background: var(--ds-surface); border-radius: var(--ds-radius-lg); box-shadow: var(--ds-shadow-md); overflow: hidden; margin: 0 auto; transition: max-width 250ms var(--ds-ease); max-width: 100%; }
+.preview-frame.is-mobile { max-width: 300px; }
+.preview-bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: var(--ds-surface-2); border-bottom: 1px solid var(--ds-line); font-size: 0.6875rem; color: var(--ds-text-muted); }
+.preview-bar span:not(.mono) { width: 8px; height: 8px; border-radius: 50%; background: var(--ds-border); }
+.preview-bar .mono { margin-left: 8px; font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview-body { padding: 18px; max-height: 560px; overflow-y: auto; }
+.preview-body .form-control:disabled, .preview-body .form-select:disabled { background: var(--ds-surface); color: var(--ds-text-subtle); }

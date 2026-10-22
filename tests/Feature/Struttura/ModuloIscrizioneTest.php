@@ -252,4 +252,24 @@ class ModuloIscrizioneTest extends TestCase
         $this->assertSame(Associazione::MODALITA_PREISCRIZIONE, $this->associazione->fresh()->modalita_iscrizione);
         $this->assertSame(Associazione::MODALITA_DIRETTA, $altra->fresh()->modalita_iscrizione);
     }
+
+    public function test_nuovo_campo_dal_costruttore_entra_subito_nel_modulo(): void
+    {
+        $this->actingAs($this->admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->get(self::URL)->assertOk()
+            ->assertSee('Aggiungi campo')->assertSee('Struttura del modulo')->assertSee('Anteprima pubblica')->assertSee('Codice embed');
+
+        $this->actingAs($this->admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('config-campi.store'), [
+                'nome_campo' => 'Taglia maglietta',
+                'tipo_campo' => 'select',
+                'opzioni' => "S\nM\nL",
+                'obbligatorio' => '1',
+                'aggiungi_al_modulo' => '1',
+            ])->assertRedirect(route('configurazioni.modulo-iscrizione'));
+
+        $campo = CampoPersonalizzato::query()->withoutGlobalScopes()->where('nome_campo', 'Taglia maglietta')->sole();
+        $config = $this->associazione->fresh()->iscrizioni()->iscrizione_form_config;
+        $this->assertContains($campo->id, $config['campi_personalizzati']);
+    }
 }

@@ -43,7 +43,7 @@ test.describe('Rinnovi, ricevute e anteprime email', () => {
 
         await loginSocio(page, email);
 
-        await expect(page.getByRole('heading', { name: 'Ciao, Socio!' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /^(Buongiorno|Buon pomeriggio|Buonasera), Socio$/ })).toBeVisible();
         await expect(page.getByRole('button', { name: /rinnova per il/i })).toHaveCount(0);
     });
 

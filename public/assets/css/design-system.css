@@ -1674,7 +1674,8 @@ a.metric-cell:hover { box-shadow: var(--ds-shadow-md); transform: translateY(-1p
 .socio-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 22px; }
 @media (max-width: 991.98px) { .socio-hero { grid-template-columns: 1fr; } }
 .socio-hero .member-card { min-height: 210px; display: flex; flex-direction: column; }
-.socio-hero .member-card .mc-qr { width: 88px; height: 88px; }
+.socio-hero .member-card .mc-qr { width: 112px; height: 112px; padding: 6px; }
+@media (max-width: 575.98px) { .socio-hero .member-card .mc-qr { position: relative; right: auto; bottom: auto; margin-top: 14px; width: 132px; height: 132px; } }
 .socio-hero .member-card .mc-actions { margin-top: auto; padding-top: 16px; display: flex; gap: 8px; position: relative; z-index: 1; }
 .member-card .btn-mc { background: rgba(255, 255, 255, 0.16); color: #fff; border: 0; min-height: 34px; font-size: 0.8125rem; }
 .member-card .btn-mc:hover { background: rgba(255, 255, 255, 0.28); color: #fff; }

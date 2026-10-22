@@ -99,7 +99,7 @@ test.describe('Registro e anagrafica pro', () => {
         await page.goto('/associazioni');
 
         // Apre la modifica dell'associazione "Spenta" (non usata dagli altri test 10-12)
-        await page.locator('tr', { hasText: 'Associazione Spenta' }).locator('a[title="Modifica"]').click();
+        await page.locator('article.assoc-card', { hasText: 'Associazione Spenta' }).locator('a[title="Modifica"]').click();
         await expect(page.locator('#modalAssociazione')).toBeVisible();
         await expect(page.locator('#slug')).toHaveValue('spenta');
 
@@ -109,7 +109,7 @@ test.describe('Registro e anagrafica pro', () => {
         await expect(page.getByText('Associazione aggiornata con successo.')).toBeVisible();
 
         // Riapre la modifica: lo slug persistito è quello nuovo
-        await page.locator('tr', { hasText: 'Associazione Spenta' }).locator('a[title="Modifica"]').click();
+        await page.locator('article.assoc-card', { hasText: 'Associazione Spenta' }).locator('a[title="Modifica"]').click();
         await expect(page.locator('#slug')).toHaveValue(nuovoSlug);
 
         // Ripristina lo slug originale per l'idempotenza del run

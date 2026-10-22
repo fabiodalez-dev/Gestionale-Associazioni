@@ -126,3 +126,56 @@ Correzione di sicurezza (Fase 8), da revisione automatica:
 - Compilate tutte le 253 viste: nessun errore di sintassi, nessuna direttiva rimasta come testo. Un solo file (`soci/show`) mescolava `@php(...)` inline e blocchi `@php … @endphp`, la combinazione che due volte in questo lavoro ha prodotto variabili non definite a runtime senza errori di sintassi: convertito alla sola forma a blocco.
 - Nuovo `tests/Feature/BladeViewsTest.php` che ripete i controlli a ogni esecuzione della suite (sintassi del compilato, direttive residue, forme di `@php` mescolate). Verificato che fallisce sulla versione precedente di `soci/show`.
 - Il test intermittente segnalato nella Fase 8 era `CampagnaRinnoviTest`: usava i cognomi "Rossi" e "Verdi" e controllava che "Verdi" non comparisse, ma il nome dell'associazione e dell'admin sono generati a caso con cognomi italiani. Ora usa cognomi che Faker non genera.
+
+## Fase 10 — Nuova grafica
+
+Ridisegno a partire dallo schizzo "Consocia CRM" (8 schermate), migliorato dove serviva.
+
+- **Design system** (`public/assets/css/design-system.css`, riscritto): Public Sans e JetBrains Mono in locale (la CSP ammette solo font locali), palette verde acqua `#0D9488`, card senza bordo con ombra morbida, badge tenui, tabelle, form, tab, modali, paginazione in italiano (`resources/views/vendor/pagination`), tema scuro completo. Le variabili legacy e quelle Bootstrap sono rimappate: tutte le ~250 viste prendono il nuovo aspetto anche senza essere state riscritte. Colore del marchio aggiornato anche in grafici, PDF, email e pagine pubbliche.
+- **Struttura**: sidebar bianca a gruppi con card dell'associazione; per il super admin il selettore è un menu a tendina con ricerca e vista globale. Barra in alto con ricerca globale, tema, avvisi "da gestire" (richieste di iscrizione, modifiche dati, tessere in scadenza, quote scadute, associazioni da approvare) e menu utente.
+- **Schermate dello schizzo**, tutte rifatte:
+  - Dashboard: saluto con anello dei tesserati, KPI con confronto, andamento 12 mesi, composizione per categoria, rinnovi in scadenza, attività recente; ogni sezione solo con il permesso del modulo.
+  - Soci: KPI, schede per stato, filtri avanzati a scomparsa, avatar e azioni compatte.
+  - Scheda socio: copertina, tessera digitale con QR, statistiche, consensi.
+  - Nuova iscrizione a passi (anagrafica, tesseramento, dati aggiuntivi, privacy e conferma) con riepilogo della quota e controlli automatici: email e codice fiscale già presenti, validità del codice fiscale con data di nascita e sesso ricavati, età e tutore, campi obbligatori.
+  - CRM a colonne (kanban) con SortableJS 1.15.6 (MIT): pipeline adesioni, sponsor e volontari, trascinamento salvato, opportunità vinte/perse, KPI, "Iscrivi come socio".
+  - Quote e pagamenti: KPI dell'anno, transazioni con metodo, listino e metodi di incasso.
+  - Moduli pubblici: costruttore del modulo di iscrizione con campi aggiungibili e riordinabili e anteprima dal vivo desktop/mobile.
+  - Associazioni (super admin): riepilogo della piattaforma, card per associazione, matrice dei ruoli, registro accessi.
+- Ridisegnate anche **area soci** (stessa struttura, colori dell'associazione, tessera digitale), login, pre-iscrizione pubblica.
+- Modali: rimosso il vecchio hack CSS/JS che le deformava (il bottone "Nuova associazione" sembrava non funzionare perché gli errori finivano fuori vista).
+
+## Fase 11 — Iscrizione delle associazioni alla piattaforma
+
+- Modalità scelta dal super admin (Impostazioni di sistema → Registrazione associazioni): solo super admin, iscrizione con approvazione, iscrizione attiva subito.
+- Modulo pubblico `/registrati` (Formello, honeypot, 5 invii al minuto) con dati dell'associazione e del primo amministratore. **Conferma dell'email** con link firmato (48 ore) prima di qualunque effetto: senza conferma la richiesta non arriva al super admin, non attiva nulla e non occupa email o codici. Al massimo 3 email di conferma per indirizzo in 24 ore (controllo atomico), oggetto fisso, richieste non confermate cancellate dopo 7 giorni.
+- Richieste per il super admin (menu, avvisi, email): l'approvazione crea associazione, sede principale e amministratore con la password scelta (salvata solo come hash, cancellato se rifiutata); il rifiuto invia il motivo. Nessuna approvazione con dati già usati da un'altra associazione.
+- Test: `PercorsoAssociazioneTest` (8 scenari: revisione, automatica, rifiuto, solo super admin, validazione, permessi, conferma email con link manomesso o scaduto, limite di invii) e lo spec E2E `20-percorso-associazione` che fa tutto nel browser: iscrizione, conferma, approvazione, primo accesso, import soci da file, pre-iscrizione pubblica, approvazione e pagamento.
+
+## Fase 12 — Funzionalità della vecchia app portate in Laravel
+
+Confronto pagina per pagina con l'app PHP originale; le lacune trovate e chiuse:
+
+- L'opzione "Conferma pagamento quota" delle impostazioni email era salvata ma ignorata: ora se spenta non parte l'email (senza impostazioni salvate resta l'invio).
+- Impostazioni di sistema → Sicurezza: **revoca tutti gli accessi** (Ricordami e sessioni), **azzera i tentativi di accesso** (pannello, area soci, sito pubblico), **durata del blocco** configurabile (`AUTH_LOCKOUT_MINUTES`).
+- **App installabile** anche nel pannello e nelle pagine di check-in, scanner, verifica tessera e kiosk. Il service worker non salva più le pagine in cache (contenevano dati personali e restavano sul dispositivo dopo il logout).
+- Avvisi in alto: quote scadute non pagate.
+- **Export CSV** di quote e tessere con i filtri dell'elenco.
+- Comandi `admin:recupera-accesso` (elenco admin e link di reimpostazione password, ex `reset_credentials.php`) e `app:disinstalla` (backup, cancellazione di tabelle e file caricati, ritorno all'installer; conferma digitata, `--prova`, ex `uninstall.php`).
+- Le note interne della segreteria sono ora incluse nell'archivio dei dati personali (GDPR).
+
+## Correzioni di sicurezza (Fasi 10–12)
+
+Tutte da revisione automatica dei commit, con test di regressione:
+- dashboard: incassi e nomi dei soci visibili a chi aveva solo il permesso eventi (anche nei widget compleanni e top partecipanti, problema preesistente);
+- iscrizione associazioni: attivazione senza verifica dell'email, invio di email di conferma a raffica, controllo del limite non atomico;
+- export CSV ed Excel: formula injection (testi che iniziano con `=`, `+`, `-`, `@` neutralizzati in tutti gli export, numeri e telefoni intatti);
+- CRM: la tendina dei responsabili mostrava gli utenti di tutte le associazioni;
+- costruttore del modulo: aggiungere un campo modificava il modulo di iscrizione senza il permesso relativo.
+
+Un errore mio durante il lavoro: la prima versione del test di `app:disinstalla` ha svuotato le cartelle reali `storage/app/public` e `storage/app/media-private` del progetto. Verificato che nessun record dei database di sviluppo ed E2E puntava a quei file (0 media, nessun logo): erano residui dei test. Il test ora usa solo cartelle e database temporanei e le cartelle sono configurabili in `config/installer.php`.
+
+## Esito finale (Fasi 10–12)
+
+- **PHPUnit 1851/1851 verdi** (6741 asserzioni), PHPStan livello 5 pulito, **E2E 110/110** (nuovo percorso completo di una associazione nel browser).
+- La prima esecuzione E2E completa ha trovato 4 selettori legati ai vecchi testi (saluto della dashboard soci, numero tessera, elenco associazioni ora a schede): aggiornati. Lo stesso controllo ha rivelato che il QR della tessera nella dashboard soci era largo 78px, troppo piccolo per lo scanner: ora è di 100px su desktop e di 120px su mobile, dove si trova sotto i dati della tessera invece che sopra i pulsanti.

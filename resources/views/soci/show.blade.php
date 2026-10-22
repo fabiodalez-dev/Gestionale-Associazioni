@@ -80,7 +80,9 @@
     <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white mb-4">
         {{-- Tab Anagrafica --}}
         <div class="tab-pane fade {{ $tab === 'anagrafica' ? 'show active' : '' }}" id="tab-anagrafica" role="tabpanel">
-            @php($haFoto = $socio->getFirstMedia(\App\Models\Socio::COLLEZIONE_FOTO) !== null)
+            @php
+                $haFoto = $socio->getFirstMedia(\App\Models\Socio::COLLEZIONE_FOTO) !== null;
+            @endphp
             <div class="d-flex flex-wrap align-items-center gap-3 mb-3 pb-3 border-bottom">
                 @if ($haFoto)
                     <img src="{{ route('soci.foto.show', $socio) }}" alt="Foto di {{ $socio->nome }} {{ $socio->cognome }}" class="rounded border" width="96" height="96" style="object-fit: cover;">
@@ -136,6 +138,22 @@
                     @endif
                 @endforeach
             </dl>
+            @php
+                $consensiSocio = $socio->consensi()->latest()->get()->unique('chiave');
+            @endphp
+            @if ($consensiSocio->isNotEmpty())
+                <h3 class="h6 mt-4">Consensi</h3>
+                <ul class="list-unstyled small mb-0">
+                    @foreach ($consensiSocio as $consenso)
+                        <li class="mb-1">
+                            <i class="bi {{ $consenso->accettato ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-secondary' }} me-1" aria-hidden="true"></i>
+                            <span class="visually-hidden">{{ $consenso->accettato ? 'Dato' : 'Non dato' }}:</span>
+                            {{ $consenso->testo }}
+                            <span class="text-muted">— {{ $consenso->created_at->format('d/m/Y H:i') }}, {{ str_replace('_', ' ', $consenso->origine) }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
 
             {{-- Nucleo familiare (f.20 piano "Gestione 2" — modulo membri) --}}
             @if (\Illuminate\Support\Facades\Route::has('nuclei.store'))

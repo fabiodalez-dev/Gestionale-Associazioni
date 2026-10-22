@@ -27,7 +27,7 @@
         }
     }
     if ($utente->isSuperAdmin()) {
-        $n = \App\Models\RichiestaRegistrazione::query()->inAttesa()->count();
+        $n = \App\Models\RichiestaRegistrazione::query()->daEsaminare()->count();
         if ($n > 0) {
             $daGestire->prepend(['n' => $n, 'testo' => $n === 1 ? 'associazione chiede di iscriversi' : 'associazioni chiedono di iscriversi', 'icona' => 'bi-buildings', 'tono' => 'tone-0', 'url' => route('richieste-registrazione.index')]);
         }

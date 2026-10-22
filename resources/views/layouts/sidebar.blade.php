@@ -352,7 +352,7 @@
                 </a>
             </li>
             @php
-                $richiesteRegistrazione = \App\Models\RichiestaRegistrazione::query()->inAttesa()->count();
+                $richiesteRegistrazione = \App\Models\RichiestaRegistrazione::query()->daEsaminare()->count();
             @endphp
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('richieste-registrazione.*') ? 'active' : '' }}" href="{{ $nav('richieste-registrazione.index') }}">

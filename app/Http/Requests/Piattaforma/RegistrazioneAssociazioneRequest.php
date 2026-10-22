@@ -32,8 +32,11 @@ class RegistrazioneAssociazioneRequest extends FormRequest
      */
     public function rules(): array
     {
-        // Una richiesta ancora in attesa blocca un secondo invio con gli stessi dati
-        $inAttesa = fn (string $colonna) => Rule::unique('richieste_registrazione', $colonna)->where('stato', RichiestaRegistrazione::STATO_IN_ATTESA);
+        // Blocca un secondo invio solo se la prima richiesta è stata confermata via email:
+        // richieste mai confermate non devono poter "occupare" l'email di qualcun altro
+        $inAttesa = fn (string $colonna) => Rule::unique('richieste_registrazione', $colonna)
+            ->where('stato', RichiestaRegistrazione::STATO_IN_ATTESA)
+            ->whereNotNull('email_verificata_at');
 
         return [
             'nome' => ['required', 'string', 'max:255'],

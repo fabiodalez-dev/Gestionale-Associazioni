@@ -58,6 +58,11 @@ Route::middleware('guest')->group(function (): void {
         ->name('registrazione.inviata');
 });
 
+// Link firmato dell'email di conferma: vale anche se chi clicca ha già una sessione aperta
+Route::get('/registrati/conferma/{richiesta}', [RegistrazioneAssociazioneController::class, 'verifica'])
+    ->middleware(['signed', 'throttle:10,1'])
+    ->name('registrazione.verifica');
+
 Route::middleware('auth')->prefix('richieste-registrazione')->name('richieste-registrazione.')->group(function (): void {
     Route::get('/', [RichiesteRegistrazioneController::class, 'index'])->name('index');
     Route::post('/{richiesta}/approva', [RichiesteRegistrazioneController::class, 'approva'])->name('approva');

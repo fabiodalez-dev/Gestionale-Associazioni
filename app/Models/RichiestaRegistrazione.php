@@ -50,7 +50,7 @@ class RichiestaRegistrazione extends Model
     protected $fillable = [
         'stato', 'nome', 'email', 'tipo', 'codice_fiscale', 'partita_iva', 'telefono', 'citta', 'provincia',
         'numero_soci_stimato', 'messaggio', 'admin_nome', 'admin_cognome', 'admin_email', 'admin_password_hash',
-        'ip', 'privacy_accettata_at', 'motivo_rifiuto', 'associazione_id', 'gestita_da', 'gestita_at',
+        'ip', 'privacy_accettata_at', 'email_verificata_at', 'motivo_rifiuto', 'associazione_id', 'gestita_da', 'gestita_at',
     ];
 
     protected $hidden = ['admin_password_hash'];
@@ -59,6 +59,7 @@ class RichiestaRegistrazione extends Model
     {
         return [
             'privacy_accettata_at' => 'datetime',
+            'email_verificata_at' => 'datetime',
             'gestita_at' => 'datetime',
             'numero_soci_stimato' => 'integer',
         ];
@@ -71,6 +72,22 @@ class RichiestaRegistrazione extends Model
     public function scopeInAttesa(Builder $query): Builder
     {
         return $query->where('stato', self::STATO_IN_ATTESA);
+    }
+
+    /**
+     * Richieste confermate dall'email dell'amministratore e ancora da esaminare.
+     *
+     * @param  Builder<RichiestaRegistrazione>  $query
+     * @return Builder<RichiestaRegistrazione>
+     */
+    public function scopeDaEsaminare(Builder $query): Builder
+    {
+        return $query->where('stato', self::STATO_IN_ATTESA)->whereNotNull('email_verificata_at');
+    }
+
+    public function isVerificata(): bool
+    {
+        return $this->email_verificata_at !== null;
     }
 
     /**

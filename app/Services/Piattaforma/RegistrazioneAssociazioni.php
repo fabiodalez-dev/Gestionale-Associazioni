@@ -4,6 +4,7 @@ namespace App\Services\Piattaforma;
 
 use App\Mail\Piattaforma\EsitoRegistrazioneMail;
 use App\Mail\Piattaforma\NuovaRichiestaRegistrazioneMail;
+use App\Mail\Piattaforma\VerificaEmailRegistrazioneMail;
 use App\Models\Associazione;
 use App\Models\RichiestaRegistrazione;
 use App\Models\Sede;
@@ -12,18 +13,25 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 /**
  * Iscrizione delle associazioni alla piattaforma: registrazione della
- * richiesta, approvazione (crea associazione, sede principale e primo
- * amministratore), rifiuto, avvisi email.
+ * richiesta, conferma dell'email dell'amministratore, approvazione (crea
+ * associazione, sede principale e primo amministratore), rifiuto, avvisi.
+ *
+ * Nessuna richiesta produce effetti finché chi la invia non conferma di
+ * controllare l'email indicata: senza conferma non arriva al super admin,
+ * non attiva nulla (nemmeno in modalità automatica) e non occupa email o codici.
  */
 class RegistrazioneAssociazioni
 {
+    public const ORE_VALIDITA_LINK = 48;
+
     /**
-     * Salva la richiesta e, in modalità automatica, la approva subito.
+     * Salva la richiesta e invia il link di conferma all'amministratore.
      *
      * @param  array<string, mixed>  $dati  dati validati del modulo pubblico
      */
@@ -49,9 +57,32 @@ class RegistrazioneAssociazioni
             'privacy_accettata_at' => now(),
         ]);
 
-        if (RichiestaRegistrazione::modalita() === 'automatica') {
+        $this->invia($richiesta->admin_email, new VerificaEmailRegistrazioneMail($richiesta, $this->linkVerifica($richiesta)));
+
+        return $richiesta;
+    }
+
+    public function linkVerifica(RichiestaRegistrazione $richiesta): string
+    {
+        return URL::temporarySignedRoute('registrazione.verifica', now()->addHours(self::ORE_VALIDITA_LINK), ['richiesta' => $richiesta->id]);
+    }
+
+    /**
+     * Email confermata: in modalità automatica l'associazione nasce ora,
+     * altrimenti la richiesta passa al super admin.
+     */
+    public function verifica(RichiestaRegistrazione $richiesta): RichiestaRegistrazione
+    {
+        if (! $richiesta->isInAttesa() || $richiesta->isVerificata()) {
+            return $richiesta;
+        }
+
+        $richiesta->update(['email_verificata_at' => now()]);
+
+        if (RichiestaRegistrazione::modalita() === 'automatica' && $this->doppione($richiesta) === null) {
             $this->approva($richiesta, null);
         } else {
+            // Con dati già in uso anche la modalità automatica passa dal super admin
             $this->avvisaSuperAdmin($richiesta);
         }
 
@@ -64,6 +95,7 @@ class RegistrazioneAssociazioni
     public function approva(RichiestaRegistrazione $richiesta, ?Utente $superAdmin): Associazione
     {
         abort_unless($richiesta->isInAttesa(), 409, 'La richiesta è già stata gestita.');
+        abort_unless($richiesta->isVerificata(), 409, 'L\'email dell\'amministratore non è stata confermata.');
 
         $associazione = DB::transaction(function () use ($richiesta, $superAdmin): Associazione {
             $associazione = Associazione::create([
@@ -111,6 +143,24 @@ class RegistrazioneAssociazioni
         $this->invia($richiesta->admin_email, new EsitoRegistrazioneMail($richiesta->refresh()));
 
         return $associazione;
+    }
+
+    /**
+     * Dato già usato da un'associazione esistente o da un account, se c'è
+     * (due richieste confermate con gli stessi dati, o dati cambiati nel frattempo).
+     */
+    public function doppione(RichiestaRegistrazione $richiesta): ?string
+    {
+        $esiste = fn (string $colonna, ?string $valore) => $valore !== null && $valore !== ''
+            && Associazione::query()->where($colonna, $valore)->exists();
+
+        return match (true) {
+            $esiste('email', $richiesta->email) => 'la stessa email',
+            $esiste('codice_fiscale', $richiesta->codice_fiscale) => 'lo stesso codice fiscale',
+            $esiste('partita_iva', $richiesta->partita_iva) => 'la stessa partita IVA',
+            Utente::query()->withoutGlobalScopes()->where('email', $richiesta->admin_email)->exists() => 'un account con l\'email dell\'amministratore',
+            default => null,
+        };
     }
 
     public function rifiuta(RichiestaRegistrazione $richiesta, Utente $superAdmin, ?string $motivo): void

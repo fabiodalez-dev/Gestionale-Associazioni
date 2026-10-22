@@ -19,14 +19,18 @@ class RichiesteRegistrazioneController extends Controller
     {
         $this->soloSuperAdmin($request);
 
-        $stato = in_array($request->query('stato'), ['in_attesa', 'approvata', 'rifiutata', 'tutte'], true) ? $request->query('stato') : 'in_attesa';
+        $stato = in_array($request->query('stato'), ['in_attesa', 'da_confermare', 'approvata', 'rifiutata', 'tutte'], true) ? $request->query('stato') : 'in_attesa';
 
-        $conteggi = RichiestaRegistrazione::query()->selectRaw('stato, count(*) as n')->groupBy('stato')->pluck('n', 'stato');
+        $conteggi = RichiestaRegistrazione::query()->whereIn('stato', ['approvata', 'rifiutata'])->selectRaw('stato, count(*) as n')->groupBy('stato')->pluck('n', 'stato');
+        $conteggi['in_attesa'] = RichiestaRegistrazione::query()->daEsaminare()->count();
+        $conteggi['da_confermare'] = RichiestaRegistrazione::query()->inAttesa()->whereNull('email_verificata_at')->count();
 
         return view('piattaforma.registrazione.index', [
             'richieste' => RichiestaRegistrazione::query()
                 ->with(['associazione:id,nome', 'gestore:id,nome,cognome'])
-                ->when($stato !== 'tutte', fn ($q) => $q->where('stato', $stato))
+                ->when($stato === 'in_attesa', fn ($q) => $q->daEsaminare())
+                ->when($stato === 'da_confermare', fn ($q) => $q->inAttesa()->whereNull('email_verificata_at'))
+                ->when(in_array($stato, ['approvata', 'rifiutata'], true), fn ($q) => $q->where('stato', $stato))
                 ->latest()
                 ->paginate(20)
                 ->withQueryString(),
@@ -42,6 +46,12 @@ class RichiesteRegistrazioneController extends Controller
 
         if (! $richiesta->isInAttesa()) {
             return back()->with('warning', 'La richiesta è già stata gestita.');
+        }
+        if (! $richiesta->isVerificata()) {
+            return back()->with('warning', 'L\'email dell\'amministratore non è ancora stata confermata.');
+        }
+        if ($doppione = $registrazioni->doppione($richiesta)) {
+            return back()->with('warning', 'Esiste già un\'associazione con '.$doppione.': controlla prima di approvare.');
         }
 
         $associazione = $registrazioni->approva($richiesta, $superAdmin);

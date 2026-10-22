@@ -4,6 +4,7 @@ namespace Tests\Feature\Piattaforma;
 
 use App\Mail\Piattaforma\EsitoRegistrazioneMail;
 use App\Mail\Piattaforma\NuovaRichiestaRegistrazioneMail;
+use App\Mail\Piattaforma\VerificaEmailRegistrazioneMail;
 use App\Models\Associazione;
 use App\Models\RichiestaRegistrazione;
 use App\Models\Sede;
@@ -14,6 +15,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -21,7 +24,7 @@ use Tests\TestCase;
 /**
  * Percorso completo di un'associazione sulla piattaforma:
  * iscrizione dal sito (con revisione, automatica o solo dal super admin),
- * approvazione, primo accesso dell'amministratore, import dei soci da Excel,
+ * conferma dell'email, approvazione, primo accesso dell'amministratore, import dei soci da Excel,
  * iscrizioni dei soci dal modulo pubblico e loro approvazione.
  */
 class PercorsoAssociazioneTest extends TestCase
@@ -98,6 +101,24 @@ class PercorsoAssociazioneTest extends TestCase
     }
 
     /**
+     * Apre il link di conferma ricevuto via email dall'amministratore.
+     */
+    private function confermaEmail(string $email): TestResponse
+    {
+        $url = null;
+        Mail::assertSent(VerificaEmailRegistrazioneMail::class, function (VerificaEmailRegistrazioneMail $m) use ($email, &$url) {
+            if ($m->hasTo($email)) {
+                $url = $m->url;
+            }
+
+            return $m->hasTo($email);
+        });
+        $this->assertNotNull($url);
+
+        return $this->get((string) $url);
+    }
+
+    /**
      * Come un nuovo visitatore: nessuna sessione né utente dal passo precedente.
      */
     private function esci(): void
@@ -122,6 +143,17 @@ class PercorsoAssociazioneTest extends TestCase
         $this->assertSame('BO', $richiesta->provincia);
         $this->assertNotSame(self::PASSWORD_ADMIN, $richiesta->admin_password_hash, 'La password non va salvata in chiaro');
         $this->assertSame(0, Associazione::query()->count(), 'Con la revisione l\'associazione non esiste ancora');
+
+        // Finché l'email non è confermata il super admin non viene disturbato e non può approvare
+        Mail::assertNotSent(NuovaRichiestaRegistrazioneMail::class);
+        $this->actingAs($this->superAdmin)->get(route('richieste-registrazione.index'))->assertOk()->assertDontSee('Arriviamo da fogli Excel');
+        $this->post(route('richieste-registrazione.approva', $richiesta))->assertSessionHas('warning');
+        $this->assertSame(0, Associazione::query()->count());
+        $this->esci();
+
+        // Clic sul link ricevuto via email: ora la richiesta arriva al super admin
+        $this->confermaEmail('marta.ferraresi@aurora.test')->assertOk()->assertSee('Email confermata');
+        $this->assertNotNull($richiesta->refresh()->email_verificata_at);
         Mail::assertSent(NuovaRichiestaRegistrazioneMail::class, fn ($m) => $m->hasTo('super@piattaforma.test'));
 
         // Un secondo invio con la stessa email è bloccato finché la prima è in attesa
@@ -234,7 +266,10 @@ class PercorsoAssociazioneTest extends TestCase
         config(['piattaforma.registrazione_associazioni' => 'automatica']);
 
         $this->get('/registrati')->assertOk()->assertSee('Crea l&#039;associazione', false);
-        $this->post('/registrati', $this->moduloRegistrazione())
+        $this->post('/registrati', $this->moduloRegistrazione())->assertRedirect(route('registrazione.inviata'));
+        $this->assertSame(0, Associazione::query()->count(), 'Anche in automatico serve prima la conferma dell\'email');
+
+        $this->confermaEmail('marta.ferraresi@aurora.test')
             ->assertRedirect(route('login'))
             ->assertSessionHas('status', fn ($m) => str_contains($m, 'Polisportiva Aurora è attiva'));
 
@@ -254,6 +289,7 @@ class PercorsoAssociazioneTest extends TestCase
     {
         config(['piattaforma.registrazione_associazioni' => 'revisione']);
         $this->post('/registrati', $this->moduloRegistrazione());
+        $this->confermaEmail('marta.ferraresi@aurora.test')->assertOk();
         $richiesta = RichiestaRegistrazione::query()->sole();
 
         $this->actingAs($this->superAdmin)
@@ -272,6 +308,39 @@ class PercorsoAssociazioneTest extends TestCase
         $this->esci();
         $this->post('/registrati', $this->moduloRegistrazione())->assertSessionHasNoErrors();
         $this->assertSame(1, RichiestaRegistrazione::query()->inAttesa()->count());
+    }
+
+    public function test_senza_conferma_dell_email_non_succede_nulla(): void
+    {
+        config(['piattaforma.registrazione_associazioni' => 'automatica']);
+
+        // Qualcuno usa l'email di un'altra associazione: senza la casella non può confermare
+        $this->post('/registrati', $this->moduloRegistrazione(['admin_email' => 'impostore@altrove.test']))->assertSessionHasNoErrors();
+        $this->assertSame(0, Associazione::query()->count());
+        Mail::assertNotSent(NuovaRichiestaRegistrazioneMail::class);
+
+        // ... e la richiesta non confermata non blocca la vera associazione
+        $this->post('/registrati', $this->moduloRegistrazione())->assertSessionHasNoErrors();
+        $vera = RichiestaRegistrazione::query()->where('admin_email', 'marta.ferraresi@aurora.test')->sole();
+        $impostore = RichiestaRegistrazione::query()->where('admin_email', 'impostore@altrove.test')->sole();
+
+        // Link manomesso o scaduto: rifiutato
+        $this->get(route('registrazione.verifica', ['richiesta' => $impostore->id]))->assertForbidden();
+        $scaduto = URL::temporarySignedRoute('registrazione.verifica', now()->subMinute(), ['richiesta' => $impostore->id]);
+        $this->get($scaduto)->assertForbidden();
+        $this->assertNull($impostore->refresh()->email_verificata_at);
+
+        // La vera associazione conferma e viene attivata
+        $this->confermaEmail('marta.ferraresi@aurora.test')->assertRedirect(route('login'));
+        $this->assertSame($vera->refresh()->associazione_id, Associazione::query()->sole()->id);
+
+        // Un link firmato valido dell'impostore, arrivato dopo, non crea un doppione:
+        // la richiesta passa al super admin, che non può approvarla
+        $this->confermaEmail('impostore@altrove.test')->assertOk();
+        $this->assertSame(1, Associazione::query()->count());
+        $this->actingAs($this->superAdmin)->post(route('richieste-registrazione.approva', $impostore))
+            ->assertSessionHas('warning', fn ($m) => str_contains($m, 'Esiste già'));
+        $this->assertSame(1, Associazione::query()->count());
     }
 
     public function test_con_iscrizione_disattivata_le_crea_solo_il_super_admin(): void
@@ -322,6 +391,7 @@ class PercorsoAssociazioneTest extends TestCase
     {
         config(['piattaforma.registrazione_associazioni' => 'revisione']);
         $this->post('/registrati', $this->moduloRegistrazione());
+        $this->confermaEmail('marta.ferraresi@aurora.test');
         $richiesta = RichiestaRegistrazione::query()->sole();
 
         $associazione = Associazione::factory()->create();

@@ -4,7 +4,7 @@
 
 @section('content')
     @php
-        $etichette = ['in_attesa' => 'Da esaminare', 'approvata' => 'Approvate', 'rifiutata' => 'Rifiutate', 'tutte' => 'Tutte'];
+        $etichette = ['in_attesa' => 'Da esaminare', 'da_confermare' => 'Email da confermare', 'approvata' => 'Approvate', 'rifiutata' => 'Rifiutate', 'tutte' => 'Tutte'];
         $modalitaTesto = [
             'disattivata' => 'La registrazione autonoma è disattivata: le associazioni le crei solo tu.',
             'revisione' => 'Le associazioni possono iscriversi da sole; ogni richiesta aspetta la tua approvazione.',
@@ -88,7 +88,9 @@
                                     <div class="who-sub">{{ $richiesta->created_at->format('H:i') }}</div>
                                 </td>
                                 <td>
-                                    @if ($richiesta->stato === 'in_attesa')
+                                    @if ($richiesta->stato === 'in_attesa' && ! $richiesta->isVerificata())
+                                        <span class="badge bg-secondary">Email da confermare</span>
+                                    @elseif ($richiesta->stato === 'in_attesa')
                                         <span class="badge bg-warning">Da esaminare</span>
                                     @elseif ($richiesta->stato === 'approvata')
                                         <span class="badge bg-success">Approvata</span>
@@ -99,7 +101,9 @@
                                     @endif
                                 </td>
                                 <td class="text-end text-nowrap">
-                                    @if ($richiesta->isInAttesa())
+                                    @if ($richiesta->isInAttesa() && ! $richiesta->isVerificata())
+                                        <span class="who-sub">In attesa che {{ $richiesta->admin_email }} confermi</span>
+                                    @elseif ($richiesta->isInAttesa())
                                         <form method="POST" action="{{ route('richieste-registrazione.approva', $richiesta) }}" class="d-inline">
                                             @csrf
                                             <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i>Approva</button>

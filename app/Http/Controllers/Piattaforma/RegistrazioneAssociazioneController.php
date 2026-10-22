@@ -33,16 +33,36 @@ class RegistrazioneAssociazioneController extends Controller
 
         $richiesta = $registrazioni->registra($request->validated(), $request->ip());
 
+        return redirect()->route('registrazione.inviata')
+            ->with('registrazione_nome', $richiesta->nome)
+            ->with('registrazione_email', $richiesta->admin_email);
+    }
+
+    public function inviata(): View
+    {
+        return view('piattaforma.registrazione.inviata', [
+            'nome' => session('registrazione_nome'),
+            'email' => session('registrazione_email'),
+            'fase' => 'conferma',
+        ]);
+    }
+
+    /**
+     * Link firmato ricevuto via email: conferma l'indirizzo dell'amministratore.
+     */
+    public function verifica(RichiestaRegistrazione $richiesta, RegistrazioneAssociazioni $registrazioni): View|RedirectResponse
+    {
+        $richiesta = $registrazioni->verifica($richiesta);
+
         if ($richiesta->stato === RichiestaRegistrazione::STATO_APPROVATA) {
             return redirect()->route('login')
                 ->with('status', $richiesta->nome.' è attiva: accedi con '.$richiesta->admin_email.' e la password che hai scelto.');
         }
 
-        return redirect()->route('registrazione.inviata')->with('registrazione_nome', $richiesta->nome);
-    }
-
-    public function inviata(): View
-    {
-        return view('piattaforma.registrazione.inviata', ['nome' => session('registrazione_nome')]);
+        return view('piattaforma.registrazione.inviata', [
+            'nome' => $richiesta->nome,
+            'email' => $richiesta->admin_email,
+            'fase' => $richiesta->stato === RichiestaRegistrazione::STATO_RIFIUTATA ? 'rifiutata' : 'revisione',
+        ]);
     }
 }

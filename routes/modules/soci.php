@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Privacy\DatiPersonaliController;
 use App\Http\Controllers\Soci\CampoPersonalizzatoController;
 use App\Http\Controllers\Soci\CategoriaSocioController;
 use App\Http\Controllers\Soci\DocumentoSocioController;
@@ -54,6 +55,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/soci/{socio}/documenti/{documento}/download', [DocumentoSocioController::class, 'download'])->name('soci.documenti.download');
     Route::delete('/soci/{socio}/documenti/{documento}', [DocumentoSocioController::class, 'destroy'])->name('soci.documenti.destroy');
 
+    Route::get('/soci/{socio}/dati-personali', [DatiPersonaliController::class, 'esportaPerSocio'])
+        ->middleware('throttle:10,1')
+        ->name('soci.dati-personali');
     Route::get('/soci/{socio}', [SocioController::class, 'show'])->name('soci.show');
     Route::get('/soci/{socio}/modifica', [SocioController::class, 'edit'])->name('soci.edit');
     Route::put('/soci/{socio}', [SocioController::class, 'update'])->name('soci.update');

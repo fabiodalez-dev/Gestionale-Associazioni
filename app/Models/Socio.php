@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Services\Privacy\ArchivioDatiPersonali;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,12 +17,14 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use Spatie\PersonalDataExport\ExportsPersonalData;
+use Spatie\PersonalDataExport\PersonalDataSelection;
 
 /**
  * Socio dell'associazione. Funziona anche da Authenticatable per la guard 'socio'
  * (area soci: login via email + password_hash, NULL = nessun accesso).
  */
-class Socio extends Authenticatable
+class Socio extends Authenticatable implements ExportsPersonalData
 {
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
@@ -435,5 +438,16 @@ class Socio extends Authenticatable
             'codice_fiscale' => (string) $this->codice_fiscale,
             'numero_socio' => (string) $this->numero_socio,
         ];
+    }
+
+    /** Contenuto dell'archivio dei dati personali (spatie/laravel-personal-data-export). */
+    public function selectPersonalData(PersonalDataSelection $personalDataSelection): void
+    {
+        app(ArchivioDatiPersonali::class)->riempi($personalDataSelection, $this);
+    }
+
+    public function personalDataExportName(): string
+    {
+        return 'dati-personali.zip';
     }
 }

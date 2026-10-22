@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Notifications\Accounts\ResetPasswordAccount;
 use App\Notifications\Accounts\VerificaEmailAccount;
+use App\Services\Privacy\ArchivioDatiPersonali;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\PersonalDataExport\ExportsPersonalData;
+use Spatie\PersonalDataExport\PersonalDataSelection;
 
 /**
  * Account ospite del frontend pubblico (guard 'account').
@@ -21,7 +24,7 @@ use Illuminate\Notifications\Notifiable;
  * dell'associazione, prenota eventi e — se l'admin lo collega/promuove —
  * può essere associato a un Socio (socio_id unique, mai automatico).
  */
-class Account extends Authenticatable implements MustVerifyEmail
+class Account extends Authenticatable implements ExportsPersonalData, MustVerifyEmail
 {
     use BelongsToAssociazione;
     use HasFactory;
@@ -132,5 +135,16 @@ class Account extends Authenticatable implements MustVerifyEmail
         ])->save();
 
         $this->delete();
+    }
+
+    /** Contenuto dell'archivio dei dati personali (spatie/laravel-personal-data-export). */
+    public function selectPersonalData(PersonalDataSelection $personalDataSelection): void
+    {
+        app(ArchivioDatiPersonali::class)->riempi($personalDataSelection, $this);
+    }
+
+    public function personalDataExportName(): string
+    {
+        return 'dati-personali.zip';
     }
 }

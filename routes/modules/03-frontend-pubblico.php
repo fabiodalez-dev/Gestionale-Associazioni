@@ -16,6 +16,7 @@ use App\Http\Controllers\FrontendPubblico\PasswordResetController;
 use App\Http\Controllers\FrontendPubblico\PrenotazioneController;
 use App\Http\Controllers\FrontendPubblico\RegistrazioneController;
 use App\Http\Controllers\FrontendPubblico\VerificaEmailController;
+use App\Http\Controllers\Privacy\DatiPersonaliController;
 use App\Http\Middleware\FrontendPubblico\AutenticaAccount;
 use App\Http\Middleware\FrontendPubblico\EnsureAccountValido;
 use App\Http\Middleware\FrontendPubblico\EnsureAccountVerificato;
@@ -233,6 +234,12 @@ Route::prefix('a/{associazione:slug}')
                 // Privacy GDPR: export JSON + cancellazione (anonimizzazione)
                 Route::get('/privacy', [PrivacyAccountController::class, 'show'])->name('privacy');
                 Route::get('/privacy/export', [PrivacyAccountController::class, 'export'])->name('privacy.export');
+                Route::post('/privacy/archivio', [DatiPersonaliController::class, 'richiediAccount'])
+                    ->middleware('throttle:5,1')
+                    ->name('privacy.archivio');
+                Route::get('/privacy/archivio/{file}', [DatiPersonaliController::class, 'scaricaAccount'])
+                    ->middleware('signed:relative')
+                    ->name('privacy.archivio.scarica');
                 Route::post('/privacy/cancella', [PrivacyAccountController::class, 'cancella'])
                     ->middleware('throttle:5,1')
                     ->name('privacy.cancella');

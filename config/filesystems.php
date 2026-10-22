@@ -38,6 +38,15 @@ return [
             'report' => false,
         ],
 
+        // Archivi dei dati personali (GDPR), cancellati dopo
+        // personal-data-export.delete_after_days giorni
+        'personal-data-exports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/personal-data-exports'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

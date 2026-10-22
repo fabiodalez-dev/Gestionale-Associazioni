@@ -122,5 +122,21 @@
                 </div>
             </div>
         @endif
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-shield-lock me-2"></i>I tuoi dati personali</div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        Puoi ricevere una copia di tutti i dati che l'associazione conserva su di te: anagrafica, tessere, quote,
+                        eventi, documenti caricati e comunicazioni (artt. 15 e 20 GDPR). Ti inviamo via email un link valido
+                        {{ config('personal-data-export.delete_after_days') }} giorni.
+                    </p>
+                    <form method="POST" action="{{ route('area-soci.dati-personali.richiedi') }}">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-file-earmark-zip me-1"></i>Scarica i miei dati</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 @endsection

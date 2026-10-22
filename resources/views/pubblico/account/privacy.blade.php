@@ -20,6 +20,15 @@
                     <a href="{{ route('pubblico.account.privacy.export', $associazione->slug) }}" class="btn btn-outline-primary">
                         <i class="bi bi-filetype-json me-1"></i>Scarica i miei dati (JSON)
                     </a>
+                    <hr>
+                    <p class="text-muted small mb-2">
+                        Archivio completo (JSON, riepilogo PDF e richieste di iscrizione): lo prepariamo e ti inviamo via email
+                        un link valido {{ config('personal-data-export.delete_after_days') }} giorni. Una richiesta ogni 24 ore.
+                    </p>
+                    <form method="POST" action="{{ route('pubblico.account.privacy.archivio', $associazione->slug) }}">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-file-earmark-zip me-1"></i>Ricevi l'archivio via email</button>
+                    </form>
                 </div>
             </div>
         </div>

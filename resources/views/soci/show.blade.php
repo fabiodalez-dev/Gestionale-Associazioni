@@ -44,6 +44,9 @@
             {{-- Contatti rapidi (f.10) + email diretta (f.12) — modulo comunicazione --}}
             @includeIf('comunicazione.soci._contatti-rapidi', ['socio' => $socio, 'dimensione' => 'md'])
             @includeIf('comunicazione.soci._invia-email', ['socio' => $socio])
+            @can('esportaDatiPersonali', $socio)
+                <a href="{{ route('soci.dati-personali', $socio) }}" class="btn btn-outline-secondary" title="Archivio ZIP con tutti i dati personali del socio (richiesta di accesso GDPR)"><i class="bi bi-file-earmark-zip me-1"></i>Dati personali</a>
+            @endcan
             <a href="{{ route('soci.edit', $socio) }}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Modifica</a>
             <a href="{{ route('soci.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Lista</a>
         </div>

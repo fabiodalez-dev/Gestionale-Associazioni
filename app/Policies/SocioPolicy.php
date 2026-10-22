@@ -37,6 +37,16 @@ class SocioPolicy
         return $this->allowed($utente, 'soci.update', self::RUOLI);
     }
 
+    /**
+     * Archivio dei dati personali generato dalla segreteria: chi può modificare
+     * il socio, solo nella sua associazione (oltre allo scope di tenant).
+     */
+    public function esportaDatiPersonali(Utente $utente, Socio $socio): bool
+    {
+        return $this->allowed($utente, 'soci.update', self::RUOLI)
+            && ($utente->isSuperAdmin() || $utente->associazione_id === $socio->associazione_id);
+    }
+
     public function delete(Utente $utente, Socio $socio): bool
     {
         return $this->allowed($utente, 'soci.delete', self::RUOLI);

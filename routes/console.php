@@ -227,3 +227,11 @@ Schedule::command('prestiti:promemoria')
 Schedule::command('adempimenti:promemoria')
     ->monthlyOn(1, '08:00')
     ->withoutOverlapping();
+
+/*
+| Archivi dei dati personali (GDPR): cancella quelli più vecchi di
+| personal-data-export.delete_after_days.
+*/
+Schedule::command('personal-data-export:clean')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();

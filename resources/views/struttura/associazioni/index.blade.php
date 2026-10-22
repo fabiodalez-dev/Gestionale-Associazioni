@@ -41,7 +41,7 @@
                         </td>
                         <td class="text-center">{{ $assoc->sedi_count }}</td>
                         <td class="text-center">{{ $assoc->soci_count }}</td>
-                        <td>{{ $assoc->tipo_scadenza_default === 'annuale' ? 'Annuale (365 gg)' : 'Anno solare' }}</td>
+                        <td>{{ $assoc->tesseramento()->scadenzaAnnuale() ? 'Annuale (365 gg)' : 'Anno solare' }}</td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" href="{{ route('associazioni.index', ['edit' => $assoc->id]) }}" title="Modifica">
                                 <i class="bi bi-pencil"></i>

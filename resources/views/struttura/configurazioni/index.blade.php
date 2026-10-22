@@ -234,14 +234,14 @@
                             <div class="col-md-6">
                                 <label class="form-label" for="cfg_scadenza">Tipo scadenza default</label>
                                 <select class="form-select" id="cfg_scadenza" name="tipo_scadenza_default">
-                                    <option value="solare" @selected(old('tipo_scadenza_default', $associazione->tipo_scadenza_default) === 'solare')>Anno Solare (31 Dicembre)</option>
-                                    <option value="annuale" @selected(old('tipo_scadenza_default', $associazione->tipo_scadenza_default) === 'annuale')>Annuale (365 giorni da iscrizione)</option>
+                                    <option value="solare" @selected(old('tipo_scadenza_default', $associazione->tesseramento()->tipo_scadenza_default) === 'solare')>Anno Solare (31 Dicembre)</option>
+                                    <option value="annuale" @selected(old('tipo_scadenza_default', $associazione->tesseramento()->tipo_scadenza_default) === 'annuale')>Annuale (365 giorni da iscrizione)</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="cfg_giorni">Giorni di preavviso notifiche scadenza</label>
                                 <input type="number" class="form-control" id="cfg_giorni" name="giorni_notifica_scadenza" min="1" max="365"
-                                       value="{{ old('giorni_notifica_scadenza', $associazione->giorni_notifica_scadenza) }}">
+                                       value="{{ old('giorni_notifica_scadenza', $associazione->tesseramento()->giorni_notifica_scadenza) }}">
                             </div>
                         </div>
                         <button class="btn btn-primary mt-3" type="submit">Salva tesseramento</button>
@@ -259,7 +259,7 @@
                         @csrf
                         <div class="mb-2">
                             <textarea class="form-control" name="template_email_scadenza" rows="6"
-                                      placeholder="Ciao {NOME_SOCIO}, ti ricordiamo che la tua quota scade il {DATA_SCADENZA}.">{{ old('template_email_scadenza', $associazione->template_email_scadenza) }}</textarea>
+                                      placeholder="Ciao {NOME_SOCIO}, ti ricordiamo che la tua quota scade il {DATA_SCADENZA}.">{{ old('template_email_scadenza', $associazione->tesseramento()->template_email_scadenza) }}</textarea>
                         </div>
                         <p class="text-muted small">
                             Placeholder disponibili: <code>{NOME_SOCIO}</code>, <code>{COGNOME_SOCIO}</code>, <code>{DATA_SCADENZA}</code>, <code>{IMPORTO_QUOTA}</code>

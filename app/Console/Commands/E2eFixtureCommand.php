@@ -548,7 +548,7 @@ class E2eFixtureCommand extends Command
             $config = ($config ?? []) + ['intro_html' => (string) $this->option('intro')];
         }
 
-        $associazione->forceFill([
+        $associazione->iscrizioni()->aggiorna([
             'iscrizioni_socio_aperte' => $this->option('aperte') === null || $this->option('aperte') === ''
                 ? true
                 : (bool) (int) $this->option('aperte'),
@@ -556,7 +556,7 @@ class E2eFixtureCommand extends Command
                 ? $this->option('modalita')
                 : 'preiscrizione',
             'iscrizione_form_config' => $config,
-        ])->save();
+        ]);
 
         return ['ok' => true, 'associazione_id' => $associazione->id];
     }

@@ -42,7 +42,7 @@ class IscrizioneController extends Controller
         /** @var ?Account $account */
         $account = $request->user('account');
 
-        if (! $associazione->iscrizioni_socio_aperte) {
+        if (! $associazione->iscrizioni()->iscrizioni_socio_aperte) {
             return view('pubblico.iscrizione.chiusa', [
                 'associazione' => $associazione,
                 'account' => $account,

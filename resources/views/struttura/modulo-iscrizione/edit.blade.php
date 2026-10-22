@@ -29,7 +29,7 @@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="iscrizioni_socio_aperte"
                                name="iscrizioni_socio_aperte" value="1"
-                               @checked(old('iscrizioni_socio_aperte', $associazione->iscrizioni_socio_aperte))>
+                               @checked(old('iscrizioni_socio_aperte', $associazione->iscrizioni()->iscrizioni_socio_aperte))>
                         <label class="form-check-label" for="iscrizioni_socio_aperte">
                             Iscrizioni socio aperte dal sito pubblico
                         </label>
@@ -40,11 +40,11 @@
                     <label class="form-label" for="modalita_iscrizione">Modalità di iscrizione</label>
                     <select class="form-select" id="modalita_iscrizione" name="modalita_iscrizione">
                         <option value="{{ \App\Models\Associazione::MODALITA_PREISCRIZIONE }}"
-                                @selected(old('modalita_iscrizione', $associazione->modalita_iscrizione) === \App\Models\Associazione::MODALITA_PREISCRIZIONE)>
+                                @selected(old('modalita_iscrizione', $associazione->iscrizioni()->modalita_iscrizione) === \App\Models\Associazione::MODALITA_PREISCRIZIONE)>
                             Preiscrizione con approvazione (socio "In Attesa")
                         </option>
                         <option value="{{ \App\Models\Associazione::MODALITA_DIRETTA }}"
-                                @selected(old('modalita_iscrizione', $associazione->modalita_iscrizione) === \App\Models\Associazione::MODALITA_DIRETTA)>
+                                @selected(old('modalita_iscrizione', $associazione->iscrizioni()->modalita_iscrizione) === \App\Models\Associazione::MODALITA_DIRETTA)>
                             Diretta (socio "Attivo" subito, senza approvazione)
                         </option>
                     </select>

@@ -1,7 +1,7 @@
 {{-- Tabella soci (renderizzata anche via AJAX — spec soci §1.10) --}}
 @php
     $oggi = \Illuminate\Support\Carbon::today();
-    $giorniNotifica = (int) ($associazione?->giorni_notifica_scadenza ?? 30);
+    $giorniNotifica = $associazione?->tesseramento()->giorni_notifica_scadenza ?? \App\Settings\TesseramentoSettings::GIORNI_PREAVVISO_DEFAULT;
     $badgeStato = fn (string $stato) => match ($stato) {
         'Attivo' => 'success',
         'In Attesa' => 'warning',

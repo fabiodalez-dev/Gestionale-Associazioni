@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Settings\ImpostazioniAssociazione;
+use App\Settings\IscrizioniSettings;
+use App\Settings\TesseramentoSettings;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +37,9 @@ class Associazione extends Model
     public const PROMEMORIA_RINNOVO_DEFAULT = [30, 15, 3];
 
     protected $table = 'associazioni';
+
+    /** @var array<class-string<ImpostazioniAssociazione>, ImpostazioniAssociazione> */
+    private array $impostazioniCaricate = [];
 
     /**
      * Default in-memory allineati ai default DB (modelli non ancora
@@ -90,6 +96,43 @@ class Associazione extends Model
     }
 
     /**
+     * Impostazioni dell'associazione (spatie/laravel-settings, una istanza per
+     * modello): $associazione->impostazioni(TesseramentoSettings::class).
+     *
+     * @template T of ImpostazioniAssociazione
+     *
+     * @param  class-string<T>  $classe
+     * @return T
+     */
+    public function impostazioni(string $classe): ImpostazioniAssociazione
+    {
+        return $this->impostazioniCaricate[$classe] ??= $classe::per($this);
+    }
+
+    public function tesseramento(): TesseramentoSettings
+    {
+        return $this->impostazioni(TesseramentoSettings::class);
+    }
+
+    public function iscrizioni(): IscrizioniSettings
+    {
+        return $this->impostazioni(IscrizioniSettings::class);
+    }
+
+    /** Usato da ImpostazioniAssociazione::save() perché il modello veda i valori salvati. */
+    public function ricordaImpostazioni(ImpostazioniAssociazione $impostazioni): void
+    {
+        $this->impostazioniCaricate[$impostazioni::class] = $impostazioni;
+    }
+
+    public function refresh()
+    {
+        $this->impostazioniCaricate = [];
+
+        return parent::refresh();
+    }
+
+    /**
      * Step promemoria rinnovo del tenant (giorni prima della scadenza,
      * ordinati decrescenti); default PROMEMORIA_RINNOVO_DEFAULT.
      *
@@ -97,21 +140,12 @@ class Associazione extends Model
      */
     public function promemoriaRinnovoSteps(): array
     {
-        $steps = $this->promemoria_rinnovo_config;
-
-        if (! is_array($steps) || $steps === []) {
-            $steps = self::PROMEMORIA_RINNOVO_DEFAULT;
-        }
-
-        $steps = array_values(array_unique(array_map('intval', $steps)));
-        rsort($steps);
-
-        return $steps;
+        return $this->tesseramento()->promemoriaRinnovoSteps();
     }
 
     public function isIscrizioneDiretta(): bool
     {
-        return $this->modalita_iscrizione === self::MODALITA_DIRETTA;
+        return $this->iscrizioni()->diretta();
     }
 
     protected static function booted(): void

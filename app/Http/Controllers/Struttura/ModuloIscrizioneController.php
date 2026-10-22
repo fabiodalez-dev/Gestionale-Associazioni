@@ -48,9 +48,7 @@ class ModuloIscrizioneController extends Controller
                 'obbligatorio' => false,
             ]);
 
-        $config = is_array($associazione->iscrizione_form_config)
-            ? $associazione->iscrizione_form_config
-            : [];
+        $config = $associazione->iscrizioni()->iscrizione_form_config ?? [];
 
         return view('struttura.modulo-iscrizione.edit', [
             'associazione' => $associazione,
@@ -73,7 +71,7 @@ class ModuloIscrizioneController extends Controller
         $associazione = $request->associazioneCorrente();
         $dati = $request->validated();
 
-        $associazione->update([
+        $associazione->iscrizioni()->aggiorna([
             'iscrizioni_socio_aperte' => $request->boolean('iscrizioni_socio_aperte'),
             'modalita_iscrizione' => $dati['modalita_iscrizione'],
             'iscrizione_form_config' => [

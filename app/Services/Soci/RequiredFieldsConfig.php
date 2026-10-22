@@ -62,7 +62,7 @@ class RequiredFieldsConfig
             $defaults['privacy_consenso'] = true;
         }
 
-        $config = $associazione?->campi_obbligatori_config;
+        $config = $associazione?->iscrizioni()->campi_obbligatori_config;
         $perContesto = is_array($config) ? ($config[$contesto] ?? []) : [];
 
         foreach ($perContesto as $campo => $valore) {

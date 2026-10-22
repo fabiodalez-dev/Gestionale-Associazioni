@@ -156,10 +156,13 @@ class AssociazioneController extends Controller
                     'citta' => $dati['citta'] ?? null,
                     'provincia' => $dati['provincia'] ?? null,
                     'cap' => $dati['cap'] ?? null,
-                    'tipo_scadenza_default' => $dati['tipo_scadenza_default'] ?? 'solare',
-                    'giorni_notifica_scadenza' => $dati['giorni_notifica_scadenza'] ?? 30,
                     'costo_tessera' => $dati['costo_tessera'] ?? null,
                     'attiva' => $request->boolean('attiva'),
+                ]);
+
+                $associazione->tesseramento()->aggiorna([
+                    'tipo_scadenza_default' => $dati['tipo_scadenza_default'] ?? 'solare',
+                    'giorni_notifica_scadenza' => $dati['giorni_notifica_scadenza'] ?? 30,
                 ]);
 
                 $this->salvaLogo($request, $associazione, $warnings);

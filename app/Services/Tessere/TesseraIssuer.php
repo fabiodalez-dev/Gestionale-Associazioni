@@ -34,7 +34,7 @@ class TesseraIssuer
      */
     public function tipoScadenza(Associazione $associazione): string
     {
-        $tipo = $associazione->tipo_scadenza_default;
+        $tipo = $associazione->tesseramento()->tipo_scadenza_default;
 
         return in_array($tipo, [Tessera::TIPO_SCADENZA_SOLARE, Tessera::TIPO_SCADENZA_ANNUALE], true)
             ? $tipo

@@ -13,6 +13,7 @@ use App\Models\Tessera;
 use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraPdfRenderer;
 use App\Services\Tessere\TesseraQrService;
+use App\Settings\TesseramentoSettings;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -56,7 +57,7 @@ class TesseraController extends Controller
             ->orderBy('soci.cognome')
             ->get();
 
-        $sogliaInScadenza = (int) ($associazione->giorni_notifica_scadenza ?? 30);
+        $sogliaInScadenza = $associazione?->tesseramento()->giorni_notifica_scadenza ?? TesseramentoSettings::GIORNI_PREAVVISO_DEFAULT;
 
         if ($request->boolean('ajax')) {
             return response()->json([

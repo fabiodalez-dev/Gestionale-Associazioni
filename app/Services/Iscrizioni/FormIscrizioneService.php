@@ -90,9 +90,7 @@ class FormIscrizioneService
      */
     public function schema(Associazione $associazione): array
     {
-        $config = is_array($associazione->iscrizione_form_config)
-            ? $associazione->iscrizione_form_config
-            : [];
+        $config = $associazione->iscrizioni()->iscrizione_form_config ?? [];
 
         $introHtml = trim((string) ($config['intro_html'] ?? ''));
 
@@ -173,7 +171,7 @@ class FormIscrizioneService
     {
         $associazione ??= Associazione::query()->findOrFail($account?->associazione_id);
 
-        if (! $associazione->iscrizioni_socio_aperte) {
+        if (! $associazione->iscrizioni()->iscrizioni_socio_aperte) {
             throw IscrizioneException::iscrizioniChiuse();
         }
 

@@ -58,7 +58,7 @@ class OnboardingChecklist
             [
                 'chiave' => 'form_iscrizione',
                 'etichetta' => 'Configura il form di iscrizione',
-                'fatto' => filled($associazione->iscrizione_form_config),
+                'fatto' => filled($associazione->iscrizioni()->iscrizione_form_config),
                 'url' => $this->url('configurazioni.modulo-iscrizione'),
             ],
             [

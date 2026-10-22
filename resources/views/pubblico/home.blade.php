@@ -16,7 +16,7 @@
                 <a href="{{ route('pubblico.eventi.index', $associazione->slug) }}" class="btn btn-primary">
                     <i class="bi bi-calendar-event me-1"></i> Scopri gli eventi
                 </a>
-                @if ($associazione->iscrizioni_socio_aperte)
+                @if ($associazione->iscrizioni()->iscrizioni_socio_aperte)
                     <a href="{{ route('pubblico.iscriviti', $associazione->slug) }}" class="btn btn-outline-primary ms-2">
                         <i class="bi bi-person-heart me-1"></i> Diventa socio
                     </a>

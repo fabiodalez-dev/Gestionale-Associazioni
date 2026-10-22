@@ -106,14 +106,14 @@ class ConfigurazioniController extends Controller
 
     public function updateTesseramento(UpdateTesseramentoRequest $request): RedirectResponse
     {
-        $request->associazioneCorrente()->update($request->validated());
+        $request->associazioneCorrente()->tesseramento()->aggiorna($request->validated());
 
         return $this->redirectToSection('tesseramento', 'Impostazioni tesseramento aggiornate.');
     }
 
     public function updateTemplateEmail(UpdateTemplateEmailRequest $request): RedirectResponse
     {
-        $request->associazioneCorrente()->update([
+        $request->associazioneCorrente()->tesseramento()->aggiorna([
             'template_email_scadenza' => $request->validated('template_email_scadenza'),
         ]);
 
@@ -149,7 +149,7 @@ class ConfigurazioniController extends Controller
             (array) $request->input('required_preiscrizione', [])
         );
 
-        $associazione->update(['campi_obbligatori_config' => $config]);
+        $associazione->iscrizioni()->aggiorna(['campi_obbligatori_config' => $config]);
 
         // Flag obbligatorietà dei campi personalizzati (UPDATE scoped per tenant)
         $customBackend = array_values((array) $request->input('required_custom_backend', []));

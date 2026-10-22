@@ -10,8 +10,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use PDO;
 use PDOException;
+use RuntimeException;
 
 class InstallerService
 {
@@ -151,15 +153,15 @@ class InstallerService
     }
 
     /**
-     * Applica a runtime la configurazione DB appena scritta e lancia
-     * migrations + seeder dei ruoli.
+     * Applica a runtime la configurazione DB appena scritta nel .env.
      *
      * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
      */
-    public function runMigrations(array $cfg): void
+    public function configuraConnessione(array $cfg): void
     {
         config([
             'database.default' => 'mysql',
+            'database.connections.mysql.url' => null,
             'database.connections.mysql.host' => $cfg['host'],
             'database.connections.mysql.port' => $cfg['port'],
             'database.connections.mysql.database' => $cfg['database'],
@@ -168,9 +170,63 @@ class InstallerService
         ]);
 
         DB::purge('mysql');
+        DB::setDefaultConnection('mysql');
+    }
 
-        Artisan::call('migrate', ['--force' => true]);
+    /**
+     * Inietta lo schema del database vuoto (database/installer/schema.sql)
+     * nel database configurato, come fa l'installer di Pinakes: niente
+     * migration a runtime, un unico dump controllato eseguito istruzione per
+     * istruzione via PDO (funziona anche dove exec() è disabilitato).
+     * Il dump registra anche le migration già applicate, così gli
+     * aggiornamenti futuri eseguono solo quelle nuove. Alla fine verifica che
+     * ogni tabella dichiarata esista e allinea ruoli e permessi.
+     *
+     * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
+     * @return array{tabelle: int, migrazioni: int}
+     *
+     * @throws RuntimeException se il file manca, è incompleto o l'import non produce tutte le tabelle
+     */
+    public function installaSchema(array $cfg): array
+    {
+        $file = (string) config('installer.schema_file');
+        if (! is_file($file) || ! is_readable($file)) {
+            throw new RuntimeException('File dello schema non trovato: '.str_replace(base_path().'/', '', $file).'. Genera il file con "php artisan installer:genera-schema".');
+        }
+
+        $sql = (string) file_get_contents($file);
+        $istruzioni = SchemaSql::istruzioni($sql);
+        $attese = SchemaSql::tabelle($sql);
+        $migrazioni = SchemaSql::migrazioni($sql);
+
+        $this->configuraConnessione($cfg);
+        $connessione = DB::connection('mysql');
+
+        foreach ($istruzioni as $i => $istruzione) {
+            try {
+                $connessione->unprepared($istruzione);
+            } catch (\Throwable $e) {
+                throw new RuntimeException(sprintf(
+                    'Errore nell\'istruzione %d di %d dello schema (%s): %s',
+                    $i + 1,
+                    count($istruzioni),
+                    Str::limit(preg_replace('/\s+/', ' ', $istruzione) ?? '', 80),
+                    $e->getMessage(),
+                ), 0, $e);
+            }
+        }
+
+        // Connessione nuova: l'elenco tabelle deve vedere quelle appena create
+        DB::purge('mysql');
+        $presenti = array_map('strtolower', Schema::connection('mysql')->getTableListing(schemaQualified: false));
+        $mancanti = array_values(array_diff($attese, $presenti));
+        if ($mancanti !== []) {
+            throw new RuntimeException('Schema importato in modo incompleto. Tabelle mancanti: '.implode(', ', $mancanti));
+        }
+
         Artisan::call('db:seed', ['--class' => RolesSeeder::class, '--force' => true]);
+
+        return ['tabelle' => count($attese), 'migrazioni' => count($migrazioni)];
     }
 
     /**

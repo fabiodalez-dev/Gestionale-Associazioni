@@ -57,11 +57,12 @@ class InstallerController extends Controller
         }
 
         // Protezione database non vuoto (come l'installer di riferimento):
-        // si procede solo con conferma esplicita
+        // lo schema sovrascrive le tabelle con lo stesso nome, quindi si
+        // procede solo con conferma esplicita
         if ($esito['tables'] > 0 && ! $request->boolean('consenti_non_vuoto')) {
             return back()
                 ->withInput()
-                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già {$esito['tables']} tabelle. Per installare comunque (le tabelle con lo stesso nome verranno riusate dalle migrations), spunta \"Consenti database non vuoto\"."]);
+                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già {$esito['tables']} tabelle. Per installare comunque spunta \"Sovrascrivi le tabelle già presenti\": le tabelle dell'applicazione con lo stesso nome verranno cancellate e ricreate vuote, le altre restano."]);
         }
 
         $this->installer->writeEnv([
@@ -74,10 +75,18 @@ class InstallerController extends Controller
             'APP_URL' => $request->getSchemeAndHttpHost(),
         ]);
 
-        $this->installer->runMigrations($cfg);
+        try {
+            $esito = $this->installer->installaSchema($cfg);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()
+                ->withInput()
+                ->withErrors(['database' => 'Installazione dello schema fallita: '.$e->getMessage()]);
+        }
 
         return redirect()->route('installer.admin')
-            ->with('success', 'Database configurato e migrato correttamente.');
+            ->with('success', "Database configurato: schema installato ({$esito['tabelle']} tabelle).");
     }
 
     /** Step 3 — super amministratore e prima associazione */

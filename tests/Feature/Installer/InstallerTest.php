@@ -71,7 +71,7 @@ class InstallerTest extends TestCase
             $mock->shouldReceive('testDatabase')->once()
                 ->andReturn(['ok' => false, 'error' => 'Access denied', 'tables' => 0]);
             $mock->shouldReceive('writeEnv')->never();
-            $mock->shouldReceive('runMigrations')->never();
+            $mock->shouldReceive('installaSchema')->never();
         });
 
         $this->from('/install/database')
@@ -88,7 +88,7 @@ class InstallerTest extends TestCase
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0]);
             $mock->shouldReceive('writeEnv')->once();
-            $mock->shouldReceive('runMigrations')->once();
+            $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
         });
 
         $this->post('/install/database', [
@@ -159,7 +159,7 @@ class InstallerTest extends TestCase
             $mock->shouldReceive('testDatabase')->twice()
                 ->andReturn(['ok' => true, 'error' => null, 'tables' => 12]);
             $mock->shouldReceive('writeEnv')->once();
-            $mock->shouldReceive('runMigrations')->once();
+            $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
         });
 
         $payload = [

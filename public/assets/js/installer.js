@@ -35,7 +35,7 @@
                     if (res.data.ok) {
                         esito.className = 'alert alert-success mt-3 mb-0';
                         esito.textContent = res.data.tables > 0
-                            ? 'Connessione riuscita. Attenzione: il database contiene già ' + res.data.tables + ' tabelle.'
+                            ? 'Connessione riuscita. Attenzione: il database contiene già ' + res.data.tables + ' tabelle. Per procedere dovrai spuntare "Sovrascrivi le tabelle già presenti".'
                             : 'Connessione riuscita. Il database è vuoto e pronto.';
                     } else {
                         esito.className = 'alert alert-danger mt-3 mb-0';

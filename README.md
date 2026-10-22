@@ -138,7 +138,23 @@ composer install --no-dev
 cp .env.example .env
 ```
 
-Apri **`/install`** nel browser: il wizard in 5 passi (requisiti → database → super admin → email → fine) genera l'`APP_KEY`, scrive il `.env`, migra lo schema e crea il primo super admin. Al termine l'installer si blocca da solo.
+Apri **`/install`** nel browser (in sviluppo con `php artisan serve --no-reload`: il wizard scrive il `.env` e senza quell'opzione il server di sviluppo si riavvierebbe a metà richiesta): il wizard in 5 passi (requisiti → database → super admin → email → fine) genera l'`APP_KEY`, scrive il `.env`, inietta lo schema del database vuoto nel database indicato e crea il primo super admin. Al termine l'installer si blocca da solo.
+
+Lo schema non viene creato eseguendo le migration a runtime ma importando `database/installer/schema.sql`, un dump del database vuoto (struttura + registro delle migration già applicate) eseguito istruzione per istruzione via PDO: funziona anche sugli hosting condivisi senza `exec()` né client `mysql`, è veloce e produce sempre lo stesso risultato. Le tabelle dell'applicazione già presenti nel database vengono ricreate vuote solo dietro conferma esplicita; le tabelle estranee restano intatte. Dopo l'installazione `php artisan migrate` (anche quello dell'aggiornamento in-app) applica soltanto le migration nuove.
+
+#### Rigenerare lo schema dell'installer
+
+Dopo ogni nuova migration va rigenerato il file, altrimenti il test `SchemaSqlTest` fallisce:
+
+```bash
+php artisan installer:genera-schema
+```
+
+Il comando crea un database temporaneo `gestione_associazioni_schema_tmp` con le credenziali MySQL del `.env`, ci esegue tutte le migration, scrive il dump e cancella il database temporaneo. Per provare l'iniezione su un MySQL reale:
+
+```bash
+INSTALLER_TEST_MYSQL_DSN="mysql://root:segreta@127.0.0.1:3306/gestione_installer_test" php artisan test --filter=InstallaSchemaMysqlTest
+```
 
 ### Installazione manuale (CLI)
 

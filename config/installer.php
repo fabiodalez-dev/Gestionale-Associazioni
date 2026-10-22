@@ -19,6 +19,10 @@ return [
 
     'env_file' => env('INSTALLER_ENV_FILE') ?: base_path('.env'),
 
+    // Schema del database vuoto iniettato dall'installer nel database
+    // configurato (generato da `php artisan installer:genera-schema`).
+    'schema_file' => env('INSTALLER_SCHEMA_FILE') ?: base_path('database/installer/schema.sql'),
+
     // Nei test l'enforcement è disattivato di default per non interferire
     // con la suite; i test dell'installer lo abilitano esplicitamente.
     'enforce_in_tests' => false,

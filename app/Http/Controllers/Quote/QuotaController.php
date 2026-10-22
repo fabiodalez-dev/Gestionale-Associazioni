@@ -10,6 +10,7 @@ use App\Models\PaymentGatewaySetting;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\TipoSocio;
+use App\Support\CellaSicura;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -128,14 +129,14 @@ class QuotaController extends Controller
         return response()->streamDownload(function () use ($query, $status): void {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF"); // BOM: Excel apre correttamente gli accenti
-            fputcsv($out, ['Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo', 'Anno', 'Importo', 'Scadenza', 'Stato', 'Data pagamento', 'Metodo'], ';');
+            fputcsv($out, CellaSicura::riga(['Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo', 'Anno', 'Importo', 'Scadenza', 'Stato', 'Data pagamento', 'Metodo']), ';');
             $query->chunk(500, function ($quote) use ($out, $status): void {
                 foreach ($quote as $quota) {
                     $stato = $quota->statoCalcolato();
                     if ($status !== 'Tutti' && $status !== $stato) {
                         continue;
                     }
-                    fputcsv($out, [
+                    fputcsv($out, CellaSicura::riga([
                         $quota->socio?->numero_socio,
                         $quota->socio?->cognome,
                         $quota->socio?->nome,
@@ -147,7 +148,7 @@ class QuotaController extends Controller
                         $stato,
                         $quota->data_pagamento?->format('d/m/Y'),
                         $quota->metodo_pagamento,
-                    ], ';');
+                    ]), ';');
                 }
             });
             fclose($out);

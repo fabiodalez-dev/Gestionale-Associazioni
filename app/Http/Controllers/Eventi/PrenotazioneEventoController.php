@@ -9,6 +9,7 @@ use App\Models\Utente;
 use App\Notifications\Prenotazioni\BigliettoPrenotazioneNotification;
 use App\Services\Prenotazioni\PrenotazioneException;
 use App\Services\Prenotazioni\PrenotazioneService;
+use App\Support\CellaSicura;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -292,13 +293,13 @@ class PrenotazioneEventoController extends Controller
             $out = fopen('php://output', 'w');
             // BOM UTF-8 per Excel
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, [
+            fputcsv($out, CellaSicura::riga([
                 'Codice', 'Cognome', 'Nome', 'Email', 'Posti', 'Stato',
                 'Importo', 'Gateway', 'Pagata il', 'Check-in', 'Operatore check-in', 'Creata il',
-            ], ';');
+            ]), ';');
 
             foreach ($prenotazioni as $p) {
-                fputcsv($out, [
+                fputcsv($out, CellaSicura::riga([
                     $p->codice,
                     $p->account?->cognome,
                     $p->account?->nome,
@@ -311,7 +312,7 @@ class PrenotazioneEventoController extends Controller
                     $p->checkin_at?->format('d/m/Y H:i'),
                     $p->checkinUtente?->nome_completo,
                     $p->created_at?->format('d/m/Y H:i'),
-                ], ';');
+                ]), ';');
             }
 
             fclose($out);

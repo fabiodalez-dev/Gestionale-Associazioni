@@ -9,6 +9,7 @@ use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -203,10 +204,10 @@ class PartecipanteController extends Controller
             $out = fopen('php://output', 'w');
             // BOM UTF-8 per Excel
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Cognome', 'Nome', 'Numero Socio', 'Email', 'Telefono', 'Stato', 'Data Conferma', 'Note'], ';');
+            fputcsv($out, CellaSicura::riga(['Cognome', 'Nome', 'Numero Socio', 'Email', 'Telefono', 'Stato', 'Data Conferma', 'Note']), ';');
 
             foreach ($partecipanti as $p) {
-                fputcsv($out, [
+                fputcsv($out, CellaSicura::riga([
                     $p->socio?->cognome,
                     $p->socio?->nome,
                     $p->socio?->numero_socio,
@@ -215,7 +216,7 @@ class PartecipanteController extends Controller
                     $p->stato_partecipazione,
                     $p->data_conferma?->format('d/m/Y H:i'),
                     $p->note,
-                ], ';');
+                ]), ';');
             }
 
             fclose($out);

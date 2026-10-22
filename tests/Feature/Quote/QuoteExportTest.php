@@ -28,7 +28,7 @@ class QuoteExportTest extends TestCase
         $anno = now()->year;
 
         $giulia = Socio::factory()->create(['associazione_id' => $associazione->id, 'nome' => 'Giulia', 'cognome' => 'Pagantini']);
-        $luca = Socio::factory()->create(['associazione_id' => $associazione->id, 'nome' => 'Luca', 'cognome' => 'Ritardini']);
+        $luca = Socio::factory()->create(['associazione_id' => $associazione->id, 'nome' => '=HYPERLINK("http://truffa.test")', 'cognome' => 'Ritardini']);
         $estraneo = Socio::factory()->create(['associazione_id' => $altra->id, 'cognome' => 'Estraneo']);
         Quota::create(['associazione_id' => $associazione->id, 'socio_id' => $giulia->id, 'anno' => $anno, 'importo' => 45, 'data_scadenza' => now()->addMonths(2)->toDateString(), 'data_pagamento' => now()->toDateString(), 'stato' => 'Pagata', 'metodo_pagamento' => 'contanti', 'tipo' => 'Quota Associativa']);
         Quota::create(['associazione_id' => $associazione->id, 'socio_id' => $luca->id, 'anno' => $anno, 'importo' => 25, 'data_scadenza' => now()->subDays(10)->toDateString(), 'stato' => 'Da Pagare', 'tipo' => 'Quota Associativa']);
@@ -45,7 +45,8 @@ class QuoteExportTest extends TestCase
             ->assertDontSee('Estraneo');
 
         $csv = $this->get(route('quote.export', ['year' => $anno, 'status' => 'Scaduta']))->assertOk()->streamedContent();
-        $this->assertStringContainsString('Ritardini;Luca', $csv);
+        // Il nome scritto come formula esce neutralizzato
+        $this->assertStringContainsString('Ritardini;"\'=HYPERLINK(""http://truffa.test"")"', $csv);
         $this->assertStringNotContainsString('Pagantini', $csv);
         $this->assertStringNotContainsString('Estraneo', $csv);
 

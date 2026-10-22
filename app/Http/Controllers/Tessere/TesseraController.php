@@ -14,6 +14,7 @@ use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraPdfRenderer;
 use App\Services\Tessere\TesseraQrService;
 use App\Settings\TesseramentoSettings;
+use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -54,12 +55,12 @@ class TesseraController extends Controller
         return response()->streamDownload(function () use ($query): void {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Numero tessera', 'Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo socio', 'Anno', 'Emessa il', 'Scade il', 'Stato', 'Template'], ';');
+            fputcsv($out, CellaSicura::riga(['Numero tessera', 'Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo socio', 'Anno', 'Emessa il', 'Scade il', 'Stato', 'Template']), ';');
             foreach ($query->cursor() as $tessera) {
                 if (! $tessera instanceof Tessera) {
                     continue;
                 }
-                fputcsv($out, [
+                fputcsv($out, CellaSicura::riga([
                     $tessera->numero_tessera,
                     $tessera->socio?->numero_socio,
                     $tessera->socio?->cognome,
@@ -71,7 +72,7 @@ class TesseraController extends Controller
                     $tessera->data_scadenza->format('d/m/Y'),
                     $tessera->stato,
                     $tessera->template_tessera,
-                ], ';');
+                ]), ';');
             }
             fclose($out);
         }, 'tessere-'.$anno.'-'.now()->format('Ymd').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

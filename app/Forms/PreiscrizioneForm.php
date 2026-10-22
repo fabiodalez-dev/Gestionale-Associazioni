@@ -57,6 +57,10 @@ class PreiscrizioneForm extends ModuloFormello
             $campo('cap', 'CAP', 3, ['maxlength' => 5, 'inputmode' => 'numeric', 'autocomplete' => 'postal-code']),
         ];
 
+        // Campi anagrafici nascosti dall'associazione (Configurazioni → Moduli pubblici)
+        $moduli = $associazione->moduli();
+        $campi = array_values(array_filter($campi, fn (FormelloField $f) => $moduli->campoVisibile($f->getName())));
+
         if ($tipi->isNotEmpty()) {
             $campi[] = $campo('tipo_socio_id', 'Tipo socio', 6)->widget('select')
                 ->choices($tipi->pluck('nome', 'id')->all())->extra('placeholder', '-- Seleziona --');
@@ -66,12 +70,11 @@ class PreiscrizioneForm extends ModuloFormello
                 ->choices($categorie->pluck('nome', 'id')->all())->extra('placeholder', '-- Seleziona --');
         }
 
+        // Link sempre presente: senza testo personalizzato la pagina mostra l'informativa predefinita
         $privacy = FormelloField::make('privacy_consenso')->label('Accetto l\'informativa sulla privacy')
-            ->widget('consenso')->required()->value($rinnovo);
-        if (filled($associazione->privacy_policy_html)) {
-            $privacy->extra('link_url', route('privacy-policy.show', ['associazione' => $associazione->id]))
-                ->extra('link_testo', '— leggi l\'informativa');
-        }
+            ->widget('consenso')->required()->value($rinnovo)
+            ->extra('link_url', route('privacy-policy.show', ['associazione' => $associazione->id]))
+            ->extra('link_testo', '— leggi l\'informativa');
         $campi[] = $privacy;
 
         return $campi;

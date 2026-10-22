@@ -4,6 +4,7 @@ namespace App\Http\Requests\FrontendPubblico;
 
 use App\Models\Associazione;
 use App\Services\Iscrizioni\FormIscrizioneService;
+use App\Services\Moduli\RegistroConsensi;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -39,6 +40,18 @@ class IscrizioneSocioRequest extends FormRequest
                 dataNascita: is_string($dataNascita) ? $dataNascita : null,
             )
             : [];
+    }
+
+    /**
+     * Messaggi dei consensi aggiuntivi obbligatori.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        $associazione = $this->associazioneCorrente();
+
+        return $associazione !== null ? app(RegistroConsensi::class)->messaggi($associazione) : [];
     }
 
     /**

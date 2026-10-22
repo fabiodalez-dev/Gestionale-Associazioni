@@ -206,6 +206,12 @@
                                 </div>
                             @endif
 
+                            @if ($associazione->moduli()->elencoConsensi() !== [])
+                                <div class="col-12">
+                                    @include('partials.consensi-modulo', ['associazione' => $associazione])
+                                </div>
+                            @endif
+
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary w-100">
                                     <i class="bi bi-person-heart me-1"></i> Invia la richiesta di iscrizione

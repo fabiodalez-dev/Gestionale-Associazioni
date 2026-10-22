@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Services\Struttura\LogoAssociazione;
 use App\Settings\ImpostazioniAssociazione;
 use App\Settings\IscrizioniSettings;
+use App\Settings\ModuliSettings;
 use App\Settings\TesseramentoSettings;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
-use App\Services\Struttura\LogoAssociazione;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -21,9 +22,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Associazione extends Model implements HasMedia
 {
     use HasDefaultActivityLog;
-    use InteractsWithMedia;
     use HasFactory;
     use HasUuids;
+    use InteractsWithMedia;
 
     /** Iscrizione socio: l'admin approva la richiesta (Socio "In Attesa"). */
     public const MODALITA_PREISCRIZIONE = 'preiscrizione';
@@ -123,6 +124,11 @@ class Associazione extends Model implements HasMedia
     public function iscrizioni(): IscrizioniSettings
     {
         return $this->impostazioni(IscrizioniSettings::class);
+    }
+
+    public function moduli(): ModuliSettings
+    {
+        return $this->impostazioni(ModuliSettings::class);
     }
 
     /** Usato da ImpostazioniAssociazione::save() perché il modello veda i valori salvati. */

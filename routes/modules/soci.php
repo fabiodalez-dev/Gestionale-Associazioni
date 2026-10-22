@@ -4,13 +4,13 @@ use App\Http\Controllers\Privacy\DatiPersonaliController;
 use App\Http\Controllers\Soci\CampoPersonalizzatoController;
 use App\Http\Controllers\Soci\CategoriaSocioController;
 use App\Http\Controllers\Soci\DocumentoSocioController;
+use App\Http\Controllers\Soci\FotoSocioController;
 use App\Http\Controllers\Soci\GruppoDinamicoController;
 use App\Http\Controllers\Soci\SavedFilterController;
 use App\Http\Controllers\Soci\SocioController;
 use App\Http\Controllers\Soci\SocioStatoController;
 use App\Http\Controllers\Soci\TagController;
 use App\Http\Controllers\Soci\TipoSocioController;
-use App\Http\Controllers\Soci\FotoSocioController;
 use Illuminate\Support\Facades\Route;
 
 /*

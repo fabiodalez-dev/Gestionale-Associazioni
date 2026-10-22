@@ -112,3 +112,17 @@ Correzione di sicurezza (Fase 8), da revisione automatica:
 - **Sedi eliminate**: se l'unica sede assegnata veniva eliminata l'utente tornava a vedere tutto. Nuova colonna `utenti.limitato_sedi`: chi è limitato resta tale e, senza sedi valide, non vede nulla finché l'admin non lo riassegna.
 - **Altri dati collegati**: scope per sede aggiunto anche ad assegnazioni dei turni, prestiti, cariche, valori dei campi personalizzati e storico (tramite socio), spese e feedback (tramite evento) e turni (tramite evento; quelli senza evento restano di tutta l'associazione).
 - 3 test di regressione in `PerimetroSediTest` (13 in tutto).
+
+## Fase 9 — Moduli pubblici personalizzabili per associazione
+
+- **Privacy**: il modulo di pre-iscrizione linka sempre l'informativa (prima il link compariva solo con un testo personalizzato). Senza testo, la pagina pubblica mostra un'**informativa predefinita** (artt. 13-14 GDPR) compilata con i dati dell'associazione (titolare, sede, codice fiscale, contatti) e con i consensi configurati; in Configurazioni → Privacy Policy il pulsante "Inserisci il modello predefinito" la porta nell'editor come base da adattare (aggiunto `h4` ai tag consentiti).
+- **Configurazioni → Moduli pubblici** (`ModuliSettings`, impostazioni per associazione della Fase 3): colore principale e logo sì/no (pre-iscrizione, iscrizione online, privacy, mini-sito, con testo bianco o scuro calcolato sul contrasto), titolo, testo introduttivo (HTML purificato) e messaggio dopo l'invio della pre-iscrizione, campi anagrafici da mostrare, campi personalizzati da mostrare (tutti di default, così i nuovi compaiono da soli), consensi aggiuntivi con testo, link facoltativo e obbligatorietà.
+- I campi nascosti sono esclusi dalla validazione e non vengono salvati anche se inviati a mano; i campi personalizzati non mostrati non sono richiesti né salvati.
+- **Registro dei consensi** (tabella `consensi`, art. 7 GDPR): a ogni pre-iscrizione, aggiornamento dati e iscrizione online si registrano privacy e consensi aggiuntivi, dati e non dati, con testo esatto, data, origine e IP. Visibili nella scheda socio e inclusi nell'archivio GDPR della Fase 4. Gli stessi consensi valgono nell'iscrizione online del mini-sito.
+- Esito: **1810/1810 test verdi** (7 nuovi in `ModuliPubbliciTest` e test della privacy aggiornato all'informativa predefinita), PHPStan pulito, **E2E 109/109**, verifica sulla pagina reale `/preiscrizione/2f606db8-…`.
+
+## Controllo delle viste Blade
+
+- Compilate tutte le 253 viste: nessun errore di sintassi, nessuna direttiva rimasta come testo. Un solo file (`soci/show`) mescolava `@php(...)` inline e blocchi `@php … @endphp`, la combinazione che due volte in questo lavoro ha prodotto variabili non definite a runtime senza errori di sintassi: convertito alla sola forma a blocco.
+- Nuovo `tests/Feature/BladeViewsTest.php` che ripete i controlli a ogni esecuzione della suite (sintassi del compilato, direttive residue, forme di `@php` mescolate). Verificato che fallisce sulla versione precedente di `soci/show`.
+- Il test intermittente segnalato nella Fase 8 era `CampagnaRinnoviTest`: usava i cognomi "Rossi" e "Verdi" e controllava che "Verdi" non comparisse, ma il nome dell'associazione e dell'admin sono generati a caso con cognomi italiani. Ora usa cognomi che Faker non genera.

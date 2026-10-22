@@ -34,7 +34,7 @@ class ConfigurazioniController extends Controller
 {
     /** Whitelist HTML coerente con la toolbar TinyMCE legacy (spec §9.10). */
     private const PRIVACY_HTML_ALLOWED =
-        'p,h1,h2,h3,b,strong,i,em,u,ul,ol,li,a[href|title|target],table,thead,tbody,tr,td,th,br,span,div';
+        'p,h1,h2,h3,h4,b,strong,i,em,u,ul,ol,li,a[href|title|target],table,thead,tbody,tr,td,th,br,span,div';
 
     public function __construct(
         private readonly RequiredFieldsService $requiredFields,

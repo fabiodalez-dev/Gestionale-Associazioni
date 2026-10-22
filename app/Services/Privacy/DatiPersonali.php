@@ -64,6 +64,8 @@ class DatiPersonali
             'cessazioni' => $this->righe($socio->cessazioni()->get()),
             'richieste_modifica_dati' => $this->righe($socio->richiesteModificaDati()->get()),
             'storico_attivita' => $this->righe($socio->storicoAttivita()->orderBy('data_attivita')->get()),
+            'consensi' => $socio->consensi()->withoutGlobalScopes()->orderBy('created_at')->get()
+                ->map(fn (Model $c) => $c->only(['testo', 'accettato', 'origine', 'created_at']))->all(),
             'email_ricevute' => $socio->emailLogs()->orderBy('sent_at')->get()
                 ->map(fn (Model $e) => $e->only(['to_email', 'subject', 'status', 'sent_at']))->all(),
             'account_collegati' => Account::query()->withoutGlobalScopes()->where('socio_id', $socio->id)->get()

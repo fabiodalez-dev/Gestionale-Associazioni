@@ -447,6 +447,16 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
         ];
     }
 
+    /**
+     * Consensi espressi nei moduli pubblici (registro GDPR).
+     *
+     * @return HasMany<Consenso, $this>
+     */
+    public function consensi(): HasMany
+    {
+        return $this->hasMany(Consenso::class, 'socio_id');
+    }
+
     public const COLLEZIONE_FOTO = 'foto';
 
     /**

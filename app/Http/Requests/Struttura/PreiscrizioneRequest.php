@@ -4,7 +4,9 @@ namespace App\Http\Requests\Struttura;
 
 use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
+use App\Services\Moduli\RegistroConsensi;
 use App\Services\Struttura\RequiredFieldsService;
+use App\Settings\ModuliSettings;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -47,11 +49,24 @@ class PreiscrizioneRequest extends FormRequest
             'custom_field' => ['nullable', 'array'],
         ];
 
-        // Campi personalizzati con obbligatorio_preiscrizione=1 (eccetto checkbox)
+        // Campi nascosti dall'associazione: esclusi (mai obbligatori né salvati)
+        $moduli = $associazione->moduli();
+        foreach (ModuliSettings::CAMPI_NASCONDIBILI as $campo) {
+            if (! $moduli->campoVisibile($campo)) {
+                $rules[$campo] = ['exclude'];
+            }
+        }
+
+        // Consensi aggiuntivi configurati dall'associazione
+        $rules += app(RegistroConsensi::class)->regole($associazione);
+
+        // Campi personalizzati mostrati e con obbligatorio_preiscrizione=1 (eccetto checkbox)
+        $scelti = $moduli->campi_personalizzati_preiscrizione;
         $campi = CampoPersonalizzato::query()
             ->forAssociazione($associazione->id)
             ->where('obbligatorio_preiscrizione', true)
             ->where('tipo_campo', '<>', 'checkbox')
+            ->when($scelti !== null, fn ($q) => $q->whereIn('id', $scelti))
             ->get();
 
         foreach ($campi as $campo) {
@@ -83,6 +98,7 @@ class PreiscrizioneRequest extends FormRequest
         }
 
         $messages['custom_field.*.required'] = 'Compila tutti i campi aggiuntivi obbligatori.';
+        $messages += app(RegistroConsensi::class)->messaggi($this->associazione());
 
         return $messages;
     }

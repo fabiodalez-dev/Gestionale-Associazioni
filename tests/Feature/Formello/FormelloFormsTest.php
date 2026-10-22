@@ -12,6 +12,7 @@ use App\Models\Socio;
 use App\Models\Utente;
 use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
@@ -116,7 +117,7 @@ class FormelloFormsTest extends TestCase
 
     public function test_la_rotta_compute_di_formello_non_e_esposta(): void
     {
-        $this->assertFalse(\Illuminate\Support\Facades\Route::has('formello.compute'));
+        $this->assertFalse(Route::has('formello.compute'));
         $this->post('/formello/compute', ['form_class' => Utente::class, 'changed_field' => 'x', 'form_data' => ['a' => 1]])
             ->assertNotFound();
     }

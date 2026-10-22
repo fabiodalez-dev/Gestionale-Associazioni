@@ -12,8 +12,10 @@ use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\TipoSocio;
 use App\Models\ValoreCampoPersonalizzato;
+use App\Services\Moduli\RegistroConsensi;
 use App\Services\Struttura\NumeroSocioGenerator;
 use App\Services\Struttura\RequiredFieldsService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,7 @@ class PreiscrizioneController extends Controller
     public function __construct(
         private readonly RequiredFieldsService $requiredFields,
         private readonly NumeroSocioGenerator $numeroSocio,
+        private readonly RegistroConsensi $consensi,
     ) {}
 
     public function show(Request $request, string $associazione): View
@@ -134,6 +137,7 @@ class PreiscrizioneController extends Controller
                 ]);
 
                 $this->salvaCampiPersonalizzati($assoc, $socio, (array) $request->input('custom_field', []), soloNonVuoti: true);
+                $this->consensi->registra($assoc, $socio, (array) $request->input('consensi', []), 'preiscrizione', $request->ip());
 
                 StoricoAttivitaSocio::create([
                     'associazione_id' => $assoc->id,
@@ -160,7 +164,8 @@ class PreiscrizioneController extends Controller
 
         return redirect()
             ->route('preiscrizione.show', ['associazione' => $assoc->id])
-            ->with('success', 'La tua richiesta di pre-iscrizione è stata inviata con successo! Riceverai una comunicazione quando sarà approvata.');
+            ->with('success', 'La tua richiesta di pre-iscrizione è stata inviata con successo! Riceverai una comunicazione quando sarà approvata.')
+            ->with('preiscrizione_inviata', true);
     }
 
     private function aggiornaSocio(Request $request, Associazione $assoc, Socio $socio, array $dati, ?string $tipoSocioId, ?string $categoriaId): RedirectResponse
@@ -191,6 +196,7 @@ class PreiscrizioneController extends Controller
                 ])->save();
 
                 $this->salvaCampiPersonalizzati($assoc, $socio, $request->input('custom_field', []), soloNonVuoti: false);
+                $this->consensi->registra($assoc, $socio, (array) $request->input('consensi', []), 'rinnovo_dati', $request->ip());
 
                 StoricoAttivitaSocio::create([
                     'associazione_id' => $assoc->id,
@@ -220,10 +226,8 @@ class PreiscrizioneController extends Controller
      */
     private function salvaCampiPersonalizzati(Associazione $assoc, Socio $socio, array $valori, bool $soloNonVuoti): void
     {
-        $campiValidi = CampoPersonalizzato::query()
-            ->forAssociazione($assoc->id)
-            ->pluck('id')
-            ->all();
+        // Solo i campi mostrati nel modulo (anti-tamper: del tenant e visibili)
+        $campiValidi = $this->campiPersonalizzati($assoc)->pluck('id')->all();
 
         foreach ($valori as $campoId => $valore) {
             if (! in_array($campoId, $campiValidi, true)) {
@@ -310,12 +314,26 @@ class PreiscrizioneController extends Controller
             'associazione' => $assoc,
             'tipiSocio' => TipoSocio::query()->forAssociazione($assoc->id)->orderBy('nome')->get(),
             'categorieSocio' => CategoriaSocio::query()->forAssociazione($assoc->id)->orderBy('nome')->get(),
-            'campiPersonalizzati' => CampoPersonalizzato::query()
-                ->forAssociazione($assoc->id)
-                ->orderBy('ordine')
-                ->orderBy('nome_campo')
-                ->get(),
+            'campiPersonalizzati' => $this->campiPersonalizzati($assoc),
             'requiredConfig' => $this->requiredFields->load($assoc),
         ];
+    }
+
+    /**
+     * Campi personalizzati mostrati nella preiscrizione: tutti, o quelli
+     * scelti dall'associazione (Configurazioni → Moduli pubblici).
+     *
+     * @return Collection<int, CampoPersonalizzato>
+     */
+    private function campiPersonalizzati(Associazione $assoc): Collection
+    {
+        $scelti = $assoc->moduli()->campi_personalizzati_preiscrizione;
+
+        return CampoPersonalizzato::query()
+            ->forAssociazione($assoc->id)
+            ->when($scelti !== null, fn ($q) => $q->whereIn('id', $scelti))
+            ->orderBy('ordine')
+            ->orderBy('nome_campo')
+            ->get();
     }
 }

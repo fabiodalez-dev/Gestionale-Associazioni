@@ -7,21 +7,21 @@
     <title>{{ $socioRinnovo ? 'Rinnovo iscrizione' : 'Pre-iscrizione' }} — {{ $associazione->nome }}</title>
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
-    <meta name="theme-color" content="#FF7B11">
+    @include('partials.stile-associazione')
     <style>
         body { background: #F3F4F6; }
-        .brand-header { background: #FF7B11; color: #FFFFFF; padding: 1.5rem 0; }
+        .brand-header { background: var(--brand); color: var(--brand-testo); padding: 1.5rem 0; }
         .brand-header img { max-height: 56px; background: #FFFFFF; border-radius: 8px; padding: 4px; }
         .form-card { max-width: 760px; margin: -1.5rem auto 2rem; }
         .required-star { color: #DC2626; }
-        .btn-brand { background: #FF7B11; border-color: #FF7B11; color: #FFFFFF; }
-        .btn-brand:hover { background: #E86A00; border-color: #E86A00; color: #FFFFFF; }
+        .btn-brand { background: var(--brand); border-color: var(--brand); color: var(--brand-testo); }
+        .btn-brand:hover { background: var(--brand-hover); border-color: var(--brand-hover); color: var(--brand-testo); }
         footer { color: #9CA3AF; font-size: 0.8rem; }
     </style>
 </head>
 <body>
     <div class="brand-header text-center mb-5">
-        @if ($associazione->logoUrl())
+        @if ($associazione->moduli()->mostra_logo && $associazione->logoUrl())
             <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}" class="mb-2"><br>
         @endif
         <h1 class="h4 mb-0">{{ $associazione->nome }}</h1>
@@ -29,7 +29,7 @@
 
     <div class="container form-card">
         @if (session('success'))
-            <div class="alert alert-success">{{ session('success') }}</div>
+            <div class="alert alert-success">{{ $associazione->moduli()->messaggio_conferma && session('preiscrizione_inviata') ? $associazione->moduli()->messaggio_conferma : session('success') }}</div>
         @endif
         @if (session('error'))
             <div class="alert alert-danger">{{ session('error') }}</div>
@@ -54,8 +54,12 @@
             <div class="card shadow-sm">
                 <div class="card-body p-4">
                     <h2 class="h5 mb-3">
-                        {{ $socioRinnovo ? 'Rinnovo iscrizione a '.$associazione->nome : 'Richiesta di pre-iscrizione' }}
+                        {{ $socioRinnovo ? 'Rinnovo iscrizione a '.$associazione->nome : ($associazione->moduli()->titolo_preiscrizione ?: 'Richiesta di pre-iscrizione') }}
                     </h2>
+                    @if (! $socioRinnovo && filled($associazione->moduli()->intro_preiscrizione_html))
+                        {{-- HTML purificato in scrittura (Configurazioni → Moduli pubblici) --}}
+                        <div class="mb-4 intro-modulo">{!! $associazione->moduli()->intro_preiscrizione_html !!}</div>
+                    @endif
 
                     <form method="POST" action="{{ route('preiscrizione.store', ['associazione' => $associazione->id]) }}" id="formPreiscrizione">
                         @csrf
@@ -108,6 +112,7 @@
 
                             <div class="col-12">
                                 @include('formello.campi', ['form' => $formPreiscrizione, 'solo' => ['privacy_consenso']])
+                                @include('partials.consensi-modulo', ['associazione' => $associazione])
                             </div>
 
                             <div class="col-12">

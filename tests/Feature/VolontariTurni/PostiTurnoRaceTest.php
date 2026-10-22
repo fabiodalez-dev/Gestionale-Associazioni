@@ -145,11 +145,12 @@ class PostiTurnoRaceTest extends TestCase
     {
         $admin = Utente::query()->where('associazione_id', $this->associazione->id)->first();
 
-        // posti=1 con una proposta esistente: la conferma di quella proposta
-        // non crea posti aggiuntivi, ma resta serializzata sul mutex di turno.
+        // posti=1 con una proposta esistente: la proposta occupa già l'unico
+        // posto, quindi la conferma non deve chiederne uno in più (né crearne),
+        // e resta serializzata sul mutex di turno.
         $turno = Turno::factory()->create([
             'associazione_id' => $this->associazione->id,
-            'posti' => 2,
+            'posti' => 1,
         ]);
         $proposta = TurnoAssegnazione::factory()->create([
             'associazione_id' => $this->associazione->id,

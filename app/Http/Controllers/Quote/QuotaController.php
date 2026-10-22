@@ -143,7 +143,7 @@ class QuotaController extends Controller
                         $quota->tipo,
                         $quota->anno,
                         number_format((float) $quota->importo, 2, ',', ''),
-                        $quota->data_scadenza?->format('d/m/Y'),
+                        $quota->data_scadenza->format('d/m/Y'),
                         $stato,
                         $quota->data_pagamento?->format('d/m/Y'),
                         $quota->metodo_pagamento,

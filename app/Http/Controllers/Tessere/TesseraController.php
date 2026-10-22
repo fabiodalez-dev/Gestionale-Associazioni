@@ -56,6 +56,9 @@ class TesseraController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['Numero tessera', 'Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo socio', 'Anno', 'Emessa il', 'Scade il', 'Stato', 'Template'], ';');
             foreach ($query->cursor() as $tessera) {
+                if (! $tessera instanceof Tessera) {
+                    continue;
+                }
                 fputcsv($out, [
                     $tessera->numero_tessera,
                     $tessera->socio?->numero_socio,
@@ -64,8 +67,8 @@ class TesseraController extends Controller
                     $tessera->socio?->email,
                     $tessera->socio?->tipoSocio?->nome,
                     $tessera->anno_validita,
-                    $tessera->data_emissione?->format('d/m/Y'),
-                    $tessera->data_scadenza?->format('d/m/Y'),
+                    $tessera->data_emissione->format('d/m/Y'),
+                    $tessera->data_scadenza->format('d/m/Y'),
                     $tessera->stato,
                     $tessera->template_tessera,
                 ], ';');

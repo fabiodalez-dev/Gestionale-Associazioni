@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Socio;
 use App\Services\Soci\SociFilter;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -17,7 +18,7 @@ class SociExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping
 {
     public function __construct(private readonly SociFilter $filter) {}
 
-    public function query()
+    public function query(): Builder
     {
         return $this->filter->build();
     }
@@ -43,7 +44,7 @@ class SociExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping
      * @param  Socio  $socio
      * @return list<mixed>
      */
-    public function map($socio): array
+    public function map(mixed $socio): array
     {
         return [
             $socio->numero_socio,

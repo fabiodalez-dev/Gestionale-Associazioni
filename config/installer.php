@@ -21,7 +21,7 @@ return [
     'enforce_in_tests' => false,
 
     'requirements' => [
-        'php' => '8.2.0',
+        'php' => '8.3.0',
         'extensions' => [
             'pdo_mysql', 'mbstring', 'openssl', 'tokenizer', 'xml',
             'ctype', 'json', 'curl', 'fileinfo', 'gd', 'zip', 'intl',

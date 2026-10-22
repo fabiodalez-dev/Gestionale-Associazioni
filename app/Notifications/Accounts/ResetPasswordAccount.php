@@ -34,11 +34,12 @@ class ResetPasswordAccount extends Notification implements ShouldQueue
         /** @var Account $notifiable */
         $associazione = $notifiable->associazione;
 
-        $url = route('pubblico.password.reset', [
+        // Link costruito da APP_URL, mai dall'Host della richiesta (password reset poisoning)
+        $url = rtrim((string) config('app.url'), '/').route('pubblico.password.reset', [
             'associazione' => $associazione?->slug,
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
-        ]);
+        ], false);
 
         $scadenza = (int) config('auth.passwords.accounts.expire', 60);
 

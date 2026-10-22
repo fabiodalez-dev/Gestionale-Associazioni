@@ -3,13 +3,14 @@
 namespace App\Exports\AnagraficaPro;
 
 use App\Models\Associazione;
+use Maatwebsite\Excel\Concerns\Export;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 /**
  * Export Excel multi-foglio (f.25 PIANO-VITA-SOCIALE):
  * Soci, Tessere {anno}, Quote {anno}, Libro soci.
  */
-class AnagraficaProExport implements WithMultipleSheets
+class AnagraficaProExport implements Export, WithMultipleSheets
 {
     public function __construct(
         private readonly Associazione $associazione,

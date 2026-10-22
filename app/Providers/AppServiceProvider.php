@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Listeners\RegistraAccesso;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\DebugModeCheck;
@@ -28,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerHealthChecks();
+        $this->forzaUrlApplicazione();
 
         // Audit accessi (f.25 piano "Gestione 2"): Login/Failed/Logout
         // di tutte le guard registrati best-effort nella tabella accessi
@@ -62,5 +64,24 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Health::checks($checks);
+    }
+
+    /**
+     * Fuori dallo sviluppo locale tutti gli URL generati (link nelle email, redirect)
+     * partono da APP_URL e non dall'Host della richiesta, che il client può falsificare
+     * (password reset poisoning). Prima dell'installazione APP_URL non è ancora affidabile.
+     */
+    private function forzaUrlApplicazione(): void
+    {
+        $url = (string) config('app.url');
+        if ($url === '' || $this->app->environment('local') || $this->app->runningUnitTests()
+            || ! is_file((string) config('installer.lock_file'))) {
+            return;
+        }
+
+        URL::forceRootUrl($url);
+        if (str_starts_with($url, 'https://')) {
+            URL::forceScheme('https');
+        }
     }
 }

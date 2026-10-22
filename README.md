@@ -2,7 +2,7 @@
 
 Piattaforma **SaaS multi-tenant** per la gestione completa della vita di un'associazione: soci e tesseramento, eventi con prenotazioni online, quote e pagamenti, registro ufficiale e governance, comunicazione, economia, volontari e organizzazione interna. Ogni associazione ha il proprio mini-sito pubblico brandizzato dove i cittadini si iscrivono e prenotano gli eventi.
 
-Costruita in **Laravel 12 / PHP 8.4**, con isolamento multi-tenant a livello di framework, un'area pubblica per ogni associazione, un'area riservata per i soci, API REST documentate e oltre **1.700 test automatici** (PHPUnit + Playwright E2E).
+Costruita in **Laravel 13 / PHP 8.5**, con isolamento multi-tenant a livello di framework, un'area pubblica per ogni associazione, un'area riservata per i soci, API REST documentate e oltre **1.700 test automatici** (PHPUnit + Playwright E2E).
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -112,7 +112,7 @@ A colpo d'occhio: **68 modelli**, **159 controller**, **232 rotte**, **58 migrat
 
 ## Stack e librerie
 
-**Laravel 12 · PHP 8.4 · MySQL 8** (test su SQLite in-memory).
+**Laravel 13 · PHP 8.3–8.5 · MySQL 8** (test su SQLite in-memory).
 
 Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activitylog, backup, medialibrary, query-builder, data, settings, csp, honeypot, health, schedule-monitor), maatwebsite/excel, barryvdh/laravel-dompdf, chillerlan/php-qrcode, propaganistas/laravel-phone, robertogallea/laravel-codicefiscale, mews/purifier, dedoc/scramble, stripe/stripe-php, srmklive/paypal, larastan, debugbar.
 
@@ -120,7 +120,7 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 
 ## Requisiti
 
-- PHP **8.3+** (consigliato 8.4) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`, `curl`, `openssl`
+- PHP **8.3+** (consigliato 8.5) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`, `curl`, `openssl`
 - **MySQL 8** (o MariaDB compatibile)
 - Composer 2, Node.js 20+ e npm
 - `mysqldump` nel PATH (per i backup)

@@ -46,7 +46,7 @@ class LibroSociExport implements FromArray, ShouldAutoSize, WithHeadings, WithMa
      * @param  RigaLibroSoci  $riga
      * @return list<mixed>
      */
-    public function map($riga): array
+    public function map(mixed $riga): array
     {
         $socio = $riga['socio'];
         $cessazione = $riga['cessazione'];

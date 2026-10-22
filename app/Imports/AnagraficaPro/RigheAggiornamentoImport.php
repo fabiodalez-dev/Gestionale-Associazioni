@@ -2,6 +2,7 @@
 
 namespace App\Imports\AnagraficaPro;
 
+use Maatwebsite\Excel\Concerns\Import;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
@@ -10,4 +11,4 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
  * righe vuote; la logica diff/applicazione è in ImportAggiornamentoService
  * (il file viene letto due volte: anteprima e applicazione).
  */
-class RigheAggiornamentoImport implements SkipsEmptyRows, WithHeadingRow {}
+class RigheAggiornamentoImport implements Import, SkipsEmptyRows, WithHeadingRow {}

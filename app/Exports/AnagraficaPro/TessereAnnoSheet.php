@@ -4,6 +4,7 @@ namespace App\Exports\AnagraficaPro;
 
 use App\Models\Associazione;
 use App\Models\Tessera;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -25,7 +26,7 @@ class TessereAnnoSheet implements FromQuery, ShouldAutoSize, WithHeadings, WithM
         return 'Tessere '.$this->anno;
     }
 
-    public function query()
+    public function query(): Builder
     {
         return Tessera::allTenants()
             ->where('associazione_id', $this->associazione->id)
@@ -49,7 +50,7 @@ class TessereAnnoSheet implements FromQuery, ShouldAutoSize, WithHeadings, WithM
      * @param  Tessera  $tessera
      * @return list<mixed>
      */
-    public function map($tessera): array
+    public function map(mixed $tessera): array
     {
         return [
             $tessera->numero_tessera,

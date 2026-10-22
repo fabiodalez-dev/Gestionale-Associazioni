@@ -50,6 +50,23 @@ class PasswordResetTest extends TestCase
         });
     }
 
+    public function test_il_link_di_reset_usa_app_url_anche_con_host_contraffatto(): void
+    {
+        Notification::fake();
+        config(['app.url' => 'https://gestionale.example.com']);
+        $utente = Utente::factory()->create(['email' => 'admin@example.com']);
+
+        $this->withServerVariables(['HTTP_HOST' => 'attaccante.example'])
+            ->post('/forgot-password', ['email' => 'admin@example.com']);
+
+        Notification::assertSentTo($utente, ResetPasswordUtente::class, function (ResetPasswordUtente $notification) use ($utente) {
+            $url = (string) $notification->toMail($utente)->actionUrl;
+
+            return str_starts_with($url, 'https://gestionale.example.com/reset-password/')
+                && ! str_contains($url, 'attaccante');
+        });
+    }
+
     public function test_email_inesistente_riceve_la_stessa_risposta(): void
     {
         Notification::fake();

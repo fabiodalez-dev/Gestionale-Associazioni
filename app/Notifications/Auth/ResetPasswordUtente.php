@@ -3,7 +3,6 @@
 namespace App\Notifications\Auth;
 
 use App\Models\Utente;
-use App\Services\Email\TenantNotificationMailer;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -11,7 +10,7 @@ use Illuminate\Notifications\Notification;
  * Reset password degli utenti backend (broker 'utenti', Fortify).
  *
  * Invio sincrono: chi ha perso la password non deve dipendere dal worker delle code.
- * Usa l'SMTP dell'associazione dell'utente se configurato, altrimenti quello di sistema.
+ * Usa sempre l'SMTP di sistema (.env), mai quello dell'associazione.
  */
 class ResetPasswordUtente extends Notification
 {
@@ -28,10 +27,11 @@ class ResetPasswordUtente extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         /** @var Utente $notifiable */
-        $url = route('password.reset', [
+        // Link costruito da APP_URL, mai dall'Host della richiesta (password reset poisoning)
+        $url = rtrim((string) config('app.url'), '/').route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
-        ]);
+        ], false);
 
         $scadenza = (int) config('auth.passwords.utenti.expire', 60);
 
@@ -44,6 +44,8 @@ class ResetPasswordUtente extends Notification
             ->line('Se non hai richiesto tu la reimpostazione, ignora questa email: la tua password resterà invariata.')
             ->salutation('A presto!');
 
-        return TenantNotificationMailer::applica($message, $notifiable->associazione);
+        // Solo il mailer di piattaforma: l'SMTP di un'associazione è configurato dal suo admin,
+        // che altrimenti potrebbe leggere i link di reset degli altri utenti dell'associazione.
+        return $message;
     }
 }

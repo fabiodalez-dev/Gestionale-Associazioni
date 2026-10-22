@@ -41,19 +41,25 @@ class EnsureInstalled
         // Non installata: crea il .env se manca e garantisce l'APP_KEY prima
         // che EncryptCookies la richieda (primo avvio senza terminale)
         $installer = app(InstallerService::class);
-        $installer->preparaEnv();
+        if ($installer->preparaEnv()) {
+            // .env appena creato: questa richiesta è partita senza (sessione,
+            // cache e database con i valori predefiniti del framework), si
+            // ricomincia con la configurazione giusta
+            return redirect($request->fullUrl());
+        }
 
         if ($request->is('up')) {
             return $next($request);
         }
         $rottaInstaller = $request->is('install', 'install/*');
+        $token = $request->cookies->get((string) config('installer.in_progress_cookie'));
+        $token = is_string($token) ? $token : null;
 
         if ($installer->adminExists()) {
             // Il wizard stesso ha appena creato il super admin e sta
             // completando gli ultimi step dallo stesso browser (token nel
             // cookie): restano aperti solo email e fine, non più il database
-            $token = $request->cookies->get((string) config('installer.in_progress_cookie'));
-            if ($rottaInstaller && $installer->wizardInCorso(is_string($token) ? $token : null)) {
+            if ($rottaInstaller && $installer->wizardInCorso($token)) {
                 return $request->is('install/database*')
                     ? redirect()->route('installer.email')
                     : $next($request);
@@ -68,6 +74,14 @@ class EnsureInstalled
         }
 
         if ($rottaInstaller) {
+            // Schema installato da un wizard in corso (marcatore presente) ma
+            // super admin non ancora creato: gli step successivi restano al
+            // browser che ha il token, altrimenti chiunque potrebbe creare
+            // l'amministratore o rifare il database nel frattempo
+            if (! $request->is('install') && $installer->wizardRivendicato() && $installer->databaseReady() && ! $installer->wizardInCorso($token)) {
+                abort(403, 'Installazione in corso da un altro browser: completala da lì oppure, se è stata interrotta, elimina storage/app/installer-in-corso e ricomincia.');
+            }
+
             return $next($request);
         }
 

@@ -6,8 +6,10 @@ use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
 use App\Models\Utente;
 use App\Services\Iscrizioni\FormIscrizioneService;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -271,5 +273,26 @@ class ModuloIscrizioneTest extends TestCase
         $campo = CampoPersonalizzato::query()->withoutGlobalScopes()->where('nome_campo', 'Taglia maglietta')->sole();
         $config = $this->associazione->fresh()->iscrizioni()->iscrizione_form_config;
         $this->assertContains($campo->id, $config['campi_personalizzati']);
+    }
+
+    public function test_aggiungere_al_modulo_richiede_il_permesso_sul_modulo(): void
+    {
+        $this->seed(RolesSeeder::class);
+        // Amministratore (può creare campi personalizzati) con un ruolo senza struttura.update:
+        // può creare il campo ma non modificare il modulo di iscrizione
+        $ruolo = Role::findOrCreate('admin_senza_struttura_test', 'web');
+        $ruolo->syncPermissions(['soci.view', 'soci.create', 'soci.update', 'struttura.view']);
+        $admin = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
+        $admin->syncRoles([$ruolo]);
+        $this->actingAs($admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('config-campi.store'), ['nome_campo' => 'Campo lecito', 'tipo_campo' => 'text'])
+            ->assertRedirect(route('config-campi.index'));
+
+        $this->actingAs($admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('config-campi.store'), ['nome_campo' => 'Campo intruso', 'tipo_campo' => 'text', 'aggiungi_al_modulo' => '1'])
+            ->assertForbidden();
+
+        $this->assertFalse(CampoPersonalizzato::query()->withoutGlobalScopes()->where('nome_campo', 'Campo intruso')->exists());
+        $this->assertNotContains('Campo intruso', (array) ($this->associazione->fresh()->iscrizioni()->iscrizione_form_config['campi_personalizzati'] ?? []));
     }
 }

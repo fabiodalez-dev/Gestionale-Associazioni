@@ -7,6 +7,7 @@ use App\Models\CampoPersonalizzato;
 use App\Models\Socio;
 use App\Rules\SedeNelPerimetro;
 use App\Services\Soci\RequiredFieldsConfig;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -25,6 +26,9 @@ use Propaganistas\LaravelPhone\Rules\Phone;
  */
 abstract class SocioRequest extends FormRequest
 {
+    /** @var Collection<int, CampoPersonalizzato>|null */
+    private ?Collection $campiPersonalizzati = null;
+
     public function authorize(): bool
     {
         return true; // autorizzazione via SocioPolicy nel controller
@@ -130,7 +134,7 @@ abstract class SocioRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return array_merge(RequiredFieldsConfig::LABELS, [
+        $attributi = array_merge(RequiredFieldsConfig::LABELS, [
             'nome' => 'Nome',
             'cognome' => 'Cognome',
             'email' => 'Email',
@@ -141,6 +145,14 @@ abstract class SocioRequest extends FormRequest
             'tutore_telefono' => 'Telefono del tutore',
             'tutore_email' => 'Email del tutore',
         ]);
+
+        // Nei messaggi di errore il campo personalizzato si chiama col suo nome,
+        // non "custom field.<uuid>"
+        foreach ($this->campiPersonalizzatiDelTenant() as $campo) {
+            $attributi['custom_field.'.$campo->id] = $campo->nome_campo;
+        }
+
+        return $attributi;
     }
 
     /**
@@ -236,12 +248,9 @@ abstract class SocioRequest extends FormRequest
     {
         $rules = ['custom_field' => ['nullable', 'array']];
         $pending = $this->isStatoPending();
+        $valoriAttuali = $this->valoriAttualiCampiPersonalizzati();
 
-        $campi = CampoPersonalizzato::allTenants()
-            ->where('associazione_id', $this->associazioneId())
-            ->get();
-
-        foreach ($campi as $campo) {
+        foreach ($this->campiPersonalizzatiDelTenant() as $campo) {
             $key = "custom_field.{$campo->id}";
 
             $tipo = match ($campo->tipo_campo) {
@@ -249,7 +258,7 @@ abstract class SocioRequest extends FormRequest
                 'number' => ['numeric'],
                 'date' => ['date'],
                 'url' => ['url'],
-                'select' => [Rule::in(array_filter(array_map('trim', explode("\n", (string) $campo->opzioni))))],
+                'select' => [Rule::in($this->opzioniAmmesse($campo, $valoriAttuali[$campo->id] ?? null))],
                 'checkbox' => ['in:0,1,on,true'],
                 default => ['string', 'max:1000'],
             };
@@ -260,5 +269,48 @@ abstract class SocioRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Opzioni accettate per una select: quelle configurate più il valore già
+     * salvato per il socio in modifica, se non è più tra le opzioni (opzione
+     * rinominata o rimossa dopo il salvataggio): così il form di modifica non
+     * rifiuta né perde un dato inserito legittimamente.
+     *
+     * @return list<string>
+     */
+    private function opzioniAmmesse(CampoPersonalizzato $campo, ?string $valoreAttuale): array
+    {
+        $opzioni = array_values(array_filter(array_map('trim', explode("\n", (string) $campo->opzioni))));
+
+        if (filled($valoreAttuale) && ! in_array($valoreAttuale, $opzioni, true)) {
+            $opzioni[] = $valoreAttuale;
+        }
+
+        return $opzioni;
+    }
+
+    /**
+     * @return array<string, string|null> campo_id => valore salvato per il socio in modifica
+     */
+    private function valoriAttualiCampiPersonalizzati(): array
+    {
+        $socio = $this->socioInModifica();
+
+        if ($socio === null) {
+            return [];
+        }
+
+        return $socio->valoriCampiPersonalizzati()->pluck('valore', 'campo_id')->all();
+    }
+
+    /**
+     * @return Collection<int, CampoPersonalizzato>
+     */
+    private function campiPersonalizzatiDelTenant(): Collection
+    {
+        return $this->campiPersonalizzati ??= CampoPersonalizzato::allTenants()
+            ->where('associazione_id', $this->associazioneId())
+            ->get();
     }
 }

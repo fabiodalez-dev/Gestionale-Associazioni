@@ -43,18 +43,25 @@ class InstallerService
      * Primo avvio senza terminale (pacchetto caricato via FTP): crea il .env
      * da .env.example se manca e genera APP_KEY se è vuota, prima che
      * EncryptCookies la richieda. Non fa nulla se non può scrivere.
+     * Ritorna true se il .env è stato creato adesso: la configurazione di
+     * questa richiesta è già stata costruita senza, quindi il chiamante deve
+     * rispondere con un redirect alla stessa pagina.
      */
-    public function preparaEnv(): void
+    public function preparaEnv(): bool
     {
         $env = (string) config('installer.env_file');
+        $creato = false;
 
         if (! file_exists($env)) {
             $esempio = base_path('.env.example');
             if (! is_file($esempio) || ! is_writable(dirname($env))) {
-                return;
+                return false;
             }
-            copy($esempio, $env);
+            if (! @copy($esempio, $env)) {
+                return false;
+            }
             @chmod($env, 0600);
+            $creato = true;
 
             // .env.example è pensato per lo sviluppo: un sito creato dal
             // wizard è in produzione (niente stack trace pubblici, URL
@@ -68,6 +75,20 @@ class InstallerService
             $this->writeEnv(['APP_KEY' => $chiave]);
             config(['app.key' => $chiave]);
         }
+
+        return $creato;
+    }
+
+    /** Il wizard è stato avviato (marcatore presente e non scaduto), da chiunque. */
+    public function wizardRivendicato(): bool
+    {
+        $file = (string) config('installer.in_progress_file');
+        if (! is_file($file)) {
+            return false;
+        }
+        $minuti = (int) config('installer.in_progress_ttl_minutes', 120);
+
+        return (filemtime($file) ?: 0) >= time() - $minuti * 60;
     }
 
     /**
@@ -351,6 +372,12 @@ class InstallerService
         if (! is_file($file) || ! is_readable($file)) {
             throw new RuntimeException('File dello schema non trovato: '.str_replace(base_path().'/', '', $file).'. Genera il file con "php artisan installer:genera-schema".');
         }
+
+        // Centinaia di DDL: su hosting con max_execution_time a 30 secondi
+        // l'import morirebbe a metà (e la chiusura del browser non deve
+        // interromperlo)
+        @set_time_limit(0);
+        ignore_user_abort(true);
 
         $sql = (string) file_get_contents($file);
         $istruzioni = SchemaSql::istruzioni($sql);

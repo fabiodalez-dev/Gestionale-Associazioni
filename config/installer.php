@@ -15,10 +15,12 @@ return [
     'lock_file' => env('INSTALLER_LOCK_FILE', storage_path('app/installed.lock')),
 
     // Marcatore "wizard in corso": creato quando lo schema è stato installato,
-    // cancellato dal lock. Senza marcatore, un database già installato chiude
-    // il wizard anche se il lock manca (es. lock perso in un deploy).
+    // contiene l'hash di un token che sta solo nel cookie del browser che
+    // installa, cancellato dal lock. Senza marcatore e token validi, un
+    // database già installato chiude il wizard anche se il lock manca.
     'in_progress_file' => env('INSTALLER_IN_PROGRESS_FILE', storage_path('app/installer-in-corso')),
-    'in_progress_ttl_hours' => 24,
+    'in_progress_ttl_minutes' => 120,
+    'in_progress_cookie' => 'installer_token',
 
     // Versioni minime del server (json nativo e utf8mb4_unicode_ci)
     'min_mysql' => '5.7.8',

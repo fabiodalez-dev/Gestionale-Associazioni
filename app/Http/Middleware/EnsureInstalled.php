@@ -53,9 +53,13 @@ class EnsureInstalled
 
         if ($installer->adminExists()) {
             // Il wizard stesso ha appena creato il super admin e sta
-            // completando gli ultimi step: resta aperto
-            if ($rottaInstaller && $installer->wizardInCorso()) {
-                return $next($request);
+            // completando gli ultimi step dallo stesso browser (token nel
+            // cookie): restano aperti solo email e fine, non più il database
+            $token = $request->cookies->get((string) config('installer.in_progress_cookie'));
+            if ($rottaInstaller && $installer->wizardInCorso(is_string($token) ? $token : null)) {
+                return $request->is('install/database*')
+                    ? redirect()->route('installer.email')
+                    : $next($request);
             }
 
             // Lock assente ma database già installato (installazione manuale

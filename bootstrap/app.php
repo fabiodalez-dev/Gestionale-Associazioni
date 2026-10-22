@@ -32,6 +32,11 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureInstalled::class,
         ]);
 
+        // Il token del wizard viene letto da EnsureInstalled, che gira prima
+        // della decifratura dei cookie: resta in chiaro (è già un segreto
+        // casuale, nel file c'è solo il suo hash)
+        $middleware->encryptCookies(except: ['installer_token']);
+
         // Security headers + Content-Security-Policy su tutte le risposte web (miglioramento 5)
         $middleware->web(append: [
             SecurityHeaders::class,

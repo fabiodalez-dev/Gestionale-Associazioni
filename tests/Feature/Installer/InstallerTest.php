@@ -42,12 +42,13 @@ class InstallerTest extends TestCase
         parent::tearDown();
     }
 
-    /** Simula un wizard che ha già installato lo schema e creato l'admin */
+    /** Simula un wizard che ha già installato lo schema e creato l'admin, dallo stesso browser */
     private function wizardInCorso(): void
     {
         $this->seed(RolesSeeder::class);
         Utente::factory()->superAdmin()->create();
-        app(InstallerService::class)->segnaWizardInCorso();
+        $token = app(InstallerService::class)->segnaWizardInCorso();
+        $this->withUnencryptedCookie('installer_token', $token);
     }
 
     public function test_app_non_installata_redirige_tutte_le_rotte_a_install(): void
@@ -108,9 +109,37 @@ class InstallerTest extends TestCase
         $this->post('/install/database', [
             'host' => '127.0.0.1', 'port' => 3306,
             'database' => 'demo', 'username' => 'root', 'password' => '',
-        ])->assertRedirect(route('installer.admin'))->assertSessionHas('success');
+        ])->assertRedirect(route('installer.admin'))->assertSessionHas('success')->assertCookie('installer_token');
 
         $this->assertFileExists($this->inCorsoFile, 'Dopo lo schema il wizard segna che è in corso');
+    }
+
+    public function test_wizard_in_corso_resta_aperto_solo_al_browser_che_lo_sta_facendo(): void
+    {
+        $this->seed(RolesSeeder::class);
+        Utente::factory()->superAdmin()->create();
+        $token = app(InstallerService::class)->segnaWizardInCorso();
+
+        // Altro browser (nessun token o token sbagliato): wizard chiuso, lock scritto
+        $this->get('/install/email')->assertRedirect('/login');
+        $this->assertFileExists($this->lockFile);
+        File::delete($this->lockFile);
+        app(InstallerService::class)->segnaWizardInCorso(); // nuovo marcatore, il token vecchio non vale più
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertRedirect('/login');
+        File::delete($this->lockFile);
+
+        // Browser giusto: prosegue, ma lo step database non è più raggiungibile
+        $token = app(InstallerService::class)->segnaWizardInCorso();
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertOk();
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/database')->assertRedirect(route('installer.email'));
+        $this->withUnencryptedCookie('installer_token', $token)->post('/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'demo', 'username' => 'root',
+        ])->assertRedirect(route('installer.email'));
+        $this->assertFileDoesNotExist($this->lockFile);
+
+        // Marcatore scaduto: chiuso anche con il token giusto
+        touch($this->inCorsoFile, time() - 3 * 3600);
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertRedirect('/login');
     }
 
     public function test_import_schema_fallito_mostra_l_errore_e_non_tocca_env(): void

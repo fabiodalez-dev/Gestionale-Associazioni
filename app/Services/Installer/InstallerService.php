@@ -43,21 +43,36 @@ class InstallerService
      * step successivi (admin, email): finché il marcatore è valido le rotte
      * /install restano aperte anche se nel frattempo esiste un super admin.
      */
-    public function segnaWizardInCorso(): void
+    public function segnaWizardInCorso(): string
     {
-        file_put_contents((string) config('installer.in_progress_file'), now()->format('Y-m-d H:i:s').PHP_EOL);
+        $token = bin2hex(random_bytes(32));
+        $file = (string) config('installer.in_progress_file');
+
+        file_put_contents($file, hash('sha256', $token).PHP_EOL);
+        @chmod($file, 0600);
+
+        return $token;
     }
 
-    public function wizardInCorso(): bool
+    /**
+     * Il wizard è in corso E la richiesta arriva dal browser che lo sta
+     * facendo (token del cookie corrispondente all'hash nel marcatore).
+     */
+    public function wizardInCorso(?string $token): bool
     {
         $file = (string) config('installer.in_progress_file');
-        if (! is_file($file)) {
+        if ($token === null || $token === '' || ! is_file($file)) {
             return false;
         }
 
-        $ore = (int) config('installer.in_progress_ttl_hours', 24);
+        $minuti = (int) config('installer.in_progress_ttl_minutes', 120);
+        if ((filemtime($file) ?: 0) < time() - $minuti * 60) {
+            return false;
+        }
 
-        return (filemtime($file) ?: 0) >= time() - $ore * 3600;
+        $atteso = trim((string) file_get_contents($file));
+
+        return $atteso !== '' && hash_equals($atteso, hash('sha256', $token));
     }
 
     /**

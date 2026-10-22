@@ -101,9 +101,21 @@ class InstallerController extends Controller
             'APP_URL' => $request->getSchemeAndHttpHost(),
         ]);
 
-        $this->installer->segnaWizardInCorso();
+        // Token in cookie HttpOnly (non cifrato: il middleware EnsureInstalled
+        // gira prima di EncryptCookies), valido quanto il marcatore
+        $token = $this->installer->segnaWizardInCorso();
+        $cookie = cookie(
+            name: (string) config('installer.in_progress_cookie'),
+            value: $token,
+            minutes: (int) config('installer.in_progress_ttl_minutes', 120),
+            path: '/',
+            secure: $request->isSecure(),
+            httpOnly: true,
+            sameSite: 'lax',
+        );
 
         return redirect()->route('installer.admin')
+            ->withCookie($cookie)
             ->with('success', "Database configurato: schema installato ({$risultato['tabelle']} tabelle).");
     }
 

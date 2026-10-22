@@ -37,6 +37,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/soci/import', [SocioController::class, 'import'])->name('soci.import');
     Route::post('/soci/import', [SocioController::class, 'importStore'])->name('soci.import.store');
     Route::get('/soci/search', [SocioController::class, 'search'])->name('soci.search');
+    Route::get('/soci/verifica-dati', [SocioController::class, 'verificaDati'])->middleware('throttle:60,1')->name('soci.verifica-dati');
 
     // Preset filtri salvati (spec §11)
     Route::post('/soci/filtri', [SavedFilterController::class, 'store'])->name('soci.filtri.store');

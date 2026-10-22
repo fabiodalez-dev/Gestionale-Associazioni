@@ -30,6 +30,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Excel as ExcelFormat;
 use Maatwebsite\Excel\Facades\Excel;
+use robertogallea\LaravelCodiceFiscale\CodiceFiscale;
 
 class SocioController extends Controller
 {
@@ -280,6 +281,41 @@ class SocioController extends Controller
                 $import->errori === [] ? 'success' : 'warning',
                 "Import completato: {$import->importati} soci importati, ".count($import->errori).' righe scartate.'
             );
+    }
+
+    /**
+     * Controlli automatici della nuova iscrizione: email e codice fiscale già
+     * presenti nell'associazione, validità del codice fiscale e dati che se ne
+     * ricavano (data di nascita, sesso).
+     */
+    public function verificaDati(Request $request): JsonResponse
+    {
+        $this->authorize('create', Socio::class);
+
+        $email = mb_strtolower(trim((string) $request->query('email', '')));
+        $cf = mb_strtoupper(trim((string) $request->query('codice_fiscale', '')));
+
+        $risposta = ['email' => null, 'codice_fiscale' => null];
+
+        if ($email !== '') {
+            $risposta['email'] = [
+                'valida' => filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+                'duplicato' => Socio::query()->withTrashed()->whereRaw('LOWER(email) = ?', [$email])->exists(),
+            ];
+        }
+
+        if ($cf !== '') {
+            $parser = new CodiceFiscale;
+            $valido = strlen($cf) === 16 && $parser->tryParse($cf);
+            $risposta['codice_fiscale'] = [
+                'valido' => $valido,
+                'duplicato' => Socio::query()->withTrashed()->where('codice_fiscale', $cf)->exists(),
+                'data_nascita' => $valido ? $parser->getBirthdate()->toDateString() : null,
+                'sesso' => $valido ? $parser->getGender() : null,
+            ];
+        }
+
+        return response()->json($risposta);
     }
 
     /**

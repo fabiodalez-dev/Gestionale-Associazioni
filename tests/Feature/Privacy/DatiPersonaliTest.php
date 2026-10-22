@@ -5,6 +5,7 @@ namespace Tests\Feature\Privacy;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\DocumentoSocio;
+use App\Models\NotaSocio;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Utente;
@@ -81,6 +82,7 @@ class DatiPersonaliTest extends TestCase
 
     public function test_il_socio_riceve_l_archivio_completo_via_email(): void
     {
+        NotaSocio::create(['associazione_id' => $this->associazione->id, 'socio_id' => $this->socio->id, 'testo' => 'Ha chiesto lo sconto famiglia']);
         Quota::factory()->create(['associazione_id' => $this->associazione->id, 'socio_id' => $this->socio->id, 'anno' => 2026]);
         Storage::disk('local')->put('documenti_soci/carta.pdf', 'contenuto-documento');
         DocumentoSocio::create([
@@ -112,10 +114,12 @@ class DatiPersonaliTest extends TestCase
         $this->assertSame(2026, $dati['quote'][0]['anno']);
         $this->assertSame($documenti[0], $dati['documenti'][0]['file_nell_archivio']);
 
-        // Niente segreti né note interne
+        // Niente segreti; le note interne della segreteria ci sono (art. 15 GDPR)
         $this->assertStringNotContainsString('password', $contenuto['dati.json']);
         $this->assertStringNotContainsString('token', $contenuto['dati.json']);
-        $this->assertStringNotContainsString('Nota riservata', $contenuto['dati.json']);
+        $this->assertSame('Nota riservata della segreteria', $dati['note_interne'][0]['testo']);
+        $this->assertSame('Ha chiesto lo sconto famiglia', $dati['note_interne'][1]['testo']);
+        $this->assertSame('Nota della segreteria', $dati['note_interne'][1]['tipo']);
 
         $this->assertDatabaseHas('activity_log', ['subject_id' => $this->socio->id, 'event' => 'dati_personali_richiesti']);
     }

@@ -17,9 +17,9 @@ use Illuminate\Support\Collection;
  *
  * Ogni sezione è un elenco di righe con gli attributi dei modelli, senza
  * segreti (password, token), chiavi tecniche e contenuti pesanti (HTML delle
- * email). Sono escluse per scelta le note interne della segreteria
- * (soci.note, note_soci): sono valutazioni dello staff che possono
- * riguardare terzi e vanno valutate caso per caso.
+ * email). Le note interne della segreteria (soci.note e note_soci) sono
+ * incluse nella sezione note_interne: sono dati che riguardano il socio
+ * (art. 15 GDPR), con data e autore della nota.
  *
  * Le relazioni sono filtrate per socio_id/account_id, quindi il risultato non
  * dipende dallo scope di tenant (il job gira in coda senza sessione).
@@ -64,6 +64,15 @@ class DatiPersonali
             'cessazioni' => $this->righe($socio->cessazioni()->get()),
             'richieste_modifica_dati' => $this->righe($socio->richiesteModificaDati()->get()),
             'storico_attivita' => $this->righe($socio->storicoAttivita()->orderBy('data_attivita')->get()),
+            'note_interne' => collect(filled($socio->note) ? [['tipo' => 'Nota in anagrafica', 'testo' => $socio->note, 'autore' => null, 'scritta_il' => null]] : [])
+                ->merge($socio->noteInterne()->withoutGlobalScopes()->with('autore:id,nome,cognome')->orderBy('created_at')->get()
+                    ->map(fn (Model $n) => [
+                        'tipo' => 'Nota della segreteria',
+                        'testo' => $n->getAttribute('testo'),
+                        'autore' => $n->getRelation('autore')?->nome_completo,
+                        'scritta_il' => $n->getAttribute('created_at')?->toIso8601String(),
+                    ]))
+                ->values()->all(),
             'consensi' => $socio->consensi()->withoutGlobalScopes()->orderBy('created_at')->get()
                 ->map(fn (Model $c) => $c->only(['testo', 'accettato', 'origine', 'created_at']))->all(),
             'email_ricevute' => $socio->emailLogs()->orderBy('sent_at')->get()

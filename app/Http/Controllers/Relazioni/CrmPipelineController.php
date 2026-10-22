@@ -58,7 +58,8 @@ class CrmPipelineController extends Controller
                 'ritardo' => (clone $aperte)->whereNotNull('prossima_azione_il')->whereDate('prossima_azione_il', '<', now()->startOfDay())->count(),
             ],
             'perse' => OpportunitaCrm::query()->where('pipeline', $pipeline)->where('esito', 'persa')->latest('chiusa_at')->limit(20)->get(),
-            'responsabili' => Utente::query()->where('attivo', true)->orderBy('nome')->get(['id', 'nome', 'cognome']),
+            // Utente non ha lo scope di tenant: filtro esplicito sull'associazione corrente
+            'responsabili' => Utente::query()->where('associazione_id', OpportunitaCrm::currentAssociazioneId())->where('attivo', true)->orderBy('nome')->get(['id', 'nome', 'cognome']),
         ]);
     }
 

@@ -115,7 +115,8 @@ class CrmPipelineTest extends TestCase
         $estranea = OpportunitaCrm::create(['associazione_id' => $altra->id, 'pipeline' => 'adesioni', 'fase' => 'contatto', 'titolo' => 'Contatto Estraneo']);
         $mia = $this->nuova();
 
-        $this->get(route('crm.index'))->assertDontSee('Contatto Estraneo');
+        Utente::factory()->adminAssociazione()->create(['associazione_id' => $altra->id, 'nome' => 'Amministratore', 'cognome' => 'Forestiero']);
+        $this->get(route('crm.index'))->assertDontSee('Contatto Estraneo')->assertDontSee('Forestiero')->assertSee('Marco Rossi');
         $this->patchJson(route('crm.sposta', $estranea), ['fase' => 'qualificato', 'ordine' => [$estranea->id]])->assertNotFound();
         // Un id di un'altra associazione nell'ordine viene ignorato
         $this->patchJson(route('crm.sposta', $mia), ['fase' => 'qualificato', 'ordine' => [$estranea->id, $mia->id]])->assertOk();

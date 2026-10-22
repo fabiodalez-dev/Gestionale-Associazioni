@@ -14,6 +14,9 @@ return [
 
     'lock_file' => env('INSTALLER_LOCK_FILE', storage_path('app/installed.lock')),
 
+    // Cartelle dei file caricati svuotate da "php artisan app:disinstalla"
+    'cartelle_file' => [storage_path('app/public'), storage_path('app/media-private')],
+
     'env_file' => env('INSTALLER_ENV_FILE') ?: base_path('.env'),
 
     // Nei test l'enforcement è disattivato di default per non interferire

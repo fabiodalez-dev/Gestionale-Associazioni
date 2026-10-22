@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Struttura;
 
 use App\Models\Utente;
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,7 +32,7 @@ class StoreAmministratoreRequest extends FormRequest
             ],
             // Con invito via email la password viene generata e impostata dall'invitato
             'invia_invito' => ['nullable', 'boolean'],
-            'password' => ['nullable', 'required_without:invia_invito', 'string', 'min:8'],
+            'password' => ['nullable', 'required_without:invia_invito', ...PasswordPolicy::rules([$this->input('email'), $this->input('nome'), $this->input('cognome')])],
         ];
     }
 
@@ -42,7 +43,7 @@ class StoreAmministratoreRequest extends FormRequest
     {
         return [
             'associazione_id.required' => 'Gli admin di associazione devono essere collegati a un\'associazione!',
-            'password.min' => 'La password deve avere almeno 8 caratteri.',
+            ...PasswordPolicy::messages(),
             'password.required_without' => 'Inserisci una password oppure attiva l\'invito via email.',
         ];
     }

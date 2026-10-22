@@ -38,7 +38,7 @@
             <div class="col-6">
                 <label class="form-label" for="password">Password</label>
                 <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password">
-                <div class="form-text">Minimo 10 caratteri, con lettere e numeri.</div>
+                <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
             </div>
             <div class="col-6">
                 <label class="form-label" for="password_confirmation">Conferma password</label>

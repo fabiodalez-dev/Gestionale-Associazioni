@@ -55,8 +55,8 @@ class AuthPubblicaTest extends TestCase
             'cognome' => 'Verdi',
             'email' => 'giulia.verdi@example.com',
             'telefono' => '3331234567',
-            'password' => 'passworD1234',
-            'password_confirmation' => 'passworD1234',
+            'password' => 'Lampione-Viola-Treno-42',
+            'password_confirmation' => 'Lampione-Viola-Treno-42',
             'privacy' => '1',
         ], $override);
     }
@@ -87,7 +87,7 @@ class AuthPubblicaTest extends TestCase
         $this->assertNull($account->email_verified_at);
         $this->assertNotNull($account->privacy_accettata_at);
         $this->assertTrue($account->attivo);
-        $this->assertTrue(Hash::check('passworD1234', $account->password));
+        $this->assertTrue(Hash::check('Lampione-Viola-Treno-42', $account->password));
 
         $this->assertAuthenticatedAs($account, 'account');
 
@@ -265,12 +265,12 @@ class AuthPubblicaTest extends TestCase
         /** @var Account $account */
         $account = Account::factory()->create([
             'associazione_id' => $this->associazione->id,
-            'password' => 'passworD1234',
+            'password' => 'Lampione-Viola-Treno-42',
         ]);
 
         $response = $this->post($this->urlTenant('login'), [
             'email' => $account->email,
-            'password' => 'passworD1234',
+            'password' => 'Lampione-Viola-Treno-42',
         ]);
 
         $response->assertRedirect($this->urlTenant());
@@ -283,7 +283,7 @@ class AuthPubblicaTest extends TestCase
         /** @var Account $account */
         $account = Account::factory()->create([
             'associazione_id' => $this->associazione->id,
-            'password' => 'passworD1234',
+            'password' => 'Lampione-Viola-Treno-42',
         ]);
 
         $this->from($this->urlTenant('login'))
@@ -300,7 +300,7 @@ class AuthPubblicaTest extends TestCase
         $this->from($this->urlTenant('login'))
             ->post($this->urlTenant('login'), [
                 'email' => $account->email,
-                'password' => 'passworD1234',
+                'password' => 'Lampione-Viola-Treno-42',
             ])
             ->assertSessionHasErrors('email');
 
@@ -312,7 +312,7 @@ class AuthPubblicaTest extends TestCase
         /** @var Account $account */
         $account = Account::factory()->create([
             'associazione_id' => $this->associazione->id,
-            'password' => 'passworD1234',
+            'password' => 'Lampione-Viola-Treno-42',
         ]);
 
         for ($i = 0; $i < 5; $i++) {
@@ -326,7 +326,7 @@ class AuthPubblicaTest extends TestCase
         $response = $this->from($this->urlTenant('login'))
             ->post($this->urlTenant('login'), [
                 'email' => $account->email,
-                'password' => 'passworD1234',
+                'password' => 'Lampione-Viola-Treno-42',
             ]);
 
         $response->assertSessionHasErrors('email');
@@ -344,14 +344,14 @@ class AuthPubblicaTest extends TestCase
         /** @var Account $account */
         $account = Account::factory()->create([
             'associazione_id' => $this->associazione->id,
-            'password' => 'passworD1234',
+            'password' => 'Lampione-Viola-Treno-42',
         ]);
 
         // Credenziali VALIDE del tenant A sul frontend del tenant B: rifiutate
         $this->from($this->urlTenant('login', $altra))
             ->post($this->urlTenant('login', $altra), [
                 'email' => $account->email,
-                'password' => 'passworD1234',
+                'password' => 'Lampione-Viola-Treno-42',
             ])
             ->assertSessionHasErrors('email');
 
@@ -428,16 +428,16 @@ class AuthPubblicaTest extends TestCase
         $this->post($this->urlTenant('password/reset'), [
             'token' => $token,
             'email' => $account->email,
-            'password' => 'nuovaPassword123',
-            'password_confirmation' => 'nuovaPassword123',
+            'password' => 'Girasole-Marmo-Vento-19',
+            'password_confirmation' => 'Girasole-Marmo-Vento-19',
         ])->assertRedirect($this->urlTenant('login'));
 
-        $this->assertTrue(Hash::check('nuovaPassword123', $account->fresh()->password));
+        $this->assertTrue(Hash::check('Girasole-Marmo-Vento-19', $account->fresh()->password));
 
         // Login con la nuova password
         $this->post($this->urlTenant('login'), [
             'email' => $account->email,
-            'password' => 'nuovaPassword123',
+            'password' => 'Girasole-Marmo-Vento-19',
         ])->assertRedirect($this->urlTenant());
 
         $this->assertAuthenticatedAs($account->fresh(), 'account');
@@ -455,8 +455,8 @@ class AuthPubblicaTest extends TestCase
             ->post($this->urlTenant('password/reset'), [
                 'token' => 'token-finto',
                 'email' => $account->email,
-                'password' => 'nuovaPassword123',
-                'password_confirmation' => 'nuovaPassword123',
+                'password' => 'Girasole-Marmo-Vento-19',
+                'password_confirmation' => 'Girasole-Marmo-Vento-19',
             ])
             ->assertSessionHasErrors('email');
 

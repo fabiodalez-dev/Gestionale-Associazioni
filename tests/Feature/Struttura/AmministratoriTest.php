@@ -64,7 +64,7 @@ class AmministratoriTest extends TestCase
             'email' => 'nuovo.super@example.com',
             'ruolo' => Utente::RUOLO_SUPER_ADMIN,
             'associazione_id' => $associazione->id, // deve essere ignorata
-            'password' => 'password123',
+            'password' => 'Lampione-Viola-Treno-42',
         ])->assertRedirect(route('amministratori.index'));
 
         $this->assertDatabaseHas('utenti', [

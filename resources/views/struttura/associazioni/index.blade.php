@@ -216,7 +216,7 @@
                                 <div class="col-md-3"><input type="text" class="form-control" name="admin_nome" placeholder="Nome" value="{{ old('admin_nome') }}"></div>
                                 <div class="col-md-3"><input type="text" class="form-control" name="admin_cognome" placeholder="Cognome" value="{{ old('admin_cognome') }}"></div>
                                 <div class="col-md-3"><input type="email" class="form-control" name="admin_email" placeholder="Email" value="{{ old('admin_email') }}"></div>
-                                <div class="col-md-3"><input type="password" class="form-control" name="admin_password" placeholder="Password (min 8)" autocomplete="new-password"></div>
+                                <div class="col-md-3"><input type="password" class="form-control" name="admin_password" placeholder="Password (min 10)" autocomplete="new-password"></div>
                             </div>
                         </div>
                     </div>

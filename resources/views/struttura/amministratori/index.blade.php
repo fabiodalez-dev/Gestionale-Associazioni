@@ -127,7 +127,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="adm_password">Password {{ $editUtente ? '(vuota = invariata)' : '' }}</label>
-                            <input type="password" class="form-control" id="adm_password" name="password" minlength="8" autocomplete="new-password">
+                            <input type="password" class="form-control" id="adm_password" name="password" minlength="10" autocomplete="new-password">
                         </div>
                         @unless ($editUtente)
                             <div class="col-12">

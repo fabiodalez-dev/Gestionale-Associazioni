@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Struttura;
 
 use App\Models\Associazione;
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -44,7 +45,7 @@ class StoreAssociazioneRequest extends FormRequest
             'admin_nome' => ['exclude_without:create_admin', 'required', 'string', 'max:100'],
             'admin_cognome' => ['exclude_without:create_admin', 'nullable', 'string', 'max:100'],
             'admin_email' => ['exclude_without:create_admin', 'required', 'email', Rule::unique('utenti', 'email')],
-            'admin_password' => ['exclude_without:create_admin', 'required', 'string', 'min:8'],
+            'admin_password' => ['exclude_without:create_admin', 'required', ...PasswordPolicy::rules([$this->input('admin_email'), $this->input('admin_nome'), $this->input('admin_cognome'), $this->input('nome')])],
 
             // Sede iniziale
             'create_sede' => ['nullable', 'boolean'],
@@ -75,7 +76,8 @@ class StoreAssociazioneRequest extends FormRequest
             'email.unique' => 'Esiste già un\'associazione con questa email.',
             'slug.regex' => 'Lo slug deve essere in kebab-case: solo minuscole, numeri e trattini (es. "mia-associazione").',
             'slug.unique' => 'Questo slug è già usato da un\'altra associazione.',
-            'admin_password.min' => 'Admin non creato: la password deve avere almeno 8 caratteri.',
+            'admin_password.min' => 'Admin non creato: la password deve avere almeno '.PasswordPolicy::MIN_LENGTH.' caratteri.',
+            'admin_password.max' => 'Admin non creato: la password non può superare i '.PasswordPolicy::MAX_LENGTH.' caratteri.',
             'admin_email.unique' => 'Admin non creato: email già esistente.',
             'clone_from_assoc_id.required' => 'Seleziona l\'associazione da cui clonare le configurazioni.',
         ];

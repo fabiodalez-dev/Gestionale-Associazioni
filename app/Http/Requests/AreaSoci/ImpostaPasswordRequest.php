@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\AreaSoci;
 
-use Illuminate\Contracts\Validation\Rule;
+use App\Models\Socio;
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 class ImpostaPasswordRequest extends FormRequest
 {
@@ -14,16 +14,31 @@ class ImpostaPasswordRequest extends FormRequest
     }
 
     /**
-     * Regola legacy: min 8 caratteri + conferma. Password::min(8) consente
-     * di irrobustire centralmente in futuro (Password::defaults()).
+     * Politica password unica (PasswordPolicy) + conferma.
      *
-     * @return array<string, array<int, Rule|string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
-            'password' => ['required', 'string', 'confirmed', Password::min(8)],
+            'password' => ['required', 'confirmed', ...PasswordPolicy::rules($this->datiSocio())],
         ];
+    }
+
+    /**
+     * Nome ed email del socio del link, per impedire password basate sui suoi dati.
+     *
+     * @return list<string|null>
+     */
+    private function datiSocio(): array
+    {
+        $token = (string) $this->route('token');
+        $socio = $token === '' ? null : Socio::allTenants()
+            ->where('password_reset_token', $token)
+            ->where('password_reset_expires', '>', now())
+            ->first();
+
+        return $socio === null ? [] : [$socio->email, $socio->nome, $socio->cognome];
     }
 
     /**
@@ -32,8 +47,8 @@ class ImpostaPasswordRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...PasswordPolicy::messages(),
             'password.confirmed' => 'Le password non corrispondono.',
-            'password.min' => 'La password deve contenere almeno 8 caratteri.',
         ];
     }
 }

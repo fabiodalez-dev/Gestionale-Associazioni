@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Notifications\Auth\ResetPasswordUtente;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -89,6 +90,16 @@ class Utente extends Authenticatable
     public function getAuthPassword(): string
     {
         return (string) $this->password_hash;
+    }
+
+    /**
+     * Link di recupero password in italiano (Fortify, broker 'utenti').
+     *
+     * @param  string  $token
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordUtente($token));
     }
 
     public function isSuperAdmin(): bool

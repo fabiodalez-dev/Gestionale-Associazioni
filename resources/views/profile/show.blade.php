@@ -51,8 +51,8 @@
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Nuova password</label>
-                            <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password" minlength="8">
-                            <div class="form-text">Minimo 8 caratteri.</div>
+                            <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password" minlength="10">
+                            <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
                         </div>
                         <div class="mb-3">
                             <label for="password_confirmation" class="form-label">Conferma nuova password</label>

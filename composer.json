@@ -17,6 +17,7 @@
         "laravel/scout": "^11.2",
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^3.1",
+        "metalogico/laravel-formello": "^2.1",
         "mews/purifier": "^3.4",
         "propaganistas/laravel-phone": "^6.0",
         "robertogallea/laravel-codicefiscale": "^2.3",
@@ -32,7 +33,8 @@
         "spatie/laravel-schedule-monitor": "^4.3",
         "spatie/laravel-settings": "^3.9",
         "srmklive/paypal": "^3.1",
-        "stripe/stripe-php": "^20.2"
+        "stripe/stripe-php": "^20.2",
+        "ziming/laravel-zxcvbn": "^2.4"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.3",

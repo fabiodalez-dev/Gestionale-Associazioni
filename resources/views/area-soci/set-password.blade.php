@@ -16,11 +16,12 @@
             @csrf
             <div class="mb-3">
                 <label for="password" class="form-label">Nuova password</label>
-                <input type="password" class="form-control" id="password" name="password" required autofocus autocomplete="new-password" minlength="8" placeholder="Minimo 8 caratteri">
+                <input type="password" class="form-control" id="password" name="password" required autofocus autocomplete="new-password" minlength="10" placeholder="Minimo 10 caratteri">
+                <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
             </div>
             <div class="mb-3">
                 <label for="password_confirmation" class="form-label">Conferma password</label>
-                <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required autocomplete="new-password" minlength="8" placeholder="Ripeti la password">
+                <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required autocomplete="new-password" minlength="10" placeholder="Ripeti la password">
             </div>
             <button type="submit" class="btn-login">Imposta password</button>
         </form>

@@ -2,15 +2,18 @@
 
 namespace App\Providers;
 
+use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Models\Utente;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse;
 use Laravel\Fortify\Contracts\TwoFactorLoginResponse;
@@ -37,6 +40,22 @@ class FortifyServiceProvider extends ServiceProvider
             }
         });
 
+        // Recupero password: un'email inesistente riceve la stessa risposta di una valida,
+        // per non rivelare quali indirizzi hanno un account. Il throttle resta un errore.
+        $this->app->singleton(FailedPasswordResetLinkRequestResponse::class, fn ($app, array $params = []) => new class($params['status'] ?? '') implements FailedPasswordResetLinkRequestResponse
+        {
+            public function __construct(private string $status) {}
+
+            public function toResponse($request)
+            {
+                if ($this->status === Password::INVALID_USER) {
+                    return back()->with('status', trans(Password::RESET_LINK_SENT));
+                }
+
+                return back()->withInput($request->only('email'))->withErrors(['email' => trans($this->status)]);
+            }
+        });
+
         // Dopo il logout si torna alla pagina di login
         $this->app->singleton(LogoutResponse::class, fn () => new class implements LogoutResponse
         {
@@ -52,8 +71,11 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn () => view('auth.login'));
         Fortify::twoFactorChallengeView(fn () => view('auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('auth.confirm-password'));
+        Fortify::requestPasswordResetLinkView(fn () => view('auth.forgot-password'));
+        Fortify::resetPasswordView(fn (Request $request) => view('auth.reset-password', ['request' => $request]));
 
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
+        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
         /*
          * Autenticazione personalizzata sulla tabella `utenti`:
@@ -79,11 +101,11 @@ class FortifyServiceProvider extends ServiceProvider
             return $utente;
         });
 
-        // Rate limiting login: max 5 tentativi al minuto per combinazione email+IP
+        // Rate limiting login: tentativi al minuto per combinazione email+IP (AUTH_LOGIN_ATTEMPTS, default 5)
         RateLimiter::for('login', function (Request $request) {
             $email = Str::lower((string) $request->input(Fortify::username()));
 
-            return Limit::perMinute(5)->by($email.'|'.$request->ip());
+            return Limit::perMinute(max(1, (int) config('auth.login_max_attempts', 5)))->by($email.'|'.$request->ip());
         });
 
         // Rate limiting sulla challenge 2FA: 5 tentativi al minuto per sessione di login

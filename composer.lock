@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "03d8566085396210f955ce8801075d7a",
+    "content-hash": "5782dcebacd14bc05b6ef8a3ac0f88dd",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -137,6 +137,62 @@
                 }
             ],
             "time": "2026-02-21T08:51:10+00:00"
+        },
+        {
+            "name": "bjeavons/zxcvbn-php",
+            "version": "1.4.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/bjeavons/zxcvbn-php.git",
+                "reference": "426f664501a0747beb8f3ee17ac30c7dd6327ffa"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/bjeavons/zxcvbn-php/zipball/426f664501a0747beb8f3ee17ac30c7dd6327ffa",
+                "reference": "426f664501a0747beb8f3ee17ac30c7dd6327ffa",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^7.2 | ^8.0 | ^8.1",
+                "symfony/polyfill-mbstring": ">=1.3.1"
+            },
+            "require-dev": {
+                "php-coveralls/php-coveralls": "*",
+                "phpstan/phpstan": "^2.0",
+                "phpunit/phpunit": "^8.5",
+                "squizlabs/php_codesniffer": "3.*"
+            },
+            "suggest": {
+                "ext-gmp": "Required for optimized binomial calculations (also requires PHP >= 7.3)"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "ZxcvbnPhp\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "See contributors",
+                    "homepage": "https://github.com/bjeavons/zxcvbn-php"
+                }
+            ],
+            "description": "Realistic password strength estimation PHP library based on Zxcvbn JS",
+            "homepage": "https://github.com/bjeavons/zxcvbn-php",
+            "keywords": [
+                "password",
+                "zxcvbn"
+            ],
+            "support": {
+                "issues": "https://github.com/bjeavons/zxcvbn-php/issues",
+                "source": "https://github.com/bjeavons/zxcvbn-php/tree/1.4.2"
+            },
+            "time": "2025-02-24T16:47:20+00:00"
         },
         {
             "name": "brick/math",
@@ -3619,6 +3675,67 @@
                 "source": "https://github.com/Masterminds/html5-php/tree/2.10.0"
             },
             "time": "2025-07-25T09:04:22+00:00"
+        },
+        {
+            "name": "metalogico/laravel-formello",
+            "version": "v2.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/metalogico/laravel-formello",
+                "reference": "d7a4e7513d00996fec193aa2f1cf142d10280ddd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/metalogico/laravel-formello/zipball/d7a4e7513d00996fec193aa2f1cf142d10280ddd",
+                "reference": "d7a4e7513d00996fec193aa2f1cf142d10280ddd",
+                "shasum": ""
+            },
+            "require": {
+                "laravel/framework": "^9.0|^10.0|^11.0|^12.0|^13.0",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^8.0|^9.0|^10.0",
+                "pestphp/pest": "^2.0|^3.0|^4.0",
+                "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0",
+                "phpunit/phpunit": "^10.0|^11.0|^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "Formello": "Metalogico\\Formello\\Facades\\Formello"
+                    },
+                    "providers": [
+                        "Metalogico\\Formello\\FormelloServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Metalogico\\Formello\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Metalogico",
+                    "email": "michele.brandolin@gmail.com"
+                }
+            ],
+            "description": "A Laravel package for generating Bootstrap 5 and Tailwind CSS 4 forms based on models",
+            "homepage": "https://github.com/metalogico/laravel-formello",
+            "keywords": [
+                "Forms",
+                "bootstrap",
+                "form-builder",
+                "laravel",
+                "metalogico"
+            ],
+            "time": "2026-04-20T11:05:50+00:00"
         },
         {
             "name": "mews/purifier",
@@ -10978,6 +11095,82 @@
                 "source": "https://github.com/webmozarts/assert/tree/2.4.0"
             },
             "time": "2026-05-20T13:07:01+00:00"
+        },
+        {
+            "name": "ziming/laravel-zxcvbn",
+            "version": "2.4.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/ziming/laravel-zxcvbn.git",
+                "reference": "5a7cbc3d8534b4e160ae963c8d7689a262d57ec6"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/ziming/laravel-zxcvbn/zipball/5a7cbc3d8534b4e160ae963c8d7689a262d57ec6",
+                "reference": "5a7cbc3d8534b4e160ae963c8d7689a262d57ec6",
+                "shasum": ""
+            },
+            "require": {
+                "bjeavons/zxcvbn-php": "^1.3",
+                "illuminate/contracts": "^11.0||^12.0||^13.0",
+                "php": "^8.2||^8.3||^8.4",
+                "spatie/laravel-package-tools": "^1.9.2"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.8",
+                "larastan/larastan": "^3.0",
+                "nunomaduro/collision": "^7.0||^8.0||^9.0",
+                "orchestra/testbench": "^9.0||^10.0||^11.0",
+                "pestphp/pest": "^3.0||^4.0||^5.0",
+                "pestphp/pest-plugin-laravel": "^3.0||^4.0||^5.0",
+                "phpstan/extension-installer": "^1.0",
+                "phpstan/phpstan-deprecation-rules": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "phpunit/phpunit": "^11.0||^12.0",
+                "spatie/laravel-ray": "^1.26"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Ziming\\LaravelZxcvbn\\LaravelZxcvbnServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Ziming\\LaravelZxcvbn\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "ziming",
+                    "email": "ziming.opensource@gmail.com",
+                    "role": "Package Uploader"
+                }
+            ],
+            "description": "Zxcvbn Password validation rule for Laravel",
+            "homepage": "https://github.com/ziming/laravel-zxcvbn",
+            "keywords": [
+                "laravel",
+                "laravel-zxcvbn",
+                "ziming"
+            ],
+            "support": {
+                "issues": "https://github.com/ziming/laravel-zxcvbn/issues",
+                "source": "https://github.com/ziming/laravel-zxcvbn/tree/2.4.6"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/ziming",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-03-17T17:56:55+00:00"
         }
     ],
     "packages-dev": [
@@ -13676,5 +13869,5 @@
         "php": "^8.3"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }

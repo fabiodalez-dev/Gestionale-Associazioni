@@ -28,7 +28,7 @@
                             <input type="password" name="password" id="password"
                                    class="form-control @error('password') is-invalid @enderror"
                                    required autocomplete="new-password" aria-describedby="passwordHelp">
-                            <div id="passwordHelp" class="form-text">Almeno 10 caratteri, con lettere e numeri.</div>
+                            <div id="passwordHelp" class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
                             @error('password')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

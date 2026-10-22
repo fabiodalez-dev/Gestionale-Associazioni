@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\FrontendPubblico;
 
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Conferma del reset password (broker 'accounts'): token + email +
@@ -24,7 +24,15 @@ class ResetPasswordAccountRequest extends FormRequest
         return [
             'token' => ['required', 'string'],
             'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', ...PasswordPolicy::rules([$this->input('email')])],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return PasswordPolicy::messages();
     }
 }

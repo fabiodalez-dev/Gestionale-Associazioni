@@ -38,12 +38,11 @@ return [
      * Reactive system configuration
      */
     'reactive' => [
-        'compute_path' => '/formello/compute',
-        // Whitelist of form classes allowed for server callbacks.
-        // Leave empty to allow all (not recommended in production).
-        'allowed_forms' => [
-            // App\Forms\ContractForm::class,
-        ],
+        // Disattivata: nessun form usa callback reattivi lato server, e la rotta
+        // istanzierebbe classi scelte dal client. Per riattivarla elencare i form
+        // ammessi in allowed_forms (con allowlist vuota il pacchetto li accetta tutti).
+        'compute_path' => null,
+        'allowed_forms' => [],
     ],
 
     // I form dell'app usano solo widget senza librerie esterne: niente asset di Formello

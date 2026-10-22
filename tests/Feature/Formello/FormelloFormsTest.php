@@ -113,4 +113,11 @@ class FormelloFormsTest extends TestCase
         $this->assertMatchesRegularExpression('/name="attivo" value="1"\s+checked/', $modifica);
         $this->assertMatchesRegularExpression('/<option value="'.$associazione->id.'"\s+selected/', $modifica);
     }
+
+    public function test_la_rotta_compute_di_formello_non_e_esposta(): void
+    {
+        $this->assertFalse(\Illuminate\Support\Facades\Route::has('formello.compute'));
+        $this->post('/formello/compute', ['form_class' => Utente::class, 'changed_field' => 'x', 'form_data' => ['a' => 1]])
+            ->assertNotFound();
+    }
 }

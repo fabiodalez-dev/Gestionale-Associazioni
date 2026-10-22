@@ -4,6 +4,7 @@ namespace App\Http\Requests\SpaziRisorse;
 
 use App\Models\Sede;
 use App\Models\Spazio;
+use App\Rules\SedeNelPerimetro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -39,13 +40,8 @@ class SpazioRequest extends FormRequest
             'nome' => ['required', 'string', 'max:150'],
             'descrizione' => ['nullable', 'string', 'max:5000'],
             'capienza' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
-            'sede_id' => [
-                'nullable',
-                'uuid',
-                // Solo sedi del tenant corrente (Rule::exists ignora il global scope)
-                Rule::exists((new Sede)->getTable(), 'id')
-                    ->where('associazione_id', Spazio::currentAssociazioneId()),
-            ],
+            // Solo sedi del tenant e, per gli utenti limitati, una delle loro
+            'sede_id' => SedeNelPerimetro::regole(Spazio::currentAssociazioneId()),
             'attivo' => ['required', 'boolean'],
         ];
     }

@@ -6,6 +6,7 @@ use App\Models\Evento;
 use App\Models\Prenotazione;
 use App\Models\Progetto;
 use App\Models\Spazio;
+use App\Rules\SedeNelPerimetro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -77,6 +78,8 @@ class EventoRequest extends FormRequest
             'data_evento' => ['required', 'date'],
             'data_fine' => ['nullable', 'date', 'after_or_equal:data_evento'],
             'luogo' => ['nullable', 'string', 'max:255'],
+            // Sede vuota = evento di tutta l'associazione (non per gli utenti limitati a una sede)
+            'sede_id' => SedeNelPerimetro::regole(Evento::currentAssociazioneId()),
             'descrizione' => ['nullable', 'string'],
 
             // Sezione "Pubblicazione frontend"

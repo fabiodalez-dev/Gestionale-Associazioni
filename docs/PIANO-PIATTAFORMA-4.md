@@ -100,3 +100,7 @@ Oggi medialibrary è usata da `Documento`, `DocumentoSocio` ed `Evento` (galleri
 | 7 | Google Calendar | medio (API esterna) |
 
 Ogni fase produce un report `docs/REPORT-PIATTAFORMA-4.md` aggiornato con esito dei test e decisioni prese.
+
+## Fase 8 — Perimetro per sede (aggiunta)
+
+Associazione e sede restano livelli distinti; il ruolo dice cosa un utente può fare, le sedi assegnate su quali dati. Tabella `utente_sedi` (nessuna sede = tutta l'associazione), ruolo "Responsabile di sede", scope automatico per sede sui modelli con `sede_id` e su quelli collegati tramite socio o evento, `sede_id` facoltativo su eventi e prima nota (vuoto = di tutta l'associazione, visibile ma non modificabile dagli utenti limitati). Esclusi per scelta: spatie/laravel-multitenancy (il tenant è già gestito), pivot socio–sedi multiple e utente in più associazioni (finché non servono davvero), Horizon (richiede Redis).

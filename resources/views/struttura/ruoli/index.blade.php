@@ -17,7 +17,7 @@
             <thead>
                 <tr>
                     <th>Utente</th>
-                    <th>Ruoli</th>
+                    <th>Ruoli e sedi</th>
                     <th class="text-end">Azioni</th>
                 </tr>
             </thead>
@@ -40,12 +40,15 @@
                                 @empty
                                     <span class="small text-muted">Nessun ruolo: al prossimo accesso riceverà "Operatore"</span>
                                 @endforelse
+                                <div class="small mt-1">
+                                    <i class="bi bi-geo-alt me-1"></i>{{ $utente->sedi->isEmpty() ? 'Tutte le sedi' : $utente->sedi->pluck('nome')->join(', ') }}
+                                </div>
                             @endif
                         </td>
                         <td class="text-end">
                             @can('assegnaRuoli', $utente)
                                 <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#ruoli-{{ $utente->id }}" aria-expanded="false" aria-controls="ruoli-{{ $utente->id }}">
-                                    <i class="bi bi-pencil me-1"></i>Modifica ruoli
+                                    <i class="bi bi-pencil me-1"></i>Modifica ruoli e sedi
                                 </button>
                             @endcan
                         </td>
@@ -69,7 +72,22 @@
                                             </div>
                                         @endforeach
                                     </div>
-                                    <button type="submit" class="btn btn-primary btn-sm mt-3"><i class="bi bi-check-lg me-1"></i>Salva ruoli</button>
+                                    @if ($sedi->isNotEmpty())
+                                        @php($sediAssegnate = $utente->sedi->pluck('id')->all())
+                                        <fieldset class="mt-3">
+                                            <legend class="fs-6 fw-medium mb-1">Sedi</legend>
+                                            <p class="small text-muted mb-2">Con almeno una sede selezionata l'utente vede e gestisce solo i dati di quelle sedi; senza nessuna, tutta l'associazione.</p>
+                                            <div class="d-flex flex-wrap gap-3">
+                                                @foreach ($sedi as $sede)
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="sedi[]" value="{{ $sede->id }}" id="sede-{{ $utente->id }}-{{ $sede->id }}" @checked(in_array($sede->id, $sediAssegnate, true))>
+                                                        <label class="form-check-label" for="sede-{{ $utente->id }}-{{ $sede->id }}">{{ $sede->nome }}</label>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </fieldset>
+                                    @endif
+                                    <button type="submit" class="btn btn-primary btn-sm mt-3"><i class="bi bi-check-lg me-1"></i>Salva ruoli e sedi</button>
                                 </form>
                             </td>
                         </tr>

@@ -7,9 +7,11 @@ use App\Notifications\Auth\ResetPasswordUtente;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -120,6 +122,52 @@ class Utente extends Authenticatable
     public function getNomeCompletoAttribute(): string
     {
         return trim($this->nome.' '.$this->cognome);
+    }
+
+    /** @var list<string>|null */
+    private ?array $sediAssegnateCache = null;
+
+    /**
+     * Sedi a cui è limitato l'utente (Fase 8, PerimetroSedi). Nessuna = tutte.
+     *
+     * @return BelongsToMany<Sede, $this>
+     */
+    public function sedi(): BelongsToMany
+    {
+        return $this->belongsToMany(Sede::class, 'utente_sedi', 'utente_id', 'sede_id')->withTimestamps();
+    }
+
+    /**
+     * Id delle sedi assegnate, letti senza passare dagli scope di Sede (che a
+     * loro volta dipendono da questo elenco) e memorizzati sull'istanza.
+     *
+     * @return list<string>
+     */
+    public function sediAssegnateIds(): array
+    {
+        return $this->sediAssegnateCache ??= DB::table('utente_sedi')
+            ->where('utente_id', $this->getKey())
+            ->orderBy('sede_id')
+            ->pluck('sede_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+    }
+
+    /**
+     * Assegna le sedi (solo dell'associazione dell'utente) e aggiorna la cache.
+     *
+     * @param  list<string>  $sedi
+     */
+    public function assegnaSedi(array $sedi): void
+    {
+        $valide = Sede::query()->withoutGlobalScopes()
+            ->where('associazione_id', $this->associazione_id)
+            ->whereIn('id', $sedi)
+            ->pluck('id')
+            ->all();
+
+        $this->sedi()->sync($valide);
+        $this->sediAssegnateCache = null;
     }
 
     /**

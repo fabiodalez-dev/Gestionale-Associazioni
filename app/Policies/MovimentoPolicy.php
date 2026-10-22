@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Movimento;
 use App\Models\Utente;
+use App\Support\PerimetroSedi;
 
 /**
  * Autorizzazioni prima nota (f.13 del piano "Gestione 2"): come da
@@ -34,11 +35,11 @@ class MovimentoPolicy
 
     public function update(Utente $utente, Movimento $movimento): bool
     {
-        return $utente->can('economia.update');
+        return $utente->can('economia.update') && PerimetroSedi::puoModificare($utente, $movimento);
     }
 
     public function delete(Utente $utente, Movimento $movimento): bool
     {
-        return $utente->can('economia.delete');
+        return $utente->can('economia.delete') && PerimetroSedi::puoModificare($utente, $movimento);
     }
 }

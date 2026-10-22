@@ -49,6 +49,7 @@ final class RuoliAssociazione
         'segretario' => ['label' => 'Segretario', 'descrizione' => 'Anagrafica, iscrizioni, tessere, verbali, riunioni, documenti e comunicazioni.'],
         'tesoriere' => ['label' => 'Tesoriere', 'descrizione' => 'Quote, prima nota, donazioni e rendiconti dei progetti; soci in sola lettura.'],
         'consigliere' => ['label' => 'Consigliere', 'descrizione' => 'Consultazione di tutte le attività dell\'associazione, senza modifiche.'],
+        'responsabile_sede' => ['label' => 'Responsabile di sede', 'descrizione' => 'Soci, tessere, quote, eventi, volontari e spazi della propria sede; prima nota in inserimento. Va assegnato insieme alle sedi.'],
         'volontario' => ['label' => 'Volontario', 'descrizione' => 'Eventi, turni, spazi e documenti in sola lettura.'],
     ];
 
@@ -95,6 +96,11 @@ final class RuoliAssociazione
                 ['soci', 'iscrizioni', 'tessere', 'quote', 'economia', 'eventi', 'volontari', 'spazi', 'progetti', 'riunioni', 'verbali', 'documenti', 'scadenze', 'comunicazione', 'relazioni'],
                 'v',
             ),
+            'responsabile_sede' => [
+                'soci' => 'vcu', 'iscrizioni' => 'v', 'tessere' => 'vcu', 'quote' => 'vcu', 'economia' => 'vc',
+                'eventi' => 'vcud', 'volontari' => 'vcud', 'spazi' => 'vcu', 'documenti' => 'vc',
+                'scadenze' => 'v', 'comunicazione' => 'v',
+            ],
             'volontario' => ['eventi' => 'v', 'volontari' => 'v', 'spazi' => 'v', 'documenti' => 'v'],
         ];
     }

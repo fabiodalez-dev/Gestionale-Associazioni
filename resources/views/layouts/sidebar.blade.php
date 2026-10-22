@@ -33,6 +33,14 @@
                 <i class="bi bi-sun theme-label-dark"></i>
             </button>
         </div>
+        @php
+            $sediPerimetro = \App\Support\PerimetroSedi::sedi();
+        @endphp
+        @if ($sediPerimetro !== null)
+            <div class="px-3 pt-2 small text-muted" title="Vedi e gestisci solo i dati di queste sedi">
+                <i class="bi bi-geo-alt me-1"></i>{{ \App\Models\Sede::query()->orderBy('nome')->pluck('nome')->join(', ') }}
+            </div>
+        @endif
 
         @if ($isSuperAdmin)
             @php

@@ -218,6 +218,7 @@
                                value="{{ old('luogo', $editEvento?->luogo) }}" maxlength="255">
                         @error('luogo')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
+                    @include('partials.campo-sede', ['idCampo' => 'sede_evento', 'valore' => $editEvento?->sede_id, 'vuoto' => "Tutta l'associazione"])
                     {{-- f.11 piano "Organizzazione 3": spazio dell'evento (opzionale).
                          Conflitti con prenotazioni/altri eventi = warning NON bloccante al salvataggio. --}}
                     @php $spaziDisponibili = \App\Models\Spazio::query()->attivi()->orderBy('nome')->get(); @endphp

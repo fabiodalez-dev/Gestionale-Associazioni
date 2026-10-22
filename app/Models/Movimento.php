@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSede;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  */
 class Movimento extends Model
 {
+    use NelPerimetroSede;
+
+    /** Sede vuota = di tutta l'associazione, visibile anche agli utenti limitati a una sede. */
+    public const SEDE_FACOLTATIVA = true;
+
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;
@@ -37,6 +43,7 @@ class Movimento extends Model
 
     protected $fillable = [
         'associazione_id',
+        'sede_id',
         'tipo',
         'importo',
         'data',

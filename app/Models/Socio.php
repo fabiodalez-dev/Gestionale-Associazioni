@@ -3,11 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
-use Spatie\Image\Enums\Fit;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSede;
 use App\Services\Privacy\ArchivioDatiPersonali;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +18,10 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\PersonalDataExport\ExportsPersonalData;
 use Spatie\PersonalDataExport\PersonalDataSelection;
 
@@ -35,6 +36,7 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
     use HasFactory;
     use HasUuids;
     use InteractsWithMedia;
+    use NelPerimetroSede;
     use Notifiable;
     use Searchable;
     use SoftDeletes;

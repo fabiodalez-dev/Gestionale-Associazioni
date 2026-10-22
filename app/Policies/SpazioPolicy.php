@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Spazio;
 use App\Models\Utente;
 use App\Policies\Concerns\AuthorizesModulePermissions;
+use App\Support\PerimetroSedi;
 
 /**
  * Policy spazi (f.7 piano "Organizzazione 3"): abilità mappate sui permessi
@@ -42,13 +43,15 @@ class SpazioPolicy
     public function update(Utente $utente, Spazio $spazio): bool
     {
         return $this->allowed($utente, 'spazi.update', self::FALLBACK)
-            && $this->stessoTenant($utente, $spazio);
+            && $this->stessoTenant($utente, $spazio)
+            && PerimetroSedi::puoModificare($utente, $spazio);
     }
 
     public function delete(Utente $utente, Spazio $spazio): bool
     {
         return $this->allowed($utente, 'spazi.delete', self::FALLBACK)
-            && $this->stessoTenant($utente, $spazio);
+            && $this->stessoTenant($utente, $spazio)
+            && PerimetroSedi::puoModificare($utente, $spazio);
     }
 
     private function stessoTenant(Utente $utente, Spazio $spazio): bool

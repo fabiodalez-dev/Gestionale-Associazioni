@@ -5,6 +5,7 @@ namespace App\Http\Requests\Soci;
 use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
 use App\Models\Socio;
+use App\Rules\SedeNelPerimetro;
 use App\Services\Soci\RequiredFieldsConfig;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
@@ -82,10 +83,7 @@ abstract class SocioRequest extends FormRequest
                 'nullable',
                 Rule::exists('categorie_socio', 'id')->where('associazione_id', $associazioneId),
             ],
-            'sede_id' => [
-                'nullable',
-                Rule::exists('sedi', 'id')->where('associazione_id', $associazioneId),
-            ],
+            'sede_id' => SedeNelPerimetro::regole($associazioneId),
             'tag_ids' => ['nullable', 'array'],
             'tag_ids.*' => [
                 Rule::exists('tags', 'id')->where('associazione_id', $associazioneId),

@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Evento;
 use App\Models\Utente;
 use App\Policies\Concerns\AuthorizesModulePermissions;
+use App\Support\PerimetroSedi;
 
 /**
  * Policy del modulo eventi: abilità mappate sui permessi spatie
@@ -43,13 +44,15 @@ class EventoPolicy
     public function update(Utente $utente, Evento $evento): bool
     {
         return $this->allowed($utente, 'eventi.update', self::FALLBACK)
-            && $this->stessoTenant($utente, $evento);
+            && $this->stessoTenant($utente, $evento)
+            && PerimetroSedi::puoModificare($utente, $evento);
     }
 
     public function delete(Utente $utente, Evento $evento): bool
     {
         return $this->allowed($utente, 'eventi.delete', self::FALLBACK)
-            && $this->stessoTenant($utente, $evento);
+            && $this->stessoTenant($utente, $evento)
+            && PerimetroSedi::puoModificare($utente, $evento);
     }
 
     private function stessoTenant(Utente $utente, Evento $evento): bool

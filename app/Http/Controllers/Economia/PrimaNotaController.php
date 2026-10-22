@@ -101,6 +101,7 @@ class PrimaNotaController extends Controller
             'descrizione' => $request->validated('descrizione'),
             'metodo' => $request->validated('metodo'),
             'progetto_id' => $request->validated('progetto_id'),
+            'sede_id' => $request->validated('sede_id'),
             'registrato_da' => $request->user()?->id,
         ]);
 

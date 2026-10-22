@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use App\Services\Pagamenti\Pagabile;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -31,6 +32,11 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
  */
 class Prenotazione extends Model implements Pagabile
 {
+    use NelPerimetroSedeTramite;
+
+    /** Perimetro per sede tramite l'evento. */
+    public const PERIMETRO_TRAMITE = 'evento';
+
     use BelongsToAssociazione;
     use HasFactory;
     use HasUuids;

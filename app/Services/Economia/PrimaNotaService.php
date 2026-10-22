@@ -218,6 +218,7 @@ class PrimaNotaService
         try {
             return Movimento::create([
                 ...$attributi,
+                'sede_id' => $this->sedeDellOrigine($origine),
                 'origine_type' => $origine->getMorphClass(),
                 'origine_id' => $origine->getKey(),
             ]);
@@ -225,5 +226,24 @@ class PrimaNotaService
             // Race sul webhook replay: il movimento esiste già
             return null;
         }
+    }
+
+    /**
+     * Sede del movimento automatico: quella del socio (quote) o dell'evento
+     * (prenotazioni), letta senza scope perché il pagamento può arrivare da
+     * webhook o coda.
+     */
+    protected function sedeDellOrigine(Model $origine): ?string
+    {
+        foreach (['socio', 'evento'] as $relazione) {
+            if (method_exists($origine, $relazione)) {
+                $sede = $origine->{$relazione}()->withoutGlobalScopes()->value('sede_id');
+                if ($sede !== null) {
+                    return (string) $sede;
+                }
+            }
+        }
+
+        return null;
     }
 }

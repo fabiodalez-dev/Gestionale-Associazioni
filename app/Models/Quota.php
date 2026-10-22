@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use App\Services\Pagamenti\Pagabile;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +19,7 @@ class Quota extends Model implements Pagabile
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use NelPerimetroSedeTramite;
 
     public const STATO_PAGATA = 'Pagata';
 

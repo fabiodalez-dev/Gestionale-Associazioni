@@ -73,76 +73,82 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Richiedente</th>
+                            <th>Persona</th>
+                            <th>Dati inviati</th>
                             <th>Socio preiscritto</th>
                             <th>Ricevuta il</th>
-                            <th>Dati inviati</th>
                             <th class="text-end">Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($pendenti as $richiesta)
-                            @php $righe = $righeDatiForm($richiesta->dati_form); @endphp
+                            @php
+                                $righe = $righeDatiForm($richiesta->dati_form);
+                                $socio = $richiesta->socio;
+                                $persona = $richiesta->account ?? $socio;
+                                // Anagrafica dal socio preiscritto (fonte più completa), poi dallo snapshot del form
+                                $scheda = array_filter([
+                                    'Telefono' => $socio?->telefono ?? $righe['Telefono'] ?? null,
+                                    'Data di nascita' => $socio?->data_nascita?->format('d/m/Y') ?? $righe['Data di nascita'] ?? null,
+                                    'Codice fiscale' => $socio?->codice_fiscale ?? $righe['Codice fiscale'] ?? null,
+                                    'Indirizzo' => trim(implode(' ', array_filter([$socio?->indirizzo ?? $righe['Indirizzo'] ?? null, $socio?->cap ?? null, $socio?->citta ?? $righe['Citta'] ?? $righe['Città'] ?? null, $socio?->provincia ? '('.$socio->provincia.')' : null]))) ?: null,
+                                ], fn ($v) => filled($v));
+                                $altriCampi = array_diff_key($righe, ['Telefono' => 1, 'Data di nascita' => 1, 'Codice fiscale' => 1, 'Indirizzo' => 1, 'Citta' => 1, 'Città' => 1]);
+                            @endphp
                             <tr>
                                 <td>
-                                    @if ($richiesta->account)
-                                        <span class="fw-semibold">{{ $richiesta->account->cognome }} {{ $richiesta->account->nome }}</span>
-                                        <div class="text-muted small">{{ $richiesta->account->email }}</div>
+                                    @if ($persona)
+                                        <span class="fw-semibold">{{ $persona->cognome }} {{ $persona->nome }}</span>
+                                        <div class="text-muted small">{{ $persona->email }}</div>
                                     @else
                                         <span class="text-muted fst-italic">Account eliminato</span>
                                     @endif
+                                    @if ($richiesta->referral_codice)
+                                        <div class="small text-muted"><i class="bi bi-people me-1"></i>Invitato da {{ $richiesta->socioReferente?->nome_completo ?? $richiesta->referral_codice }}</div>
+                                    @endif
                                 </td>
                                 <td>
-                                    @if ($richiesta->socio)
-                                        <a href="{{ Route::has('soci.show') ? route('soci.show', $richiesta->socio) : '#' }}">
-                                            N. {{ $richiesta->socio->numero_socio }}
+                                    {{-- I dati della persona si vedono subito: sono quelli su cui si decide --}}
+                                    @if ($scheda === [] && $altriCampi === [])
+                                        <span class="text-muted">Solo nome, cognome ed email</span>
+                                    @else
+                                        <dl class="row mb-0 small" style="min-width: 260px;">
+                                            @foreach ($scheda + $altriCampi as $etichetta => $valore)
+                                                <dt class="col-5 fw-normal text-muted">{{ $etichetta }}</dt>
+                                                <dd class="col-7 mb-0">{{ $valore }}</dd>
+                                            @endforeach
+                                        </dl>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($socio)
+                                        <a href="{{ Route::has('soci.show') ? route('soci.show', $socio) : '#' }}">
+                                            N. {{ $socio->numero_socio }}
                                         </a>
-                                        <div class="text-muted small">{{ $richiesta->socio->stato }}</div>
+                                        <div class="text-muted small">{{ $socio->stato }}</div>
+                                        <a href="{{ Route::has('soci.show') ? route('soci.show', $socio) : '#' }}" class="small">Scheda completa &rsaquo;</a>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
                                 <td>{{ $richiesta->created_at?->format('d/m/Y H:i') }}</td>
-                                <td>
-                                    @if ($righe === [])
-                                        <span class="text-muted">Nessun dato aggiuntivo</span>
-                                    @else
-                                        <button class="btn btn-sm btn-outline-secondary" type="button"
-                                                data-bs-toggle="collapse" data-bs-target="#dati-{{ $richiesta->id }}"
-                                                aria-expanded="false" aria-controls="dati-{{ $richiesta->id }}">
-                                            <i class="bi bi-card-list me-1"></i>{{ count($righe) }} {{ count($righe) === 1 ? 'campo' : 'campi' }}
-                                        </button>
-                                    @endif
-                                </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm" role="group">
                                         <button type="button" class="btn btn-success btn-approva-richiesta"
                                                 data-bs-toggle="modal" data-bs-target="#modalApprova"
                                                 data-action="{{ route('richieste-iscrizione.approva', $richiesta) }}"
-                                                data-nome="{{ $richiesta->account ? $richiesta->account->cognome.' '.$richiesta->account->nome : 'richiedente' }}">
+                                                data-nome="{{ $persona ? $persona->cognome.' '.$persona->nome : 'richiedente' }}">
                                             <i class="bi bi-check-lg me-1"></i>Approva
                                         </button>
                                         <button type="button" class="btn btn-outline-danger btn-rifiuta-richiesta"
                                                 data-bs-toggle="modal" data-bs-target="#modalRifiuta"
                                                 data-action="{{ route('richieste-iscrizione.rifiuta', $richiesta) }}"
-                                                data-nome="{{ $richiesta->account ? $richiesta->account->cognome.' '.$richiesta->account->nome : 'richiedente' }}">
+                                                data-nome="{{ $persona ? $persona->cognome.' '.$persona->nome : 'richiedente' }}">
                                             <i class="bi bi-x-lg me-1"></i>Rifiuta
                                         </button>
                                     </div>
                                 </td>
                             </tr>
-                            @if ($righe !== [])
-                                <tr class="collapse" id="dati-{{ $richiesta->id }}">
-                                    <td colspan="5" class="bg-body-tertiary">
-                                        <dl class="row mb-0 small">
-                                            @foreach ($righe as $etichetta => $valore)
-                                                <dt class="col-sm-3">{{ $etichetta }}</dt>
-                                                <dd class="col-sm-9 mb-1">{{ $valore }}</dd>
-                                            @endforeach
-                                        </dl>
-                                    </td>
-                                </tr>
-                            @endif
                         @empty
                             <tr>
                                 <td colspan="5" class="text-center py-5 text-muted">
@@ -202,7 +208,13 @@
                                 </td>
                                 <td>
                                     {{-- gestita_da null = approvazione automatica (modalità diretta) --}}
-                                    {{ $richiesta->gestore?->nome_completo ?? 'Iscrizione diretta' }}
+                                    @if ($richiesta->gestore)
+                                        {{ $richiesta->gestore->nome_completo }}
+                                    @elseif ($richiesta->stato === RichiestaIscrizione::STATO_RIFIUTATA)
+                                        Cancellazione dell'account
+                                    @else
+                                        Iscrizione diretta
+                                    @endif
                                 </td>
                                 <td>{{ $richiesta->gestita_at?->format('d/m/Y H:i') }}</td>
                             </tr>

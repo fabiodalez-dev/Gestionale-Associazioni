@@ -65,6 +65,8 @@ class InstallerTest extends TestCase
         config(['installer.env_file' => $env, 'app.key' => '']);
 
         try {
+            // Primo passaggio: crea il .env e ricomincia la richiesta
+            $this->get('/install')->assertRedirect();
             $this->get('/install')->assertOk();
 
             $this->assertFileExists($env);
@@ -79,6 +81,41 @@ class InstallerTest extends TestCase
         } finally {
             File::deleteDirectory($cartella);
         }
+    }
+
+    public function test_primo_avvio_senza_env_redirige_alla_stessa_pagina_dopo_averlo_creato(): void
+    {
+        $cartella = sys_get_temp_dir().'/installer_test_'.uniqid();
+        mkdir($cartella);
+        config(['installer.env_file' => $cartella.'/.env']);
+
+        try {
+            $this->get('/install/database?x=1')->assertRedirectContains('/install/database?x=1');
+            $this->assertFileExists($cartella.'/.env');
+            // Al secondo passaggio il .env c'è: la pagina si apre
+            $this->get('/install/database')->assertOk();
+        } finally {
+            File::deleteDirectory($cartella);
+        }
+    }
+
+    public function test_schema_installato_da_un_altro_browser_blocca_gli_step_successivi(): void
+    {
+        $this->seed(RolesSeeder::class); // schema pronto (migrations + utenti), nessun admin
+        $token = app(InstallerService::class)->segnaWizardInCorso();
+
+        // Altro browser: niente admin né database, solo la pagina requisiti
+        $this->get('/install')->assertOk();
+        $this->get('/install/admin')->assertForbidden();
+        $this->post('/install/admin', ['nome' => 'x'])->assertForbidden();
+        $this->get('/install/database')->assertForbidden();
+
+        // Browser giusto: prosegue
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/admin')->assertOk();
+
+        // Marcatore scaduto: nessuno lo ha più rivendicato, si può riprendere
+        touch($this->inCorsoFile, time() - 3 * 3600);
+        $this->get('/install/admin')->assertOk();
     }
 
     public function test_pagina_requisiti_raggiungibile_quando_non_installata(): void

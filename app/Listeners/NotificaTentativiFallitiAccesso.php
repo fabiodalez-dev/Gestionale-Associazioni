@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Models\Accesso;
 use App\Models\Utente;
 use App\Notifications\Piattaforma\TentativiAccessoFallitiNotification;
+use App\Support\AccountTentativoAccesso;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -37,10 +38,9 @@ class NotificaTentativiFallitiAccesso
     {
         try {
             // Stessa forma usata da RegistraAccesso in email_tentata
-            // (match esatto del conteggio); il throttle normalizza a parte.
-            $email = isset($event->credentials['email'])
-                ? trim((string) $event->credentials['email'])
-                : '';
+            // (trim + minuscolo), così il conteggio nella finestra non si
+            // aggira alternando maiuscole o spazi
+            $email = AccountTentativoAccesso::emailNormalizzata($event->credentials['email'] ?? null);
 
             if ($email === '') {
                 return;
@@ -89,8 +89,9 @@ class NotificaTentativiFallitiAccesso
      */
     protected function destinatari(Failed $event)
     {
-        $tenantId = $event->user instanceof Model
-            ? $event->user->getAttribute('associazione_id')
+        $account = AccountTentativoAccesso::risolvi($event);
+        $tenantId = $account instanceof Model
+            ? $account->getAttribute('associazione_id')
             : null;
 
         if ($tenantId !== null) {

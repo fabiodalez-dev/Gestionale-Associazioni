@@ -196,9 +196,19 @@ cd /home/utente/public_html && php artisan schedule:run >> /dev/null 2>&1 && php
 
 ## Aggiornamenti in-app
 
-Il **super admin** trova in `/aggiornamenti` una pagina che controlla le GitHub Releases e mostra versione installata vs ultima disponibile. Con un clic l'applicazione si aggiorna da sola: backup automatico del database, download della release con verifica SHA256, modalità manutenzione, sovrascrittura dei file (preservando `.env` e `storage/`), `migrate`, pulizia cache e riavvio della coda — con **rollback automatico** dei file in caso di errore e storico completo degli aggiornamenti.
+Stesso meccanismo dell'updater di Pinakes, adattato a Laravel. Il **super admin** trova in `/aggiornamenti` versione installata e ultima release GitHub, i requisiti (PHP, zip, cartelle scrivibili, spazio, prova di scrittura reale), il pulsante di aggiornamento, l'upload di un pacchetto per i server che non raggiungono GitHub, i backup e lo storico. L'aggiornamento: lock, backup del database (spatie/laravel-backup o dump in PHP puro se manca `mysqldump`), download del pacchetto `gestionale-associazioni-vX.Y.Z.zip` della release verificato con il **digest sha256 dell'API GitHub**, estrazione con controllo anti zip-slip, prova a secco dei permessi, manutenzione, backup dei file, copia (preservando `.env`, `storage/`, upload), pulizia dei file orfani, `migrate --force`, permessi, cache, coda. Se qualcosa fallisce dopo la copia i file tornano com'erano (rollback); la manutenzione viene tolta sempre, e una manutenzione rimasta accesa si sblocca dalla pagina.
 
----
+Da terminale, come proprietario dei file (utile dove PHP del web server non può scrivere l'app):
+
+```bash
+php artisan app:aggiorna
+```
+
+```bash
+php artisan app:aggiorna --pacchetto=/percorso/gestionale-associazioni-vX.Y.Z.zip
+```
+
+Per pubblicare una versione: aggiorna `VERSION`, rigenera lo schema se ci sono migration nuove, committa, poi `bash bin/create-release.sh X.Y.Z` (tag, Action, verifica degli asset). Dettagli in [docs/AGGIORNAMENTI.md](docs/AGGIORNAMENTI.md).
 
 ## Test
 

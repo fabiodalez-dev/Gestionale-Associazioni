@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Spatie\PersonalDataExport\ExportsPersonalData;
 use Spatie\PersonalDataExport\PersonalDataSelection;
 
@@ -120,21 +121,53 @@ class Account extends Authenticatable implements ExportsPersonalData, MustVerify
      */
     public function anonimizza(): void
     {
-        $this->forceFill([
-            'nome' => 'Account',
-            'cognome' => 'Anonimizzato',
-            // Mantiene unique(associazione_id, email): l'id è già univoco
-            'email' => 'anonimizzato-'.$this->id.'@anonimo.invalid',
-            'password' => bin2hex(random_bytes(32)),
-            'email_verified_at' => null,
-            'telefono' => null,
-            'socio_id' => null,
-            'attivo' => false,
-            'preferenze' => null,
-            'remember_token' => null,
-        ])->save();
+        // Una richiesta di iscrizione ancora in attesa ha creato un socio
+        // preiscritto con i dati in chiaro: va eliminato (definitivamente,
+        // come al rifiuto) e la richiesta chiusa senza dati, altrimenti la
+        // cancellazione GDPR lascerebbe l'anagrafica nella tabella soci e
+        // bloccherebbe una futura iscrizione con la stessa email.
+        DB::transaction(function (): void {
+            // Lock come in ApprovazioneIscrizioneService::rifiuta: se nel
+            // frattempo un admin approva, la richiesta non è più in attesa
+            // e non va toccata (il socio è ormai un dato dell'associazione)
+            RichiestaIscrizione::withoutGlobalScopes()
+                ->where('account_id', $this->id)
+                ->where('stato', RichiestaIscrizione::STATO_IN_ATTESA)
+                ->lockForUpdate()
+                ->get()
+                ->each(function (RichiestaIscrizione $richiesta): void {
+                    $socioId = $richiesta->socio_id;
+                    if ($socioId !== null) {
+                        $socio = Socio::withoutGlobalScopes()->withTrashed()->find($socioId);
+                        if ($socio !== null && $socio->stato === Socio::STATO_IN_ATTESA) {
+                            $socio->forceDelete();
+                        }
+                    }
+                    $richiesta->forceFill([
+                        'stato' => RichiestaIscrizione::STATO_RIFIUTATA,
+                        'motivo_rifiuto' => 'Account cancellato dall\'interessato',
+                        'socio_id' => null,
+                        'dati_form' => [],
+                        'gestita_at' => now(),
+                    ])->save();
+                });
 
-        $this->delete();
+            $this->forceFill([
+                'nome' => 'Account',
+                'cognome' => 'Anonimizzato',
+                // Mantiene unique(associazione_id, email): l'id è già univoco
+                'email' => 'anonimizzato-'.$this->id.'@anonimo.invalid',
+                'password' => bin2hex(random_bytes(32)),
+                'email_verified_at' => null,
+                'telefono' => null,
+                'socio_id' => null,
+                'attivo' => false,
+                'preferenze' => null,
+                'remember_token' => null,
+            ])->save();
+
+            $this->delete();
+        });
     }
 
     /** Contenuto dell'archivio dei dati personali (spatie/laravel-personal-data-export). */

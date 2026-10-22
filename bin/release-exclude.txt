@@ -47,7 +47,13 @@ storage/framework/sessions/*
 storage/framework/views/*
 storage/framework/testing/*
 storage/media-library/temp/*
-bootstrap/cache/*.php
+# Cache di bootstrap: packages.php e services.php arrivano freschi dal
+# composer install dello staging (e l'updater li copia), le altre sono
+# cache locali che non devono viaggiare
+bootstrap/cache/config.php
+bootstrap/cache/routes-*.php
+bootstrap/cache/events.php
+bootstrap/cache/*.scanned.php
 # File di sviluppo
 .phpunit.cache/
 .phpunit.result.cache

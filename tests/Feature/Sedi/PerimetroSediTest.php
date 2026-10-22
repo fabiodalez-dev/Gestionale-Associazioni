@@ -11,6 +11,7 @@ use App\Models\Quota;
 use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Models\Turno;
 use App\Models\Utente;
 use App\Services\Economia\PrimaNotaService;
 use App\Support\PerimetroSedi;
@@ -229,5 +230,36 @@ class PerimetroSediTest extends TestCase
             ->assertOk()->assertJsonPath('gruppi', []);
         $this->comeResponsabile()->getJson(route('ricerca-globale', ['q' => 'Padovani']))
             ->assertOk()->assertJsonPath('gruppi.0.risultati.0.titolo', fn (string $t) => str_starts_with($t, 'Padovani'));
+    }
+
+    public function test_eliminare_le_sedi_assegnate_non_toglie_il_limite(): void
+    {
+        $this->padova->delete();
+
+        $responsabile = $this->responsabile->fresh();
+        $this->assertSame([], PerimetroSedi::sediDi($responsabile), 'Limitato senza sedi: non vede nulla');
+
+        $this->actingAs($responsabile);
+        $this->assertSame(0, Socio::query()->count());
+    }
+
+    public function test_il_token_api_ha_lo_stesso_perimetro_dell_utente(): void
+    {
+        $token = $this->responsabile->createToken('prova', ['soci:read'])->plainTextToken;
+
+        $risposta = $this->withHeader('Authorization', 'Bearer '.$token)->getJson('/api/v1/soci');
+        $risposta->assertOk();
+        $cognomi = collect($risposta->json('soci'))->pluck('cognome')->all();
+        $this->assertSame(['Padovani'], $cognomi);
+    }
+
+    public function test_turni_senza_evento_restano_visibili_quelli_di_altre_sedi_no(): void
+    {
+        $evVicenza = Evento::factory()->pubblicato()->create(['associazione_id' => $this->associazione->id, 'sede_id' => $this->vicenza->id]);
+        $generale = Turno::factory()->create(['associazione_id' => $this->associazione->id, 'evento_id' => null]);
+        Turno::factory()->create(['associazione_id' => $this->associazione->id, 'evento_id' => $evVicenza->id]);
+
+        $this->actingAs($this->responsabile);
+        $this->assertSame([$generale->id], Turno::query()->pluck('id')->all());
     }
 }

@@ -25,7 +25,9 @@ final class PerimetroSedi
      */
     public static function sedi(): ?array
     {
-        $utente = auth()->guard('web')->user();
+        $utente = auth()->guard('web')->user()
+            // Token API Sanctum (AuthenticateApiV1): stesso perimetro dell'utente
+            ?? (app()->bound('request') ? request()->attributes->get('api_utente') : null);
 
         return $utente instanceof Utente ? self::sediDi($utente) : null;
     }
@@ -39,9 +41,8 @@ final class PerimetroSedi
             return null;
         }
 
-        $sedi = $utente->sediAssegnateIds();
-
-        return $sedi === [] ? null : $sedi;
+        // Limitato ma senza sedi (eliminate dopo l'assegnazione): non vede nulla
+        return $utente->limitato_sedi ? $utente->sediAssegnateIds() : null;
     }
 
     public static function limitato(): bool

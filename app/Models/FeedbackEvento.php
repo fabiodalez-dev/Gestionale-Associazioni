@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,6 +19,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class FeedbackEvento extends Model
 {
+    use NelPerimetroSedeTramite;
+
+    /** Perimetro per sede tramite l'evento. */
+    public const PERIMETRO_TRAMITE = 'evento';
+
     use BelongsToAssociazione;
     use HasFactory;
     use HasUuids;

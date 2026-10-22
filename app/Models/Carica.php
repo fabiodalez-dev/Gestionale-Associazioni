@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,6 +21,7 @@ class Carica extends Model
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use NelPerimetroSedeTramite;
 
     /** Ruoli suggeriti (la colonna resta una string libera). */
     public const RUOLI = [

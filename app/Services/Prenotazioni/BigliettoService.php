@@ -3,10 +3,10 @@
 namespace App\Services\Prenotazioni;
 
 use App\Models\Account;
-use App\Services\Struttura\LogoAssociazione;
 use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\Prenotazione;
+use App\Services\Struttura\LogoAssociazione;
 use App\Services\Tessere\TesseraQrService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfBuilder;

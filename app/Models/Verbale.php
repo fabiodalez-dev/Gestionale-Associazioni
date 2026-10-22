@@ -4,18 +4,18 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HaAllegati;
-use Spatie\MediaLibrary\HasMedia;
 use App\Models\Concerns\HasDefaultActivityLog;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
 
 class Verbale extends Model implements HasMedia
 {
-    use HaAllegati;
     use BelongsToAssociazione;
+    use HaAllegati;
     use HasDefaultActivityLog;
     use HasUuids;
     use SoftDeletes;

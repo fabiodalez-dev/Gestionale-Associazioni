@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,7 @@ class PrestitoAttrezzatura extends Model
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use NelPerimetroSedeTramite;
 
     protected $table = 'prestiti_attrezzature';
 

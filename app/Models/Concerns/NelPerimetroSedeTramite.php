@@ -22,6 +22,16 @@ trait NelPerimetroSedeTramite
             }
 
             $relazione = defined(static::class.'::PERIMETRO_TRAMITE') ? constant(static::class.'::PERIMETRO_TRAMITE') : 'socio';
+
+            // PERIMETRO_FACOLTATIVO: i record senza collegamento (es. turno senza
+            // evento) sono di tutta l'associazione e restano visibili
+            if (defined(static::class.'::PERIMETRO_FACOLTATIVO') && constant(static::class.'::PERIMETRO_FACOLTATIVO')) {
+                $chiave = $builder->qualifyColumn($builder->getModel()->{$relazione}()->getForeignKeyName());
+                $builder->where(fn (Builder $q) => $q->whereHas($relazione)->orWhereNull($chiave));
+
+                return;
+            }
+
             $builder->whereHas($relazione);
         });
     }

@@ -74,6 +74,7 @@ class Utente extends Authenticatable
     protected function casts(): array
     {
         return [
+            'limitato_sedi' => 'boolean',
             'attivo' => 'boolean',
             'last_login' => 'datetime',
             'password_hash' => 'hashed',
@@ -167,6 +168,8 @@ class Utente extends Authenticatable
             ->all();
 
         $this->sedi()->sync($valide);
+        // Il limite resta anche se in futuro le sedi assegnate vengono eliminate
+        $this->forceFill(['limitato_sedi' => $valide !== []])->save();
         $this->sediAssegnateCache = null;
     }
 

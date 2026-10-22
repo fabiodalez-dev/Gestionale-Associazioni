@@ -97,7 +97,11 @@ class CheckinController extends Controller
         // il tesseramento non è stato rinnovato, il check-in va rifiutato con
         // lo stesso criterio della verifica pubblica (Tessera::isValida).
         // Un socio senza alcuna tessera emessa resta identificabile per numero socio.
-        $tessereSocio = Tessera::query()->where('socio_id', $socio->id);
+        // Tutte le tessere del socio, anche fuori dal perimetro di sede
+        // dell'operatore: una tessera valida emessa altrove vale comunque
+        $tessereSocio = Tessera::withoutGlobalScopes()
+            ->where('associazione_id', $socio->associazione_id)
+            ->where('socio_id', $socio->id);
 
         if ((clone $tessereSocio)->exists() && ! (clone $tessereSocio)->valide()->exists()) {
             return response()->json([

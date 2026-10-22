@@ -208,7 +208,13 @@
                                 </td>
                                 <td>
                                     {{-- gestita_da null = approvazione automatica (modalità diretta) --}}
-                                    {{ $richiesta->gestore?->nome_completo ?? 'Iscrizione diretta' }}
+                                    @if ($richiesta->gestore)
+                                        {{ $richiesta->gestore->nome_completo }}
+                                    @elseif ($richiesta->stato === RichiestaIscrizione::STATO_RIFIUTATA)
+                                        Cancellazione dell'account
+                                    @else
+                                        Iscrizione diretta
+                                    @endif
                                 </td>
                                 <td>{{ $richiesta->gestita_at?->format('d/m/Y H:i') }}</td>
                             </tr>

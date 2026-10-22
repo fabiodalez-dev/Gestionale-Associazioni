@@ -38,10 +38,9 @@ class NotificaTentativiFallitiAccesso
     {
         try {
             // Stessa forma usata da RegistraAccesso in email_tentata
-            // (match esatto del conteggio); il throttle normalizza a parte.
-            $email = isset($event->credentials['email'])
-                ? trim((string) $event->credentials['email'])
-                : '';
+            // (trim + minuscolo), così il conteggio nella finestra non si
+            // aggira alternando maiuscole o spazi
+            $email = AccountTentativoAccesso::emailNormalizzata($event->credentials['email'] ?? null);
 
             if ($email === '') {
                 return;

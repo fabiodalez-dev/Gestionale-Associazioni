@@ -21,8 +21,16 @@ final class AccountTentativoAccesso
             return $event->user;
         }
 
-        $email = isset($event->credentials['email']) ? trim((string) $event->credentials['email']) : '';
+        $email = self::emailNormalizzata($event->credentials['email'] ?? null);
         if ($email === '') {
+            return null;
+        }
+
+        // Le email di account e soci sono uniche solo per associazione: senza
+        // il tenant pubblico risolto (richiesta fuori da /a/{slug}) la ricerca
+        // prenderebbe un account a caso e l'avviso andrebbe all'admin sbagliato.
+        // Solo la guard 'web' (utenti) ha l'email unica a livello globale.
+        if ($event->guard !== 'web' && ! app()->bound('tenant.pubblico')) {
             return null;
         }
 
@@ -33,5 +41,11 @@ final class AccountTentativoAccesso
         }
 
         return $account instanceof Model ? $account : null;
+    }
+
+    /** Forma unica dell'email tentata (trim + minuscolo), usata da audit e avvisi. */
+    public static function emailNormalizzata(mixed $email): string
+    {
+        return is_string($email) ? mb_strtolower(trim($email)) : '';
     }
 }

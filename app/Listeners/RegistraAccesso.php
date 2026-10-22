@@ -32,9 +32,7 @@ class RegistraAccesso
         // Fortify emette Failed con utente nullo anche a password errata su
         // un'email esistente: l'account si risolve dal provider della guard,
         // così tenant e morph restano noti e l'admin vede il tentativo nel suo audit.
-        $emailTentata = isset($event->credentials['email'])
-            ? (string) $event->credentials['email']
-            : null;
+        $emailTentata = AccountTentativoAccesso::emailNormalizzata($event->credentials['email'] ?? null) ?: null;
 
         $this->registra($event->guard, AccountTentativoAccesso::risolvi($event), Accesso::ESITO_FALLITO, $emailTentata);
     }

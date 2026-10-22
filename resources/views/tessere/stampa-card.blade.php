@@ -108,8 +108,8 @@
     <div class="card-container">
         <div class="card-header">
             <div class="logo">
-                @if ($associazione?->logo_url)
-                    <img src="{{ $associazione->logo_url }}" alt="Logo">
+                @if ($associazione?->logoUrl())
+                    <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo">
                 @else
                     LOGO
                 @endif

@@ -17,7 +17,7 @@ use App\Models\PaymentGatewaySetting;
 use App\Models\Sede;
 use App\Models\TesseraTemplate;
 use App\Models\TipoSocio;
-use App\Services\Struttura\LogoStorageService;
+use App\Services\Struttura\LogoAssociazione;
 use App\Services\Struttura\RequiredFieldsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,7 +38,7 @@ class ConfigurazioniController extends Controller
 
     public function __construct(
         private readonly RequiredFieldsService $requiredFields,
-        private readonly LogoStorageService $logoStorage,
+        private readonly LogoAssociazione $logo,
     ) {}
 
     public function index(Request $request): View
@@ -96,10 +96,7 @@ class ConfigurazioniController extends Controller
     {
         $associazione = $request->associazioneCorrente();
 
-        $vecchioLogo = $associazione->logo_url;
-        $path = $this->logoStorage->store($request->file('logo_file'));
-        $associazione->update(['logo_url' => $path]);
-        $this->logoStorage->delete($vecchioLogo);
+        $this->logo->salva($associazione, $request->file('logo_file'));
 
         return $this->redirectToSection('logo', 'Logo aggiornato con successo.');
     }

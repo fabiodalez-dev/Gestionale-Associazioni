@@ -43,8 +43,8 @@
     <nav class="navbar navbar-expand-md pubblico-navbar">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('pubblico.home.show', $associazione->slug) }}">
-                @if (filled($associazione->logo_url))
-                    <img src="{{ $associazione->logo_url }}" alt="Logo {{ $associazione->nome }}" class="pubblico-logo">
+                @if (filled($associazione->logoUrl()))
+                    <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}" class="pubblico-logo">
                 @else
                     <i class="bi bi-people-fill text-primary fs-4"></i>
                 @endif

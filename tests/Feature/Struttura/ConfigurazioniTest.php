@@ -86,10 +86,14 @@ class ConfigurazioniTest extends TestCase
             'logo_file' => UploadedFile::fake()->image('logo.png', 200, 200),
         ])->assertRedirect(route('configurazioni.index', ['section' => 'logo']));
 
-        $logoUrl = $this->associazione->fresh()->logo_url;
-        $this->assertNotNull($logoUrl);
-        $this->assertStringStartsWith('uploads/logos/logo_', $logoUrl);
-        Storage::disk('public')->assertExists($logoUrl);
+        // Logo su medialibrary (disco public); la colonna punta al file del media
+        $associazione = $this->associazione->fresh();
+        $media = $associazione->getFirstMedia('logo');
+        $this->assertNotNull($media);
+        $this->assertSame($media->getPathRelativeToRoot(), $associazione->logo_url);
+        Storage::disk('public')->assertExists($associazione->logo_url);
+        $this->assertStringStartsWith('logo-', $media->file_name);
+        $this->assertTrue($media->hasGeneratedConversion('miniatura'));
     }
 
     public function test_upload_logo_estensione_non_valida_bloccante(): void

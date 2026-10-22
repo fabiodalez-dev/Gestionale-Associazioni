@@ -83,7 +83,7 @@ class TenantNotificationMailer
                 ['html' => 'emails.layout', 'text' => 'emails.layout-text'],
                 [
                     'brandNome' => filled($associazione->nome) ? (string) $associazione->nome : (string) config('app.name'),
-                    'brandLogo' => filled($associazione->logo_url) ? (string) $associazione->logo_url : null,
+                    'brandLogo' => $associazione->logoUrl('email'),
                     'brandColore' => static::colore($associazione),
                     'unsubscribeUrl' => $unsubscribeUrl,
                     'annoCorrente' => now()->format('Y'),

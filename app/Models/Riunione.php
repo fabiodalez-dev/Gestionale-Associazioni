@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\HaAllegati;
+use Spatie\MediaLibrary\HasMedia;
 use App\Models\Concerns\HasDefaultActivityLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -17,8 +19,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * (round 1), votazioni per punto (f.18) e verbale generato dalla bozza
  * (modulo Verbale esistente con numerazione automatica).
  */
-class Riunione extends Model
+class Riunione extends Model implements HasMedia
 {
+    use HaAllegati;
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;

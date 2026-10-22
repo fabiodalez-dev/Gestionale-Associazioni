@@ -28,7 +28,7 @@ class EmailLayout
             return view('email.layout-base', [
                 'body' => $bodyHtml,
                 'associazioneNome' => $associazione->nome,
-                'logoUrl' => $associazione->logo_url,
+                'logoUrl' => $associazione->logoUrl('email'),
                 'unsubscribeUrl' => $unsubscribeUrl,
                 'anno' => now()->format('Y'),
             ])->render();

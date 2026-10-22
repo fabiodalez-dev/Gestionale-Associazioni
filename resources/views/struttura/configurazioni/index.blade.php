@@ -110,8 +110,8 @@
             <div class="card">
                 <div class="card-header"><i class="bi bi-image me-2"></i>Logo associazione</div>
                 <div class="card-body">
-                    @if ($associazione->logo_url)
-                        <p><img src="{{ asset('storage/'.$associazione->logo_url) }}" alt="Logo {{ $associazione->nome }}" style="max-height: 120px;" class="rounded border p-2"></p>
+                    @if ($associazione->logoUrl())
+                        <p><img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}" style="max-height: 120px;" class="rounded border p-2"></p>
                     @else
                         <p class="text-muted">Nessun logo caricato.</p>
                     @endif

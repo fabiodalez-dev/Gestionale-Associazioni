@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use App\Models\Concerns\HasDefaultActivityLog;
 use App\Services\Privacy\ArchivioDatiPersonali;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -24,12 +28,13 @@ use Spatie\PersonalDataExport\PersonalDataSelection;
  * Socio dell'associazione. Funziona anche da Authenticatable per la guard 'socio'
  * (area soci: login via email + password_hash, NULL = nessun accesso).
  */
-class Socio extends Authenticatable implements ExportsPersonalData
+class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
 {
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use InteractsWithMedia;
     use Notifiable;
     use Searchable;
     use SoftDeletes;
@@ -438,6 +443,39 @@ class Socio extends Authenticatable implements ExportsPersonalData
             'codice_fiscale' => (string) $this->codice_fiscale,
             'numero_socio' => (string) $this->numero_socio,
         ];
+    }
+
+    public const COLLEZIONE_FOTO = 'foto';
+
+    /**
+     * Foto del socio (tessera): disco privato, servita solo da FotoSocioController.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::COLLEZIONE_FOTO)
+            ->useDisk('media_private')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->singleFile();
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('tessera')
+            ->performOnCollections(self::COLLEZIONE_FOTO)
+            ->nonQueued()
+            ->fit(Fit::Crop, 300, 300);
+    }
+
+    /** File locale della foto in formato tessera (quadrato), null se assente. */
+    public function fotoPercorso(): ?string
+    {
+        $media = $this->getFirstMedia(self::COLLEZIONE_FOTO);
+        if ($media === null) {
+            return null;
+        }
+        $path = $media->hasGeneratedConversion('tessera') ? $media->getPath('tessera') : $media->getPath();
+
+        return is_file($path) ? $path : null;
     }
 
     /** Contenuto dell'archivio dei dati personali (spatie/laravel-personal-data-export). */

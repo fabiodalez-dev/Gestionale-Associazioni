@@ -10,6 +10,7 @@ use App\Http\Controllers\Soci\SocioController;
 use App\Http\Controllers\Soci\SocioStatoController;
 use App\Http\Controllers\Soci\TagController;
 use App\Http\Controllers\Soci\TipoSocioController;
+use App\Http\Controllers\Soci\FotoSocioController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -55,6 +56,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/soci/{socio}/documenti/{documento}/download', [DocumentoSocioController::class, 'download'])->name('soci.documenti.download');
     Route::delete('/soci/{socio}/documenti/{documento}', [DocumentoSocioController::class, 'destroy'])->name('soci.documenti.destroy');
 
+    Route::get('/soci/{socio}/foto', [FotoSocioController::class, 'show'])->name('soci.foto.show');
+    Route::post('/soci/{socio}/foto', [FotoSocioController::class, 'store'])->middleware('throttle:20,1')->name('soci.foto.store');
+    Route::delete('/soci/{socio}/foto', [FotoSocioController::class, 'destroy'])->name('soci.foto.destroy');
     Route::get('/soci/{socio}/dati-personali', [DatiPersonaliController::class, 'esportaPerSocio'])
         ->middleware('throttle:10,1')
         ->name('soci.dati-personali');

@@ -21,8 +21,8 @@
 </head>
 <body>
     <div class="brand-header text-center mb-5">
-        @if ($associazione->logo_url)
-            <img src="{{ asset('storage/'.$associazione->logo_url) }}" alt="Logo {{ $associazione->nome }}" class="mb-2"><br>
+        @if ($associazione->logoUrl())
+            <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}" class="mb-2"><br>
         @endif
         <h1 class="h4 mb-0">{{ $associazione->nome }}</h1>
     </div>

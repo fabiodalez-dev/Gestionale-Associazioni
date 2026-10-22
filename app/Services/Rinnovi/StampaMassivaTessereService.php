@@ -3,6 +3,7 @@
 namespace App\Services\Rinnovi;
 
 use App\Models\Associazione;
+use App\Services\Struttura\LogoAssociazione;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Services\Tessere\TesseraPdfRenderer;
@@ -69,32 +70,9 @@ class StampaMassivaTessereService
         return $pdf->stream('tessere_'.now()->format('Ymd_His').'.pdf');
     }
 
-    /**
-     * Tag <img> del logo (stessa semantica del renderer singolo:
-     * URL remoto così com'è, path locale → data URI confinato a public/).
-     */
+    /** Tag <img> del logo per dompdf (LogoAssociazione). */
     private function logoImg(Associazione $associazione): string
     {
-        $logo = $associazione->logo_url;
-
-        if (empty($logo)) {
-            return '';
-        }
-
-        if (preg_match('~^https?://~i', $logo)) {
-            return '<img src="'.e($logo).'" style="height:48px; width:auto;">';
-        }
-
-        $root = realpath(public_path());
-        $path = realpath(public_path(ltrim($logo, '/')));
-
-        if ($root === false || $path === false || ! is_file($path) || ! str_starts_with($path, $root)) {
-            return '';
-        }
-
-        $mime = mime_content_type($path) ?: 'image/png';
-        $data = base64_encode((string) file_get_contents($path));
-
-        return '<img src="data:'.e($mime).';base64,'.$data.'" style="height:48px; width:auto;">';
+        return app(LogoAssociazione::class)->imgPdf($associazione);
     }
 }

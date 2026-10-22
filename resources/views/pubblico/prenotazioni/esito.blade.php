@@ -21,8 +21,8 @@
 <div class="container py-4" style="max-width: 560px;">
     <div class="card shadow-sm overflow-hidden">
         <div class="brand-header p-4 text-center">
-            @if (filled($associazione->logo_url ?? null))
-                <img src="{{ $associazione->logo_url }}" alt="{{ $associazione->nome }}" class="mb-2 d-block mx-auto">
+            @if (filled($associazione->logoUrl()))
+                <img src="{{ $associazione->logoUrl('miniatura') }}" alt="{{ $associazione->nome }}" class="mb-2 d-block mx-auto">
             @endif
             <h1 class="h4 mb-0">{{ $associazione->nome }}</h1>
             <div class="small opacity-75">Prenotazione evento</div>

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Soci;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use App\Http\Requests\Soci\UploadDocumentoSocioRequest;
 use App\Models\DocumentoSocio;
 use App\Models\Socio;
@@ -30,21 +32,29 @@ class DocumentoSocioController extends Controller
         $this->authorize('update', $socio);
 
         $file = $request->file('file');
-        $percorso = $file->store(
-            "documenti-soci/{$socio->associazione_id}/{$socio->id}",
-            self::DISK
-        );
 
-        $documento = DocumentoSocio::create([
-            'socio_id' => $socio->id,
-            'associazione_id' => $socio->associazione_id,
-            'nome_file' => $file->getClientOriginalName(),
-            'percorso_file' => $percorso,
-            'descrizione' => $request->validated('descrizione'),
-            'tipo_documento' => $request->validated('tipo_documento'),
-            'data_scadenza' => $request->validated('data_scadenza'),
-            'caricato_da' => $request->user()->id,
-        ]);
+        // File su medialibrary (collezione "file", disco privato local);
+        // percorso_file resta valorizzato per download, export GDPR e cestino.
+        $documento = DB::transaction(function () use ($request, $socio, $file): DocumentoSocio {
+            $documento = DocumentoSocio::create([
+                'socio_id' => $socio->id,
+                'associazione_id' => $socio->associazione_id,
+                'nome_file' => $file->getClientOriginalName(),
+                'percorso_file' => '',
+                'descrizione' => $request->validated('descrizione'),
+                'tipo_documento' => $request->validated('tipo_documento'),
+                'data_scadenza' => $request->validated('data_scadenza'),
+                'caricato_da' => $request->user()->id,
+            ]);
+
+            $media = $documento->addMedia($file)
+                ->usingFileName(Str::random(40).'.'.strtolower($file->getClientOriginalExtension() ?: 'bin'))
+                ->toMediaCollection(DocumentoSocio::COLLEZIONE_FILE);
+
+            $documento->forceFill(['percorso_file' => $media->getPathRelativeToRoot()])->save();
+
+            return $documento;
+        });
 
         $this->activityLogger->log(
             $socio,

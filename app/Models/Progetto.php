@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\HaAllegati;
+use Spatie\MediaLibrary\HasMedia;
 use App\Models\Concerns\HasDefaultActivityLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -18,8 +20,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property-read int<0, max>|null $milestones_completate_count alias withCount() (vedi ProgettoController)
  */
-class Progetto extends Model
+class Progetto extends Model implements HasMedia
 {
+    use HaAllegati;
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;

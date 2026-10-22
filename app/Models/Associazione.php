@@ -12,10 +12,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use App\Services\Struttura\LogoAssociazione;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Associazione extends Model
+class Associazione extends Model implements HasMedia
 {
     use HasDefaultActivityLog;
+    use InteractsWithMedia;
     use HasFactory;
     use HasUuids;
 
@@ -130,6 +136,36 @@ class Associazione extends Model
         $this->impostazioniCaricate = [];
 
         return parent::refresh();
+    }
+
+    /**
+     * Logo (LogoAssociazione): pubblico perché serve a pagine pubbliche ed email.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(LogoAssociazione::COLLEZIONE)
+            ->useDisk('public')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->singleFile();
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('miniatura')
+            ->performOnCollections(LogoAssociazione::COLLEZIONE)
+            ->nonQueued()
+            ->fit(Fit::Contain, 400, 400);
+
+        $this->addMediaConversion('email')
+            ->performOnCollections(LogoAssociazione::COLLEZIONE)
+            ->nonQueued()
+            ->fit(Fit::Contain, 300, 100);
+    }
+
+    /** URL assoluto del logo, null se assente. */
+    public function logoUrl(string $conversione = ''): ?string
+    {
+        return app(LogoAssociazione::class)->url($this, $conversione);
     }
 
     /**

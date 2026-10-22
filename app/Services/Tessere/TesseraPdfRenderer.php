@@ -3,6 +3,7 @@
 namespace App\Services\Tessere;
 
 use App\Models\Associazione;
+use App\Services\Struttura\LogoAssociazione;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\TesseraTemplate;
@@ -44,6 +45,7 @@ class TesseraPdfRenderer
             'costoStr' => $costoStr,
             'testoTessera' => $testo,
             'logoImg' => $this->logoImg($associazione),
+            'fotoImg' => $this->fotoImg($socio),
             'dataOggi' => now()->format('d/m/Y'),
             'validoFinoAl' => $tessera->data_scadenza->format('d/m/Y'),
         ])
@@ -120,32 +122,22 @@ class TesseraPdfRenderer
         ];
     }
 
-    /**
-     * Tag <img> del logo per il PDF: URL remoto così com'è, path locale
-     * convertito in data URI (con protezione path traversal confinata a public/).
-     */
+    /** Foto del socio in data URI per dompdf, stringa vuota se assente. */
+    private function fotoImg(Socio $socio): string
+    {
+        $percorso = $socio->fotoPercorso();
+        if ($percorso === null) {
+            return '';
+        }
+
+        $mime = mime_content_type($percorso) ?: 'image/jpeg';
+
+        return '<img src="data:'.e($mime).';base64,'.base64_encode((string) file_get_contents($percorso)).'" style="width:90px; height:90px; border:1px solid #ccc;" alt="">';
+    }
+
+    /** Tag <img> del logo per dompdf (LogoAssociazione). */
     private function logoImg(Associazione $associazione): string
     {
-        $logo = $associazione->logo_url;
-
-        if (empty($logo)) {
-            return '';
-        }
-
-        if (preg_match('~^https?://~i', $logo)) {
-            return '<img src="'.e($logo).'" style="height:48px; width:auto;">';
-        }
-
-        $root = realpath(public_path());
-        $path = realpath(public_path(ltrim($logo, '/')));
-
-        if ($root === false || $path === false || ! is_file($path) || ! str_starts_with($path, $root)) {
-            return '';
-        }
-
-        $mime = mime_content_type($path) ?: 'image/png';
-        $data = base64_encode((string) file_get_contents($path));
-
-        return '<img src="data:'.e($mime).';base64,'.$data.'" style="height:48px; width:auto;">';
+        return app(LogoAssociazione::class)->imgPdf($associazione);
     }
 }

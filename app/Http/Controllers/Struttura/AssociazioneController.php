@@ -9,7 +9,7 @@ use App\Models\Associazione;
 use App\Models\Sede;
 use App\Models\Utente;
 use App\Services\Struttura\CloneAssociazioneConfigService;
-use App\Services\Struttura\LogoStorageService;
+use App\Services\Struttura\LogoAssociazione;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +25,7 @@ use Spatie\Permission\Models\Role;
 class AssociazioneController extends Controller
 {
     public function __construct(
-        private readonly LogoStorageService $logoStorage,
+        private readonly LogoAssociazione $logo,
         private readonly CloneAssociazioneConfigService $cloneService,
     ) {}
 
@@ -35,6 +35,7 @@ class AssociazioneController extends Controller
 
         // withCount senza scope tenant: i conteggi sono cross-tenant per definizione
         $associazioni = Associazione::query()
+            ->with('media')
             ->withCount([
                 'soci' => fn ($q) => $q->withoutGlobalScope('associazione'),
                 'sedi' => fn ($q) => $q->withoutGlobalScope('associazione'),
@@ -256,10 +257,7 @@ class AssociazioneController extends Controller
         }
 
         try {
-            $vecchioLogo = $associazione->logo_url;
-            $path = $this->logoStorage->store($request->file('logo_file'));
-            $associazione->update(['logo_url' => $path]);
-            $this->logoStorage->delete($vecchioLogo);
+            $this->logo->salva($associazione, $request->file('logo_file'));
         } catch (\Throwable $e) {
             Log::warning('Upload logo fallito: '.$e->getMessage());
             $warnings[] = '(Logo non salvato)';

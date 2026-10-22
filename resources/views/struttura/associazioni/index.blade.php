@@ -28,8 +28,8 @@
                 @forelse ($associazioni as $assoc)
                     <tr>
                         <td>
-                            @if ($assoc->logo_url)
-                                <img src="{{ asset('storage/'.$assoc->logo_url) }}" alt="Logo {{ $assoc->nome }}" style="height: 28px; width: auto;" class="me-2 rounded">
+                            @if ($assoc->logoUrl())
+                                <img src="{{ $assoc->logoUrl('miniatura') }}" alt="Logo {{ $assoc->nome }}" style="height: 28px; width: auto;" class="me-2 rounded">
                             @endif
                             <strong>{{ $assoc->nome }}</strong>
                         </td>

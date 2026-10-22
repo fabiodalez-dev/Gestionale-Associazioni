@@ -80,6 +80,32 @@
     <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white mb-4">
         {{-- Tab Anagrafica --}}
         <div class="tab-pane fade {{ $tab === 'anagrafica' ? 'show active' : '' }}" id="tab-anagrafica" role="tabpanel">
+            @php($haFoto = $socio->getFirstMedia(\App\Models\Socio::COLLEZIONE_FOTO) !== null)
+            <div class="d-flex flex-wrap align-items-center gap-3 mb-3 pb-3 border-bottom">
+                @if ($haFoto)
+                    <img src="{{ route('soci.foto.show', $socio) }}" alt="Foto di {{ $socio->nome }} {{ $socio->cognome }}" class="rounded border" width="96" height="96" style="object-fit: cover;">
+                @else
+                    <div class="rounded border bg-body-tertiary d-flex align-items-center justify-content-center text-muted" style="width: 96px; height: 96px;" aria-hidden="true"><i class="bi bi-person fs-1"></i></div>
+                @endif
+                @can('update', $socio)
+                    <form method="POST" action="{{ route('soci.foto.store', $socio) }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-start">
+                        @csrf
+                        <div>
+                            <label for="foto" class="form-label small mb-1">{{ $haFoto ? 'Sostituisci foto' : 'Foto per la tessera' }}</label>
+                            <input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/webp" class="form-control form-control-sm @error('foto') is-invalid @enderror" required>
+                            @error('foto')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-primary mt-4"><i class="bi bi-upload me-1"></i>Carica</button>
+                    </form>
+                    @if ($haFoto)
+                        <form method="POST" action="{{ route('soci.foto.destroy', $socio) }}" class="mt-4" onsubmit="return confirm('Rimuovere la foto?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Rimuovi</button>
+                        </form>
+                    @endif
+                @endcan
+            </div>
             <dl class="row mb-0">
                 <dt class="col-sm-3">Email</dt><dd class="col-sm-9">{{ $socio->email ?: 'N/D' }}</dd>
                 <dt class="col-sm-3">Telefono</dt><dd class="col-sm-9">{{ $socio->telefono ?: 'N/D' }}</dd>

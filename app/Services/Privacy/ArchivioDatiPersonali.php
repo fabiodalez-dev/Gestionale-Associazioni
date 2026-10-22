@@ -33,6 +33,11 @@ class ArchivioDatiPersonali
 
         if ($titolare instanceof Socio) {
             $disco = Storage::disk('local');
+            $foto = $titolare->getFirstMedia(Socio::COLLEZIONE_FOTO);
+            if ($foto !== null && is_file($foto->getPath())) {
+                $selezione->add('foto/'.$foto->file_name, (string) file_get_contents($foto->getPath()));
+            }
+
             foreach ($titolare->documenti()->get() as $documento) {
                 if (filled($documento->percorso_file) && $disco->exists($documento->percorso_file)) {
                     $selezione->add($this->dati->percorsoDocumento($documento), (string) $disco->get($documento->percorso_file));

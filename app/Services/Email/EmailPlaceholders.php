@@ -79,7 +79,7 @@ class EmailPlaceholders
             'DATA_CORRENTE' => $e(now()->format('d/m/Y')),
             'NOME_ASSOCIAZIONE' => $e($associazione->nome),
             'EMAIL_ASSOCIAZIONE' => $e($associazione->email),
-            'LOGO_ASSOCIAZIONE' => $e($associazione->logo_url),
+            'LOGO_ASSOCIAZIONE' => $e($associazione->logoUrl('email') ?? ''),
         ];
 
         if ($socio !== null) {

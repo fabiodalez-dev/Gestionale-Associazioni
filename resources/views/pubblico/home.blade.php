@@ -27,9 +27,9 @@
                     </a>
                 @endguest
             </div>
-            @if (filled($associazione->logo_url))
+            @if (filled($associazione->logoUrl()))
                 <div class="col-md-4 text-center d-none d-md-block">
-                    <img src="{{ $associazione->logo_url }}" alt="Logo {{ $associazione->nome }}"
+                    <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}"
                          class="img-fluid" style="max-height: 160px;">
                 </div>
             @endif

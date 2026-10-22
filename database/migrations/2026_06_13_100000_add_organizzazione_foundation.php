@@ -226,7 +226,7 @@ return new class extends Migration
             $table->uuid('associazione_id')->index();
             $table->uuid('turno_id');
             $table->uuid('socio_id');
-            // Valori ammessi: vedi TurnoAssegnazione::STATI ('proposto'|'confermato'|'rinunciato')
+            // Valori ammessi: vedi TurnoAssegnazione::STATO_* ('proposto'|'confermato'|'rinunciato')
             $table->string('stato', 20)->default('proposto');
             // Ore effettive registrate al completamento del turno (registro f.5)
             $table->decimal('ore_effettive', 5, 2)->nullable();

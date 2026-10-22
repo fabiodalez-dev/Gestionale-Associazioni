@@ -59,7 +59,7 @@ class InstallerController extends Controller
         // Un database con un'installazione completa non si tocca MAI dal
         // wizard (raggiungibile senza login): per reinstallare si passa
         // dalla CLI, che fa prima il backup
-        if ($esito['installata'] ?? false) {
+        if ($esito['installata']) {
             return back()
                 ->withInput()
                 ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già un'installazione di Gestione Associazioni con un super amministratore. Per reinstallare da zero esegui prima \"php artisan app:disinstalla\" (fa il backup e svuota il database), oppure indica un altro database."]);
@@ -69,7 +69,7 @@ class InstallerController extends Controller
         // lo schema sovrascrive le tabelle con lo stesso nome, quindi si
         // procede solo con conferma esplicita, elencando cosa verrà perso
         if ($esito['tables'] > 0 && ! $request->boolean('consenti_non_vuoto')) {
-            $daSovrascrivere = $this->installer->tabelleDaSovrascrivere($esito['tabelle'] ?? []);
+            $daSovrascrivere = $this->installer->tabelleDaSovrascrivere($esito['tabelle']);
             $dettaglio = $daSovrascrivere === []
                 ? 'Nessuna di queste è una tabella dell\'applicazione: resteranno intatte.'
                 : sprintf('Le tabelle dell\'applicazione già presenti verranno cancellate e ricreate vuote (%d): %s. Le altre restano intatte.', count($daSovrascrivere), implode(', ', $daSovrascrivere));

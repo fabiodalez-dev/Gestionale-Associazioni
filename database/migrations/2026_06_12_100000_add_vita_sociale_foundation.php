@@ -43,7 +43,7 @@ return new class extends Migration
             $table->uuid('associazione_id')->index();
             $table->uuid('socio_id');
             $table->uuid('tessera_id')->nullable();
-            // Valori ammessi: vedi PromemoriaInviato::TIPI (es. 'rinnovo_tessera', 'documento_scadenza')
+            // Valori ammessi: vedi PromemoriaInviato::TIPO_* (es. 'rinnovo_tessera', 'documento_scadenza')
             $table->string('tipo', 50);
             // Step in giorni prima della scadenza (es. 30, 15, 3)
             $table->unsignedSmallInteger('step');

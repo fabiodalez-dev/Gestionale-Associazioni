@@ -29,13 +29,6 @@ class Quota extends Model implements Pagabile
 
     public const STATO_IN_SCADENZA = 'In Scadenza';
 
-    public const STATI = [
-        self::STATO_PAGATA,
-        self::STATO_DA_PAGARE,
-        self::STATO_SCADUTA,
-        self::STATO_IN_SCADENZA,
-    ];
-
     protected $table = 'quote';
 
     protected $fillable = [

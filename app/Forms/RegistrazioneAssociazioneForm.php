@@ -12,8 +12,18 @@ use Metalogico\Formello\FormelloField;
  */
 class RegistrazioneAssociazioneForm extends ModuloFormello
 {
+    /**
+     * Letta dalla vista piattaforma/registrazione/create.
+     *
+     * @api
+     */
     public const GRUPPO_ASSOCIAZIONE = ['nome', 'tipo', 'email', 'codice_fiscale', 'partita_iva', 'telefono', 'citta', 'provincia', 'numero_soci_stimato', 'messaggio'];
 
+    /**
+     * Letta dalla vista piattaforma/registrazione/create.
+     *
+     * @api
+     */
     public const GRUPPO_ADMIN = ['admin_nome', 'admin_cognome', 'admin_email', 'admin_password'];
 
     protected function fields(): array

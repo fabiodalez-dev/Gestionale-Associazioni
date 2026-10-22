@@ -14,10 +14,25 @@ use Metalogico\Formello\FormelloField;
  */
 class AssociazioneForm extends ModuloFormello
 {
+    /**
+     * Letta dalla vista struttura/associazioni/index.
+     *
+     * @api
+     */
     public const GRUPPO_ANAGRAFICA = ['nome', 'email', 'slug', 'partita_iva', 'codice_fiscale', 'telefono', 'indirizzo', 'citta', 'provincia', 'cap'];
 
+    /**
+     * Letta dalla vista struttura/associazioni/index.
+     *
+     * @api
+     */
     public const GRUPPO_CONFIGURAZIONE = ['tipo_scadenza_default', 'giorni_notifica_scadenza', 'costo_tessera', 'attiva'];
 
+    /**
+     * Letta dalla vista struttura/associazioni/index.
+     *
+     * @api
+     */
     public const GRUPPO_ADMIN = ['admin_nome', 'admin_cognome', 'admin_email', 'admin_password'];
 
     protected function fields(): array

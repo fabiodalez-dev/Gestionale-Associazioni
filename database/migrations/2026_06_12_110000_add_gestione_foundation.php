@@ -237,7 +237,7 @@ return new class extends Migration
             $table->uuid('socio_id');
             // Campi anagrafici proposti: {campo: nuovo_valore, ...} (f.19)
             $table->json('proposte');
-            // Valori ammessi: vedi RichiestaModificaDati::STATI ('in_attesa'|'approvata'|'rifiutata')
+            // Valori ammessi: vedi RichiestaModificaDati::STATO_* ('in_attesa'|'approvata'|'rifiutata')
             $table->string('stato', 20)->default('in_attesa');
             // Chi ha proposto la modifica: Socio (area soci) o Account collegato
             $table->nullableUuidMorphs('origine');

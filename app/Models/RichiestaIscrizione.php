@@ -32,12 +32,6 @@ class RichiestaIscrizione extends Model
 
     public const STATO_RIFIUTATA = 'rifiutata';
 
-    public const STATI = [
-        self::STATO_IN_ATTESA,
-        self::STATO_APPROVATA,
-        self::STATO_RIFIUTATA,
-    ];
-
     protected $table = 'richieste_iscrizione';
 
     protected $fillable = [

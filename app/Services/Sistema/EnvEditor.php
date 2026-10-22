@@ -56,11 +56,6 @@ class EnvEditor
         return (string) ($this->read()[$key] ?? $default);
     }
 
-    public function has(string $key): bool
-    {
-        return ($this->read()[$key] ?? '') !== '';
-    }
-
     /**
      * Applica le modifiche: stringa = imposta, null = rimuove la variabile.
      *

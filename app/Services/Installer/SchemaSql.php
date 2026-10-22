@@ -81,7 +81,8 @@ final class SchemaSql
 
         $tabelle = [];
         foreach ($trovate as $t) {
-            $tabelle[] = strtolower($t[1] !== '' ? $t[1] : $t[2]);
+            // Il gruppo 2 (nome senza backtick) è presente solo quando il gruppo 1 non ha fatto match
+            $tabelle[] = strtolower($t[2] ?? $t[1]);
         }
         if (count(array_unique($tabelle)) !== count($tabelle)) {
             throw new RuntimeException('schema.sql contiene dichiarazioni CREATE TABLE duplicate.');
@@ -136,6 +137,6 @@ final class SchemaSql
         $nomi = array_map(fn (string $f) => basename($f, '.php'), $file);
         sort($nomi);
 
-        return array_values($nomi);
+        return $nomi;
     }
 }

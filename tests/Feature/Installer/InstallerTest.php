@@ -274,7 +274,7 @@ class InstallerTest extends TestCase
     {
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('testDatabase')->twice()
-                ->andReturn(['ok' => true, 'error' => null, 'tables' => 12]);
+                ->andReturn(['ok' => true, 'error' => null, 'tables' => 12, 'tabelle' => ['wp_posts', 'wp_users'], 'installata' => false, 'server' => '8.0.36']);
             $mock->shouldReceive('writeEnv')->once();
             $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
         });

@@ -77,33 +77,6 @@ class EmailService
     // ── Invio ────────────────────────────────────────────────────────
 
     /**
-     * Invio singolo immediato (con rate limit).
-     *
-     * @param  array<string, string>  $headers
-     * @return array{success: bool, error: string|null}
-     */
-    public function sendSingle(
-        Associazione $associazione,
-        string $toEmail,
-        string $toName,
-        string $subject,
-        string $bodyHtml,
-        array $headers = []
-    ): array {
-        $settings = $this->settings($associazione);
-
-        if ($settings === null || ! $this->isConfigured($associazione)) {
-            return ['success' => false, 'error' => 'SMTP non configurato.'];
-        }
-
-        if (! $this->checkRateLimit($associazione)) {
-            return ['success' => false, 'error' => 'Limite invii orario raggiunto.'];
-        }
-
-        return $this->mailer->send($settings, $toEmail, $toName, $subject, $bodyHtml, $headers);
-    }
-
-    /**
      * Email di test SMTP: bypassa il rate limit, non viene loggata;
      * su successo aggiorna is_verified e last_test_at.
      *
@@ -165,32 +138,6 @@ class EmailService
             'priority' => $priority,
             'status' => EmailQueue::STATUS_PENDING,
         ]);
-    }
-
-    /**
-     * Accoda in massa lo stesso subject/body per più destinatari.
-     *
-     * @param  list<array{email: string, name?: string, socio_id?: string|null}>  $recipients
-     * @return string batch_id generato
-     */
-    public function queueBulk(string $associazioneId, array $recipients, string $subject, string $bodyHtml, ?string $templateCodice = null): string
-    {
-        $batchId = (string) Str::uuid();
-
-        foreach ($recipients as $recipient) {
-            $this->queueEmail(
-                $associazioneId,
-                $recipient['email'],
-                $recipient['name'] ?? '',
-                $subject,
-                $bodyHtml,
-                $recipient['socio_id'] ?? null,
-                $batchId,
-                $templateCodice
-            );
-        }
-
-        return $batchId;
     }
 
     // ── Elaborazione coda ────────────────────────────────────────────
@@ -305,17 +252,6 @@ class EmailService
             ->where('status', EmailQueue::STATUS_SENDING)
             ->where('last_attempt_at', '<', now()->subMinutes(self::STUCK_SENDING_MINUTES))
             ->update(['status' => EmailQueue::STATUS_PENDING]);
-    }
-
-    /**
-     * Annulla tutte le email 'pending' di un batch; ritorna il numero di righe.
-     */
-    public function cancelBatch(string $associazioneId, string $batchId): int
-    {
-        return EmailQueue::forAssociazione($associazioneId)
-            ->where('batch_id', $batchId)
-            ->where('status', EmailQueue::STATUS_PENDING)
-            ->update(['status' => EmailQueue::STATUS_CANCELLED]);
     }
 
     // ── Template ─────────────────────────────────────────────────────

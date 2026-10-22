@@ -43,13 +43,6 @@ class PromemoriaInviato extends Model
     /** Promemoria mensile di un adempimento ricorrente (f.20). */
     public const TIPO_ADEMPIMENTO = 'adempimento';
 
-    public const TIPI = [
-        self::TIPO_RINNOVO_TESSERA,
-        self::TIPO_DOCUMENTO_SCADENZA,
-        self::TIPO_TURNO,
-        self::TIPO_ADEMPIMENTO,
-    ];
-
     protected $table = 'promemoria_inviati';
 
     protected $fillable = [

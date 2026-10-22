@@ -1,5 +1,7 @@
 includes:
     - vendor/larastan/larastan/extension.neon
+    # Codice morto (classi, metodi, costanti mai usati): shipmonk/dead-code-detector
+    - vendor/shipmonk/dead-code-detector/rules.neon
     # Solo falsi positivi Larastan: il tipo accessorio non-empty-array<string, mixed>
     # viene rifiutato da array<model property, mixed> anche quando le chiavi sono valide.
     - phpstan-baseline.neon
@@ -9,6 +11,12 @@ parameters:
 
     paths:
         - app
+        # Per il rilevatore di codice morto: le rotte, le migration e i
+        # seeder usano classi e metodi di app/ che altrimenti sembrerebbero inutilizzati
+        - routes
+        - database
+        - config
+        - bootstrap/app.php
 
     # Le tabelle di dominio usano UUID CHAR(36): nessun problema con gli id stringa.
     checkModelProperties: true
@@ -18,3 +26,81 @@ parameters:
     parseModelCastsMethod: true
 
     reportUnmatchedIgnoredErrors: false
+
+    # Falsi positivi strutturali del rilevatore di codice morto: punti
+    # d'ingresso che Laravel invoca per nome, per convenzione o per
+    # riflessione, invisibili all'analisi statica. Ogni regola copre una sola
+    # categoria ed è limitata a identificatore + percorso (+ nome del membro
+    # dove serve). Il codice realmente morto non rientra in nessuna di queste.
+    ignoreErrors:
+        # Servizi risolti dal container (app(), iniezione nei controller e nei
+        # job): il costruttore non compare mai come `new` nel codice analizzato.
+        -
+            identifier: shipmonk.deadMethod
+            message: '#::__construct$#'
+            path: app/Services/*
+
+        # Notifiche istanziate dal pacchetto spatie/laravel-personal-data-export
+        # a partire dal nome classe in config/personal-data-export.php.
+        -
+            identifier: shipmonk.deadMethod
+            message: '#::__construct$#'
+            path: app/Notifications/*
+
+        # Stati delle factory: usati dai test (tests/ non è tra i path analizzati).
+        -
+            identifier: shipmonk.deadMethod
+            path: database/factories/*
+
+        # Policy: i metodi sono risolti per nome da Gate::authorize('export', ...),
+        # $this->authorize(), @can nelle viste e dal middleware can:.
+        -
+            identifier: shipmonk.deadMethod
+            path: app/Policies/*
+
+        # Listener/subscriber: RegistraAccesso::subscribe() restituisce la mappa
+        # evento => nome del metodo, registrata con Event::subscribe() in
+        # AppServiceProvider; il dispatcher li chiama per stringa.
+        -
+            identifier: shipmonk.deadMethod
+            path: app/Listeners/*
+
+        # Actions Fortify: registrate per nome classe in FortifyServiceProvider
+        # (Fortify::resetUserPasswordsUsing(ResetUserPassword::class)); Fortify
+        # chiama reset()/create()/update() tramite il container.
+        -
+            identifier: shipmonk.deadMethod
+            path: app/Actions/Fortify/*
+
+        # Trait Eloquent: Model::bootTraits() chiama per convenzione il metodo
+        # statico boot<NomeTrait>() di ogni trait usato dal model.
+        -
+            identifier: shipmonk.deadMethod
+            message: '#::boot[A-Z]\w*$#'
+            path: app/Models/Concerns/*
+
+        # Costanti opzionali dei model lette dai trait NelPerimetroSede e
+        # NelPerimetroSedeTramite con defined(static::class.'::X') / constant().
+        -
+            identifier: shipmonk.deadConstant
+            message: '#::(SEDE_FACOLTATIVA|PERIMETRO_TRAMITE|PERIMETRO_FACOLTATIVO)$#'
+            path: app/Models/*
+
+        # Mailable: le proprietà pubbliche sono passate automaticamente alla
+        # vista Blade dichiarata in content() e lette lì ($socio, $url, ...).
+        -
+            identifier: shipmonk.deadProperty.neverRead
+            path: app/Mail/*
+
+        # Job in coda: $tries, $backoff, $uniqueFor (e simili) sono letti dal
+        # worker e dal middleware ShouldBeUnique tramite riflessione.
+        -
+            identifier: shipmonk.deadProperty.neverRead
+            message: '#::\$(tries|backoff|uniqueFor|timeout|maxExceptions)\b#'
+            path: app/Jobs/*
+
+        # DTO spatie/laravel-data delle risposte API v1: le proprietà pubbliche
+        # sono serializzate in JSON per riflessione, nessuna lettura esplicita.
+        -
+            identifier: shipmonk.deadProperty.neverRead
+            path: app/Data/*

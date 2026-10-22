@@ -12,9 +12,6 @@ use App\Models\Associazione;
  */
 class RequiredFieldsService
 {
-    /** Campi sempre obbligatori, non configurabili. */
-    public const ALWAYS_REQUIRED = ['nome', 'cognome', 'email'];
-
     /** Campi built-in configurabili per il backend soci. */
     public const BACKEND_FIELDS = [
         'telefono', 'codice_fiscale', 'data_nascita', 'indirizzo', 'citta',
@@ -68,22 +65,6 @@ class RequiredFieldsService
         $preiscrizione['privacy_consenso'] = true;
 
         return ['backend' => $backend, 'preiscrizione' => $preiscrizione];
-    }
-
-    /**
-     * @param  array{backend: array<string, bool>, preiscrizione: array<string, bool>}  $config
-     */
-    public function isRequired(array $config, string $contesto, string $campo): bool
-    {
-        if (in_array($campo, self::ALWAYS_REQUIRED, true)) {
-            return true;
-        }
-
-        if ($contesto === 'preiscrizione' && $campo === 'privacy_consenso') {
-            return true;
-        }
-
-        return (bool) ($config[$contesto][$campo] ?? false);
     }
 
     /**

@@ -48,10 +48,12 @@ class RichiestaIscrizioneFactory extends Factory
     public function conSocio(?Socio $socio = null): static
     {
         return $this->state(fn (array $attributes) => [
-            'socio_id' => $socio?->id ?? Socio::factory()->create([
-                'associazione_id' => $attributes['associazione_id'],
-                'stato' => Socio::STATO_IN_ATTESA,
-            ])->id,
+            'socio_id' => $socio !== null
+                ? $socio->id
+                : Socio::factory()->create([
+                    'associazione_id' => $attributes['associazione_id'],
+                    'stato' => Socio::STATO_IN_ATTESA,
+                ])->id,
         ]);
     }
 

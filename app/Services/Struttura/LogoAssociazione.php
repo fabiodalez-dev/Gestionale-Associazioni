@@ -3,6 +3,7 @@
 namespace App\Services\Struttura;
 
 use App\Models\Associazione;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -25,7 +26,7 @@ class LogoAssociazione
         $vecchio = $associazione->getFirstMedia(self::COLLEZIONE) === null ? $associazione->logo_url : null;
 
         $media = $associazione->addMedia($file)
-            ->usingFileName('logo-'.bin2hex(random_bytes(8)).'.'.strtolower($file->getClientOriginalExtension() ?: 'png'))
+            ->usingFileName(NomeFileSicuro::per($file, 'logo-', NomeFileSicuro::IMMAGINI, 'png'))
             ->toMediaCollection(self::COLLEZIONE);
 
         // Colonna allineata finché esiste (onboarding, export, codice esterno)

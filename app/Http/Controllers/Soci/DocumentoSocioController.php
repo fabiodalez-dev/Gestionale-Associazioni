@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Soci;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 use App\Http\Requests\Soci\UploadDocumentoSocioRequest;
 use App\Models\DocumentoSocio;
 use App\Models\Socio;
 use App\Services\Soci\SocioActivityLogger;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -24,6 +24,9 @@ class DocumentoSocioController extends Controller
     use AuthorizesRequests;
 
     private const DISK = 'local';
+
+    /** Estensioni con cui salvare i documenti (dal contenuto); le altre diventano .bin. */
+    private const ESTENSIONI_DOCUMENTI = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx', 'xls', 'xlsx', 'odt', 'ods', 'txt', 'csv'];
 
     public function __construct(private readonly SocioActivityLogger $activityLogger) {}
 
@@ -48,7 +51,7 @@ class DocumentoSocioController extends Controller
             ]);
 
             $media = $documento->addMedia($file)
-                ->usingFileName(Str::random(40).'.'.strtolower($file->getClientOriginalExtension() ?: 'bin'))
+                ->usingFileName(NomeFileSicuro::per($file, '', self::ESTENSIONI_DOCUMENTI))
                 ->toMediaCollection(DocumentoSocio::COLLEZIONE_FILE);
 
             $documento->forceFill(['percorso_file' => $media->getPathRelativeToRoot()])->save();

@@ -8,6 +8,7 @@ use App\Models\Progetto;
 use App\Models\Riunione;
 use App\Models\Socio;
 use App\Models\Utente;
+use App\Services\Privacy\ArchivioDatiPersonali;
 use App\Services\Struttura\LogoAssociazione;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -54,6 +55,20 @@ class MediaEstesaTest extends TestCase
         // Un nuovo logo sostituisce il precedente
         $logo->salva($this->associazione->fresh(), UploadedFile::fake()->image('nuovo.png', 300, 300));
         $this->assertCount(1, $this->associazione->fresh()->getMedia('logo'));
+    }
+
+    public function test_l_estensione_salvata_viene_dal_contenuto_non_dal_nome(): void
+    {
+        // Immagine valida con nome .html: sul disco pubblico non deve mai diventare HTML
+        app(LogoAssociazione::class)->salva($this->associazione, UploadedFile::fake()->image('attacco.html', 200, 200));
+        $this->assertStringEndsWith('.png', $this->associazione->fresh()->getFirstMedia('logo')->file_name);
+
+        $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id]);
+        $this->actingAs($this->admin)->post(route('soci.documenti.store', $socio), [
+            'file' => UploadedFile::fake()->image('documento.png', 100, 100),
+            'tipo_documento' => 'altro',
+        ]);
+        $this->assertStringEndsWith('.png', DocumentoSocio::query()->firstOrFail()->getFirstMedia('file')->file_name);
     }
 
     public function test_logo_precedente_senza_media_resta_leggibile_e_confinato(): void
@@ -156,7 +171,7 @@ class MediaEstesaTest extends TestCase
         auth()->forgetGuards();
         $this->get(route('soci.foto.show', $socio))->assertRedirect();
 
-        $archivio = app(\App\Services\Privacy\ArchivioDatiPersonali::class);
+        $archivio = app(ArchivioDatiPersonali::class);
         [$zip, $cartella] = $archivio->creaOra($socio->fresh());
         $z = new \ZipArchive;
         $z->open($zip);

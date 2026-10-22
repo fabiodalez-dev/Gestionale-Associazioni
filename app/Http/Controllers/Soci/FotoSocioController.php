@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Soci;
 
 use App\Http\Controllers\Controller;
 use App\Models\Socio;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -29,7 +30,7 @@ class FotoSocioController extends Controller
         ]);
 
         $socio->addMedia($request->file('foto'))
-            ->usingFileName('foto-'.bin2hex(random_bytes(8)).'.'.strtolower($request->file('foto')->getClientOriginalExtension() ?: 'jpg'))
+            ->usingFileName(NomeFileSicuro::per($request->file('foto'), 'foto-', NomeFileSicuro::IMMAGINI, 'jpg'))
             ->toMediaCollection(Socio::COLLEZIONE_FOTO);
 
         return redirect()->route('soci.show', $socio)->with('success', 'Foto aggiornata.');

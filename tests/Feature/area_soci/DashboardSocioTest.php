@@ -42,7 +42,8 @@ class DashboardSocioTest extends TestCase
         $response = $this->actingAs($socio, 'socio')->get(route('area-soci.dashboard'));
 
         $response->assertOk();
-        $response->assertSee('Ciao, Mario!');
+        $response->assertSee(', Mario');
+        $response->assertSee('La tua prossima quota');
         $response->assertSee('50,00');
         $response->assertSee(now()->addDays(20)->format('d/m/Y'));
         $response->assertSee('TES-0042');
@@ -64,7 +65,8 @@ class DashboardSocioTest extends TestCase
         $response = $this->actingAs($socio, 'socio')->get(route('area-soci.dashboard'));
 
         $response->assertOk();
-        $response->assertSee('Sei in regola con i pagamenti!');
+        $response->assertSee('Sei in regola');
+        $response->assertSee('Non hai quote in scadenza');
         $response->assertSee('Nessuna tessera attiva');
     }
 

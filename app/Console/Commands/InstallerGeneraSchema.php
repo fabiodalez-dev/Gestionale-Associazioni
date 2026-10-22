@@ -53,6 +53,15 @@ class InstallerGeneraSchema extends Command
 
         $output = (string) ($this->option('output') ?: config('installer.schema_file'));
 
+        // Config da ripristinare alla fine: il comando può girare dentro un
+        // processo che poi continua (test, altri comandi)
+        $configOriginale = [
+            "database.connections.{$sorgente}.database" => config("database.connections.{$sorgente}.database"),
+            "database.connections.{$sorgente}.url" => config("database.connections.{$sorgente}.url"),
+            'database.default' => config('database.default'),
+            'cache.default' => config('cache.default'),
+        ];
+
         try {
             $pdo = $this->connessioneServer($cfg);
             $pdo->exec("DROP DATABASE IF EXISTS `{$nomeTmp}`");
@@ -84,9 +93,8 @@ class InstallerGeneraSchema extends Command
 
             $sql = $this->dump(DB::connection($sorgente)->getPdo(), $nomeTmp);
 
-            File::ensureDirectoryExists(dirname($output));
-            File::put($output, $sql);
-
+            // Validazione PRIMA di scrivere: un dump incoerente non deve
+            // sostituire quello buono su disco
             $tabelle = SchemaSql::tabelle($sql);
             $migrazioni = SchemaSql::migrazioni($sql);
             $attese = SchemaSql::migrazioniDelProgetto(database_path('migrations'));
@@ -95,6 +103,9 @@ class InstallerGeneraSchema extends Command
 
                 return self::FAILURE;
             }
+
+            File::ensureDirectoryExists(dirname($output));
+            File::put($output, $sql);
 
             $this->info(sprintf(
                 'Scritto %s: %d tabelle, %d migration registrate (%s).',
@@ -110,10 +121,17 @@ class InstallerGeneraSchema extends Command
 
             return self::FAILURE;
         } finally {
+            DB::purge($sorgente);
+            config($configOriginale);
+            DB::setDefaultConnection((string) $configOriginale['database.default']);
+
             if (! $this->option('mantieni') && isset($pdo)) {
-                DB::purge($sorgente);
-                $pdo->exec("DROP DATABASE IF EXISTS `{$nomeTmp}`");
-                $this->line("Database temporaneo {$nomeTmp} cancellato.");
+                try {
+                    $pdo->exec("DROP DATABASE IF EXISTS `{$nomeTmp}`");
+                    $this->line("Database temporaneo {$nomeTmp} cancellato.");
+                } catch (Throwable $e) {
+                    $this->warn("Database temporaneo {$nomeTmp} NON cancellato: ".$e->getMessage());
+                }
             }
         }
     }

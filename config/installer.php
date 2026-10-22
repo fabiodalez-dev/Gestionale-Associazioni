@@ -14,6 +14,16 @@ return [
 
     'lock_file' => env('INSTALLER_LOCK_FILE', storage_path('app/installed.lock')),
 
+    // Marcatore "wizard in corso": creato quando lo schema è stato installato,
+    // cancellato dal lock. Senza marcatore, un database già installato chiude
+    // il wizard anche se il lock manca (es. lock perso in un deploy).
+    'in_progress_file' => env('INSTALLER_IN_PROGRESS_FILE', storage_path('app/installer-in-corso')),
+    'in_progress_ttl_hours' => 24,
+
+    // Versioni minime del server (json nativo e utf8mb4_unicode_ci)
+    'min_mysql' => '5.7.8',
+    'min_mariadb' => '10.2.7',
+
     // Cartelle dei file caricati svuotate da "php artisan app:disinstalla"
     'cartelle_file' => [storage_path('app/public'), storage_path('app/media-private')],
 

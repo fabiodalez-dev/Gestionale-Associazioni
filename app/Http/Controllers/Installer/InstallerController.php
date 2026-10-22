@@ -56,13 +56,39 @@ class InstallerController extends Controller
                 ->withErrors(['database' => 'Connessione fallita: '.$esito['error']]);
         }
 
-        // Protezione database non vuoto (come l'installer di riferimento):
-        // lo schema sovrascrive le tabelle con lo stesso nome, quindi si
-        // procede solo con conferma esplicita
-        if ($esito['tables'] > 0 && ! $request->boolean('consenti_non_vuoto')) {
+        // Un database con un'installazione completa non si tocca MAI dal
+        // wizard (raggiungibile senza login): per reinstallare si passa
+        // dalla CLI, che fa prima il backup
+        if ($esito['installata'] ?? false) {
             return back()
                 ->withInput()
-                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già {$esito['tables']} tabelle. Per installare comunque spunta \"Sovrascrivi le tabelle già presenti\": le tabelle dell'applicazione con lo stesso nome verranno cancellate e ricreate vuote, le altre restano."]);
+                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già un'installazione di Gestione Associazioni con un super amministratore. Per reinstallare da zero esegui prima \"php artisan app:disinstalla\" (fa il backup e svuota il database), oppure indica un altro database."]);
+        }
+
+        // Protezione database non vuoto (come l'installer di riferimento):
+        // lo schema sovrascrive le tabelle con lo stesso nome, quindi si
+        // procede solo con conferma esplicita, elencando cosa verrà perso
+        if ($esito['tables'] > 0 && ! $request->boolean('consenti_non_vuoto')) {
+            $daSovrascrivere = $this->installer->tabelleDaSovrascrivere($esito['tabelle'] ?? []);
+            $dettaglio = $daSovrascrivere === []
+                ? 'Nessuna di queste è una tabella dell\'applicazione: resteranno intatte.'
+                : sprintf('Le tabelle dell\'applicazione già presenti verranno cancellate e ricreate vuote (%d): %s. Le altre restano intatte.', count($daSovrascrivere), implode(', ', $daSovrascrivere));
+
+            return back()
+                ->withInput()
+                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già {$esito['tables']} tabelle. {$dettaglio} Per procedere spunta \"Sovrascrivi le tabelle già presenti\"."]);
+        }
+
+        // Prima lo schema, poi il .env: se l'import fallisce la configurazione
+        // precedente resta com'era e l'utente può correggere e riprovare
+        try {
+            $risultato = $this->installer->installaSchema($cfg);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()
+                ->withInput()
+                ->withErrors(['database' => 'Installazione dello schema fallita: '.$e->getMessage()]);
         }
 
         $this->installer->writeEnv([
@@ -75,18 +101,10 @@ class InstallerController extends Controller
             'APP_URL' => $request->getSchemeAndHttpHost(),
         ]);
 
-        try {
-            $esito = $this->installer->installaSchema($cfg);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return back()
-                ->withInput()
-                ->withErrors(['database' => 'Installazione dello schema fallita: '.$e->getMessage()]);
-        }
+        $this->installer->segnaWizardInCorso();
 
         return redirect()->route('installer.admin')
-            ->with('success', "Database configurato: schema installato ({$esito['tabelle']} tabelle).");
+            ->with('success', "Database configurato: schema installato ({$risultato['tabelle']} tabelle).");
     }
 
     /** Step 3 — super amministratore e prima associazione */

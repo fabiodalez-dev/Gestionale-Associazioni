@@ -27,6 +27,7 @@ class InstallerService
         $lockFile = config('installer.lock_file');
 
         file_put_contents($lockFile, 'Installata il '.now()->format('Y-m-d H:i:s').PHP_EOL);
+        @unlink((string) config('installer.in_progress_file'));
 
         // Hardening permessi: file sensibili leggibili solo dal proprietario
         @chmod($lockFile, 0600);
@@ -35,6 +36,28 @@ class InstallerService
         if (file_exists($envFile)) {
             @chmod($envFile, 0600);
         }
+    }
+
+    /**
+     * Segna che il wizard ha installato lo schema e sta proseguendo con gli
+     * step successivi (admin, email): finché il marcatore è valido le rotte
+     * /install restano aperte anche se nel frattempo esiste un super admin.
+     */
+    public function segnaWizardInCorso(): void
+    {
+        file_put_contents((string) config('installer.in_progress_file'), now()->format('Y-m-d H:i:s').PHP_EOL);
+    }
+
+    public function wizardInCorso(): bool
+    {
+        $file = (string) config('installer.in_progress_file');
+        if (! is_file($file)) {
+            return false;
+        }
+
+        $ore = (int) config('installer.in_progress_ttl_hours', 24);
+
+        return (filemtime($file) ?: 0) >= time() - $ore * 3600;
     }
 
     /**
@@ -74,10 +97,12 @@ class InstallerService
     /**
      * Tenta la connessione MySQL e, se richiesto, crea il database.
      * Restituisce anche quante tabelle contiene già il database di
-     * destinazione (per avvisare prima di migrare su un DB non vuoto).
+     * destinazione (per avvisare prima di sovrascriverle) e se contiene
+     * un'installazione completa (tabella utenti con un super admin): in
+     * quel caso il wizard non deve mai cancellare nulla.
      *
      * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
-     * @return array{ok: bool, error: ?string, tables: int}
+     * @return array{ok: bool, error: ?string, tables: int, tabelle: list<string>, installata: bool, server: ?string}
      */
     public function testDatabase(array $cfg, bool $creaDatabase = false): array
     {
@@ -98,14 +123,80 @@ class InstallerService
             $pdo->exec("USE `{$nomeDb}`");
 
             $stmt = $pdo->prepare(
-                'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?'
+                'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME'
             );
             $stmt->execute([$nomeDb]);
-            $tables = (int) $stmt->fetchColumn();
+            /** @var list<string> $nomiTabelle */
+            $nomiTabelle = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
 
-            return ['ok' => true, 'error' => null, 'tables' => $tables];
+            $versione = (string) $pdo->query('SELECT VERSION()')->fetchColumn();
+            if ($errore = $this->versioneServerTroppoVecchia($versione)) {
+                return ['ok' => false, 'error' => $errore, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => $versione];
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'tables' => count($nomiTabelle),
+                'tabelle' => $nomiTabelle,
+                'installata' => $this->contieneInstallazione($pdo, $nomeDb),
+                'server' => $versione,
+            ];
         } catch (PDOException $e) {
-            return ['ok' => false, 'error' => $e->getMessage(), 'tables' => 0];
+            return ['ok' => false, 'error' => $e->getMessage(), 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => null];
+        }
+    }
+
+    /**
+     * Messaggio d'errore se il server è più vecchio del minimo supportato
+     * dallo schema (colonne json, utf8mb4_unicode_ci), altrimenti null.
+     */
+    public function versioneServerTroppoVecchia(string $versione): ?string
+    {
+        $mariadb = stripos($versione, 'mariadb') !== false;
+        $minima = (string) config($mariadb ? 'installer.min_mariadb' : 'installer.min_mysql');
+        preg_match('/\\d+(?:\\.\\d+){1,2}/', $versione, $m);
+        $numero = $m[0] ?? '0';
+
+        if (version_compare($numero, $minima, '>=')) {
+            return null;
+        }
+
+        return sprintf('Server %s troppo vecchio (%s): serve almeno %s %s.', $mariadb ? 'MariaDB' : 'MySQL', $versione, $mariadb ? 'MariaDB' : 'MySQL', $minima);
+    }
+
+    /**
+     * Tabelle dell'applicazione già presenti nel database di destinazione:
+     * sono quelle che l'installazione cancellerebbe e ricreerebbe vuote.
+     *
+     * @param  list<string>  $esistenti
+     * @return list<string>
+     */
+    public function tabelleDaSovrascrivere(array $esistenti): array
+    {
+        $file = (string) config('installer.schema_file');
+        $attese = is_file($file) ? SchemaSql::tabelle((string) file_get_contents($file)) : [];
+
+        return array_values(array_intersect($attese, array_map('strtolower', $esistenti)));
+    }
+
+    /**
+     * Il database contiene già un'installazione dell'app (un super admin)?
+     * Letto con la connessione dell'installer, non con quella del .env.
+     */
+    private function contieneInstallazione(PDO $pdo, string $nomeDb): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?');
+        $stmt->execute([$nomeDb, 'utenti']);
+        if ((int) $stmt->fetchColumn() === 0) {
+            return false;
+        }
+
+        try {
+            return (int) $pdo->query("SELECT COUNT(*) FROM `{$nomeDb}`.`utenti` WHERE `ruolo` = 'super_admin'")->fetchColumn() > 0;
+        } catch (PDOException) {
+            // Tabella `utenti` di un'altra applicazione, senza colonna ruolo
+            return false;
         }
     }
 
@@ -162,6 +253,7 @@ class InstallerService
         config([
             'database.default' => 'mysql',
             'database.connections.mysql.url' => null,
+            'database.connections.mysql.unix_socket' => '',
             'database.connections.mysql.host' => $cfg['host'],
             'database.connections.mysql.port' => $cfg['port'],
             'database.connections.mysql.database' => $cfg['database'],
@@ -206,12 +298,16 @@ class InstallerService
             try {
                 $connessione->unprepared($istruzione);
             } catch (\Throwable $e) {
+                // Il QueryException di Laravel include l'intera istruzione nel
+                // messaggio: all'utente basta l'errore del server, accorciato
+                $messaggio = $e->getPrevious()?->getMessage() ?? $e->getMessage();
+
                 throw new RuntimeException(sprintf(
                     'Errore nell\'istruzione %d di %d dello schema (%s): %s',
                     $i + 1,
                     count($istruzioni),
                     Str::limit(preg_replace('/\s+/', ' ', $istruzione) ?? '', 80),
-                    $e->getMessage(),
+                    Str::limit($messaggio, 300),
                 ), 0, $e);
             }
         }
@@ -235,7 +331,12 @@ class InstallerService
     public function databaseReady(): bool
     {
         try {
-            return Schema::hasTable('utenti');
+            // `utenti` esiste e il registro delle migration è popolato: l'INSERT
+            // in `migrations` è l'ultima istruzione dello schema, quindi un
+            // import interrotto a metà non passa per "pronto"
+            return Schema::hasTable('utenti')
+                && Schema::hasTable('migrations')
+                && DB::table('migrations')->exists();
         } catch (\Throwable) {
             return false;
         }

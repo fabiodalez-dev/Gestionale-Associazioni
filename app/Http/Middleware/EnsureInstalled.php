@@ -44,16 +44,29 @@ class EnsureInstalled
             Artisan::call('key:generate', ['--force' => true]);
         }
 
-        if ($request->is('install', 'install/*', 'up')) {
+        if ($request->is('up')) {
             return $next($request);
         }
 
-        // Installazione manuale via CLI (migrate + admin creato a mano):
-        // riconosce lo stato e scrive il lock senza passare dal wizard.
         $installer = app(InstallerService::class);
+        $rottaInstaller = $request->is('install', 'install/*');
+
         if ($installer->adminExists()) {
+            // Il wizard stesso ha appena creato il super admin e sta
+            // completando gli ultimi step: resta aperto
+            if ($rottaInstaller && $installer->wizardInCorso()) {
+                return $next($request);
+            }
+
+            // Lock assente ma database già installato (installazione manuale
+            // via CLI, oppure lock perso in un deploy): scrive il lock e
+            // chiude il wizard, che altrimenti resterebbe aperto senza login
             $installer->markInstalled();
 
+            return $rottaInstaller ? redirect('/login') : $next($request);
+        }
+
+        if ($rottaInstaller) {
             return $next($request);
         }
 

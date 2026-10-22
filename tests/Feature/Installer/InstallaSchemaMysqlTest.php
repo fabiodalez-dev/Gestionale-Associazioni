@@ -8,6 +8,7 @@ use App\Services\Installer\SchemaSql;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use PDO;
 use Tests\TestCase;
 
@@ -123,17 +124,35 @@ class InstallaSchemaMysqlTest extends TestCase
     {
         $installer = app(InstallerService::class);
         $installer->installaSchema($this->cfg);
-        $installer->createAdmin([
-            'associazione_nome' => 'Vecchia', 'associazione_email' => 'v@prova.test',
-            'nome' => 'A', 'cognome' => 'B', 'email' => 'ab@prova.test', 'password' => 'SuperSegreta123',
+        // Installazione interrotta: tabelle e qualche dato, ma nessun super admin
+        DB::connection('mysql')->table('associazioni')->insert([
+            'id' => (string) Str::uuid(), 'nome' => 'Parziale', 'email' => 'p@prova.test',
+            'attiva' => 1, 'created_at' => now(), 'updated_at' => now(),
         ]);
         // Una tabella estranea all'app deve sopravvivere alla reinstallazione
         DB::connection('mysql')->statement('CREATE TABLE `tabella_di_altri` (`id` int)');
 
+        $esito = $installer->testDatabase($this->cfg);
+        $this->assertGreaterThan(0, $esito['tables']);
+        $this->assertFalse($esito['installata'], 'Senza super admin il database non conta come installato');
+
         $installer->installaSchema($this->cfg);
 
-        $this->assertFalse($installer->adminExists());
         $this->assertSame(0, DB::connection('mysql')->table('associazioni')->count());
         $this->assertTrue(Schema::connection('mysql')->hasTable('tabella_di_altri'));
+    }
+
+    public function test_un_database_con_super_admin_viene_riconosciuto_come_installato(): void
+    {
+        $installer = app(InstallerService::class);
+        $installer->installaSchema($this->cfg);
+        $this->assertFalse($installer->testDatabase($this->cfg)['installata']);
+
+        $installer->createAdmin([
+            'associazione_nome' => 'Vecchia', 'associazione_email' => 'v@prova.test',
+            'nome' => 'A', 'cognome' => 'B', 'email' => 'ab@prova.test', 'password' => 'SuperSegreta123',
+        ]);
+
+        $this->assertTrue($installer->testDatabase($this->cfg)['installata']);
     }
 }

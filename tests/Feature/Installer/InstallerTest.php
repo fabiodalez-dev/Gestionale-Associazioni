@@ -15,25 +15,39 @@ class InstallerTest extends TestCase
 
     private string $lockFile;
 
+    private string $inCorsoFile;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->lockFile = sys_get_temp_dir().'/installer_test_'.uniqid().'.lock';
+        $this->inCorsoFile = sys_get_temp_dir().'/installer_test_'.uniqid().'.in-corso';
         config([
             'installer.enforce_in_tests' => true,
             'installer.lock_file' => $this->lockFile,
+            'installer.in_progress_file' => $this->inCorsoFile,
         ]);
     }
 
     protected function tearDown(): void
     {
-        // Rimuove solo il lock creato da questo test nella dir temporanea
-        if (str_starts_with($this->lockFile, sys_get_temp_dir().'/installer_test_')) {
-            File::delete($this->lockFile);
+        // Rimuove solo i file creati da questo test nella dir temporanea
+        foreach ([$this->lockFile, $this->inCorsoFile] as $file) {
+            if (str_starts_with($file, sys_get_temp_dir().'/installer_test_')) {
+                File::delete($file);
+            }
         }
 
         parent::tearDown();
+    }
+
+    /** Simula un wizard che ha già installato lo schema e creato l'admin */
+    private function wizardInCorso(): void
+    {
+        $this->seed(RolesSeeder::class);
+        Utente::factory()->superAdmin()->create();
+        app(InstallerService::class)->segnaWizardInCorso();
     }
 
     public function test_app_non_installata_redirige_tutte_le_rotte_a_install(): void
@@ -83,18 +97,59 @@ class InstallerTest extends TestCase
             ->assertSessionHasErrors('database');
     }
 
-    public function test_database_store_valido_scrive_env_e_migra(): void
+    public function test_database_store_valido_installa_lo_schema_e_solo_dopo_scrive_env(): void
     {
         $this->partialMock(InstallerService::class, function ($mock) {
-            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0]);
-            $mock->shouldReceive('writeEnv')->once();
-            $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
+            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => '8.0.36']);
+            $mock->shouldReceive('installaSchema')->once()->ordered()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
+            $mock->shouldReceive('writeEnv')->once()->ordered()->withArgs(fn (array $v) => ($v['DB_DATABASE'] ?? null) === 'demo');
         });
 
         $this->post('/install/database', [
             'host' => '127.0.0.1', 'port' => 3306,
             'database' => 'demo', 'username' => 'root', 'password' => '',
-        ])->assertRedirect(route('installer.admin'));
+        ])->assertRedirect(route('installer.admin'))->assertSessionHas('success');
+
+        $this->assertFileExists($this->inCorsoFile, 'Dopo lo schema il wizard segna che è in corso');
+    }
+
+    public function test_import_schema_fallito_mostra_l_errore_e_non_tocca_env(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => '8.0.36']);
+            $mock->shouldReceive('installaSchema')->once()->andThrow(new \RuntimeException('Errore nell\'istruzione 12 di 200 dello schema (CREATE TABLE `x`): Access denied'));
+            $mock->shouldReceive('writeEnv')->never();
+        });
+
+        $this->from('/install/database')
+            ->post('/install/database', [
+                'host' => '127.0.0.1', 'port' => 3306,
+                'database' => 'demo', 'username' => 'root', 'password' => '',
+            ])
+            ->assertRedirect('/install/database')
+            ->assertSessionHasErrors('database');
+
+        $this->assertStringContainsString('istruzione 12 di 200', session('errors')->first('database'));
+        $this->assertFileDoesNotExist($this->inCorsoFile);
+    }
+
+    public function test_database_non_vuoto_elenca_le_tabelle_dell_app_che_verrebbero_cancellate(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()
+                ->andReturn(['ok' => true, 'error' => null, 'tables' => 3, 'tabelle' => ['utenti', 'wp_posts', 'soci'], 'installata' => false, 'server' => '8.0.36']);
+            $mock->shouldReceive('installaSchema')->never();
+        });
+
+        $this->from('/install/database')
+            ->post('/install/database', [
+                'host' => '127.0.0.1', 'port' => 3306,
+                'database' => 'demo', 'username' => 'root', 'password' => '',
+            ])
+            ->assertRedirect('/install/database')
+            ->assertInvalid(['database' => 'soci, utenti']);
+
+        $this->assertStringNotContainsString('wp_posts', json_encode(session('errors')));
     }
 
     public function test_step_admin_crea_super_admin_e_associazione(): void
@@ -119,14 +174,14 @@ class InstallerTest extends TestCase
 
     public function test_step_done_scrive_il_lock(): void
     {
-        $this->seed(RolesSeeder::class);
-        Utente::factory()->superAdmin()->create();
+        $this->wizardInCorso();
 
         $this->get('/install/done')
             ->assertOk()
             ->assertSee('Installazione completata');
 
         $this->assertFileExists($this->lockFile);
+        $this->assertFileDoesNotExist($this->inCorsoFile);
     }
 
     public function test_installazione_manuale_da_cli_viene_riconosciuta_e_crea_il_lock(): void
@@ -178,17 +233,53 @@ class InstallerTest extends TestCase
             ->assertRedirect(route('installer.admin'));
     }
 
+    public function test_database_gia_installato_non_viene_mai_sovrascritto_dal_wizard(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()
+                ->andReturn(['ok' => true, 'error' => null, 'tables' => 94, 'installata' => true]);
+            $mock->shouldReceive('writeEnv')->never();
+            $mock->shouldReceive('installaSchema')->never();
+        });
+
+        // Nemmeno con la conferma di sovrascrittura
+        $this->from('/install/database')
+            ->post('/install/database', [
+                'host' => '127.0.0.1', 'port' => 3306,
+                'database' => 'demo', 'username' => 'root', 'password' => '',
+                'consenti_non_vuoto' => 1,
+            ])
+            ->assertRedirect('/install/database')
+            ->assertSessionHasErrors('database');
+
+        $this->assertStringContainsString('app:disinstalla', session('errors')->first('database'));
+    }
+
+    public function test_lock_assente_ma_app_installata_chiude_il_wizard(): void
+    {
+        $this->seed(RolesSeeder::class);
+        Utente::factory()->superAdmin()->create();
+
+        $this->get('/install')->assertRedirect('/login');
+        $this->assertFileExists($this->lockFile);
+
+        $this->post('/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306,
+            'database' => 'demo', 'username' => 'root', 'password' => '',
+        ])->assertRedirect('/login');
+    }
+
     public function test_endpoint_ajax_test_connessione(): void
     {
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('testDatabase')->once()
-                ->andReturn(['ok' => true, 'error' => null, 'tables' => 3]);
+                ->andReturn(['ok' => true, 'error' => null, 'tables' => 3, 'installata' => false]);
         });
 
         $this->postJson('/install/database/test', [
             'host' => '127.0.0.1', 'port' => 3306,
             'database' => 'demo', 'username' => 'root', 'password' => '',
-        ])->assertOk()->assertJson(['ok' => true, 'tables' => 3]);
+        ])->assertOk()->assertJson(['ok' => true, 'tables' => 3, 'installata' => false]);
     }
 
     public function test_dati_demo_opzionali_creano_i_contenuti(): void
@@ -215,8 +306,7 @@ class InstallerTest extends TestCase
 
     public function test_step_email_puo_essere_saltato(): void
     {
-        $this->seed(RolesSeeder::class);
-        Utente::factory()->superAdmin()->create();
+        $this->wizardInCorso();
 
         $this->post('/install/email', ['driver' => 'log'])
             ->assertSessionHasNoErrors()
@@ -225,8 +315,7 @@ class InstallerTest extends TestCase
 
     public function test_step_email_salva_le_impostazioni_smtp(): void
     {
-        $this->seed(RolesSeeder::class);
-        Utente::factory()->superAdmin()->create();
+        $this->wizardInCorso();
 
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('writeEnv')->once()->withArgs(function (array $valori) {

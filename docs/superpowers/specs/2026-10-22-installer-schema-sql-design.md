@@ -26,8 +26,18 @@ L'installer web (`/install`) deve funzionare come quello di Pinakes: un dump del
 3. `App\Services\Installer\SchemaSql` (puro, senza database): divide il dump in istruzioni, estrae i nomi delle tabelle (rifiutando parsing parziali e duplicati) e delle migration registrate.
 4. `InstallerService::installaSchema()` sostituisce `runMigrations()`: riconfigura la connessione `mysql` a runtime, esegue ogni istruzione con `unprepared`, riapre la connessione e confronta le tabelle presenti con quelle attese, poi lancia `RolesSeeder`. Ogni errore diventa un `RuntimeException` leggibile mostrato nel form del database.
 
+## Sicurezza (dalla revisione)
+
+Il wizard è raggiungibile senza login, e con `DROP TABLE` nel dump un database già in uso va protetto più di prima:
+
+- `testDatabase()` riconosce un database **già installato** (tabella `utenti` con un super admin): in quel caso il wizard rifiuta di procedere anche con la conferma di sovrascrittura e rimanda a `php artisan app:disinstalla`, che fa prima il backup.
+- Il middleware `EnsureInstalled` chiude le rotte `/install` (e scrive il lock) appena rileva un super admin, salvo che il wizard stesso sia in corso: lo segnala un marcatore `storage/app/installer-in-corso`, creato dopo l'import dello schema, valido 24 ore e cancellato dal lock. Così un lock perso in un deploy non riapre l'installer su un'app in produzione.
+- Il `.env` viene scritto **dopo** l'import riuscito: se l'import fallisce la configurazione precedente resta com'era.
+- Il messaggio di conferma elenca le tabelle dell'app che verrebbero cancellate e ricreate vuote; le tabelle estranee non vengono toccate.
+- Il wizard rifiuta server troppo vecchi (MySQL < 5.7.8, MariaDB < 10.2.7).
+
 ## Verifica
 
 - `tests/Feature/Installer/SchemaSqlTest.php`: parsing e allineamento dump/migration (gira su SQLite in memoria, sempre).
 - `tests/Feature/Installer/InstallaSchemaMysqlTest.php`: iniezione reale su MySQL, `migrate` senza nulla da fare, creazione admin, reinstallazione con tabella estranea. Si attiva con `INSTALLER_TEST_MYSQL_DSN`.
-- Prova manuale del wizard nel browser su un database inesistente creato dal wizard.
+- Prova manuale del wizard nel browser su un database inesistente creato dal wizard (MySQL 9.6), più `InstallaSchemaMysqlTest` eseguito anche contro MariaDB 12.3.

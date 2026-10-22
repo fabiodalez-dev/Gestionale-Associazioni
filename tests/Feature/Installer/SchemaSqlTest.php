@@ -43,6 +43,41 @@ class SchemaSqlTest extends TestCase
         }
         // Dump deterministico: nessun contatore AUTO_INCREMENT del server
         $this->assertStringNotContainsString('AUTO_INCREMENT=', $sql);
+
+        // Ogni istruzione è di un tipo atteso e bilanciata (apici e parentesi):
+        // una divisione sbagliata del dump produrrebbe frammenti sbilanciati
+        $attesi = ['SET' => 0, 'DROP TABLE IF EXISTS' => 0, 'CREATE TABLE' => 0, 'INSERT INTO' => 0];
+        foreach ($istruzioni as $i) {
+            $tipo = null;
+            foreach (array_keys($attesi) as $prefisso) {
+                if (str_starts_with($i, $prefisso)) {
+                    $tipo = $prefisso;
+                    break;
+                }
+            }
+            $this->assertNotNull($tipo, 'Istruzione di tipo inatteso: '.substr($i, 0, 60));
+            $attesi[$tipo]++;
+            $this->assertSame(0, substr_count($i, "'") % 2, 'Apici sbilanciati in: '.substr($i, 0, 60));
+            $this->assertSame(substr_count($i, '('), substr_count($i, ')'), 'Parentesi sbilanciate in: '.substr($i, 0, 60));
+        }
+        $this->assertSame(count($tabelle), $attesi['CREATE TABLE']);
+        $this->assertSame(count($tabelle), $attesi['DROP TABLE IF EXISTS']);
+        $this->assertSame(1, $attesi['INSERT INTO']);
+        $this->assertSame(3, $attesi['SET']);
+    }
+
+    public function test_versione_minima_del_server(): void
+    {
+        $installer = app(InstallerService::class);
+
+        $this->assertNull($installer->versioneServerTroppoVecchia('9.6.0'));
+        $this->assertNull($installer->versioneServerTroppoVecchia('8.0.36-0ubuntu0.22.04.1'));
+        $this->assertNull($installer->versioneServerTroppoVecchia('5.7.44'));
+        $this->assertNull($installer->versioneServerTroppoVecchia('10.6.18-MariaDB-0ubuntu0.22.04.1'));
+        $this->assertNull($installer->versioneServerTroppoVecchia('12.3.2-MariaDB'));
+
+        $this->assertStringContainsString('MySQL 5.7.8', (string) $installer->versioneServerTroppoVecchia('5.6.51'));
+        $this->assertStringContainsString('MariaDB 10.2.7', (string) $installer->versioneServerTroppoVecchia('10.1.48-MariaDB'));
     }
 
     public function test_istruzioni_divide_sul_punto_e_virgola_a_fine_riga_e_ignora_i_commenti(): void

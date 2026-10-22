@@ -93,6 +93,20 @@ class CheckinController extends Controller
             ], 400);
         }
 
+        // Socio con tessere ma nessuna valida (scadute, annullate, sospese):
+        // il tesseramento non è stato rinnovato, il check-in va rifiutato con
+        // lo stesso criterio della verifica pubblica (Tessera::isValida).
+        // Un socio senza alcuna tessera emessa resta identificabile per numero socio.
+        $tessereSocio = Tessera::query()->where('socio_id', $socio->id);
+
+        if ((clone $tessereSocio)->exists() && ! (clone $tessereSocio)->valide()->exists()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Tessera scaduta o non rinnovata: il socio non ha una tessera valida.',
+                'code' => 'tessera_non_valida',
+            ], 400);
+        }
+
         $partecipante = EventoPartecipante::query()
             ->where('evento_id', $evento->id)
             ->where('socio_id', $socio->id)

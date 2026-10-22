@@ -6,12 +6,15 @@ use App\Models\Associazione;
 use App\Models\Utente;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RolesSeeder;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use PDO;
 use PDOException;
+use RuntimeException;
 
 class InstallerService
 {
@@ -25,6 +28,7 @@ class InstallerService
         $lockFile = config('installer.lock_file');
 
         file_put_contents($lockFile, 'Installata il '.now()->format('Y-m-d H:i:s').PHP_EOL);
+        @unlink((string) config('installer.in_progress_file'));
 
         // Hardening permessi: file sensibili leggibili solo dal proprietario
         @chmod($lockFile, 0600);
@@ -33,6 +37,93 @@ class InstallerService
         if (file_exists($envFile)) {
             @chmod($envFile, 0600);
         }
+    }
+
+    /**
+     * Primo avvio senza terminale (pacchetto caricato via FTP): crea il .env
+     * da .env.example se manca e genera APP_KEY se è vuota, prima che
+     * EncryptCookies la richieda. Non fa nulla se non può scrivere.
+     */
+    public function preparaEnv(): void
+    {
+        $env = (string) config('installer.env_file');
+
+        if (! file_exists($env)) {
+            $esempio = base_path('.env.example');
+            if (! is_file($esempio) || ! is_writable(dirname($env))) {
+                return;
+            }
+            copy($esempio, $env);
+            @chmod($env, 0600);
+
+            // .env.example è pensato per lo sviluppo: un sito creato dal
+            // wizard è in produzione (niente stack trace pubblici, URL
+            // generati da APP_URL e non dall'Host della richiesta)
+            $this->writeEnv(['APP_ENV' => 'production', 'APP_DEBUG' => 'false', 'LOG_LEVEL' => 'warning']);
+            config(['app.env' => 'production', 'app.debug' => false]);
+        }
+
+        if (blank(config('app.key')) && is_writable($env)) {
+            $chiave = 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher', 'AES-256-CBC')));
+            $this->writeEnv(['APP_KEY' => $chiave]);
+            config(['app.key' => $chiave]);
+        }
+    }
+
+    /**
+     * Collegamento public/storage → storage/app/public (immagini caricate):
+     * senza terminale lo fa l'installer a fine wizard. Ritorna false se il
+     * link non si può creare (si rimedia dopo con php artisan storage:link).
+     */
+    public function collegaStorage(): bool
+    {
+        $link = public_path('storage');
+        if (is_link($link) || file_exists($link)) {
+            return true;
+        }
+
+        try {
+            return Artisan::call('storage:link', ['--force' => true]) === 0;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Segna che il wizard ha installato lo schema e sta proseguendo con gli
+     * step successivi (admin, email): finché il marcatore è valido le rotte
+     * /install restano aperte anche se nel frattempo esiste un super admin.
+     */
+    public function segnaWizardInCorso(): string
+    {
+        $token = bin2hex(random_bytes(32));
+        $file = (string) config('installer.in_progress_file');
+
+        file_put_contents($file, hash('sha256', $token).PHP_EOL);
+        @chmod($file, 0600);
+
+        return $token;
+    }
+
+    /**
+     * Il wizard è in corso E la richiesta arriva dal browser che lo sta
+     * facendo (token del cookie corrispondente all'hash nel marcatore).
+     */
+    public function wizardInCorso(?string $token): bool
+    {
+        $file = (string) config('installer.in_progress_file');
+        if ($token === null || $token === '' || ! is_file($file)) {
+            return false;
+        }
+
+        $minuti = (int) config('installer.in_progress_ttl_minutes', 120);
+        if ((filemtime($file) ?: 0) < time() - $minuti * 60) {
+            return false;
+        }
+
+        $atteso = trim((string) file_get_contents($file));
+
+        return $atteso !== '' && hash_equals($atteso, hash('sha256', $token));
     }
 
     /**
@@ -72,10 +163,12 @@ class InstallerService
     /**
      * Tenta la connessione MySQL e, se richiesto, crea il database.
      * Restituisce anche quante tabelle contiene già il database di
-     * destinazione (per avvisare prima di migrare su un DB non vuoto).
+     * destinazione (per avvisare prima di sovrascriverle) e se contiene
+     * un'installazione completa (tabella utenti con un super admin): in
+     * quel caso il wizard non deve mai cancellare nulla.
      *
      * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
-     * @return array{ok: bool, error: ?string, tables: int}
+     * @return array{ok: bool, error: ?string, tables: int, tabelle: list<string>, installata: bool, server: ?string}
      */
     public function testDatabase(array $cfg, bool $creaDatabase = false): array
     {
@@ -96,14 +189,80 @@ class InstallerService
             $pdo->exec("USE `{$nomeDb}`");
 
             $stmt = $pdo->prepare(
-                'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?'
+                'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME'
             );
             $stmt->execute([$nomeDb]);
-            $tables = (int) $stmt->fetchColumn();
+            /** @var list<string> $nomiTabelle */
+            $nomiTabelle = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
 
-            return ['ok' => true, 'error' => null, 'tables' => $tables];
+            $versione = (string) $pdo->query('SELECT VERSION()')->fetchColumn();
+            if ($errore = $this->versioneServerTroppoVecchia($versione)) {
+                return ['ok' => false, 'error' => $errore, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => $versione];
+            }
+
+            return [
+                'ok' => true,
+                'error' => null,
+                'tables' => count($nomiTabelle),
+                'tabelle' => $nomiTabelle,
+                'installata' => $this->contieneInstallazione($pdo, $nomeDb),
+                'server' => $versione,
+            ];
         } catch (PDOException $e) {
-            return ['ok' => false, 'error' => $e->getMessage(), 'tables' => 0];
+            return ['ok' => false, 'error' => $e->getMessage(), 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => null];
+        }
+    }
+
+    /**
+     * Messaggio d'errore se il server è più vecchio del minimo supportato
+     * dallo schema (colonne json, utf8mb4_unicode_ci), altrimenti null.
+     */
+    public function versioneServerTroppoVecchia(string $versione): ?string
+    {
+        $mariadb = stripos($versione, 'mariadb') !== false;
+        $minima = (string) config($mariadb ? 'installer.min_mariadb' : 'installer.min_mysql');
+        preg_match('/\\d+(?:\\.\\d+){1,2}/', $versione, $m);
+        $numero = $m[0] ?? '0';
+
+        if (version_compare($numero, $minima, '>=')) {
+            return null;
+        }
+
+        return sprintf('Server %s troppo vecchio (%s): serve almeno %s %s.', $mariadb ? 'MariaDB' : 'MySQL', $versione, $mariadb ? 'MariaDB' : 'MySQL', $minima);
+    }
+
+    /**
+     * Tabelle dell'applicazione già presenti nel database di destinazione:
+     * sono quelle che l'installazione cancellerebbe e ricreerebbe vuote.
+     *
+     * @param  list<string>  $esistenti
+     * @return list<string>
+     */
+    public function tabelleDaSovrascrivere(array $esistenti): array
+    {
+        $file = (string) config('installer.schema_file');
+        $attese = is_file($file) ? SchemaSql::tabelle((string) file_get_contents($file)) : [];
+
+        return array_values(array_intersect($attese, array_map('strtolower', $esistenti)));
+    }
+
+    /**
+     * Il database contiene già un'installazione dell'app (un super admin)?
+     * Letto con la connessione dell'installer, non con quella del .env.
+     */
+    private function contieneInstallazione(PDO $pdo, string $nomeDb): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?');
+        $stmt->execute([$nomeDb, 'utenti']);
+        if ((int) $stmt->fetchColumn() === 0) {
+            return false;
+        }
+
+        try {
+            return (int) $pdo->query("SELECT COUNT(*) FROM `{$nomeDb}`.`utenti` WHERE `ruolo` = 'super_admin'")->fetchColumn() > 0;
+        } catch (PDOException) {
+            // Tabella `utenti` di un'altra applicazione, senza colonna ruolo
+            return false;
         }
     }
 
@@ -151,15 +310,16 @@ class InstallerService
     }
 
     /**
-     * Applica a runtime la configurazione DB appena scritta e lancia
-     * migrations + seeder dei ruoli.
+     * Applica a runtime la configurazione DB appena scritta nel .env.
      *
      * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
      */
-    public function runMigrations(array $cfg): void
+    public function configuraConnessione(array $cfg): void
     {
         config([
             'database.default' => 'mysql',
+            'database.connections.mysql.url' => null,
+            'database.connections.mysql.unix_socket' => '',
             'database.connections.mysql.host' => $cfg['host'],
             'database.connections.mysql.port' => $cfg['port'],
             'database.connections.mysql.database' => $cfg['database'],
@@ -168,9 +328,67 @@ class InstallerService
         ]);
 
         DB::purge('mysql');
+        DB::setDefaultConnection('mysql');
+    }
 
-        Artisan::call('migrate', ['--force' => true]);
+    /**
+     * Inietta lo schema del database vuoto (database/installer/schema.sql)
+     * nel database configurato, come fa l'installer di Pinakes: niente
+     * migration a runtime, un unico dump controllato eseguito istruzione per
+     * istruzione via PDO (funziona anche dove exec() è disabilitato).
+     * Il dump registra anche le migration già applicate, così gli
+     * aggiornamenti futuri eseguono solo quelle nuove. Alla fine verifica che
+     * ogni tabella dichiarata esista e allinea ruoli e permessi.
+     *
+     * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
+     * @return array{tabelle: int, migrazioni: int}
+     *
+     * @throws RuntimeException se il file manca, è incompleto o l'import non produce tutte le tabelle
+     */
+    public function installaSchema(array $cfg): array
+    {
+        $file = (string) config('installer.schema_file');
+        if (! is_file($file) || ! is_readable($file)) {
+            throw new RuntimeException('File dello schema non trovato: '.str_replace(base_path().'/', '', $file).'. Genera il file con "php artisan installer:genera-schema".');
+        }
+
+        $sql = (string) file_get_contents($file);
+        $istruzioni = SchemaSql::istruzioni($sql);
+        $attese = SchemaSql::tabelle($sql);
+        $migrazioni = SchemaSql::migrazioni($sql);
+
+        $this->configuraConnessione($cfg);
+        $connessione = DB::connection('mysql');
+
+        foreach ($istruzioni as $i => $istruzione) {
+            try {
+                $connessione->unprepared($istruzione);
+            } catch (\Throwable $e) {
+                // Il QueryException di Laravel include l'intera istruzione nel
+                // messaggio: all'utente basta l'errore del server, accorciato
+                $messaggio = $e->getPrevious()?->getMessage() ?? $e->getMessage();
+
+                throw new RuntimeException(sprintf(
+                    'Errore nell\'istruzione %d di %d dello schema (%s): %s',
+                    $i + 1,
+                    count($istruzioni),
+                    Str::limit(preg_replace('/\s+/', ' ', $istruzione) ?? '', 80),
+                    Str::limit($messaggio, 300),
+                ), 0, $e);
+            }
+        }
+
+        // Connessione nuova: l'elenco tabelle deve vedere quelle appena create
+        DB::purge('mysql');
+        $presenti = array_map('strtolower', Schema::connection('mysql')->getTableListing(schemaQualified: false));
+        $mancanti = array_values(array_diff($attese, $presenti));
+        if ($mancanti !== []) {
+            throw new RuntimeException('Schema importato in modo incompleto. Tabelle mancanti: '.implode(', ', $mancanti));
+        }
+
         Artisan::call('db:seed', ['--class' => RolesSeeder::class, '--force' => true]);
+
+        return ['tabelle' => count($attese), 'migrazioni' => count($migrazioni)];
     }
 
     /**
@@ -179,7 +397,12 @@ class InstallerService
     public function databaseReady(): bool
     {
         try {
-            return Schema::hasTable('utenti');
+            // `utenti` esiste e il registro delle migration è popolato: l'INSERT
+            // in `migrations` è l'ultima istruzione dello schema, quindi un
+            // import interrotto a metà non passa per "pronto"
+            return Schema::hasTable('utenti')
+                && Schema::hasTable('migrations')
+                && DB::table('migrations')->exists();
         } catch (\Throwable) {
             return false;
         }

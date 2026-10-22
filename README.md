@@ -129,16 +129,42 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 
 ## Installazione
 
-### Installer web (consigliato)
+### Su hosting condiviso, senza terminale (consigliato)
+
+1. Scarica `gestionale-associazioni-vX.Y.Z.zip` dall'ultima [release](https://github.com/fabiodalez-dev/gestionale-associazioni/releases): contiene già tutto (`vendor/`, asset compilati), non serve né Composer né npm.
+2. Estrai lo zip: trovi una cartella `gestionale-associazioni/`. Carica via FTP o File Manager **il contenuto** di quella cartella in `public_html` (l'app risponde su `https://tuodominio.it`), oppure l'intera cartella (risponde su `https://tuodominio.it/gestionale-associazioni`).
+3. Nel pannello dell'hosting seleziona **PHP 8.3 o successivo** e crea un database MySQL con un utente (annota nome, utente e password).
+4. Apri il sito nel browser: parte da solo il wizard `/install`, che crea `.env` e chiave dell'applicazione, verifica i requisiti, inietta lo schema nel database e crea il primo super admin.
+5. Alla fine il wizard mostra il comando per il cron (cPanel → Cron Jobs, ogni minuto): manda le email in coda, i promemoria e i backup.
+
+Il `.htaccess` nella radice del progetto fa passare tutte le richieste da `public/`, quindi `app/`, `storage/`, `vendor/` e `.env` non sono raggiungibili dal browser; ogni cartella non pubblica ha inoltre un proprio `.htaccess` di diniego, che vale anche se l'hosting non ha mod_rewrite (in quel caso l'app risponde su `/public/`). Se puoi scegliere la document root (VPS, hosting che lo permette), puntala direttamente a `public/`. Il pacchetto si costruisce con `bash bin/build-release.sh` (lo fa la GitHub Action a ogni tag `v*`, e l'aggiornatore in-app scarica lo stesso pacchetto).
+
+### Installer web da sorgenti
 
 ```bash
 git clone https://github.com/fabiodalez-dev/gestionale-associazioni.git
 cd gestionale-associazioni
 composer install --no-dev
-cp .env.example .env
+npm install && npm run build
 ```
 
-Apri **`/install`** nel browser: il wizard in 5 passi (requisiti → database → super admin → email → fine) genera l'`APP_KEY`, scrive il `.env`, migra lo schema e crea il primo super admin. Al termine l'installer si blocca da solo.
+Apri **`/install`** nel browser (in sviluppo con `php artisan serve --no-reload`: il wizard scrive il `.env` e senza quell'opzione il server di sviluppo si riavvierebbe a metà richiesta): il wizard in 5 passi (requisiti → database → super admin → email → fine) crea il `.env` da `.env.example` se manca, genera l'`APP_KEY`, inietta lo schema del database vuoto nel database indicato, crea il primo super admin e il collegamento `public/storage`. Al termine l'installer si blocca da solo.
+
+Server supportati: MySQL 5.7.8 o successivo, MariaDB 10.2.7 o successivo (colonne `json` e collation `utf8mb4_unicode_ci`); il wizard rifiuta versioni più vecchie. Lo schema non viene creato eseguendo le migration a runtime ma importando `database/installer/schema.sql`, un dump del database vuoto (struttura + registro delle migration già applicate) eseguito istruzione per istruzione via PDO: funziona anche sugli hosting condivisi senza `exec()` né client `mysql`, è veloce e produce sempre lo stesso risultato. Le tabelle dell'applicazione già presenti nel database vengono ricreate vuote solo dietro conferma esplicita; le tabelle estranee restano intatte. Dopo l'installazione `php artisan migrate` (anche quello dell'aggiornamento in-app) applica soltanto le migration nuove.
+
+#### Rigenerare lo schema dell'installer
+
+Dopo ogni nuova migration va rigenerato il file, altrimenti il test `SchemaSqlTest` fallisce:
+
+```bash
+php artisan installer:genera-schema
+```
+
+Il comando crea un database temporaneo `gestione_associazioni_schema_tmp` con le credenziali MySQL del `.env`, ci esegue tutte le migration, scrive il dump e cancella il database temporaneo. Per provare l'iniezione su un MySQL reale:
+
+```bash
+INSTALLER_TEST_MYSQL_DSN="mysql://root:segreta@127.0.0.1:3306/gestione_installer_test" php artisan test --filter=InstallaSchemaMysqlTest
+```
 
 ### Installazione manuale (CLI)
 
@@ -158,6 +184,12 @@ php artisan storage:link
 php artisan serve            # applicazione
 php artisan queue:work       # coda email e job (obbligatorio)
 # cron: * * * * * php artisan schedule:run
+```
+
+Su hosting condiviso, dove un worker permanente non si può tenere acceso, basta un cron ogni minuto che esegue entrambi:
+
+```bash
+cd /home/utente/public_html && php artisan schedule:run >> /dev/null 2>&1 && php artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
 ```
 
 ---

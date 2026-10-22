@@ -5,11 +5,11 @@
 
 @section('content')
     <h2>Configurazione database</h2>
-    <p class="subtitle">Credenziali MySQL. Verranno salvate nel file <code>.env</code>, poi lo schema sarà creato automaticamente.</p>
+    <p class="subtitle">Credenziali MySQL. Verranno salvate nel file <code>.env</code>, poi lo schema del database vuoto sarà iniettato nel database indicato.</p>
 
     @if ($dbReady)
         <div class="alert alert-success mb-3">
-            Il database risulta già configurato e migrato. Puoi proseguire.
+            Il database risulta già configurato e lo schema è presente. Puoi proseguire.
         </div>
         <a href="{{ route('installer.admin') }}" class="btn btn-primary w-100 mb-2">
             Continua<i class="bi bi-arrow-right ms-2"></i>
@@ -46,7 +46,7 @@
                 </div>
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="consenti_non_vuoto" name="consenti_non_vuoto" value="1" @checked(old('consenti_non_vuoto'))>
-                    <label class="form-check-label" for="consenti_non_vuoto">Consenti database non vuoto <span class="text-muted">(sconsigliato)</span></label>
+                    <label class="form-check-label" for="consenti_non_vuoto">Sovrascrivi le tabelle già presenti <span class="text-muted">(i dati con lo stesso nome di tabella vengono cancellati)</span></label>
                 </div>
             </div>
         </div>

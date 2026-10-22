@@ -32,11 +32,14 @@
                         esito.textContent = errs;
                         return;
                     }
-                    if (res.data.ok) {
+                    if (res.data.ok && res.data.installata) {
+                        esito.className = 'alert alert-danger mt-3 mb-0';
+                        esito.textContent = 'Connessione riuscita, ma il database contiene già un\'installazione con un super amministratore: non può essere sovrascritto dal wizard. Indica un altro database o esegui prima "php artisan app:disinstalla".';
+                    } else if (res.data.ok) {
                         esito.className = 'alert alert-success mt-3 mb-0';
                         esito.textContent = res.data.tables > 0
-                            ? 'Connessione riuscita. Attenzione: il database contiene già ' + res.data.tables + ' tabelle.'
-                            : 'Connessione riuscita. Il database è vuoto e pronto.';
+                            ? 'Connessione riuscita (' + res.data.server + '). Attenzione: il database contiene già ' + res.data.tables + ' tabelle. Per procedere dovrai spuntare "Sovrascrivi le tabelle già presenti".'
+                            : 'Connessione riuscita (' + res.data.server + '). Il database è vuoto e pronto.';
                     } else {
                         esito.className = 'alert alert-danger mt-3 mb-0';
                         esito.textContent = 'Connessione fallita: ' + (res.data.error || 'errore sconosciuto');

@@ -56,12 +56,39 @@ class InstallerController extends Controller
                 ->withErrors(['database' => 'Connessione fallita: '.$esito['error']]);
         }
 
-        // Protezione database non vuoto (come l'installer di riferimento):
-        // si procede solo con conferma esplicita
-        if ($esito['tables'] > 0 && ! $request->boolean('consenti_non_vuoto')) {
+        // Un database con un'installazione completa non si tocca MAI dal
+        // wizard (raggiungibile senza login): per reinstallare si passa
+        // dalla CLI, che fa prima il backup
+        if ($esito['installata'] ?? false) {
             return back()
                 ->withInput()
-                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già {$esito['tables']} tabelle. Per installare comunque (le tabelle con lo stesso nome verranno riusate dalle migrations), spunta \"Consenti database non vuoto\"."]);
+                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già un'installazione di Gestione Associazioni con un super amministratore. Per reinstallare da zero esegui prima \"php artisan app:disinstalla\" (fa il backup e svuota il database), oppure indica un altro database."]);
+        }
+
+        // Protezione database non vuoto (come l'installer di riferimento):
+        // lo schema sovrascrive le tabelle con lo stesso nome, quindi si
+        // procede solo con conferma esplicita, elencando cosa verrà perso
+        if ($esito['tables'] > 0 && ! $request->boolean('consenti_non_vuoto')) {
+            $daSovrascrivere = $this->installer->tabelleDaSovrascrivere($esito['tabelle'] ?? []);
+            $dettaglio = $daSovrascrivere === []
+                ? 'Nessuna di queste è una tabella dell\'applicazione: resteranno intatte.'
+                : sprintf('Le tabelle dell\'applicazione già presenti verranno cancellate e ricreate vuote (%d): %s. Le altre restano intatte.', count($daSovrascrivere), implode(', ', $daSovrascrivere));
+
+            return back()
+                ->withInput()
+                ->withErrors(['database' => "Il database \"{$cfg['database']}\" contiene già {$esito['tables']} tabelle. {$dettaglio} Per procedere spunta \"Sovrascrivi le tabelle già presenti\"."]);
+        }
+
+        // Prima lo schema, poi il .env: se l'import fallisce la configurazione
+        // precedente resta com'era e l'utente può correggere e riprovare
+        try {
+            $risultato = $this->installer->installaSchema($cfg);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()
+                ->withInput()
+                ->withErrors(['database' => 'Installazione dello schema fallita: '.$e->getMessage()]);
         }
 
         $this->installer->writeEnv([
@@ -71,13 +98,27 @@ class InstallerController extends Controller
             'DB_DATABASE' => $cfg['database'],
             'DB_USERNAME' => $cfg['username'],
             'DB_PASSWORD' => (string) ($cfg['password'] ?? ''),
-            'APP_URL' => $request->getSchemeAndHttpHost(),
+            // root() include l'eventuale sottocartella (es. /public o
+            // /gestionale/public): gli URL generati devono partire da lì
+            'APP_URL' => rtrim($request->root(), '/'),
         ]);
 
-        $this->installer->runMigrations($cfg);
+        // Token in cookie HttpOnly (non cifrato: il middleware EnsureInstalled
+        // gira prima di EncryptCookies), valido quanto il marcatore
+        $token = $this->installer->segnaWizardInCorso();
+        $cookie = cookie(
+            name: (string) config('installer.in_progress_cookie'),
+            value: $token,
+            minutes: (int) config('installer.in_progress_ttl_minutes', 120),
+            path: '/',
+            secure: $request->isSecure(),
+            httpOnly: true,
+            sameSite: 'lax',
+        );
 
         return redirect()->route('installer.admin')
-            ->with('success', 'Database configurato e migrato correttamente.');
+            ->withCookie($cookie)
+            ->with('success', "Database configurato: schema installato ({$risultato['tabelle']} tabelle).");
     }
 
     /** Step 3 — super amministratore e prima associazione */
@@ -157,6 +198,9 @@ class InstallerController extends Controller
 
         $this->installer->markInstalled();
 
-        return view('installer.done', ['step' => 5]);
+        return view('installer.done', [
+            'step' => 5,
+            'storageCollegato' => $this->installer->collegaStorage(),
+        ]);
     }
 }

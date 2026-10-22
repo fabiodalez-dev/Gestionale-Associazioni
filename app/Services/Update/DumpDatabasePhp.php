@@ -32,9 +32,19 @@ class DumpDatabasePhp
             throw new RuntimeException('Impossibile creare il file di backup '.$file);
         }
 
+        // Le righe vengono lette una alla volta: con il buffer di PDO una
+        // tabella grande (email_log, activity_log) finirebbe tutta in memoria
+        $bufferizzato = $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+        $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+        $scrivi = function (string $testo) use ($gz, $file): void {
+            if (gzwrite($gz, $testo) !== strlen($testo)) {
+                throw new RuntimeException('Scrittura del backup interrotta (spazio o quota esauriti): '.$file);
+            }
+        };
+
         try {
-            gzwrite($gz, "-- Backup di {$db} generato dall'updater di Gestione Associazioni il ".date('Y-m-d H:i:s')."\n");
-            gzwrite($gz, "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
+            $scrivi("-- Backup di {$db} generato dall'updater di Gestione Associazioni il ".date('Y-m-d H:i:s')."\n");
+            $scrivi("SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
 
             $tabelle = $pdo->query('SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = '.$pdo->quote($db)." AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME")->fetchAll(PDO::FETCH_COLUMN);
             if ($tabelle === []) {
@@ -43,28 +53,54 @@ class DumpDatabasePhp
 
             foreach ($tabelle as $tabella) {
                 $create = $pdo->query("SHOW CREATE TABLE `{$tabella}`")->fetch(PDO::FETCH_ASSOC);
-                gzwrite($gz, "DROP TABLE IF EXISTS `{$tabella}`;\n".($create['Create Table'] ?? '').";\n\n");
+                $scrivi("DROP TABLE IF EXISTS `{$tabella}`;\n".($create['Create Table'] ?? '').";\n\n");
+
+                // Colonne binarie (blob, binary, varbinary): in esadecimale,
+                // altrimenti il reimport con SET NAMES utf8mb4 le rifiuta
+                $binarie = [];
+                foreach ($pdo->query("SHOW COLUMNS FROM `{$tabella}`")->fetchAll(PDO::FETCH_ASSOC) as $col) {
+                    if (preg_match('/blob|binary/i', (string) ($col['Type'] ?? ''))) {
+                        $binarie[(string) $col['Field']] = true;
+                    }
+                }
 
                 $stmt = $pdo->query("SELECT * FROM `{$tabella}`");
                 $buffer = [];
                 $colonne = null;
                 while (($riga = $stmt->fetch(PDO::FETCH_ASSOC)) !== false) {
                     $colonne ??= '(`'.implode('`, `', array_keys($riga)).'`)';
-                    $buffer[] = '('.implode(', ', array_map(fn ($v) => $v === null ? 'NULL' : $pdo->quote((string) $v), $riga)).')';
+                    $valori = [];
+                    foreach ($riga as $campo => $v) {
+                        $valori[] = match (true) {
+                            $v === null => 'NULL',
+                            isset($binarie[$campo]) => "X'".bin2hex((string) $v)."'",
+                            default => $pdo->quote((string) $v),
+                        };
+                    }
+                    $buffer[] = '('.implode(', ', $valori).')';
                     if (count($buffer) >= self::RIGHE_PER_INSERT) {
-                        gzwrite($gz, "INSERT INTO `{$tabella}` {$colonne} VALUES\n".implode(",\n", $buffer).";\n");
+                        $scrivi("INSERT INTO `{$tabella}` {$colonne} VALUES\n".implode(",\n", $buffer).";\n");
                         $buffer = [];
                     }
                 }
+                $stmt->closeCursor();
                 if ($buffer !== []) {
-                    gzwrite($gz, "INSERT INTO `{$tabella}` {$colonne} VALUES\n".implode(",\n", $buffer).";\n");
+                    $scrivi("INSERT INTO `{$tabella}` {$colonne} VALUES\n".implode(",\n", $buffer).";\n");
                 }
-                gzwrite($gz, "\n");
+                $scrivi("\n");
             }
 
-            gzwrite($gz, "SET FOREIGN_KEY_CHECKS = 1;\n");
+            $scrivi("SET FOREIGN_KEY_CHECKS = 1;\n");
+            if (! gzclose($gz)) {
+                throw new RuntimeException('Chiusura del file di backup fallita: '.$file);
+            }
+        } catch (\Throwable $e) {
+            // Mai lasciare un backup parziale spacciato per buono
+            @gzclose($gz);
+            @unlink($file);
+            throw $e;
         } finally {
-            gzclose($gz);
+            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, (bool) $bufferizzato);
         }
 
         @chmod($file, 0600);

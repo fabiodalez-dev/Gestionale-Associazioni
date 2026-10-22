@@ -59,10 +59,13 @@ class EnsureInstalled
             // Il wizard stesso ha appena creato il super admin e sta
             // completando gli ultimi step dallo stesso browser (token nel
             // cookie): restano aperti solo email e fine, non più il database
-            if ($rottaInstaller && $installer->wizardInCorso($token)) {
-                return $request->is('install/database*')
-                    ? redirect()->route('installer.email')
-                    : $next($request);
+            if ($installer->wizardInCorso($token)) {
+                // Fuori dal wizard (es. apre / in un'altra scheda) o indietro
+                // allo step database: si torna allo step email, senza chiudere
+                // il wizard a metà
+                return $rottaInstaller && ! $request->is('install/database*')
+                    ? $next($request)
+                    : redirect()->route('installer.email');
             }
 
             // Lock assente ma database già installato (installazione manuale

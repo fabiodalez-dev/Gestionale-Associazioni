@@ -57,7 +57,9 @@ class InstallerService
             if (! is_file($esempio) || ! is_writable(dirname($env))) {
                 return false;
             }
-            copy($esempio, $env);
+            if (! @copy($esempio, $env)) {
+                return false;
+            }
             @chmod($env, 0600);
             $creato = true;
 

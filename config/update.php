@@ -47,6 +47,11 @@ return [
         'public/uploads',
         'public/.user.ini',
         '.htaccess.local',
+        // Database locale (sviluppo o installazioni sqlite) e cache di
+        // composer: mai cancellati dalla pulizia degli orfani
+        'database/database.sqlite',
+        'bootstrap/cache/packages.php',
+        'bootstrap/cache/services.php',
     ],
 
     // Percorsi del pacchetto ignorati in copia.
@@ -54,7 +59,7 @@ return [
 
     // Cartelle di codice in cui i file non più presenti nel pacchetto vengono
     // cancellati dopo la copia (classi rimosse, dipendenze dismesse).
-    'orphan_dirs' => ['app', 'bootstrap/app.php', 'config', 'database', 'lang', 'resources', 'routes', 'vendor', 'public/assets', 'public/build', 'bin'],
+    'orphan_dirs' => ['app', 'config', 'database', 'lang', 'resources', 'routes', 'vendor', 'public/assets', 'public/build', 'bin'],
 
     // Area di lavoro: pacchetto scaricato, estrazione, backup dei file.
     'temp_path' => 'storage/app/updates',

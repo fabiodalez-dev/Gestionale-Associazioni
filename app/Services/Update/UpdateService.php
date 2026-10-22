@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Symfony\Component\Process\Process;
 use ZipArchive;
 
 /**
@@ -55,9 +56,16 @@ class UpdateService
 
     private bool $ownsUpdate = false;
 
+    /** Backup dei file della copia in corso: l'handler di shutdown lo usa per il rollback. */
+    private ?string $backupFileInCorso = null;
+
+    private bool $copiaIniziata = false;
+
+    private bool $shutdownRegistrato = false;
+
     public function __construct(?string $root = null)
     {
-        $root = $root ?? (string) config('update.root_path') ?: base_path();
+        $root = $root ?? ((string) config('update.root_path') ?: base_path());
         $this->root = rtrim(str_replace('\\', '/', $root), '/');
     }
 
@@ -272,8 +280,12 @@ class UpdateService
      */
     public function applicaAggiornamento(string $versione, ?Utente $esecutore = null, ?string $pacchettoLocale = null): array
     {
-        if (! $this->acquisisciLock()) {
-            return ['success' => false, 'error' => 'Un altro aggiornamento è già in corso.', 'log_id' => null, 'versione' => null];
+        try {
+            if (! $this->acquisisciLock()) {
+                return ['success' => false, 'error' => 'Un altro aggiornamento è già in corso.', 'log_id' => null, 'versione' => null];
+            }
+        } catch (RuntimeException $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'log_id' => null, 'versione' => null];
         }
 
         @set_time_limit(0);
@@ -325,6 +337,9 @@ class UpdateService
             $sorgente = $this->estrai($zip, $estrazione);
             $versionePacchetto = trim((string) file_get_contents($sorgente.'/VERSION'));
             if ($pacchettoLocale !== null) {
+                if (version_compare($versionePacchetto, $this->versioneCorrente(), '<')) {
+                    throw new RuntimeException("Il pacchetto dichiara la versione {$versionePacchetto}, più vecchia di quella installata (".$this->versioneCorrente().'): non si torna indietro con l\'aggiornamento (le migration non sono reversibili). Ripristina da un backup se serve.');
+                }
                 $versione = $versionePacchetto;
                 $log->update(['to_version' => $versione]);
             } elseif (ltrim($versione, 'v') !== $versionePacchetto) {
@@ -341,7 +356,8 @@ class UpdateService
             // 5. Manutenzione, backup file, copia, orfani
             $this->manutenzione(true);
             $backupFile = $this->backupFile($sorgente, $tmp.'/filebackup_'.now()->format('YmdHis'));
-            $copiaIniziata = true;
+            $this->backupFileInCorso = $backupFile;
+            $copiaIniziata = $this->copiaIniziata = true;
             $this->copia($sorgente, $this->root);
             $this->rimuoviOrfani($sorgente);
 
@@ -357,23 +373,34 @@ class UpdateService
             Log::error('UpdateService: aggiornamento fallito', ['versione' => $versione, 'error' => $e->getMessage()]);
 
             $stato = UpdateLog::STATO_FALLITO;
+            $messaggio = $e->getMessage();
+            $rollbackFallito = false;
             if ($copiaIniziata && $backupFile !== null) {
                 try {
                     $this->ripristinaFile($backupFile);
                     $stato = UpdateLog::STATO_ROLLBACK;
+                    // I file sono tornati indietro; il database no (le migration
+                    // già eseguite restano): il backup del passo 1 serve a questo
+                    $messaggio .= ' File ripristinati dal backup. Se le migration erano già partite, il database va ripristinato dal backup: '.($log->backup_path ?? 'vedi storage/app/private').'.';
                 } catch (\Throwable $r) {
                     Log::critical('UpdateService: rollback fallito', ['error' => $r->getMessage(), 'backup' => $backupFile]);
+                    $rollbackFallito = true;
+                    $messaggio .= ' ATTENZIONE: il ripristino dei file è fallito ('.$r->getMessage().'). Il sito resta in manutenzione; i file precedenti sono in '.$backupFile.' (.voci.json elenca cosa rimettere).';
                     $backupFile = null; // da conservare per il ripristino manuale
                 }
             }
-            $this->manutenzione(false);
+            if (! $rollbackFallito) {
+                $this->manutenzione(false);
+            }
 
-            $log->update(['stato' => $stato, 'messaggio_errore' => $e->getMessage(), 'completato_at' => now()]);
+            $log->update(['stato' => $stato, 'messaggio_errore' => $messaggio, 'completato_at' => now()]);
             $this->pulisci([$estrazione, $backupFile, $zipScaricato]);
 
-            return ['success' => false, 'error' => $e->getMessage(), 'log_id' => $log->id, 'versione' => $versione];
+            return ['success' => false, 'error' => $messaggio, 'log_id' => $log->id, 'versione' => $versione];
         } finally {
             $this->ownsUpdate = false;
+            $this->copiaIniziata = false;
+            $this->backupFileInCorso = null;
             $this->rilasciaLock();
         }
     }
@@ -557,13 +584,17 @@ class UpdateService
         if ($zip->open($zipPath) !== true) {
             throw new RuntimeException('Il pacchetto non è uno zip valido.');
         }
+        $byteDecompressi = 0;
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $entry = (string) $zip->getNameIndex($i);
-            if ($entry === '' || str_contains($entry, '..') || str_starts_with($entry, '/') || str_starts_with($entry, '\\') || preg_match('/^[A-Za-z]:[\\\\\/]/', $entry)) {
+            $segmenti = preg_split('/[\\\\\/]+/', $entry) ?: [];
+            if ($entry === '' || in_array('..', $segmenti, true) || str_starts_with($entry, '/') || str_starts_with($entry, '\\') || preg_match('/^[A-Za-z]:[\\\\\/]/', $entry)) {
                 $zip->close();
                 throw new RuntimeException('Percorso non valido nel pacchetto: '.$entry);
             }
+            $byteDecompressi += (int) ($zip->statIndex($i)['size'] ?? 0);
         }
+        $this->verificaSpazio($byteDecompressi + 50 * 1024 * 1024);
         File::deleteDirectory($destinazione);
         File::ensureDirectoryExists($destinazione);
         if (! $zip->extractTo($destinazione)) {
@@ -716,7 +747,7 @@ class UpdateService
     }
 
     /** Rollback: rimette ogni voce com'era prima della copia (e toglie quelle che non esistevano). */
-    private function ripristinaFile(string $backupDir): void
+    protected function ripristinaFile(string $backupDir): void
     {
         $elenco = json_decode((string) file_get_contents($backupDir.'/.voci.json'), true) ?: [];
         foreach ($elenco as $v) {
@@ -764,20 +795,43 @@ class UpdateService
     }
 
     /** Comandi dopo la copia dei file. */
+    /**
+     * Comandi dopo la copia dei file, in un processo PHP separato: il
+     * processo corrente ha in memoria il kernel e le classi della versione
+     * vecchia (comandi nuovi non registrati, classi miste). Prima vengono
+     * tolte le cache di bootstrap (config, rotte, eventi): quelle di
+     * composer (packages/services) arrivano fresche dal pacchetto.
+     */
     protected function postInstallazione(): void
     {
-        Artisan::call('migrate', ['--force' => true]);
-        Artisan::call('app:aggiorna-permessi');
-        Artisan::call('config:clear');
-        Artisan::call('cache:clear');
-        Artisan::call('view:clear');
-        Artisan::call('queue:restart');
-        if ($this->rootReale() && ! file_exists($this->root.'/public/storage')) {
+        foreach (['config.php', 'routes-v7.php', 'events.php', 'routes.scanned.php', 'events.scanned.php'] as $cache) {
+            @unlink($this->root.'/bootstrap/cache/'.$cache);
+        }
+
+        $this->artisanSeparato(['optimize:clear']);
+        $this->artisanSeparato(['migrate', '--force', '--no-interaction']);
+        $this->artisanSeparato(['app:aggiorna-permessi']);
+        try {
+            $this->artisanSeparato(['queue:restart']);
+        } catch (\Throwable $e) {
+            Log::warning('UpdateService: queue:restart non riuscito', ['error' => $e->getMessage()]);
+        }
+        if (! file_exists($this->root.'/public/storage')) {
             try {
-                Artisan::call('storage:link', ['--force' => true]);
+                $this->artisanSeparato(['storage:link', '--force']);
             } catch (\Throwable $e) {
                 Log::warning('UpdateService: storage:link non riuscito', ['error' => $e->getMessage()]);
             }
+        }
+    }
+
+    /** @param  list<string>  $argomenti */
+    private function artisanSeparato(array $argomenti): void
+    {
+        $processo = new Process(array_merge([PHP_BINARY, $this->root.'/artisan'], $argomenti), $this->root, null, null, 600);
+        $processo->run();
+        if (! $processo->isSuccessful()) {
+            throw new RuntimeException('php artisan '.implode(' ', $argomenti).' fallito: '.trim($processo->getErrorOutput().' '.$processo->getOutput()));
         }
     }
 
@@ -811,11 +865,10 @@ class UpdateService
     /** Un errore fatale a metà update non deve lasciare il sito in manutenzione. */
     private function registraShutdown(): void
     {
-        static $registrato = false;
-        if ($registrato) {
+        if ($this->shutdownRegistrato) {
             return;
         }
-        $registrato = true;
+        $this->shutdownRegistrato = true;
         register_shutdown_function(function (): void {
             if (! $this->ownsUpdate) {
                 return;
@@ -824,9 +877,24 @@ class UpdateService
             if ($errore !== null && in_array($errore['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
                 Log::critical('UpdateService: errore fatale durante l\'aggiornamento', $errore);
             }
-            try {
-                $this->manutenzione(false);
-            } catch (\Throwable) {
+            // Copia a metà: si prova il rollback; se fallisce il sito resta in
+            // manutenzione invece di andare online con file misti
+            $ripristinato = true;
+            if ($this->copiaIniziata && $this->backupFileInCorso !== null) {
+                try {
+                    $this->ripristinaFile($this->backupFileInCorso);
+                    UpdateLog::query()->where('stato', UpdateLog::STATO_AVVIATO)->orderByDesc('avviato_at')->first()
+                        ?->update(['stato' => UpdateLog::STATO_ROLLBACK, 'messaggio_errore' => 'Interrotto da un errore fatale; file ripristinati dal backup.', 'completato_at' => now()]);
+                } catch (\Throwable $r) {
+                    $ripristinato = false;
+                    Log::critical('UpdateService: rollback dopo errore fatale fallito, sito lasciato in manutenzione', ['error' => $r->getMessage(), 'backup' => $this->backupFileInCorso]);
+                }
+            }
+            if ($ripristinato) {
+                try {
+                    $this->manutenzione(false);
+                } catch (\Throwable) {
+                }
             }
             $this->rilasciaLock();
         });
@@ -838,7 +906,7 @@ class UpdateService
         File::ensureDirectoryExists(dirname($lock));
         $h = @fopen($lock, 'c');
         if ($h === false) {
-            return false;
+            throw new RuntimeException('Impossibile aprire il file di lock '.$lock.' (permessi: forse creato da un altro utente, es. aggiornamento lanciato da CLI). Correggi il proprietario o cancellalo.');
         }
         if (! flock($h, LOCK_EX | LOCK_NB)) {
             fclose($h);

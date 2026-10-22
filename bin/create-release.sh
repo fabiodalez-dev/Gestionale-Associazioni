@@ -53,7 +53,8 @@ echo "   ok: ".count($dump)." migration registrate\n";
 '
 
 if ! $SI; then
-    read -r -p "Creo e pusho il tag $TAG su $REPO ($BRANCH)${PRERELEASE:+ come prerelease}? [s/N] " r
+    nota=""; [[ "$PRERELEASE" == true ]] && nota=" come prerelease"
+    read -r -p "Creo e pusho il tag $TAG su $REPO ($BRANCH)${nota}? [s/N] " r
     [[ "$r" =~ ^[sS]$ ]] || fail "annullato"
 fi
 
@@ -80,10 +81,15 @@ DIGEST="$(gh api "repos/$REPO/releases/tags/$TAG" --jq ".assets[] | select(.name
 SHA_FILE="$(gh release download "$TAG" --pattern "$ASSET.sha256" --output - | cut -d' ' -f1)"
 [[ "sha256:$SHA_FILE" == "$DIGEST" ]] || fail "lo sha256 pubblicato ($SHA_FILE) non coincide con il digest dell'API ($DIGEST)"
 
-if $PRERELEASE; then
-    gh release edit "$TAG" --prerelease >/dev/null
+# La Action pubblica già i tag con trattino come prerelease: qui si verifica
+if [[ "$PRERELEASE" == true ]]; then
+    [[ "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" == "true" ]] || fail "la release $TAG non è marcata prerelease"
 fi
 
 info "Release $TAG pubblicata: $(gh release view "$TAG" --json url --jq .url)"
 echo "   digest $DIGEST"
-echo "   l'updater in-app (/aggiornamenti) la proporrà alle installazioni ${PRERELEASE:+sul canale rc}"
+if [[ "$PRERELEASE" == true ]]; then
+    echo "   l'updater in-app la proporrà solo alle installazioni con UPDATE_CHANNEL=rc"
+else
+    echo "   l'updater in-app (/aggiornamenti) la proporrà alle installazioni"
+fi

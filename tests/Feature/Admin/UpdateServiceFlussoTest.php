@@ -155,6 +155,57 @@ class UpdateServiceFlussoTest extends TestCase
         $this->assertFalse($updater->inCorso());
     }
 
+    public function test_rollback_fallito_lascia_il_sito_in_manutenzione_e_indica_il_backup(): void
+    {
+        $updater = new UpdateServiceDiProva($this->root);
+        $updater->fallisciPostInstallazione = true;
+        $updater->fallisciRipristino = true;
+
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto);
+
+        $this->assertFalse($esito['success']);
+        $this->assertStringContainsString('ripristino dei file è fallito', (string) $esito['error']);
+        $this->assertStringContainsString('filebackup_', (string) $esito['error']);
+        $this->assertFileExists($this->root.'/storage/framework/down', 'Con file misti il sito non deve tornare online');
+        $this->assertDatabaseHas('update_logs', ['stato' => 'fallito']);
+        // Il backup dei file resta sul disco per il ripristino manuale
+        $this->assertNotEmpty(glob($this->root.'/storage/app/updates/filebackup_*'));
+    }
+
+    public function test_pacchetto_locale_con_versione_piu_vecchia_viene_rifiutato(): void
+    {
+        File::put($this->root.'/VERSION', "0.5.0\n");
+        $updater = new UpdateServiceDiProva($this->root);
+
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto); // dichiara 0.2.0
+
+        $this->assertFalse($esito['success']);
+        $this->assertStringContainsString('non si torna indietro', (string) $esito['error']);
+        $this->assertFileExists($this->root.'/app/vecchio.php');
+        $this->assertSame('0.5.0', trim((string) file_get_contents($this->root.'/VERSION')));
+    }
+
+    public function test_nome_file_con_due_punti_consecutivi_e_ammesso_ma_il_segmento_padre_no(): void
+    {
+        // "..": solo come segmento di percorso è pericoloso; dentro un nome di file è legittimo
+        $zip = sys_get_temp_dir().'/updater_punti_'.uniqid().'.zip';
+        $z = new ZipArchive;
+        $z->open($zip, ZipArchive::CREATE);
+        $p = 'gestionale-associazioni/';
+        foreach (['VERSION' => "0.2.0\n", 'artisan' => '<?php', 'bootstrap/app.php' => '<?php', 'public/index.php' => '<?php', 'vendor/autoload.php' => '<?php', 'vendor/lib/file..js' => '//'] as $nome => $contenuto) {
+            $z->addFromString($p.$nome, $contenuto);
+        }
+        $z->close();
+
+        try {
+            $esito = (new UpdateServiceDiProva($this->root))->applicaAggiornamento('0.0.0', null, $zip);
+            $this->assertTrue($esito['success'], (string) $esito['error']);
+            $this->assertFileExists($this->root.'/vendor/lib/file..js');
+        } finally {
+            @unlink($zip);
+        }
+    }
+
     public function test_lock_impedisce_due_aggiornamenti_insieme(): void
     {
         File::ensureDirectoryExists($this->root.'/storage/framework');
@@ -263,6 +314,8 @@ class UpdateServiceDiProva extends UpdateService
 {
     public bool $fallisciPostInstallazione = false;
 
+    public bool $fallisciRipristino = false;
+
     public int $postInstallazioneEseguita = 0;
 
     protected function backupDatabase(): string
@@ -276,5 +329,13 @@ class UpdateServiceDiProva extends UpdateService
             throw new \RuntimeException('migrate fallita');
         }
         $this->postInstallazioneEseguita++;
+    }
+
+    protected function ripristinaFile(string $backupDir): void
+    {
+        if ($this->fallisciRipristino) {
+            throw new \RuntimeException('disco pieno durante il ripristino');
+        }
+        parent::ripristinaFile($backupDir);
     }
 }

@@ -10,6 +10,7 @@ use App\Models\RichiestaRegistrazione;
 use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Utente;
+use App\Services\Piattaforma\RegistrazioneAssociazioni;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -363,6 +364,14 @@ class PercorsoAssociazioneTest extends TestCase
         // L'oggetto è fisso: il testo scritto nel modulo non finisce nell'oggetto
         Mail::assertSent(VerificaEmailRegistrazioneMail::class, fn ($m) => ! str_contains($m->envelope()->subject, 'premio')
             && str_contains($m->render(), '&lt;b&gt;Vinci un premio&lt;/b&gt;'));
+
+        // Richieste simultanee che superano tutte la validazione prima che il contatore
+        // salga: il controllo al momento dell'invio è atomico, nessuna email in più
+        $servizio = app(RegistrazioneAssociazioni::class);
+        for ($i = 5; $i <= 7; $i++) {
+            $servizio->registra($this->moduloRegistrazione(['email' => "spam{$i}@truffa.test", 'admin_email' => 'vittima@casella.test']), '203.0.113.9');
+        }
+        Mail::assertSentCount(3);
 
         // Le richieste mai confermate vengono cancellate dopo 7 giorni
         RichiestaRegistrazione::query()->update(['created_at' => now()->subDays(8)]);

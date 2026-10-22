@@ -59,8 +59,12 @@ class RegistrazioneAssociazioni
             'privacy_accettata_at' => now(),
         ]);
 
-        RateLimiter::hit(RegistrazioneAssociazioneRequest::chiaveLimite($richiesta->admin_email), 86400);
-        $this->invia($richiesta->admin_email, new VerificaEmailRegistrazioneMail($richiesta, $this->linkVerifica($richiesta)));
+        // Controllo atomico: hit() incrementa e restituisce il nuovo valore, quindi
+        // invii simultanei non superano il limite (la validazione dà solo il messaggio)
+        $invii = RateLimiter::hit(RegistrazioneAssociazioneRequest::chiaveLimite($richiesta->admin_email), 86400);
+        if ($invii <= RegistrazioneAssociazioneRequest::INVII_PER_INDIRIZZO) {
+            $this->invia($richiesta->admin_email, new VerificaEmailRegistrazioneMail($richiesta, $this->linkVerifica($richiesta)));
+        }
 
         return $richiesta;
     }

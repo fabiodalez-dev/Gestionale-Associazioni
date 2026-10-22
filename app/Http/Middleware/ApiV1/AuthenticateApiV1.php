@@ -90,7 +90,6 @@ class AuthenticateApiV1
             tipo: ApiClientContext::TIPO_API_KEY,
             identificatore: $apiKey->id,
             associazioneId: $apiKey->associazione_id,
-            associazioneNome: $apiKey->associazione?->nome,
             permessi: $apiKey->permessi ?? [],
         );
 
@@ -145,7 +144,6 @@ class AuthenticateApiV1
             tipo: ApiClientContext::TIPO_SANCTUM,
             identificatore: (string) $accessToken->id,
             associazioneId: $utente->associazione_id ?: null,
-            associazioneNome: $associazione?->nome,
             permessi: $accessToken->abilities ?? [],
         );
 

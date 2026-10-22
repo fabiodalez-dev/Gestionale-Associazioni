@@ -25,8 +25,6 @@ class Scadenza extends Model
 
     public const STATO_COMPLETATA = 'Completata';
 
-    public const STATO_ANNULLATA = 'Annullata';
-
     protected $table = 'scadenze';
 
     protected $fillable = [

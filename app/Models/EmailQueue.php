@@ -46,14 +46,6 @@ class EmailQueue extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
-    public const STATUSES = [
-        self::STATUS_PENDING,
-        self::STATUS_SENDING,
-        self::STATUS_SENT,
-        self::STATUS_FAILED,
-        self::STATUS_CANCELLED,
-    ];
-
     protected $table = 'email_queue';
 
     public const UPDATED_AT = null;

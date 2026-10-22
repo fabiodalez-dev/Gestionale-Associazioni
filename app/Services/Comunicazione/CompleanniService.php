@@ -26,7 +26,10 @@ class CompleanniService
 
     /**
      * Soci attivi del tenant che compiono gli anni nel mese corrente,
-     * ordinati per giorno del mese.
+     * ordinati per giorno del mese. Chiamato dalla vista
+     * comunicazione/dashboard/_compleanni.
+     *
+     * @api
      *
      * @return Collection<int, Socio>
      */

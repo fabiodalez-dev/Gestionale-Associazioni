@@ -31,12 +31,6 @@ class TurnoAssegnazione extends Model
 
     public const STATO_RINUNCIATO = 'rinunciato';
 
-    public const STATI = [
-        self::STATO_PROPOSTO,
-        self::STATO_CONFERMATO,
-        self::STATO_RINUNCIATO,
-    ];
-
     protected $table = 'turni_assegnazioni';
 
     protected $fillable = [

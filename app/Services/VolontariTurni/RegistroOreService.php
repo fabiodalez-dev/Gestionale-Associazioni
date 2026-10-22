@@ -135,25 +135,4 @@ class RegistroOreService
             ->sortBy(fn (TurnoAssegnazione $a) => $a->turno?->data?->toDateString())
             ->values();
     }
-
-    /**
-     * Anni per cui esistono ore registrate per il socio (selezione attestato).
-     *
-     * @return list<int>
-     */
-    public function anniConOre(Socio $socio): array
-    {
-        return TurnoAssegnazione::query()
-            ->where('socio_id', $socio->id)
-            ->whereNotNull('ore_effettive')
-            ->whereHas('turno')
-            ->with('turno:id,data')
-            ->get()
-            ->map(fn (TurnoAssegnazione $a) => (int) $a->turno?->data?->format('Y'))
-            ->filter()
-            ->unique()
-            ->sortDesc()
-            ->values()
-            ->all();
-    }
 }

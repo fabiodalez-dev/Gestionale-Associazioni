@@ -18,11 +18,6 @@ use RuntimeException;
 
 class InstallerService
 {
-    public function isInstalled(): bool
-    {
-        return file_exists(config('installer.lock_file'));
-    }
-
     public function markInstalled(): void
     {
         $lockFile = config('installer.lock_file');

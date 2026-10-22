@@ -17,6 +17,11 @@ use Metalogico\Formello\FormelloField;
  */
 class PreiscrizioneForm extends ModuloFormello
 {
+    /**
+     * Campi anagrafici mostrati dalla vista struttura/preiscrizione/show.
+     *
+     * @api
+     */
     public const CAMPI_ANAGRAFICA = ['nome', 'cognome', 'email', 'telefono', 'data_nascita', 'codice_fiscale', 'indirizzo', 'citta', 'provincia', 'cap', 'tipo_socio_id', 'categoria_socio_id'];
 
     protected function fields(): array
@@ -80,6 +85,11 @@ class PreiscrizioneForm extends ModuloFormello
         return $campi;
     }
 
+    /**
+     * Costruisce il modulo dalla vista struttura/preiscrizione/show.
+     *
+     * @api
+     */
     public static function nuovo(Associazione $associazione, ?Socio $socioRinnovo, array $obbligatori, Collection $tipiSocio, Collection $categorieSocio): self
     {
         return new self($socioRinnovo ?? Socio::class, [

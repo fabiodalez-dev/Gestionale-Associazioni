@@ -26,7 +26,6 @@ class ApiClientContext
         public readonly string $tipo,
         public readonly string $identificatore,
         public readonly ?string $associazioneId,
-        public readonly ?string $associazioneNome,
         public readonly array $permessi,
     ) {}
 

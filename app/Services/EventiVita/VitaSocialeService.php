@@ -22,6 +22,9 @@ class VitaSocialeService
 {
     /**
      * Statistiche per la tab "Vita sociale" della scheda socio.
+     * Chiamato dalla vista eventi-vita/_vita-sociale-socio.
+     *
+     * @api
      *
      * @return array{
      *     account: Account|null,
@@ -95,7 +98,10 @@ class VitaSocialeService
 
     /**
      * Top partecipanti del tenant per la dashboard: account con più
-     * check-in agli eventi, con eventuale socio collegato.
+     * check-in agli eventi, con eventuale socio collegato. Chiamato dalla
+     * vista eventi-vita/_top-partecipanti.
+     *
+     * @api
      *
      * @return Collection<int, array{account: Account, presenze: int}>
      */

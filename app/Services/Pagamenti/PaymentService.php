@@ -34,8 +34,6 @@ class PaymentService
 {
     public const TOKEN_EXPIRY_HOURS = 72;
 
-    public const GIORNI_PREAVVISO_SCADENZA = 30;
-
     public function __construct(
         protected StripeGatewayInterface $stripe,
         protected PayPalGatewayInterface $paypal,

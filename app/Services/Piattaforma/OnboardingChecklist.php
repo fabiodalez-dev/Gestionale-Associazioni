@@ -96,6 +96,9 @@ class OnboardingChecklist
 
     /**
      * La card va mostrata? Solo se non dismessa e non al 100%.
+     * Chiamato dalla vista piattaforma/_onboarding-card.
+     *
+     * @api
      */
     public function visibile(Associazione $associazione): bool
     {

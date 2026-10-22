@@ -73,9 +73,4 @@ class RequiredFieldsConfig
 
         return $defaults;
     }
-
-    public function isRequired(?Associazione $associazione, string $contesto, string $campo): bool
-    {
-        return $this->per($associazione, $contesto)[$campo] ?? false;
-    }
 }

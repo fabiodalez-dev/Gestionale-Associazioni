@@ -67,33 +67,6 @@ final class Disponibilita
     }
 
     /**
-     * Sintesi leggibile della disponibilità per la scheda socio.
-     * Il dato arriva dal cast json di soci.disponibilita: i valori non sono
-     * garantiti (defensive contro json malformati).
-     *
-     * @param  array<string, mixed>|null  $disponibilita
-     */
-    public static function descrizione(?array $disponibilita): string
-    {
-        if (empty($disponibilita)) {
-            return 'Nessuna disponibilità indicata.';
-        }
-
-        $righe = [];
-
-        foreach ($disponibilita as $giorno => $fasce) {
-            if (! isset(self::GIORNI[$giorno]) || ! is_array($fasce)) {
-                continue;
-            }
-
-            $etichette = array_map(fn ($f) => self::FASCE[$f] ?? $f, $fasce);
-            $righe[] = self::GIORNI[$giorno].': '.implode(', ', $etichette);
-        }
-
-        return $righe === [] ? 'Nessuna disponibilità indicata.' : implode(' · ', $righe);
-    }
-
-    /**
      * Verifica se la disponibilità copre la data/fascia di un turno
      * (suggerimenti per disponibilità, f.3).
      *

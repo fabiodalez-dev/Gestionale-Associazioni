@@ -452,17 +452,16 @@ class DemoSeeder extends Seeder
         }
 
         // f.21 Ricevuta numerata (1/{anno}) della quota già pagata di Anna
-        // Verdi, scaricabile da admin (Quote) e dall'area soci
-        if ($quotaPagata !== null) {
-            Ricevuta::create([
-                'associazione_id' => $associazione->id,
-                'quota_id' => $quotaPagata->id,
-                'numero' => 1,
-                'anno' => $anno,
-                'importo' => $quotaPagata->importo,
-                'emessa_at' => now()->subMonths(1),
-            ]);
-        }
+        // Verdi (prima socia dell'elenco), scaricabile da admin (Quote) e
+        // dall'area soci
+        Ricevuta::create([
+            'associazione_id' => $associazione->id,
+            'quota_id' => $quotaPagata->id,
+            'numero' => 1,
+            'anno' => $anno,
+            'importo' => $quotaPagata->importo,
+            'emessa_at' => now()->subMonths(1),
+        ]);
 
         /*
         |------------------------------------------------------------------
@@ -514,10 +513,7 @@ class DemoSeeder extends Seeder
         $primaNota = app(PrimaNotaService::class);
         $primaNota->seedCategorie($associazione->id);
 
-        if ($quotaPagata !== null) {
-            $primaNota->registraIncassoQuotaBestEffort($quotaPagata->id);
-        }
-
+        $primaNota->registraIncassoQuotaBestEffort($quotaPagata->id);
         $primaNota->registraDonazioneBestEffort($donazione);
 
         Movimento::create([

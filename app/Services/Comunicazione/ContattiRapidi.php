@@ -16,6 +16,9 @@ class ContattiRapidi
 
     /**
      * URL wa.me del numero, o NULL se il telefono non è utilizzabile.
+     * Chiamato dalla vista comunicazione/soci/_contatti-rapidi.
+     *
+     * @api
      */
     public static function whatsappUrl(?string $telefono): ?string
     {
@@ -26,6 +29,9 @@ class ContattiRapidi
 
     /**
      * URL tel: del numero (così com'è, spazi esclusi), o NULL.
+     * Chiamato dalla vista comunicazione/soci/_contatti-rapidi.
+     *
+     * @api
      */
     public static function telUrl(?string $telefono): ?string
     {

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Relazioni\AmbasciatoriController;
 use App\Http\Controllers\Relazioni\ContattoEsternoController;
+use App\Http\Controllers\Relazioni\CrmPipelineController;
 use App\Http\Controllers\Relazioni\GalleriaEventoController;
 use App\Http\Controllers\Relazioni\SponsorController;
 use App\Http\Controllers\Relazioni\StatisticheAnnualiController;
@@ -48,6 +49,15 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::post('/sponsor', [SponsorController::class, 'store'])->name('sponsor.store');
     Route::put('/sponsor/{sponsor}', [SponsorController::class, 'update'])->name('sponsor.update');
     Route::delete('/sponsor/{sponsor}', [SponsorController::class, 'destroy'])->name('sponsor.destroy');
+
+    // ---- CRM a colonne: adesioni, sponsor, volontari ----
+    Route::get('/crm', [CrmPipelineController::class, 'index'])->name('crm.index');
+    Route::post('/crm', [CrmPipelineController::class, 'store'])->name('crm.store');
+    Route::put('/crm/{opportunita}', [CrmPipelineController::class, 'update'])->name('crm.update');
+    Route::patch('/crm/{opportunita}/sposta', [CrmPipelineController::class, 'sposta'])->name('crm.sposta');
+    Route::post('/crm/{opportunita}/persa', [CrmPipelineController::class, 'persa'])->name('crm.persa');
+    Route::post('/crm/{opportunita}/riapri', [CrmPipelineController::class, 'riapri'])->name('crm.riapri');
+    Route::delete('/crm/{opportunita}', [CrmPipelineController::class, 'destroy'])->name('crm.destroy');
 
     // ---- f.23 Classifica ambasciatori (porta un amico) ----
     Route::get('/ambasciatori', [AmbasciatoriController::class, 'index'])->name('ambasciatori.index');

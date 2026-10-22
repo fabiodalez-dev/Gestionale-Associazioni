@@ -316,6 +316,13 @@
                     </div>
                 </li>
                 @endif
+                @if ($can('relazioni.view'))
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('crm.*') ? 'active' : '' }}" href="{{ $nav('crm.index') }}">
+                        <i class="bi bi-kanban"></i>CRM a colonne
+                    </a>
+                </li>
+                @endif
                 @if ($can('relazioni.view') || $can('soci.view'))
                 <li class="nav-item">
                     <a class="nav-link {{ $relazioniActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#relazioniSubmenu" role="button" aria-expanded="{{ $relazioniActive ? 'true' : 'false' }}">

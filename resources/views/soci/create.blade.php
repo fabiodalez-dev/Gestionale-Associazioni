@@ -82,12 +82,12 @@
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label" for="nome">Nome *</label>
-                                    <input type="text" class="form-control @error('nome') is-invalid @enderror" id="nome" name="nome" maxlength="100" required autocomplete="off" value="{{ old('nome') }}">
+                                    <input type="text" class="form-control @error('nome') is-invalid @enderror" id="nome" name="nome" maxlength="100" required autocomplete="off" value="{{ old('nome', is_string(request('nome')) ? request('nome') : '') }}">
                                     @error('nome')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="cognome">Cognome *</label>
-                                    <input type="text" class="form-control @error('cognome') is-invalid @enderror" id="cognome" name="cognome" maxlength="100" required autocomplete="off" value="{{ old('cognome') }}">
+                                    <input type="text" class="form-control @error('cognome') is-invalid @enderror" id="cognome" name="cognome" maxlength="100" required autocomplete="off" value="{{ old('cognome', is_string(request('cognome')) ? request('cognome') : '') }}">
                                     @error('cognome')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="col-md-6">
@@ -105,7 +105,7 @@
                                     <label class="form-label" for="email">Email *</label>
                                     <div class="input-group has-validation">
                                         <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                                        <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" required autocomplete="off" value="{{ old('email') }}">
+                                        <input type="email" class="form-control @error('email') is-invalid @enderror" id="email" name="email" required autocomplete="off" value="{{ old('email', is_string(request('email')) ? request('email') : '') }}">
                                         <div class="invalid-feedback" data-feedback="email">@error('email'){{ $message }}@enderror</div>
                                     </div>
                                 </div>
@@ -113,7 +113,7 @@
                                     <label class="form-label" for="telefono">Telefono{{ $star('telefono') }}</label>
                                     <div class="input-group has-validation">
                                         <span class="input-group-text">+39</span>
-                                        <input type="tel" class="form-control @error('telefono') is-invalid @enderror" id="telefono" name="telefono" maxlength="20" @required($req('telefono')) value="{{ old('telefono') }}" placeholder="333 123 4567">
+                                        <input type="tel" class="form-control @error('telefono') is-invalid @enderror" id="telefono" name="telefono" maxlength="20" @required($req('telefono')) value="{{ old('telefono', is_string(request('telefono')) ? request('telefono') : '') }}" placeholder="333 123 4567">
                                         @error('telefono')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                 </div>

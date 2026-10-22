@@ -18,7 +18,8 @@ use Spatie\LaravelSettings\SettingsMapper;
  * Si ottengono solo con ::per($associazione), mai dal container: il tenant è
  * esplicito anche in comandi e job che scorrono più associazioni.
  *
- * Transizione dalle colonne di `associazioni` (stessi nomi delle proprietà):
+ * Transizione dalle colonne di `associazioni` (stessi nomi delle proprietà,
+ * vedi colonne()):
  * - lettura: valore salvato in settings, altrimenti la colonna;
  * - scrittura: settings e colonna insieme, così query SQL, import e codice
  *   non ancora migrato restano coerenti. Le colonne si rimuovono in una
@@ -48,17 +49,19 @@ abstract class ImpostazioniAssociazione extends Settings
         // Modello caricato con colonne parziali (es. with('associazione:id,nome')):
         // rilegge le colonne mancanti invece di ricadere in silenzio sui default.
         $colonne = $associazione;
-        $mancanti = array_diff(static::proprieta(), array_keys($salvati), array_keys($associazione->getAttributes()));
+        $mancanti = array_diff(static::colonne(), array_keys($salvati), array_keys($associazione->getAttributes()));
         if ($mancanti !== [] && $associazione->exists) {
             $colonne = $associazione->newQuery()->withoutGlobalScopes()
-                ->whereKey($associazione->getKey())->first(static::proprieta()) ?? $associazione;
+                ->whereKey($associazione->getKey())->first(static::colonne()) ?? $associazione;
         }
 
         $valori = [];
         foreach (static::proprieta() as $nome) {
-            $valori[$nome] = array_key_exists($nome, $salvati)
-                ? $salvati[$nome]
-                : $colonne->getAttribute($nome);
+            $valori[$nome] = match (true) {
+                array_key_exists($nome, $salvati) => $salvati[$nome],
+                in_array($nome, static::colonne(), true) => $colonne->getAttribute($nome),
+                default => null,
+            };
         }
 
         $impostazioni = new static(static::normalizza($valori));
@@ -75,7 +78,10 @@ abstract class ImpostazioniAssociazione extends Settings
         DB::transaction(function () use ($associazione): void {
             ContestoImpostazioni::con((string) $associazione->getKey(), fn () => parent::save());
 
-            $associazione->forceFill($this->toArray())->save();
+            $mirror = array_intersect_key($this->toArray(), array_flip(static::colonne()));
+            if ($mirror !== []) {
+                $associazione->forceFill($mirror)->save();
+            }
         });
 
         $associazione->ricordaImpostazioni($this);
@@ -111,6 +117,17 @@ abstract class ImpostazioniAssociazione extends Settings
                 fn (ReflectionProperty $p) => ! $p->isStatic(),
             ),
         ));
+    }
+
+    /**
+     * Proprietà che hanno ancora una colonna omonima su `associazioni`
+     * (lettura di ripiego e doppia scrittura). Un gruppo nuovo restituisce [].
+     *
+     * @return list<string>
+     */
+    public static function colonne(): array
+    {
+        return static::proprieta();
     }
 
     /**

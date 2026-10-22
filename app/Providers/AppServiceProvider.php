@@ -4,6 +4,10 @@ namespace App\Providers;
 
 use App\Health\JobFallitiCheck;
 use App\Listeners\RegistraAccesso;
+use App\Models\Evento;
+use App\Observers\EventoGoogleCalendarObserver;
+use App\Services\Calendario\CalendarioEsterno;
+use App\Services\Calendario\GoogleCalendarSpatie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -21,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(CalendarioEsterno::class, GoogleCalendarSpatie::class);
     }
 
     /**
@@ -35,6 +39,9 @@ class AppServiceProvider extends ServiceProvider
         // Audit accessi (f.25 piano "Gestione 2"): Login/Failed/Logout
         // di tutte le guard registrati best-effort nella tabella accessi
         Event::subscribe(RegistraAccesso::class);
+
+        // Sincronizzazione eventi → Google Calendar (solo associazioni che l'hanno attivata)
+        Evento::observe(EventoGoogleCalendarObserver::class);
     }
 
     /**

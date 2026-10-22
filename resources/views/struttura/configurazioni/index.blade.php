@@ -13,6 +13,7 @@
         'campi-obbligatori' => ['bi-ui-checks', 'Campi obbligatori'],
         'tessera-template' => ['bi-postcard', 'Template tessera'],
         'pagamenti' => ['bi-credit-card', 'Pagamenti online'],
+        'google-calendar' => ['bi-calendar-week', 'Google Calendar'],
         'comunicazione' => ['bi-megaphone', 'Comunicazione'],
         'invito' => ['bi-qr-code', 'Invita al mini-sito'],
     ];
@@ -481,6 +482,10 @@
         @endif
 
         {{-- ============ INVITA AL MINI-SITO (f.22) ============ --}}
+        @if ($section === 'google-calendar')
+            @include('struttura.configurazioni._google-calendar')
+        @endif
+
         @if ($section === 'invito')
             @php
                 $linkIscrizione = \Illuminate\Support\Facades\Route::has('pubblico.iscriviti')

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Struttura\AmministratoreController;
 use App\Http\Controllers\Struttura\AssociazioneController;
 use App\Http\Controllers\Struttura\ConfigurazioniController;
+use App\Http\Controllers\Struttura\GoogleCalendarController;
 use App\Http\Controllers\Struttura\InvitoController;
 use App\Http\Controllers\Struttura\ModuloIscrizioneController;
 use App\Http\Controllers\Struttura\PreiscrizioneController;
@@ -78,6 +79,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/configurazioni/campi-obbligatori', [ConfigurazioniController::class, 'updateCampiObbligatori'])->name('configurazioni.campi-obbligatori');
         Route::post('/configurazioni/tessera-template', [ConfigurazioniController::class, 'saveTesseraTemplate'])->name('configurazioni.tessera-template');
         Route::post('/configurazioni/pagamenti', [ConfigurazioniController::class, 'updatePaymentGateway'])->name('configurazioni.pagamenti');
+        Route::post('/configurazioni/google-calendar', [GoogleCalendarController::class, 'update'])->name('configurazioni.google-calendar');
+        Route::post('/configurazioni/google-calendar/verifica', [GoogleCalendarController::class, 'verifica'])
+            ->middleware('throttle:10,1')->name('configurazioni.google-calendar.verifica');
+        Route::post('/configurazioni/google-calendar/sincronizza', [GoogleCalendarController::class, 'sincronizzaTutti'])
+            ->middleware('throttle:5,1')->name('configurazioni.google-calendar.sincronizza');
 
         // Modulo di iscrizione socio (PIANO-ISCRIZIONI §Rotte/Admin):
         // pagina dedicata linkata dalle Configurazioni, policy struttura.view/update

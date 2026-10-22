@@ -3,64 +3,154 @@
 @section('title', 'Gestione Associazioni')
 
 @section('content')
-<div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="bi bi-buildings me-2"></i>Gestione Associazioni</h1>
-    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalAssociazione" id="btnNuovaAssociazione">
-        <i class="bi bi-plus-lg me-1"></i>Nuova Associazione
-    </button>
+@php
+    $iniziali = fn (?string $t) => mb_strtoupper(collect(preg_split('/\s+/', trim((string) $t)) ?: [])->filter()->take(2)->map(fn ($p) => mb_substr($p, 0, 1))->join('')) ?: '?';
+    $euroBreve = fn (float $v) => $v >= 1000 ? '€ '.number_format($v / 1000, $v >= 10000 ? 0 : 1, ',', '.').'k' : '€ '.number_format($v, 0, ',', '.');
+    $etichetteRegistrazione = ['disattivata' => 'Solo super admin', 'revisione' => 'Con approvazione', 'automatica' => 'Automatica'];
+    $tonoMatrice = ['Completo' => 'bg-success', 'Modifica' => 'bg-info', 'Lettura' => 'bg-secondary'];
+@endphp
+
+<div class="page-head">
+    <div>
+        <div class="crumb">Piattaforma / <span>Associazioni</span></div>
+        <h1>Associazioni</h1>
+    </div>
+    <div class="actions">
+        @if (Route::has('richieste-registrazione.index'))
+            <a href="{{ route('richieste-registrazione.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-inbox"></i>Richieste di iscrizione
+                @if ($piattaforma['richieste'] > 0)<span class="badge bg-danger">{{ $piattaforma['richieste'] }}</span>@endif
+            </a>
+        @endif
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalAssociazione" id="btnNuovaAssociazione">
+            <i class="bi bi-plus-lg"></i>Nuova Associazione
+        </button>
+    </div>
 </div>
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Associazione</th>
-                    <th>Email</th>
-                    <th>Stato</th>
-                    <th class="text-center">Sedi</th>
-                    <th class="text-center">Soci</th>
-                    <th>Scadenza default</th>
-                    <th class="text-end">Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($associazioni as $assoc)
-                    <tr>
-                        <td>
-                            @if ($assoc->logoUrl())
-                                <img src="{{ $assoc->logoUrl('miniatura') }}" alt="Logo {{ $assoc->nome }}" style="height: 28px; width: auto;" class="me-2 rounded">
-                            @endif
-                            <strong>{{ $assoc->nome }}</strong>
-                        </td>
-                        <td>{{ $assoc->email }}</td>
-                        <td>
-                            <span class="badge {{ $assoc->attiva ? 'bg-success' : 'bg-secondary' }}">
-                                {{ $assoc->attiva ? 'Attiva' : 'Disattiva' }}
-                            </span>
-                        </td>
-                        <td class="text-center">{{ $assoc->sedi_count }}</td>
-                        <td class="text-center">{{ $assoc->soci_count }}</td>
-                        <td>{{ $assoc->tesseramento()->scadenzaAnnuale() ? 'Annuale (365 gg)' : 'Anno solare' }}</td>
-                        <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" href="{{ route('associazioni.index', ['edit' => $assoc->id]) }}" title="Modifica">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <button class="btn btn-sm btn-outline-danger" type="button"
-                                    data-bs-toggle="modal" data-bs-target="#modalElimina"
-                                    data-assoc-id="{{ $assoc->id }}" data-assoc-nome="{{ $assoc->nome }}" title="Elimina">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="7" class="text-center text-muted py-4">Nessuna associazione presente.</td></tr>
-                @endforelse
-            </tbody>
-            <tfoot>
-                <tr><td colspan="7" class="text-muted small">Totale: {{ $associazioni->count() }} associazioni</td></tr>
-            </tfoot>
-        </table>
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="facts-grid">
+            <div><span>Associazioni attive</span><b>{{ $piattaforma['attive'] }} di {{ $piattaforma['totali'] }}</b></div>
+            <div><span>Soci in totale</span><b>{{ number_format($piattaforma['soci'], 0, ',', '.') }}</b></div>
+            <div><span>Utenti dello staff attivi</span><b>{{ number_format($piattaforma['utenti'], 0, ',', '.') }}</b></div>
+            <div><span>Quote incassate {{ now()->year }}</span><b>{{ $euroBreve($piattaforma['incassi']) }}</b></div>
+            <div><span>Iscrizione nuove associazioni</span><b><a href="{{ route('impostazioni-sistema.index', ['sezione' => 'registrazione']) }}">{{ $etichetteRegistrazione[$piattaforma['registrazione']] }}</a></b></div>
+            <div><span>Dominio</span><b class="mono">{{ parse_url(config('app.url'), PHP_URL_HOST) ?: request()->getHost() }}</b></div>
+        </div>
+    </div>
+</div>
+
+@if ($associazioni->isEmpty())
+    <div class="card"><div class="empty-state"><span class="icon-tile tone-4"><i class="bi bi-buildings"></i></span><h3>Nessuna associazione</h3><p class="mb-0">Creane una o attiva l'iscrizione autonoma.</p></div></div>
+@else
+    <div class="assoc-grid mb-4">
+        @foreach ($associazioni as $assoc)
+            <article class="card assoc-card">
+                <div class="d-flex align-items-start gap-3">
+                    @if ($assoc->logoUrl())
+                        <img src="{{ $assoc->logoUrl('miniatura') }}" alt="Logo {{ $assoc->nome }}" class="assoc-logo">
+                    @else
+                        <span class="avatar avatar-lg avatar-square tone-{{ $loop->index % 6 }}">{{ $iniziali($assoc->nome) }}</span>
+                    @endif
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold text-body text-truncate">{{ $assoc->nome }}</div>
+                        <div class="who-sub text-truncate">{{ collect([$assoc->citta, $assoc->email])->filter()->join(' · ') }}</div>
+                    </div>
+                    <span class="badge {{ $assoc->attiva ? 'bg-success' : 'bg-secondary' }}">{{ $assoc->attiva ? 'Attiva' : 'Disattiva' }}</span>
+                </div>
+                <div class="assoc-stats">
+                    <div><span>Soci</span><b>{{ number_format($assoc->soci_count, 0, ',', '.') }}</b></div>
+                    <div><span>Admin</span><b>{{ $adminPerAssociazione[$assoc->id] ?? 0 }}</b></div>
+                    <div><span>Sedi</span><b>{{ $assoc->sedi_count }}</b></div>
+                    <div><span>Incassi</span><b>{{ isset($incassiPerAssociazione[$assoc->id]) ? $euroBreve((float) $incassiPerAssociazione[$assoc->id]) : '—' }}</b></div>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-auto">
+                    <span class="mono small text-muted text-truncate flex-grow-1">/a/{{ $assoc->slug }}</span>
+                    <a class="btn btn-sm btn-icon btn-ghost" href="{{ route('associazioni.index', ['edit' => $assoc->id]) }}" title="Modifica" aria-label="Modifica {{ $assoc->nome }}"><i class="bi bi-pencil"></i></a>
+                    <button class="btn btn-sm btn-icon btn-ghost btn-ghost-danger" type="button" data-bs-toggle="modal" data-bs-target="#modalElimina"
+                            data-assoc-id="{{ $assoc->id }}" data-assoc-nome="{{ $assoc->nome }}" title="Elimina" aria-label="Elimina {{ $assoc->nome }}"><i class="bi bi-trash"></i></button>
+                    <form method="POST" action="{{ route('tenant.switch') }}" class="m-0">
+                        @csrf
+                        <input type="hidden" name="associazione_id" value="{{ $assoc->id }}">
+                        <button type="submit" class="btn btn-sm btn-soft">Apri <i class="bi bi-arrow-right"></i></button>
+                    </form>
+                </div>
+            </article>
+        @endforeach
+    </div>
+    <p class="text-muted small">Totale: {{ $associazioni->count() }} associazioni</p>
+@endif
+
+<div class="row g-4">
+    <div class="col-xl-7">
+        <div class="card h-100">
+            <div class="card-head pb-3">
+                <div>
+                    <h2>Ruoli e permessi</h2>
+                    <div class="sub">Permessi predefiniti di ogni ruolo; ogni associazione assegna i ruoli ai suoi utenti.</div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle matrix">
+                    <thead>
+                        <tr>
+                            <th>Modulo</th>
+                            @foreach ($ruoliMatrice as $ruolo)
+                                <th class="text-center">{{ \App\Support\RuoliAssociazione::label($ruolo) }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($moduliMatrice as $modulo => $nomeModulo)
+                            <tr>
+                                <td>{{ $nomeModulo }}</td>
+                                @foreach ($ruoliMatrice as $ruolo)
+                                    @php $livello = $matrice[$modulo][$ruolo] ?? null; @endphp
+                                    <td class="text-center">
+                                        @if ($livello)
+                                            <span class="badge {{ $tonoMatrice[$livello] }}">{{ $livello }}</span>
+                                        @else
+                                            <span class="text-subtle">—</span>
+                                        @endif
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card h-100">
+            <div class="card-head pb-3">
+                <h2>Registro accessi</h2>
+                @if (Route::has('audit-accessi.index'))
+                    <a href="{{ route('audit-accessi.index') }}">Audit completo</a>
+                @endif
+            </div>
+            @if ($accessiRecenti->isEmpty())
+                <div class="panel-empty"><i class="bi bi-shield-check"></i>Nessun accesso registrato.</div>
+            @else
+                <ul class="panel-list">
+                    @foreach ($accessiRecenti as $accesso)
+                        <li>
+                            <div class="who-cell">
+                                <span class="avatar avatar-sm {{ $accesso->esito === \App\Models\Accesso::ESITO_FALLITO ? 'tone-danger' : 'tone-'.(abs(crc32((string) $accesso->email_tentata)) % 6) }}">{{ mb_strtoupper(mb_substr((string) $accesso->email_tentata, 0, 2)) }}</span>
+                                <div class="min-w-0">
+                                    <div class="text-body text-truncate">
+                                        <b>{{ $accesso->email_tentata ?: 'Utente' }}</b>
+                                        {{ match ($accesso->esito) { \App\Models\Accesso::ESITO_LOGIN => 'ha effettuato l\'accesso', \App\Models\Accesso::ESITO_LOGOUT => 'è uscito', default => 'accesso non riuscito' } }}
+                                    </div>
+                                    <div class="who-sub">{{ $accesso->associazione?->nome ?? 'Piattaforma' }} · {{ $accesso->created_at?->locale('it')->diffForHumans() }}</div>
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
     </div>
 </div>
 
@@ -89,7 +179,9 @@
                             </ul>
                         </div>
                     @endif
-                    @php($formAssociazione = new \App\Forms\AssociazioneForm($editAssociazione ?? \App\Models\Associazione::class))
+                    @php
+                        $formAssociazione = new \App\Forms\AssociazioneForm($editAssociazione ?? \App\Models\Associazione::class);
+                    @endphp
                     <h6 class="text-muted text-uppercase small">Anagrafica</h6>
                     @include('formello.campi', ['form' => $formAssociazione, 'solo' => ['nome', 'email', 'slug']])
                     {{-- Anteprima dell'URL del mini-sito (f.22), aggiornata mentre si scrive lo slug --}}

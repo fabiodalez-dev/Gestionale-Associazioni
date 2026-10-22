@@ -1756,3 +1756,19 @@ details.card[open] > summary::after { transform: rotate(180deg); }
 .preview-bar .mono { margin-left: 8px; font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .preview-body { padding: 18px; max-height: 560px; overflow-y: auto; }
 .preview-body .form-control:disabled, .preview-body .form-select:disabled { background: var(--ds-surface); color: var(--ds-text-subtle); }
+
+/* ----------------------------------------------------------------------------
+   22. ASSOCIAZIONI (super admin)
+---------------------------------------------------------------------------- */
+.facts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px 24px; }
+.facts-grid span { display: block; font-size: 0.8125rem; color: var(--ds-text-muted); }
+.facts-grid b { display: block; font-weight: 600; color: var(--ds-text); margin-top: 2px; }
+.assoc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+.assoc-card { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.assoc-logo { width: 44px; height: 44px; border-radius: 10px; object-fit: contain; background: #fff; box-shadow: 0 0 0 1px var(--ds-line); }
+.assoc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--ds-surface-2); }
+.assoc-stats span { display: block; font-size: 0.71875rem; color: var(--ds-text-muted); }
+.assoc-stats b { display: block; font-weight: 600; color: var(--ds-text); font-variant-numeric: tabular-nums; }
+.table.matrix td, .table.matrix th { white-space: nowrap; }
+.table.matrix .badge { font-size: 0.6875rem; }
+.text-subtle { color: var(--ds-text-subtle) !important; }

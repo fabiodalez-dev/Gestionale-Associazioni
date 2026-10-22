@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Models\Accesso;
 use App\Models\Utente;
 use App\Notifications\Piattaforma\TentativiAccessoFallitiNotification;
+use App\Support\AccountTentativoAccesso;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -89,8 +90,9 @@ class NotificaTentativiFallitiAccesso
      */
     protected function destinatari(Failed $event)
     {
-        $tenantId = $event->user instanceof Model
-            ? $event->user->getAttribute('associazione_id')
+        $account = AccountTentativoAccesso::risolvi($event);
+        $tenantId = $account instanceof Model
+            ? $account->getAttribute('associazione_id')
             : null;
 
         if ($tenantId !== null) {

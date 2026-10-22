@@ -19,8 +19,10 @@ class NumeroProgressivoService
 {
     public function prossimoNumeroSocio(string $associazioneId): string
     {
-        $max = Socio::allTenants()
-            ->withTrashed() // l'unique (associazione_id, numero_socio) copre anche i soci nel cestino
+        // Senza alcun global scope: l'unique (associazione_id, numero_socio) copre anche i soci
+        // nel cestino e quelli fuori dal perimetro di sede dell'operatore che sta iscrivendo
+        $max = Socio::query()
+            ->withoutGlobalScopes()
             ->where('associazione_id', $associazioneId)
             ->when($this->supportsLock(), fn ($q) => $q->lockForUpdate())
             ->max(DB::raw('numero_socio + 0'));
@@ -30,7 +32,9 @@ class NumeroProgressivoService
 
     public function prossimoNumeroTessera(string $associazioneId): string
     {
-        $max = Tessera::allTenants()
+        // Anche qui tutte le tessere dell'associazione, non solo quelle nel perimetro di sede
+        $max = Tessera::query()
+            ->withoutGlobalScopes()
             ->where('associazione_id', $associazioneId)
             ->when($this->supportsLock(), fn ($q) => $q->lockForUpdate())
             ->max(DB::raw('numero_tessera + 0'));

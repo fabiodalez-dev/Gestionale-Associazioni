@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Models\Accesso;
+use App\Support\AccountTentativoAccesso;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -28,13 +29,14 @@ class RegistraAccesso
 
     public function registraFallito(Failed $event): void
     {
-        // Su tentativo fallito $event->user è valorizzato solo se l'email
-        // esiste (password errata): in quel caso tenant e morph sono noti.
+        // Fortify emette Failed con utente nullo anche a password errata su
+        // un'email esistente: l'account si risolve dal provider della guard,
+        // così tenant e morph restano noti e l'admin vede il tentativo nel suo audit.
         $emailTentata = isset($event->credentials['email'])
             ? (string) $event->credentials['email']
             : null;
 
-        $this->registra($event->guard, $event->user, Accesso::ESITO_FALLITO, $emailTentata);
+        $this->registra($event->guard, AccountTentativoAccesso::risolvi($event), Accesso::ESITO_FALLITO, $emailTentata);
     }
 
     public function registraLogout(Logout $event): void

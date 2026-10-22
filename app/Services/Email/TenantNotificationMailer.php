@@ -26,7 +26,7 @@ use Throwable;
 class TenantNotificationMailer
 {
     /** Colore brand di default quando il tenant non ne definisce uno. */
-    public const COLORE_DEFAULT = '#FF7B11';
+    public const COLORE_DEFAULT = '#0D9488';
 
     /**
      * Applica (se possibile) il layout brandizzato e il mailer SMTP

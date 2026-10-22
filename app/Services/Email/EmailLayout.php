@@ -8,7 +8,7 @@ use Throwable;
 
 /**
  * Wrapper base responsive delle email in uscita (porting di wrapInEmailTemplate):
- * layout email-safe a tabelle 600px, header brand #FF7B11 con logo e nome
+ * layout email-safe a tabelle 600px, header brand #0D9488 con logo e nome
  * associazione, footer con © anno e link di disiscrizione.
  *
  * In Laravel il layout viene applicato in modo uniforme a tutte le email

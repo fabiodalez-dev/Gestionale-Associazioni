@@ -14,5 +14,11 @@
         --ds-accent: {{ $moduliStile->colore_primario }};
         --ds-accent-hover: color-mix(in srgb, {{ $moduliStile->colore_primario }} 85%, #000);
         --ds-accent-subtle: color-mix(in srgb, {{ $moduliStile->colore_primario }} 12%, #fff);
+        --ds-accent-softer: color-mix(in srgb, {{ $moduliStile->colore_primario }} 6%, #fff);
+        --ds-accent-mid: color-mix(in srgb, {{ $moduliStile->colore_primario }} 40%, #fff);
+        --ds-accent-ink: color-mix(in srgb, {{ $moduliStile->colore_primario }} 82%, #000);
+        --ds-accent-rgb: {{ $moduliStile->coloreRgb() }};
+        --ds-accent-ring: rgba({{ $moduliStile->coloreRgb() }}, 0.2);
+        --ds-shadow-accent: 0 2px 6px rgba({{ $moduliStile->coloreRgb() }}, 0.32);
     }
 </style>

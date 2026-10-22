@@ -7,14 +7,14 @@
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/design-system.css') }}" rel="stylesheet">
-    <meta name="theme-color" content="#FF7B11">
+    <meta name="theme-color" content="#0D9488">
     <style>
         body { background: #f5f5f7; }
-        .brand-header { background: #FF7B11; color: #fff; }
+        .brand-header { background: #0D9488; color: #fff; }
         .brand-header img { max-height: 56px; }
-        .importo-big { font-size: 2.5rem; font-weight: 700; color: #FF7B11; }
-        .codice-prenotazione { font-weight: 700; letter-spacing: .12em; color: #FF7B11; }
-        .btn-brand { background: #FF7B11; border-color: #FF7B11; color: #fff; }
+        .importo-big { font-size: 2.5rem; font-weight: 700; color: #0D9488; }
+        .codice-prenotazione { font-weight: 700; letter-spacing: .12em; color: #0D9488; }
+        .btn-brand { background: #0D9488; border-color: #0D9488; color: #fff; }
         .btn-brand:hover { background: #e56e0a; border-color: #e56e0a; color: #fff; }
     </style>
 </head>

@@ -14,7 +14,7 @@
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/design-system.css') }}" rel="stylesheet">
-    <meta name="theme-color" content="#FF7B11">
+    <meta name="theme-color" content="#0D9488">
     <style>
         body.guest-body {
             min-height: 100vh;
@@ -22,63 +22,63 @@
             align-items: center;
             justify-content: center;
             background-color: var(--ds-bg);
-            background-image: radial-gradient(900px 480px at 50% -120px, oklch(72% 0.185 55 / 0.09), transparent 70%);
+            background-image:
+                radial-gradient(700px 420px at 15% -10%, rgba(13, 148, 136, 0.12), transparent 70%),
+                radial-gradient(600px 380px at 100% 110%, rgba(232, 162, 58, 0.10), transparent 70%);
             background-repeat: no-repeat;
+            background-attachment: fixed;
         }
-        [data-bs-theme="dark"] body.guest-body {
-            background-image: radial-gradient(900px 480px at 50% -120px, oklch(72% 0.185 55 / 0.14), transparent 70%);
-        }
-        .login-wrapper { width: 100%; max-width: 400px; padding: 16px; }
-        .login-brand { text-align: center; margin-bottom: 28px; }
+        .login-wrapper { width: 100%; max-width: 420px; padding: 24px 16px; }
+        .login-brand { text-align: center; margin-bottom: 26px; }
         .login-brand-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(180deg, oklch(75% 0.185 58), oklch(67% 0.19 50));
-            border-radius: 13px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 14px;
-            box-shadow: var(--ds-glow-accent), inset 0 1px 0 oklch(100% 0 0 / 0.25);
+            width: 52px;
+            height: 52px;
+            background: var(--ds-accent);
+            border-radius: 14px;
+            display: inline-grid;
+            place-items: center;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 20px rgba(13, 148, 136, 0.35);
         }
-        .login-brand-icon i { color: #fff; font-size: 1.4375rem; }
-        .login-brand h1 { font-size: 1.1875rem; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.01em; }
-        .login-brand p { font-size: 0.84375rem; color: var(--ds-text-muted); margin: 0; }
+        .login-brand-icon i { color: #fff; font-size: 1.5rem; }
+        .login-brand h1 { font-size: 1.375rem; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+        .login-brand p { font-size: 0.875rem; color: var(--ds-text-muted); margin: 0; }
         .login-card {
             background: var(--ds-surface);
-            border: 1px solid var(--ds-border);
-            border-radius: var(--ds-radius-lg);
-            padding: 28px;
+            border-radius: 16px;
+            padding: 30px 30px 26px;
             box-shadow: var(--ds-shadow-lg);
         }
+        .login-card .form-control { min-height: 44px; }
         .btn-login {
             width: 100%;
+            min-height: 44px;
             background: var(--ds-accent);
             border: 1px solid var(--ds-accent);
             color: #fff;
-            font-weight: 500;
-            font-size: 0.875rem;
+            font-weight: 600;
+            font-size: 0.9375rem;
             padding: 9px 16px;
             border-radius: var(--ds-radius);
             cursor: pointer;
-            transition: background-color 150ms ease-out;
+            box-shadow: var(--ds-shadow-accent);
+            transition: background-color 150ms ease-out, box-shadow 150ms ease-out;
         }
         .btn-login:hover { background: var(--ds-accent-hover); border-color: var(--ds-accent-hover); }
         .btn-login:focus-visible { box-shadow: 0 0 0 3px var(--ds-accent-ring); outline: none; }
         .login-alert {
-            border-radius: var(--ds-radius);
-            padding: 11px 14px;
-            font-size: 0.8125rem;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.84375rem;
             margin-bottom: 14px;
-            border: 1px solid;
         }
-        .login-alert-error { background: var(--ds-danger-subtle); border-color: oklch(from var(--ds-danger) l c h / 0.3); color: var(--ds-danger); }
-        .login-alert-info { background: var(--ds-info-subtle); border-color: oklch(from var(--ds-info) l c h / 0.3); color: var(--ds-info); }
+        .login-alert-error { background: var(--ds-danger-subtle); color: var(--ds-danger-ink); }
+        .login-alert-info { background: var(--ds-info-subtle); color: var(--ds-info-ink); }
         .login-footer-link {
             display: block;
             text-align: center;
-            margin-top: 16px;
-            font-size: 0.8125rem;
+            margin-top: 18px;
+            font-size: 0.84375rem;
             color: var(--ds-text-muted);
             text-decoration: none;
         }

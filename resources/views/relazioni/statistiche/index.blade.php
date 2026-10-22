@@ -111,12 +111,12 @@
                 {
                     label: canvas.dataset.annoPrecedente,
                     data: JSON.parse(canvas.dataset.precedente),
-                    backgroundColor: 'rgba(108, 117, 125, .6)'
+                    backgroundColor: '#A7DCD5'
                 },
                 {
                     label: canvas.dataset.annoCorrente,
                     data: JSON.parse(canvas.dataset.corrente),
-                    backgroundColor: 'rgba(255, 123, 17, .8)'
+                    backgroundColor: '#0D9488'
                 }
             ]
         },

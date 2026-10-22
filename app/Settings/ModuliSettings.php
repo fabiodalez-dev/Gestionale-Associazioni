@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
  */
 class ModuliSettings extends ImpostazioniAssociazione
 {
-    public const COLORE_DEFAULT = '#FF7B11';
+    public const COLORE_DEFAULT = '#0D9488';
 
     /** Campi anagrafici che si possono nascondere nella preiscrizione. */
     public const CAMPI_NASCONDIBILI = ['telefono', 'data_nascita', 'codice_fiscale', 'indirizzo', 'citta', 'provincia', 'cap'];

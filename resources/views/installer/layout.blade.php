@@ -8,7 +8,7 @@
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/design-system.css') }}" rel="stylesheet">
-    <meta name="theme-color" content="#FF7B11">
+    <meta name="theme-color" content="#0D9488">
     <style>
         body.installer-body {
             min-height: 100vh;

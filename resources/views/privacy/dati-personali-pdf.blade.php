@@ -20,7 +20,7 @@
     <style>
         * { font-family: DejaVu Sans, sans-serif; }
         body { font-size: 10px; color: #222; }
-        .header { border-bottom: 3px solid #FF7B11; padding-bottom: 10px; margin-bottom: 16px; }
+        .header { border-bottom: 3px solid #0D9488; padding-bottom: 10px; margin-bottom: 16px; }
         .header h1 { font-size: 16px; margin: 0 0 4px 0; }
         .muted { color: #777; }
         h2 { font-size: 12px; margin: 16px 0 6px 0; }

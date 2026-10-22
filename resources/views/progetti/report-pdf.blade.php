@@ -6,10 +6,10 @@
     <style>
         * { font-family: DejaVu Sans, sans-serif; }
         body { font-size: 11px; color: #222; }
-        .header { border-bottom: 3px solid #FF7B11; padding-bottom: 10px; margin-bottom: 16px; }
+        .header { border-bottom: 3px solid #0D9488; padding-bottom: 10px; margin-bottom: 16px; }
         .header h1 { font-size: 17px; margin: 0 0 4px 0; }
         .header .assoc-info { font-size: 9px; color: #666; }
-        h2.sezione { font-size: 13px; margin: 18px 0 6px 0; border-bottom: 1px solid #ddd; padding-bottom: 3px; color: #FF7B11; }
+        h2.sezione { font-size: 13px; margin: 18px 0 6px 0; border-bottom: 1px solid #ddd; padding-bottom: 3px; color: #0D9488; }
         table { width: 100%; border-collapse: collapse; }
         table.dati td { padding: 3px 5px; font-size: 10px; vertical-align: top; }
         table.dati td.label { color: #666; width: 28%; }

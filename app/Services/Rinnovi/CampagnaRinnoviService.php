@@ -176,7 +176,7 @@ class CampagnaRinnoviService
         return '<p>Ciao '.e($socio->nome).',</p>'
             .'<p>è tempo di rinnovare il tuo tesseramento a <strong>'.e($associazione->nome).'</strong> per l\'anno <strong>'.$anno.'</strong>.</p>'
             .'<p>Quota di rinnovo: <strong>&euro; '.$importo.'</strong> — da pagare entro il <strong>'.$scadenza.'</strong>.</p>'
-            .'<p><a href="'.e($link).'" style="display:inline-block;padding:10px 18px;background:#FF7B11;color:#fff;border-radius:6px;text-decoration:none;">Rinnova ora online</a></p>'
+            .'<p><a href="'.e($link).'" style="display:inline-block;padding:10px 18px;background:#0D9488;color:#fff;border-radius:6px;text-decoration:none;">Rinnova ora online</a></p>'
             .'<p>Oppure copia questo link nel browser:<br>'.e($link).'</p>'
             .'<p>Al pagamento la tua tessera '.$anno.' sarà emessa automaticamente.</p>'
             .'<p>Grazie,<br>'.e($associazione->nome).'</p>';

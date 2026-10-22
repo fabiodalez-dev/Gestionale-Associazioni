@@ -12,7 +12,7 @@
 --}}
 @php
     $brandNome = $brandNome ?? config('app.name');
-    $brandColore = $brandColore ?? '#FF7B11';
+    $brandColore = $brandColore ?? '#0D9488';
     $brandLogo = $brandLogo ?? null;
     $unsubscribeUrl = $unsubscribeUrl ?? null;
     $annoCorrente = $annoCorrente ?? now()->format('Y');

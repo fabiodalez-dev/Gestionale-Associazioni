@@ -92,9 +92,9 @@
         }
         .print-btn {
             position: fixed; top: 20px; right: 20px; padding: 8px 20px;
-            cursor: pointer; background-color: #FF7B11; color: #fff;
+            cursor: pointer; background-color: #0D9488; color: #fff;
             border: none; border-radius: 6px; font-size: 0.9rem; font-weight: 600;
-            box-shadow: 0 2px 8px rgba(255,123,17,0.3);
+            box-shadow: 0 2px 8px rgba(13, 148, 136,0.3);
         }
         @media print {
             body { background-color: #fff; }

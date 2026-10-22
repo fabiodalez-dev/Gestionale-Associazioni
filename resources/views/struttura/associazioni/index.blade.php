@@ -79,6 +79,16 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
                 </div>
                 <div class="modal-body">
+                    @if ($errors->any())
+                        <div class="alert alert-danger">
+                            <strong>Associazione non salvata.</strong> Correggi questi campi:
+                            <ul class="mb-0 mt-1">
+                                @foreach ($errors->all() as $messaggio)
+                                    <li>{{ $messaggio }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
                     @php($formAssociazione = new \App\Forms\AssociazioneForm($editAssociazione ?? \App\Models\Associazione::class))
                     <h6 class="text-muted text-uppercase small">Anagrafica</h6>
                     @include('formello.campi', ['form' => $formAssociazione, 'solo' => ['nome', 'email', 'slug']])

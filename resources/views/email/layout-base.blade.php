@@ -23,7 +23,7 @@ body { margin: 0; padding: 0; width: 100% !important; background-color: #f4f4f4;
 <table role="presentation" class="email-container" cellpadding="0" cellspacing="0" width="600" style="max-width:600px; margin:0 auto;">
 
     <tr>
-        <td style="background-color:#FF7B11; padding:20px 30px; text-align:center; border-radius:8px 8px 0 0;">
+        <td style="background-color:#0D9488; padding:20px 30px; text-align:center; border-radius:8px 8px 0 0;">
             <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>
                 <td style="text-align:center;">
                     @if (!empty($logoUrl))

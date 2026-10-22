@@ -9,6 +9,7 @@
 @endphp
 
 @if ($tenantIdCompleanni !== null)
+    <!-- widget:compleanni -->
     <div class="card mb-4">
         <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
             <span><i class="bi bi-cake2 me-1 text-primary"></i>Compleanni di {{ now()->translatedFormat('F') }}</span>
@@ -42,4 +43,5 @@
             @endif
         </div>
     </div>
+    <!-- /widget:compleanni -->
 @endif

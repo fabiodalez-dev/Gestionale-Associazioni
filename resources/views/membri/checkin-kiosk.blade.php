@@ -9,12 +9,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Kiosk Check-in — {{ $evento->titolo }}</title>
-    <meta name="theme-color" content="#FF7B11">
+    <meta name="theme-color" content="#0D9488">
     <link rel="apple-touch-icon" href="{{ asset('assets/icons/icon-192.png') }}">
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <style>
-        :root { --brand: #FF7B11; }
+        :root { --brand: #0D9488; }
         html, body { height: 100%; }
         body {
             background: #111;

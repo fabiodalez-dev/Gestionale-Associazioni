@@ -21,7 +21,8 @@ class VerificaEmailRegistrazioneMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Conferma l\'iscrizione di '.$this->richiesta->nome);
+        // Oggetto fisso: nessun testo scritto da chi compila il modulo pubblico
+        return new Envelope(subject: 'Conferma la tua email — '.config('app.name', 'Gestione Associazioni'));
     }
 
     public function content(): Content

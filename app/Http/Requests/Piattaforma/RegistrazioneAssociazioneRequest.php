@@ -5,7 +5,9 @@ namespace App\Http\Requests\Piattaforma;
 use App\Models\RichiestaRegistrazione;
 use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Modulo pubblico di iscrizione di un'associazione alla piattaforma.
@@ -55,6 +57,32 @@ class RegistrazioneAssociazioneRequest extends FormRequest
             'admin_password' => ['required', ...PasswordPolicy::rules([$this->input('admin_email'), $this->input('admin_nome'), $this->input('admin_cognome'), $this->input('nome')])],
             'privacy' => ['accepted'],
         ];
+    }
+
+    /**
+     * Al massimo poche email di conferma verso lo stesso indirizzo: il modulo
+     * non deve diventare un modo per inondare la casella di qualcun altro.
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                $email = $this->input('admin_email');
+                if ($validator->errors()->isNotEmpty() || ! is_string($email)) {
+                    return;
+                }
+                if (RateLimiter::tooManyAttempts(self::chiaveLimite($email), self::INVII_PER_INDIRIZZO)) {
+                    $validator->errors()->add('admin_email', 'Abbiamo già inviato più link di conferma a questo indirizzo: controlla la posta, anche nello spam, oppure riprova domani.');
+                }
+            },
+        ];
+    }
+
+    public const INVII_PER_INDIRIZZO = 3;
+
+    public static function chiaveLimite(string $email): string
+    {
+        return 'registrazione-verifica:'.sha1(mb_strtolower(trim($email)));
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Utente;
 use App\Services\EventiVita\VitaSocialeService;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -32,6 +33,9 @@ class VitaSocialeSocioTest extends TestCase
         $this->admin = Utente::factory()->adminAssociazione()->create([
             'associazione_id' => $this->associazione->id,
         ]);
+        // Come nell'app: l'admin ha il ruolo con i permessi (la dashboard mostra i nomi dei soci solo con soci.view)
+        $this->seed(RolesSeeder::class);
+        $this->admin->assignRole(Utente::RUOLO_ADMIN_ASSOCIAZIONE);
     }
 
     /**

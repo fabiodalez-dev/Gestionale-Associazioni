@@ -4,7 +4,7 @@
     <div style="max-width: 560px; margin: 0 auto; background: #FFFFFF; border-radius: 12px; padding: 32px;">
         <h1 style="font-size: 20px; color: #0D9488; margin-top: 0;">Conferma la tua email</h1>
         <p>Ciao {{ $richiesta->admin_nome }},</p>
-        <p>per completare l'iscrizione di <strong>{{ $richiesta->nome }}</strong> a {{ config('app.name', 'Gestione Associazioni') }} conferma che questo indirizzo è tuo:</p>
+        <p>per completare l'iscrizione di <strong>{{ \Illuminate\Support\Str::limit($richiesta->nome, 80) }}</strong> a {{ config('app.name', 'Gestione Associazioni') }} conferma che questo indirizzo è tuo:</p>
         <p style="text-align: center; margin: 28px 0;">
             <a href="{{ $url }}" style="background: #0D9488; color: #FFFFFF; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">Conferma l'email</a>
         </p>

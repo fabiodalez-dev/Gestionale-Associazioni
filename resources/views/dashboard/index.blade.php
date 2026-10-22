@@ -388,13 +388,16 @@
             {{-- Le mie attività (f.4 piano "Gestione 2" — modulo operativita) --}}
             @includeIf('operativita._widget-attivita')
         </div>
-        <div class="col-12 col-xl-4">
-            {{-- Top partecipanti agli eventi (f.12 piano Vita sociale) --}}
-            @includeIf('eventi-vita._top-partecipanti')
-        </div>
-        <div class="col-12 col-xl-4">
-            {{-- Compleanni del mese (f.9 piano "Gestione 2" — modulo comunicazione) --}}
-            @includeIf('comunicazione.dashboard._compleanni')
-        </div>
+        {{-- Widget con i nomi dei soci: solo per chi può vedere l'anagrafica --}}
+        @if ($p['vedi_soci'])
+            <div class="col-12 col-xl-4">
+                {{-- Top partecipanti agli eventi (f.12 piano Vita sociale) --}}
+                @includeIf('eventi-vita._top-partecipanti')
+            </div>
+            <div class="col-12 col-xl-4">
+                {{-- Compleanni del mese (f.9 piano "Gestione 2" — modulo comunicazione) --}}
+                @includeIf('comunicazione.dashboard._compleanni')
+            </div>
+        @endif
     </div>
 @endsection

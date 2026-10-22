@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Prunable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
@@ -28,6 +29,7 @@ use Illuminate\Support\Carbon;
 class RichiestaRegistrazione extends Model
 {
     use HasUuids;
+    use Prunable;
 
     public const STATO_IN_ATTESA = 'in_attesa';
 
@@ -109,6 +111,19 @@ class RichiestaRegistrazione extends Model
     public function isInAttesa(): bool
     {
         return $this->stato === self::STATO_IN_ATTESA;
+    }
+
+    /**
+     * Richieste mai confermate: dopo 7 giorni si cancellano (model:prune quotidiano).
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()
+            ->where('stato', self::STATO_IN_ATTESA)
+            ->whereNull('email_verificata_at')
+            ->where('created_at', '<', now()->subDays(7));
     }
 
     public static function modalita(): string

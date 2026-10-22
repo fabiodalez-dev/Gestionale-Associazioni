@@ -2,6 +2,7 @@
 
 namespace App\Services\Piattaforma;
 
+use App\Http\Requests\Piattaforma\RegistrazioneAssociazioneRequest;
 use App\Mail\Piattaforma\EsitoRegistrazioneMail;
 use App\Mail\Piattaforma\NuovaRichiestaRegistrazioneMail;
 use App\Mail\Piattaforma\VerificaEmailRegistrazioneMail;
@@ -13,6 +14,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
@@ -57,6 +59,7 @@ class RegistrazioneAssociazioni
             'privacy_accettata_at' => now(),
         ]);
 
+        RateLimiter::hit(RegistrazioneAssociazioneRequest::chiaveLimite($richiesta->admin_email), 86400);
         $this->invia($richiesta->admin_email, new VerificaEmailRegistrazioneMail($richiesta, $this->linkVerifica($richiesta)));
 
         return $richiesta;

@@ -250,8 +250,9 @@ class PercorsoAssociazioneTest extends TestCase
         $this->assertSame(4, Socio::query()->withoutGlobalScopes()->where('associazione_id', $associazione->id)->where('stato', Socio::STATO_ATTIVO)->count());
 
         // 7. I dati restano dell'associazione: un'altra associazione non li vede
-        $altra = Associazione::factory()->create();
-        $adminAltra = Utente::factory()->adminAssociazione()->create(['associazione_id' => $altra->id]);
+        // Nomi fissi: un nome casuale potrebbe contenere i cognomi cercati
+        $altra = Associazione::factory()->create(['nome' => 'Circolo Lontano']);
+        $adminAltra = Utente::factory()->adminAssociazione()->create(['associazione_id' => $altra->id, 'nome' => 'Altro', 'cognome' => 'Admin']);
         $adminAltra->assignRole(Utente::RUOLO_ADMIN_ASSOCIAZIONE);
         $this->actingAs($adminAltra)->withSession(['associazione_id' => $altra->id])
             ->get(route('soci.index', ['tessera_stato' => 'all']))->assertOk()
@@ -341,6 +342,32 @@ class PercorsoAssociazioneTest extends TestCase
         $this->actingAs($this->superAdmin)->post(route('richieste-registrazione.approva', $impostore))
             ->assertSessionHas('warning', fn ($m) => str_contains($m, 'Esiste già'));
         $this->assertSame(1, Associazione::query()->count());
+    }
+
+    public function test_il_modulo_non_serve_a_inondare_una_casella_email(): void
+    {
+        config(['piattaforma.registrazione_associazioni' => 'revisione']);
+
+        for ($i = 1; $i <= 3; $i++) {
+            $this->post('/registrati', $this->moduloRegistrazione([
+                'nome' => '<b>Vinci un premio</b> http://truffa.test '.$i,
+                'email' => "spam{$i}@truffa.test",
+                'admin_email' => 'vittima@casella.test',
+            ]))->assertSessionHasNoErrors();
+        }
+        // Al quarto tentativo verso lo stesso indirizzo il modulo si ferma
+        $this->post('/registrati', $this->moduloRegistrazione(['email' => 'spam4@truffa.test', 'admin_email' => 'vittima@casella.test']))
+            ->assertSessionHasErrors('admin_email');
+
+        Mail::assertSentCount(3);
+        // L'oggetto è fisso: il testo scritto nel modulo non finisce nell'oggetto
+        Mail::assertSent(VerificaEmailRegistrazioneMail::class, fn ($m) => ! str_contains($m->envelope()->subject, 'premio')
+            && str_contains($m->render(), '&lt;b&gt;Vinci un premio&lt;/b&gt;'));
+
+        // Le richieste mai confermate vengono cancellate dopo 7 giorni
+        RichiestaRegistrazione::query()->update(['created_at' => now()->subDays(8)]);
+        $this->artisan('model:prune', ['--model' => [RichiestaRegistrazione::class]])->assertSuccessful();
+        $this->assertSame(0, RichiestaRegistrazione::query()->count());
     }
 
     public function test_con_iscrizione_disattivata_le_crea_solo_il_super_admin(): void

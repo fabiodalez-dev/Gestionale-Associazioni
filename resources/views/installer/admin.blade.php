@@ -10,41 +10,11 @@
     <form method="POST" action="{{ route('installer.admin.store') }}">
         @csrf
         <h6 class="text-uppercase text-muted mb-2" style="font-size: 0.71875rem; letter-spacing: 0.05em;">Associazione</h6>
-        <div class="row g-3 mb-4">
-            <div class="col-6">
-                <label class="form-label" for="associazione_nome">Nome associazione</label>
-                <input type="text" class="form-control" id="associazione_nome" name="associazione_nome" value="{{ old('associazione_nome') }}" required>
-            </div>
-            <div class="col-6">
-                <label class="form-label" for="associazione_email">Email associazione</label>
-                <input type="email" class="form-control" id="associazione_email" name="associazione_email" value="{{ old('associazione_email') }}" required>
-            </div>
-        </div>
+        @php($form = new \App\Forms\InstallerAdminForm(\App\Models\Utente::class))
+        @include('formello.campi', ['form' => $form, 'solo' => ['associazione_nome', 'associazione_email']])
 
-        <h6 class="text-uppercase text-muted mb-2" style="font-size: 0.71875rem; letter-spacing: 0.05em;">Account super admin</h6>
-        <div class="row g-3">
-            <div class="col-6">
-                <label class="form-label" for="nome">Nome</label>
-                <input type="text" class="form-control" id="nome" name="nome" value="{{ old('nome') }}" required>
-            </div>
-            <div class="col-6">
-                <label class="form-label" for="cognome">Cognome</label>
-                <input type="text" class="form-control" id="cognome" name="cognome" value="{{ old('cognome') }}" required>
-            </div>
-            <div class="col-12">
-                <label class="form-label" for="email">Email di accesso</label>
-                <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" required autocomplete="username">
-            </div>
-            <div class="col-6">
-                <label class="form-label" for="password">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password">
-                <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
-            </div>
-            <div class="col-6">
-                <label class="form-label" for="password_confirmation">Conferma password</label>
-                <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required autocomplete="new-password">
-            </div>
-        </div>
+        <h6 class="text-uppercase text-muted mb-2 mt-2" style="font-size: 0.71875rem; letter-spacing: 0.05em;">Account super admin</h6>
+        @include('formello.campi', ['form' => $form, 'solo' => ['nome', 'cognome', 'email', 'password', 'password_confirmation']])
 
         <div class="form-check mt-4">
             <input class="form-check-input" type="checkbox" id="dati_demo" name="dati_demo" value="1" @checked(old('dati_demo'))>

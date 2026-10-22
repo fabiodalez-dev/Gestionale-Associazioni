@@ -14,15 +14,8 @@
     </p>
     <form method="POST" action="{{ url()->full() }}">
         @csrf
-        <div class="mb-3">
-            <label class="form-label" for="password">Nuova password</label>
-            <input type="password" class="form-control" id="password" name="password" required minlength="10" autocomplete="new-password" autofocus>
-            <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label" for="password_confirmation">Conferma password</label>
-            <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required minlength="10" autocomplete="new-password">
-        </div>
+        <input type="email" name="email" value="{{ $utente->email }}" autocomplete="username" hidden readonly>
+        @include('formello.campi', ['form' => new \App\Forms\ImpostaPasswordForm($utente, ['dati_utente' => [$utente->email, $utente->nome, $utente->cognome]])])
         <button type="submit" class="btn-login">Imposta password e attiva l'account</button>
     </form>
 @endsection

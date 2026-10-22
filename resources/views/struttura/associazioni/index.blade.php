@@ -79,101 +79,21 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
                 </div>
                 <div class="modal-body">
+                    @php($formAssociazione = new \App\Forms\AssociazioneForm($editAssociazione ?? \App\Models\Associazione::class))
                     <h6 class="text-muted text-uppercase small">Anagrafica</h6>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label" for="nome">Nome *</label>
-                            <input type="text" class="form-control" id="nome" name="nome" required maxlength="255"
-                                   value="{{ old('nome', $editAssociazione?->nome) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="email">Email *</label>
-                            <input type="email" class="form-control" id="email" name="email" required
-                                   value="{{ old('email', $editAssociazione?->email) }}">
-                        </div>
-                        {{-- Slug mini-sito editabile (f.22): kebab-case, unique, anteprima URL --}}
-                        <div class="col-md-12">
-                            <label class="form-label" for="slug">Slug mini-sito pubblico</label>
-                            <div class="input-group">
-                                <span class="input-group-text">{{ url('/a') }}/</span>
-                                <input type="text" class="form-control @error('slug') is-invalid @enderror" id="slug" name="slug"
-                                       maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                                       placeholder="{{ $editAssociazione?->slug ?: 'generato dal nome se vuoto' }}"
-                                       value="{{ old('slug', $editAssociazione?->slug) }}"
-                                       oninput="document.getElementById('slugAnteprima').textContent = '{{ url('/a') }}/' + (this.value || '{{ $editAssociazione?->slug ?: '...' }}');">
-                                @error('slug')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="form-text">
-                                Solo minuscole, numeri e trattini (kebab-case). Anteprima:
-                                <span id="slugAnteprima">{{ url('/a') }}/{{ old('slug', $editAssociazione?->slug) ?: '...' }}</span>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="partita_iva">Partita IVA</label>
-                            <input type="text" class="form-control" id="partita_iva" name="partita_iva" maxlength="20"
-                                   value="{{ old('partita_iva', $editAssociazione?->partita_iva) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="codice_fiscale">Codice fiscale</label>
-                            <input type="text" class="form-control" id="codice_fiscale" name="codice_fiscale" maxlength="16"
-                                   value="{{ old('codice_fiscale', $editAssociazione?->codice_fiscale) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="telefono">Telefono</label>
-                            <input type="text" class="form-control" id="telefono" name="telefono" maxlength="20"
-                                   value="{{ old('telefono', $editAssociazione?->telefono) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="indirizzo">Indirizzo</label>
-                            <input type="text" class="form-control" id="indirizzo" name="indirizzo"
-                                   value="{{ old('indirizzo', $editAssociazione?->indirizzo) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label" for="citta">Città</label>
-                            <input type="text" class="form-control" id="citta" name="citta" maxlength="100"
-                                   value="{{ old('citta', $editAssociazione?->citta) }}">
-                        </div>
-                        <div class="col-md-1">
-                            <label class="form-label" for="provincia">Prov.</label>
-                            <input type="text" class="form-control" id="provincia" name="provincia" maxlength="2"
-                                   value="{{ old('provincia', $editAssociazione?->provincia) }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label" for="cap">CAP</label>
-                            <input type="text" class="form-control" id="cap" name="cap" maxlength="5"
-                                   value="{{ old('cap', $editAssociazione?->cap) }}">
-                        </div>
+                    @include('formello.campi', ['form' => $formAssociazione, 'solo' => ['nome', 'email', 'slug']])
+                    {{-- Anteprima dell'URL del mini-sito (f.22), aggiornata mentre si scrive lo slug --}}
+                    <div class="form-text mt-n2 mb-3">
+                        Anteprima: <span id="slugAnteprima" data-base="{{ url('/a') }}/" data-attuale="{{ $editAssociazione?->slug ?: '...' }}">{{ url('/a') }}/{{ old('slug', $editAssociazione?->slug) ?: '...' }}</span>
                     </div>
+                    @include('formello.campi', ['form' => $formAssociazione, 'solo' => array_values(array_diff(\App\Forms\AssociazioneForm::GRUPPO_ANAGRAFICA, ['nome', 'email', 'slug']))])
 
                     <h6 class="text-muted text-uppercase small">Configurazione</h6>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label" for="tipo_scadenza_default">Tipo scadenza tessere</label>
-                            <select class="form-select" id="tipo_scadenza_default" name="tipo_scadenza_default">
-                                <option value="solare" @selected(old('tipo_scadenza_default', $editAssociazione?->tipo_scadenza_default ?? 'solare') === 'solare')>Anno Solare (31 Dicembre)</option>
-                                <option value="annuale" @selected(old('tipo_scadenza_default', $editAssociazione?->tipo_scadenza_default) === 'annuale')>Annuale (365 giorni da iscrizione)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="giorni_notifica_scadenza">Giorni preavviso notifica</label>
-                            <input type="number" class="form-control" id="giorni_notifica_scadenza" name="giorni_notifica_scadenza" min="1" max="365"
-                                   value="{{ old('giorni_notifica_scadenza', $editAssociazione?->giorni_notifica_scadenza ?? 30) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="costo_tessera">Costo tessera (€)</label>
-                            <input type="number" step="0.01" min="0" class="form-control" id="costo_tessera" name="costo_tessera"
-                                   value="{{ old('costo_tessera', $editAssociazione?->costo_tessera) }}">
-                        </div>
+                    @include('formello.campi', ['form' => $formAssociazione, 'solo' => \App\Forms\AssociazioneForm::GRUPPO_CONFIGURAZIONE])
+                    <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label" for="logo_file">Logo (JPG/PNG, max 2 MB)</label>
                             <input type="file" class="form-control" id="logo_file" name="logo_file" accept=".jpg,.jpeg,.png">
-                        </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="attiva" name="attiva" value="1"
-                                       @checked(old('attiva', $editAssociazione?->attiva ?? true))>
-                                <label class="form-check-label" for="attiva">Associazione attiva</label>
-                            </div>
                         </div>
                     </div>
 
@@ -212,12 +132,7 @@
                             <label class="form-check-label" for="switch_create_admin">Crea un nuovo admin per questa associazione</label>
                         </div>
                         <div id="blocco_create_admin" class="mt-2 {{ old('create_admin') ? '' : 'd-none' }}">
-                            <div class="row g-2">
-                                <div class="col-md-3"><input type="text" class="form-control" name="admin_nome" placeholder="Nome" value="{{ old('admin_nome') }}"></div>
-                                <div class="col-md-3"><input type="text" class="form-control" name="admin_cognome" placeholder="Cognome" value="{{ old('admin_cognome') }}"></div>
-                                <div class="col-md-3"><input type="email" class="form-control" name="admin_email" placeholder="Email" value="{{ old('admin_email') }}"></div>
-                                <div class="col-md-3"><input type="password" class="form-control" name="admin_password" placeholder="Password (min 10)" autocomplete="new-password"></div>
-                            </div>
+                            @include('formello.campi', ['form' => $formAssociazione, 'solo' => \App\Forms\AssociazioneForm::GRUPPO_ADMIN])
                         </div>
                     </div>
 
@@ -316,6 +231,15 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Anteprima URL del mini-sito mentre si modifica lo slug
+    var campoSlug = document.getElementById('slug');
+    var anteprimaSlug = document.getElementById('slugAnteprima');
+    if (campoSlug && anteprimaSlug) {
+        campoSlug.addEventListener('input', function () {
+            anteprimaSlug.textContent = anteprimaSlug.dataset.base + (campoSlug.value || anteprimaSlug.dataset.attuale);
+        });
+    }
+
     // Apertura automatica della modale in modalità edit (?edit=<id>) o dopo errori di validazione
     @if ($editAssociazione || $errors->any())
         new bootstrap.Modal(document.getElementById('modalAssociazione')).show();

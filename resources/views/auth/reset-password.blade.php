@@ -12,15 +12,7 @@
             <label for="email" class="form-label">Email</label>
             <input type="email" class="form-control" id="email" name="email" value="{{ old('email', $request->query('email')) }}" required autocomplete="username" readonly>
         </div>
-        <div class="mb-3">
-            <label for="password" class="form-label">Nuova password</label>
-            <input type="password" class="form-control" id="password" name="password" required autofocus autocomplete="new-password" maxlength="{{ \App\Support\PasswordPolicy::MAX_LENGTH }}">
-            <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
-        </div>
-        <div class="mb-3">
-            <label for="password_confirmation" class="form-label">Conferma password</label>
-            <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required autocomplete="new-password">
-        </div>
+        @include('formello.campi', ['form' => new \App\Forms\ImpostaPasswordForm(\App\Models\Utente::class, ['campi_utente' => ['email']])])
         <button type="submit" class="btn-login">Salva nuova password</button>
         <p class="small text-body-secondary mt-3 mb-0">Dopo il salvataggio verrai disconnesso da tutti i dispositivi.</p>
     </form>

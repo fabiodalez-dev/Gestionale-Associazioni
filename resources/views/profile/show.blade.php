@@ -45,19 +45,11 @@
                     <form method="POST" action="{{ route('user-password.update') }}">
                         @csrf
                         @method('PUT')
-                        <div class="mb-3">
-                            <label for="current_password" class="form-label">Password attuale</label>
-                            <input type="password" class="form-control" id="current_password" name="current_password" required autocomplete="current-password">
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Nuova password</label>
-                            <input type="password" class="form-control" id="password" name="password" required autocomplete="new-password" minlength="10">
-                            <div class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password_confirmation" class="form-label">Conferma nuova password</label>
-                            <input type="password" class="form-control" id="password_confirmation" name="password_confirmation" required autocomplete="new-password">
-                        </div>
+                        @include('formello.campi', ['form' => new \App\Forms\ImpostaPasswordForm(auth()->user(), [
+                            'password_attuale' => 'current_password',
+                            'error_bag' => 'updatePassword',
+                            'dati_utente' => [auth()->user()->email, auth()->user()->nome, auth()->user()->cognome],
+                        ])])
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i>Aggiorna password
                         </button>

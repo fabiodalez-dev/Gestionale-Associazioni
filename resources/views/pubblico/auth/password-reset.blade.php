@@ -23,22 +23,7 @@
                             @enderror
                         </div>
 
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Nuova password</label>
-                            <input type="password" name="password" id="password"
-                                   class="form-control @error('password') is-invalid @enderror"
-                                   required autocomplete="new-password" aria-describedby="passwordHelp">
-                            <div id="passwordHelp" class="form-text">{{ \App\Support\PasswordPolicy::hint() }}</div>
-                            @error('password')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="password_confirmation" class="form-label">Conferma nuova password</label>
-                            <input type="password" name="password_confirmation" id="password_confirmation"
-                                   class="form-control" required autocomplete="new-password">
-                        </div>
+                        @include('formello.campi', ['form' => new \App\Forms\ImpostaPasswordForm(\App\Models\Account::class, ['campi_utente' => ['email']])])
 
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="bi bi-key me-1"></i> Reimposta password

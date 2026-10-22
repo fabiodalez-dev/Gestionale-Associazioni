@@ -7,6 +7,7 @@ use App\Http\Controllers\Struttura\InvitoController;
 use App\Http\Controllers\Struttura\ModuloIscrizioneController;
 use App\Http\Controllers\Struttura\PreiscrizioneController;
 use App\Http\Controllers\Struttura\PrivacyPolicyController;
+use App\Http\Controllers\Struttura\RuoliController;
 use App\Http\Controllers\Struttura\SedeController;
 use App\Http\Controllers\Struttura\UtenteSearchController;
 use Illuminate\Support\Facades\Route;
@@ -82,6 +83,10 @@ Route::middleware(['auth'])->group(function () {
         // pagina dedicata linkata dalle Configurazioni, policy struttura.view/update
         Route::get('/configurazioni/modulo-iscrizione', [ModuloIscrizioneController::class, 'edit'])->name('configurazioni.modulo-iscrizione');
         Route::post('/configurazioni/modulo-iscrizione', [ModuloIscrizioneController::class, 'update'])->name('configurazioni.modulo-iscrizione.salva');
+
+        // Ruoli e permessi dello staff dell'associazione (admin_associazione / super_admin)
+        Route::get('/ruoli', [RuoliController::class, 'index'])->name('ruoli.index');
+        Route::put('/ruoli/{utente}', [RuoliController::class, 'update'])->name('ruoli.update');
 
         // Sedi (CRUD dentro configurazioni — spec §2.2)
         Route::post('/configurazioni/sedi', [SedeController::class, 'save'])->name('sedi.save');

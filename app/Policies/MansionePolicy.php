@@ -26,29 +26,29 @@ class MansionePolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'soci.view', self::FALLBACK);
+        return $this->allowed($utente, 'volontari.view', self::FALLBACK);
     }
 
     public function view(Utente $utente, Mansione $mansione): bool
     {
-        return $this->allowed($utente, 'soci.view', self::FALLBACK)
+        return $this->allowed($utente, 'volontari.view', self::FALLBACK)
             && $this->stessoTenant($utente, $mansione);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'soci.update', self::FALLBACK);
+        return $this->allowed($utente, 'volontari.update', self::FALLBACK);
     }
 
     public function update(Utente $utente, Mansione $mansione): bool
     {
-        return $this->allowed($utente, 'soci.update', self::FALLBACK)
+        return $this->allowed($utente, 'volontari.update', self::FALLBACK)
             && $this->stessoTenant($utente, $mansione);
     }
 
     public function delete(Utente $utente, Mansione $mansione): bool
     {
-        return $this->allowed($utente, 'soci.update', self::FALLBACK)
+        return $this->allowed($utente, 'volontari.update', self::FALLBACK)
             && $this->stessoTenant($utente, $mansione);
     }
 

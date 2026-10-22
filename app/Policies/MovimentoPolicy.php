@@ -19,26 +19,26 @@ class MovimentoPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $utente->can('quote.view');
+        return $utente->can('economia.view');
     }
 
     public function view(Utente $utente, Movimento $movimento): bool
     {
-        return $utente->can('quote.view');
+        return $utente->can('economia.view');
     }
 
     public function create(Utente $utente): bool
     {
-        return $utente->can('quote.create');
+        return $utente->can('economia.create');
     }
 
     public function update(Utente $utente, Movimento $movimento): bool
     {
-        return $utente->can('quote.update');
+        return $utente->can('economia.update');
     }
 
     public function delete(Utente $utente, Movimento $movimento): bool
     {
-        return $utente->can('quote.delete');
+        return $utente->can('economia.delete');
     }
 }

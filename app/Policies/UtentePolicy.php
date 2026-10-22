@@ -15,6 +15,29 @@ class UtentePolicy
         return $utente->isSuperAdmin();
     }
 
+    /**
+     * Pagina "Ruoli e permessi": admin dell'associazione o super_admin.
+     */
+    public function gestisciRuoli(Utente $utente): bool
+    {
+        return $utente->isSuperAdmin() || $utente->isAdminAssociazione();
+    }
+
+    /**
+     * Cariche assegnabili solo agli operatori dell'associazione corrente:
+     * l'admin non può modificare sé stesso, altri admin o utenti di altre associazioni.
+     */
+    public function assegnaRuoli(Utente $utente, Utente $target): bool
+    {
+        if (! $this->gestisciRuoli($utente) || $target->ruolo !== Utente::RUOLO_OPERATORE) {
+            return false;
+        }
+
+        $tenant = $utente->isSuperAdmin() ? session('associazione_id') : $utente->associazione_id;
+
+        return $tenant !== null && $target->associazione_id === $tenant;
+    }
+
     public function create(Utente $utente): bool
     {
         return $utente->isSuperAdmin();

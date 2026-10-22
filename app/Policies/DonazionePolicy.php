@@ -19,6 +19,6 @@ class DonazionePolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $utente->can('quote.view');
+        return $utente->can('economia.view');
     }
 }

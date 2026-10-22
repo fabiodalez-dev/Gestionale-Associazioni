@@ -18,25 +18,18 @@ Ogni fase si chiude solo con: suite PHPUnit verde, PHPStan livello 5 pulito, Pin
 
 **Piano B.** Se la 4.x introduce regressioni non risolvibili: fast-excel (openspout 4.32, PHP 8.5 ok) per gli export semplici e import, mantenendo gli export multi-foglio come generazione diretta con openspout.
 
-## Fase 1 — Ruoli dell'associazione con spatie/laravel-permission (team)
+## Fase 1 — Ruoli dell'associazione con spatie/laravel-permission
 
-**Decisione (2026-10-22).** Valutato `shipfastlabs/grant` (v0.0.1, nessuna release, un solo maintainer): si resta su `spatie/laravel-permission`, già integrato e maturo, attivando i **team** per avere ruoli diversi in ogni associazione. Stesso risultato funzionale, nessuna dipendenza giovane sul sistema di autorizzazione.
-
-**Stato attuale.** 3 ruoli (super_admin, admin_associazione, operatore) e 40 permessi `{modulo}.{azione}` (10 moduli × view/create/update/delete) in `RolesSeeder`. I controlli passano dal Gate: 71 file usano `->can('modulo.azione')`. 34 file usano `assignRole`/`syncRoles` (quasi tutti test), 3 `hasRole`, 1 middleware `role:super_admin`.
+**Decisione (2026-10-22).** Valutato `shipfastlabs/grant` (v0.0.1, nessuna release, un solo maintainer): si resta su `spatie/laravel-permission`, già integrato e maturo. In fase di implementazione si è scelto di **non attivare i team** di spatie: ogni utente staff appartiene a una sola associazione, quindi i team non aggiungono nulla, mentre richiederebbero un "team corrente" impostato in ogni contesto (richieste, job in coda, comandi, API) con il rischio di negare permessi dove manca. I ruoli sono globali e il confine tra associazioni resta garantito dal tenant.
 
 **Design.**
-- `permission.teams = true` con chiave team `associazione_id` (UUID) su `roles`, `model_has_roles`, `model_has_permissions`; i ruoli con team NULL sono i modelli globali condivisi da tutte le associazioni.
-- Nuovi ruoli: `presidente`, `vicepresidente`, `segretario`, `tesoriere`, `consigliere`, `volontario`, oltre a `admin_associazione` e `operatore`. Esempi: il tesoriere ha economia/quote/donazioni complete e soci in sola lettura; il segretario ha soci, verbali, comunicazioni e riunioni; il volontario vede turni ed eventi.
-- Nuovi moduli di permesso per le aree aggiunte nei round 2-3: `economia`, `iscrizioni`, `comunicazione`, `volontari`, `progetti`, `spazi`, `riunioni`, `relazioni`.
-- `super_admin` resta globale: bypass con `Gate::before` su `isSuperAdmin()`.
-- Middleware che imposta `setPermissionsTeamId()` dal tenant corrente a ogni richiesta (anche dopo il cambio associazione del super_admin), così le chiamate `->can()` esistenti non cambiano.
-- La colonna `utenti.ruolo` resta come ruolo di sistema per login e policy.
-
-**Passi.**
-1. Migration che aggiunge la colonna team e riassegna i ruoli esistenti all'associazione di ogni utente (idempotente, reversibile).
-2. `RolesSeeder` con i nuovi ruoli e moduli; comando per aggiornare i permessi delle installazioni esistenti.
-3. Middleware team, `Gate::before` per il super_admin, aggiornamento di `hasRole`, middleware `role:super_admin` e test.
-4. Pagina **Ruoli e permessi** per l'admin dell'associazione: assegna i ruoli agli utenti e mostra la matrice ruolo × permesso; possibilità di personalizzare i permessi di un ruolo per la propria associazione.
+- Matrice ruoli × permessi in `App\Support\RuoliAssociazione`, unica fonte per seeder, pagina e test. 18 moduli × 4 azioni = 72 permessi.
+- Nuovi moduli per le aree dei round 2-3, prima autorizzate con permessi di altre famiglie: `economia` (prima nota, donazioni), `iscrizioni`, `volontari`, `spazi`, `progetti`, `riunioni` (con adempimenti), `relazioni` (contatti, sponsor), `comunicazione` (annunci, newsletter, sondaggi).
+- Cariche: `presidente`, `vicepresidente`, `segretario`, `tesoriere`, `consigliere`, `volontario`, oltre a `operatore`. Si assegnano agli utenti con ruolo di sistema operatore; i permessi di più cariche si sommano.
+- L'operatore conserva esattamente i permessi precedenti; sui nuovi moduli eredita quelli della famiglia che li autorizzava prima.
+- Il listener di login non sovrascrive più le cariche e rimuove i ruoli di sistema non più validi (admin declassato a operatore).
+- Pagina **Ruoli e permessi** per admin dell'associazione e super_admin: assegnazione delle cariche agli operatori della propria associazione e matrice in sola lettura.
+- Comando `app:aggiorna-permessi` (idempotente), eseguito anche dall'aggiornamento in-app dopo le migration.
 
 ## Fase 2 — Formello sui form di iscrizione
 
@@ -98,7 +91,7 @@ Oggi medialibrary è usata da `Documento`, `DocumentoSocio` ed `Evento` (galleri
 | Fase | Contenuto | Rischio |
 |---|---|---|
 | 0 | Laravel Excel 4 e PHP 8.5 | medio (major upgrade) |
-| 1 | Ruoli dell'associazione (spatie team) | medio (tocca l'autorizzazione) |
+| 1 | Ruoli dell'associazione (spatie) | medio (tocca l'autorizzazione) |
 | 2 | Formello sui form di iscrizione | basso |
 | 3 | Settings per associazione | medio |
 | 4 | Export GDPR | basso |

@@ -8,6 +8,7 @@ use App\Http\Requests\Struttura\UpdateAmministratoreRequest;
 use App\Mail\Struttura\InvitoAmministratoreMail;
 use App\Models\Associazione;
 use App\Models\Utente;
+use App\Support\RuoliAssociazione;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -91,6 +92,13 @@ class AmministratoreController extends Controller
     {
         $dati = $request->validated();
 
+        // Un operatore che resta operatore nella stessa associazione conserva le sue cariche
+        $cariche = $utente->ruolo === Utente::RUOLO_OPERATORE
+            && $dati['ruolo'] === Utente::RUOLO_OPERATORE
+            && $utente->associazione_id === ($dati['associazione_id'] ?? null)
+                ? $utente->getRoleNames()->intersect(array_keys(RuoliAssociazione::RUOLI_STAFF))->values()->all()
+                : [];
+
         $utente->fill([
             'nome' => $dati['nome'],
             'cognome' => $dati['cognome'] ?? '',
@@ -111,7 +119,7 @@ class AmministratoreController extends Controller
         }
 
         $utente->save();
-        $utente->syncRoles([Role::findOrCreate($dati['ruolo'], 'web')]);
+        $utente->syncRoles($cariche !== [] ? $cariche : [Role::findOrCreate($dati['ruolo'], 'web')]);
 
         return redirect()->route('amministratori.index')->with('success', 'Amministratore aggiornato con successo.');
     }

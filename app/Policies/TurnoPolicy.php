@@ -24,29 +24,29 @@ class TurnoPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'eventi.view', self::FALLBACK);
+        return $this->allowed($utente, 'volontari.view', self::FALLBACK);
     }
 
     public function view(Utente $utente, Turno $turno): bool
     {
-        return $this->allowed($utente, 'eventi.view', self::FALLBACK)
+        return $this->allowed($utente, 'volontari.view', self::FALLBACK)
             && $this->stessoTenant($utente, $turno);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'eventi.create', self::FALLBACK);
+        return $this->allowed($utente, 'volontari.create', self::FALLBACK);
     }
 
     public function update(Utente $utente, Turno $turno): bool
     {
-        return $this->allowed($utente, 'eventi.update', self::FALLBACK)
+        return $this->allowed($utente, 'volontari.update', self::FALLBACK)
             && $this->stessoTenant($utente, $turno);
     }
 
     public function delete(Utente $utente, Turno $turno): bool
     {
-        return $this->allowed($utente, 'eventi.delete', self::FALLBACK)
+        return $this->allowed($utente, 'volontari.delete', self::FALLBACK)
             && $this->stessoTenant($utente, $turno);
     }
 

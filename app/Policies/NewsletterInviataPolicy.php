@@ -25,12 +25,12 @@ class NewsletterInviataPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'email.view', self::FALLBACK_VIEW);
+        return $this->allowed($utente, 'comunicazione.view', self::FALLBACK_VIEW);
     }
 
     /** Composizione, anteprima e invio della newsletter */
     public function send(Utente $utente): bool
     {
-        return $this->allowed($utente, 'email.create', self::FALLBACK_MANAGE);
+        return $this->allowed($utente, 'comunicazione.create', self::FALLBACK_MANAGE);
     }
 }

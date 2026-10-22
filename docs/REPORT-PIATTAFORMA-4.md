@@ -17,3 +17,13 @@ Correzioni di sicurezza successive (revisione automatica del commit):
 - Nuovo test di round-trip: l'xlsx esportato, reimportato senza modifiche, non produce differenze né errori.
 - Requisiti: installer a PHP 8.3 minimo (come composer.json), README aggiornato a Laravel 13 / PHP 8.5.
 - Esito: **1734/1734 test verdi su PHP 8.5.12**, PHPStan livello 5 pulito su tutta l'app, server di sviluppo avviato con PHP 8.5.
+
+## Fase 1 — Ruoli dell'associazione
+
+- Grant scartato per maturità (v0.0.1); team di spatie non attivati (vedi piano): ruoli globali, confine tra associazioni garantito dal tenant.
+- `App\Support\RuoliAssociazione`: 18 moduli, 72 permessi, 9 ruoli (super_admin, admin_associazione, operatore + presidente, vicepresidente, segretario, tesoriere, consigliere, volontario). `RolesSeeder` ne deriva ruoli e permessi.
+- 18 policy rimappate sui moduli dedicati (economia, iscrizioni, volontari, spazi, progetti, riunioni, relazioni, comunicazione) con fallback per ruolo invariati; menu laterale con controlli per singola voce.
+- Pagina `/ruoli` (Ruoli e permessi) per admin dell'associazione e super_admin; policy `gestisciRuoli` / `assegnaRuoli` (solo operatori dell'associazione corrente).
+- Listener di login e modifica utente dal super_admin conservano le cariche; i ruoli di sistema scaduti vengono rimossi.
+- `app:aggiorna-permessi` eseguito dall'updater dopo `migrate`; già applicato al DB di sviluppo.
+- Esito: **1741/1741 test verdi** (7 nuovi in `RuoliTest`, tra cui la verifica che l'operatore mantenga esattamente i permessi precedenti), PHPStan pulito, verifica visiva della pagina.

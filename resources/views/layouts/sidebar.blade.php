@@ -95,6 +95,7 @@
                         Soci
                     </a>
                 </li>
+                @if ($can('iscrizioni.view'))
                 @php
                     // Richieste di iscrizione dal form pubblico in attesa di esito
                     $richiesteIscrizionePendenti = \Illuminate\Support\Facades\Route::has('richieste-iscrizione.index')
@@ -110,6 +111,7 @@
                         @endif
                     </a>
                 </li>
+                @endif
                 @php
                     // Richieste di modifica dati anagrafici in attesa (f.19 — piano "Gestione 2")
                     $richiesteModifichePendenti = \Illuminate\Support\Facades\Route::has('richieste-modifica-dati.index')
@@ -183,7 +185,7 @@
                     </div>
                 </li>
                 @endif
-                @if ($can('quote.view'))
+                @if ($can('economia.view'))
                 <li class="nav-item">
                     <a class="nav-link d-flex justify-content-between align-items-center {{ $economiaActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#economiaSubmenu" role="button" aria-expanded="{{ $economiaActive ? 'true' : 'false' }}">
                         <span><i class="bi bi-cash-coin me-2"></i>Economia</span>
@@ -198,7 +200,7 @@
                     </div>
                 </li>
                 @endif
-                @if ($can('eventi.view') || $can('struttura.view'))
+                @if ($can('volontari.view') || $can('spazi.view') || $can('progetti.view') || $can('riunioni.view'))
                 <li class="nav-item">
                     <a class="nav-link d-flex justify-content-between align-items-center {{ $organizzazioneActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#organizzazioneSubmenu" role="button" aria-expanded="{{ $organizzazioneActive ? 'true' : 'false' }}">
                         <span><i class="bi bi-diagram-3 me-2"></i>Organizzazione</span>
@@ -206,14 +208,18 @@
                     </a>
                     <div class="collapse {{ $organizzazioneActive ? 'show' : '' }}" id="organizzazioneSubmenu">
                         <ul class="nav flex-column ms-3">
-                            @if ($can('eventi.view'))
+                            @if ($can('volontari.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('turni.*', 'volontari.*') ? 'active' : '' }}" href="{{ $nav('turni.index') }}"><i class="bi bi-person-raised-hand me-2"></i>Volontari e turni</a></li>
+                            @endif
+                            @if ($can('spazi.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('spazi.*') ? 'active' : '' }}" href="{{ $nav('spazi.index') }}"><i class="bi bi-door-open me-2"></i>Spazi</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('attrezzature.*') ? 'active' : '' }}" href="{{ $nav('attrezzature.index') }}"><i class="bi bi-box-seam me-2"></i>Inventario</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('prestiti.*') ? 'active' : '' }}" href="{{ $nav('prestiti.index') }}"><i class="bi bi-arrow-left-right me-2"></i>Prestiti</a></li>
                             @endif
-                            @if ($can('struttura.view'))
+                            @if ($can('progetti.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('progetti.*') ? 'active' : '' }}" href="{{ $nav('progetti.index') }}"><i class="bi bi-kanban me-2"></i>Progetti</a></li>
+                            @endif
+                            @if ($can('riunioni.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('riunioni.*') ? 'active' : '' }}" href="{{ $nav('riunioni.index') }}"><i class="bi bi-people me-2"></i>Riunioni</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('decisioni.*') ? 'active' : '' }}" href="{{ $nav('decisioni.index') }}"><i class="bi bi-check2-circle me-2"></i>Decisioni</a></li>
                             @endif
@@ -221,7 +227,7 @@
                     </div>
                 </li>
                 @endif
-                @if ($can('struttura.view') || $can('soci.view'))
+                @if ($can('relazioni.view') || $can('soci.view'))
                 <li class="nav-item">
                     <a class="nav-link d-flex justify-content-between align-items-center {{ $relazioniActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#relazioniSubmenu" role="button" aria-expanded="{{ $relazioniActive ? 'true' : 'false' }}">
                         <span><i class="bi bi-globe2 me-2"></i>Relazioni</span>
@@ -229,7 +235,7 @@
                     </a>
                     <div class="collapse {{ $relazioniActive ? 'show' : '' }}" id="relazioniSubmenu">
                         <ul class="nav flex-column ms-3">
-                            @if ($can('struttura.view'))
+                            @if ($can('relazioni.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('contatti-esterni.*') ? 'active' : '' }}" href="{{ $nav('contatti-esterni.index') }}"><i class="bi bi-person-rolodex me-2"></i>Contatti esterni</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('sponsor.*') ? 'active' : '' }}" href="{{ $nav('sponsor.index') }}"><i class="bi bi-award me-2"></i>Sponsor</a></li>
                             @endif
@@ -240,7 +246,7 @@
                     </div>
                 </li>
                 @endif
-                @if ($can('email.view'))
+                @if ($can('email.view') || $can('comunicazione.view'))
                 <li class="nav-item">
                     <a class="nav-link d-flex justify-content-between align-items-center {{ $emailActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#emailSubmenu" role="button" aria-expanded="{{ $emailActive ? 'true' : 'false' }}">
                         <span><i class="bi bi-envelope me-2"></i>Email &amp; Notifiche</span>
@@ -248,15 +254,19 @@
                     </a>
                     <div class="collapse {{ $emailActive ? 'show' : '' }}" id="emailSubmenu">
                         <ul class="nav flex-column ms-3">
+                            @if ($can('email.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('comunicazioni.*') ? 'active' : '' }}" href="{{ $nav('comunicazioni.index') }}"><i class="bi bi-send me-2"></i>Invia Comunicazione</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-templates.*') ? 'active' : '' }}" href="{{ $nav('email-templates.index') }}"><i class="bi bi-palette me-2"></i>Template Email</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-coda.*') ? 'active' : '' }}" href="{{ $nav('email-coda.index') }}"><i class="bi bi-hourglass-split me-2"></i>Coda Invio</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-log.*') ? 'active' : '' }}" href="{{ $nav('email-log.index') }}"><i class="bi bi-clock-history me-2"></i>Storico Email</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-impostazioni.*') ? 'active' : '' }}" href="{{ $nav('email-impostazioni.index') }}"><i class="bi bi-gear me-2"></i>Impostazioni SMTP</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-anteprime.*') ? 'active' : '' }}" href="{{ $nav('email-anteprime.index') }}"><i class="bi bi-eye me-2"></i>Anteprime email</a></li>
+                            @endif
+                            @if ($can('comunicazione.view'))
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('annunci.*') ? 'active' : '' }}" href="{{ $nav('annunci.index') }}"><i class="bi bi-megaphone me-2"></i>Annunci</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('newsletter.*') ? 'active' : '' }}" href="{{ $nav('newsletter.index') }}"><i class="bi bi-envelope-paper me-2"></i>Newsletter</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('sondaggi.*') ? 'active' : '' }}" href="{{ $nav('sondaggi.index') }}"><i class="bi bi-bar-chart me-2"></i>Sondaggi</a></li>
+                            @endif
                         </ul>
                     </div>
                 </li>
@@ -303,6 +313,14 @@
             </li>
             @endif
             @if ($sidebarHasAssoc && $can('struttura.view'))
+            @if ($sidebarHasAssoc && ($isSuperAdmin || $utente?->isAdminAssociazione()))
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('ruoli.*') ? 'active' : '' }}" href="{{ $nav('ruoli.index') }}">
+                    <i class="bi bi-shield-check me-2"></i>
+                    Ruoli e permessi
+                </a>
+            </li>
+            @endif
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('configurazioni.*') && request('section') !== 'sedi' ? 'active' : '' }}" href="{{ $nav('configurazioni.index') }}">
                     <i class="bi bi-gear me-2"></i>

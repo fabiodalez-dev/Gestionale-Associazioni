@@ -1330,6 +1330,9 @@ a.metric-cell:hover { box-shadow: var(--ds-shadow-md); transform: translateY(-1p
 ---------------------------------------------------------------------------- */
 .dash-grid { display: grid; gap: 22px; }
 .dash-row-1 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
+.dash-row-1.dash-kpi-1 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.dash-row-1.dash-kpi-0 { grid-template-columns: minmax(0, 1fr); }
+.dash-row-3:has(> :nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .dash-row-2 { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
 .dash-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 1199.98px) {

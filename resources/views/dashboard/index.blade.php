@@ -11,6 +11,7 @@
         $nomeAssociazione = $vistaGlobale ? 'tutte le associazioni' : session('associazione_nome', 'la tua associazione');
         $iniziali = fn (?string $t) => mb_strtoupper(collect(preg_split('/\s+/', trim((string) $t)) ?: [])->filter()->take(2)->map(fn ($x) => mb_substr($x, 0, 1))->join('')) ?: '?';
         $circonferenza = 2 * M_PI * 52;
+        $kpiVisibili = (int) ($p['incassi'] !== null) + (int) ($p['nuovi'] !== null);
     @endphp
 
     <div class="page-head">
@@ -43,16 +44,25 @@
     @endif
 
     {{-- Riga 1: saluto con tesseramento + due KPI --}}
-    <div class="dash-grid dash-row-1 mb-4">
+    <div class="dash-grid dash-row-1 dash-kpi-{{ $kpiVisibili }} mb-4">
         <div class="card hero-card">
             <div>
                 <h2>{{ $saluto }} {{ $utente->nome }}, bentornato</h2>
+                @php
+                    $frasi = [];
+                    if ($p['vedi_tessere'] && $stats['scadenze_imminenti'] > 0) {
+                        $frasi[] = '<strong>'.$stats['scadenze_imminenti'].' '.($stats['scadenze_imminenti'] === 1 ? 'tessera in scadenza' : 'tessere in scadenza').'</strong> nei prossimi 30 giorni';
+                    }
+                    if (($p['richieste_in_attesa'] ?? 0) > 0) {
+                        $frasi[] = '<strong>'.$p['richieste_in_attesa'].' '.($p['richieste_in_attesa'] === 1 ? 'richiesta di iscrizione' : 'richieste di iscrizione').'</strong> da approvare';
+                    }
+                @endphp
                 <p>
-                    @if ($stats['scadenze_imminenti'] > 0 || $p['richieste_in_attesa'] > 0)
-                        Hai <strong>{{ $stats['scadenze_imminenti'] }} {{ $stats['scadenze_imminenti'] === 1 ? 'tessera in scadenza' : 'tessere in scadenza' }}</strong> nei prossimi 30 giorni
-                        e <strong>{{ $p['richieste_in_attesa'] }} {{ $p['richieste_in_attesa'] === 1 ? 'richiesta di iscrizione' : 'richieste di iscrizione' }}</strong> da approvare.
+                    @if ($frasi !== [])
+                        {{-- solo numeri e testo fisso: nessun dato utente nelle frasi --}}
+                        Hai {!! implode(' e ', $frasi) !!}.
                     @else
-                        Nessuna tessera in scadenza nei prossimi 30 giorni e nessuna richiesta di iscrizione da approvare. Tutto in ordine.
+                        Niente in sospeso: nessuna scadenza imminente e nessuna richiesta da approvare.
                     @endif
                 </p>
                 <div class="hero-actions">
@@ -64,6 +74,7 @@
                     @endif
                 </div>
             </div>
+            @if ($p['vedi_tessere'])
             <div class="hero-ring">
                 <div class="ring" role="img" aria-label="{{ $p['percentuale_tesserati'] }}% dei soci attivi ha la tessera valida">
                     <svg viewBox="0 0 124 124" aria-hidden="true">
@@ -75,36 +86,42 @@
                 </div>
                 <div class="ring-caption">{{ number_format($p['tesserati'], 0, ',', '.') }} su {{ number_format($p['soci_attivi'], 0, ',', '.') }} soci attivi</div>
             </div>
+            @endif
         </div>
 
+        @if ($p['incassi'] !== null)
         <div class="card kpi-card">
             <span class="icon-tile tone-ok"><i class="bi bi-currency-euro"></i></span>
             <div class="kpi-label">Quote incassate {{ now()->year }}</div>
-            <div class="kpi-value">{{ $euro($p['incassato_anno']) }}</div>
-            @if ($p['variazione_incassi'] !== null)
-                <div class="kpi-trend {{ $p['variazione_incassi'] >= 0 ? 'metric-up' : 'metric-down' }}">
-                    {{ $p['variazione_incassi'] >= 0 ? '+' : '' }}{{ number_format($p['variazione_incassi'], 1, ',', '.') }}% sul {{ now()->year - 1 }}
+            <div class="kpi-value">{{ $euro($p['incassi']['incassato_anno']) }}</div>
+            @if ($p['incassi']['variazione'] !== null)
+                <div class="kpi-trend {{ $p['incassi']['variazione'] >= 0 ? 'metric-up' : 'metric-down' }}">
+                    {{ $p['incassi']['variazione'] >= 0 ? '+' : '' }}{{ number_format($p['incassi']['variazione'], 1, ',', '.') }}% sul {{ now()->year - 1 }}
                 </div>
             @else
                 <div class="kpi-trend text-muted">{{ $stats['quote_pagate'] }} {{ $stats['quote_pagate'] === 1 ? 'quota pagata' : 'quote pagate' }}</div>
             @endif
         </div>
+        @endif
 
+        @if ($p['nuovi'] !== null)
         <div class="card kpi-card">
             <span class="icon-tile tone-2"><i class="bi bi-person-plus"></i></span>
             <div class="kpi-label">Nuovi soci ({{ \Illuminate\Support\Str::lower(now()->locale('it')->translatedFormat('F')) }})</div>
-            <div class="kpi-value">{{ $p['nuovi_mese'] }}</div>
-            @if ($p['variazione_nuovi'] !== null)
-                <div class="kpi-trend {{ $p['variazione_nuovi'] >= 0 ? 'metric-up' : 'metric-down' }}">
-                    {{ $p['variazione_nuovi'] >= 0 ? '+' : '' }}{{ number_format($p['variazione_nuovi'], 1, ',', '.') }}% sul mese scorso
+            <div class="kpi-value">{{ $p['nuovi']['mese'] }}</div>
+            @if ($p['nuovi']['variazione'] !== null)
+                <div class="kpi-trend {{ $p['nuovi']['variazione'] >= 0 ? 'metric-up' : 'metric-down' }}">
+                    {{ $p['nuovi']['variazione'] >= 0 ? '+' : '' }}{{ number_format($p['nuovi']['variazione'], 1, ',', '.') }}% sul mese scorso
                 </div>
             @else
                 <div class="kpi-trend text-muted">{{ number_format($stats['total_soci'], 0, ',', '.') }} soci in totale</div>
             @endif
         </div>
+        @endif
     </div>
 
     {{-- Riga 2: andamento mensile + composizione --}}
+    @if ($p['andamento'] !== null)
     <div class="dash-grid dash-row-2 mb-4">
         <div class="card">
             <div class="card-head">
@@ -149,8 +166,8 @@
             <div class="px-4 pb-4">
                 <div class="d-flex align-items-baseline gap-2 mt-2">
                     <span class="fs-2 fw-semibold text-body lh-1">{{ number_format($p['soci_attivi'], 0, ',', '.') }}</span>
-                    @if ($p['nuovi_mese'] > 0)
-                        <span class="small metric-up fw-medium">+{{ $p['nuovi_mese'] }} questo mese</span>
+                    @if (($p['nuovi']['mese'] ?? 0) > 0)
+                        <span class="small metric-up fw-medium">+{{ $p['nuovi']['mese'] }} questo mese</span>
                     @endif
                 </div>
                 @if ($p['composizione'] === [])
@@ -175,8 +192,11 @@
         </div>
     </div>
 
+    @endif
+
     {{-- Riga 3: rinnovi, attività recente, eventi / associazioni --}}
     <div class="dash-grid dash-row-3 mb-4">
+        @if ($p['rinnovi'] !== null)
         <div class="card">
             <div class="card-head pb-3">
                 <h2>Rinnovi in scadenza</h2>
@@ -217,6 +237,7 @@
                 </ul>
             @endif
         </div>
+        @endif
 
         <div class="card">
             <div class="card-head pb-3">

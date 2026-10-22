@@ -68,7 +68,7 @@ class DashboardController extends Controller
             'vistaGlobale' => $utente->isSuperAdmin() && blank(session('associazione_id')),
             'kpiPrenotazioni' => $this->kpiPrenotazioni(),
             'caricheInScadenza' => $this->caricheInScadenza(),
-            'panoramica' => $panoramica->calcola(),
+            'panoramica' => $panoramica->calcola($utente),
             'associazioniGlobali' => $utente->isSuperAdmin() && blank(session('associazione_id')) ? $panoramica->associazioni() : collect(),
         ]);
     }

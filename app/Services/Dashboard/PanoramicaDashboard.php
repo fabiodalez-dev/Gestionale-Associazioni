@@ -9,6 +9,7 @@ use App\Models\Quota;
 use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Models\Utente;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -17,6 +18,8 @@ use Illuminate\Support\Collection;
  * mensile, composizione per categoria, rinnovi in scadenza e attività
  * recenti. Tutte le query passano dai global scope (tenant e perimetro
  * sede), quindi in vista globale del super admin coprono tutti i tenant.
+ * Ogni sezione si calcola solo se l'utente ha il permesso del modulo:
+ * le sezioni non consentite valgono null e la vista non le mostra.
  */
 class PanoramicaDashboard
 {
@@ -25,42 +28,59 @@ class PanoramicaDashboard
     /**
      * @return array<string, mixed>
      */
-    public function calcola(): array
+    public function calcola(Utente $utente): array
     {
+        $puo = fn (string $permesso): bool => $utente->isSuperAdmin() || $utente->can($permesso);
+        $vediSoci = $puo('soci.view');
+        $vediQuote = $puo('quote.view');
+        $vediTessere = $puo('tessere.view');
+
         $oggi = now()->startOfDay();
         $anno = (int) $oggi->year;
 
-        $sociAttivi = Socio::query()->where('stato', 'Attivo')->count();
-        $tesserati = Tessera::query()
-            ->where('stato', 'Attiva')
-            ->where(fn ($q) => $q->whereNull('data_scadenza')->orWhere('data_scadenza', '>=', $oggi))
-            ->distinct()
-            ->count('socio_id');
+        $sociAttivi = $vediSoci || $vediTessere ? Socio::query()->where('stato', 'Attivo')->count() : 0;
+        $tesserati = $vediTessere
+            ? Tessera::query()
+                ->where('stato', 'Attiva')
+                ->where(fn ($q) => $q->whereNull('data_scadenza')->orWhere('data_scadenza', '>=', $oggi))
+                ->distinct()
+                ->count('socio_id')
+            : 0;
 
-        $incassatoAnno = (float) Quota::query()->where('stato', 'Pagata')->where('anno', $anno)->sum('importo');
-        $incassatoPrecedente = (float) Quota::query()->where('stato', 'Pagata')->where('anno', $anno - 1)->sum('importo');
-        $daIncassare = (float) Quota::query()->where('stato', '!=', 'Pagata')->where('anno', $anno)->sum('importo');
+        $incassi = null;
+        if ($vediQuote) {
+            $incassatoAnno = (float) Quota::query()->where('stato', 'Pagata')->where('anno', $anno)->sum('importo');
+            $incassatoPrecedente = (float) Quota::query()->where('stato', 'Pagata')->where('anno', $anno - 1)->sum('importo');
+            $incassi = [
+                'incassato_anno' => $incassatoAnno,
+                'variazione' => $this->variazione($incassatoAnno, $incassatoPrecedente),
+                'da_incassare' => (float) Quota::query()->where('stato', '!=', 'Pagata')->where('anno', $anno)->sum('importo'),
+            ];
+        }
 
-        $inizioMese = $oggi->copy()->startOfMonth();
-        $nuoviMese = Socio::query()->where('data_iscrizione', '>=', $inizioMese)->count();
-        $nuoviMesePrecedente = Socio::query()
-            ->whereBetween('data_iscrizione', [$inizioMese->copy()->subMonth(), $inizioMese->copy()->subDay()->endOfDay()])
-            ->count();
+        $nuovi = null;
+        if ($vediSoci) {
+            $inizioMese = $oggi->copy()->startOfMonth();
+            $nuoviMese = Socio::query()->where('data_iscrizione', '>=', $inizioMese)->count();
+            $nuoviMesePrecedente = Socio::query()
+                ->whereBetween('data_iscrizione', [$inizioMese->copy()->subMonth(), $inizioMese->copy()->subDay()->endOfDay()])
+                ->count();
+            $nuovi = ['mese' => $nuoviMese, 'variazione' => $this->variazione($nuoviMese, $nuoviMesePrecedente)];
+        }
 
         return [
+            'vedi_soci' => $vediSoci,
+            'vedi_tessere' => $vediTessere,
             'soci_attivi' => $sociAttivi,
             'tesserati' => $tesserati,
             'percentuale_tesserati' => $sociAttivi > 0 ? (int) round(min(100, $tesserati * 100 / $sociAttivi)) : 0,
-            'richieste_in_attesa' => RichiestaIscrizione::query()->inAttesa()->count(),
-            'incassato_anno' => $incassatoAnno,
-            'variazione_incassi' => $this->variazione($incassatoAnno, $incassatoPrecedente),
-            'da_incassare' => $daIncassare,
-            'nuovi_mese' => $nuoviMese,
-            'variazione_nuovi' => $this->variazione($nuoviMese, $nuoviMesePrecedente),
-            'andamento' => $this->andamento($oggi),
-            'composizione' => $this->composizione($sociAttivi),
-            'rinnovi' => $this->rinnovi($oggi),
-            'attivita' => $this->attivita(),
+            'richieste_in_attesa' => $puo('iscrizioni.view') ? RichiestaIscrizione::query()->inAttesa()->count() : null,
+            'incassi' => $incassi,
+            'nuovi' => $nuovi,
+            'andamento' => $vediSoci ? $this->andamento($oggi) : null,
+            'composizione' => $vediSoci ? $this->composizione($sociAttivi) : null,
+            'rinnovi' => $vediTessere ? $this->rinnovi($oggi) : null,
+            'attivita' => $this->attivita($vediSoci, $vediQuote, $puo('iscrizioni.view'), $puo('eventi.view')),
         ];
     }
 
@@ -160,45 +180,53 @@ class PanoramicaDashboard
      *
      * @return Collection<int, array{tipo: string, titolo: string, dettaglio: string, quando: Carbon}>
      */
-    private function attivita(): Collection
+    private function attivita(bool $soci, bool $quote, bool $iscrizioni, bool $eventi): Collection
     {
         $voci = collect();
 
-        Socio::query()->latest('created_at')->limit(4)->get(['id', 'nome', 'cognome', 'created_at'])
-            ->each(fn (Socio $s) => $voci->push([
-                'tipo' => 'ok',
-                'titolo' => 'Nuovo socio',
-                'dettaglio' => $s->nome.' '.$s->cognome,
-                'quando' => $s->created_at,
-            ]));
+        if ($soci) {
+            Socio::query()->latest('created_at')->limit(4)->get(['id', 'nome', 'cognome', 'created_at'])
+                ->each(fn (Socio $s) => $voci->push([
+                    'tipo' => 'ok',
+                    'titolo' => 'Nuovo socio',
+                    'dettaglio' => $s->nome.' '.$s->cognome,
+                    'quando' => $s->created_at,
+                ]));
+        }
 
-        Quota::query()->with('socio:id,nome,cognome')->where('stato', 'Pagata')->whereNotNull('data_pagamento')
-            ->latest('data_pagamento')->limit(4)->get()
-            ->each(fn (Quota $q) => $voci->push([
-                'tipo' => 'info',
-                'titolo' => 'Pagamento ricevuto',
-                'dettaglio' => '€ '.number_format((float) $q->importo, 2, ',', '.').($q->socio ? ' da '.$q->socio->nome.' '.$q->socio->cognome : ''),
-                'quando' => Carbon::parse($q->data_pagamento),
-            ]));
+        if ($quote) {
+            Quota::query()->with('socio:id,nome,cognome')->where('stato', 'Pagata')->whereNotNull('data_pagamento')
+                ->latest('data_pagamento')->limit(4)->get()
+                ->each(fn (Quota $q) => $voci->push([
+                    'tipo' => 'info',
+                    'titolo' => 'Pagamento ricevuto',
+                    'dettaglio' => '€ '.number_format((float) $q->importo, 2, ',', '.').($q->socio ? ' da '.$q->socio->nome.' '.$q->socio->cognome : ''),
+                    'quando' => Carbon::parse($q->data_pagamento),
+                ]));
+        }
 
-        RichiestaIscrizione::query()->latest('created_at')->limit(4)->get()
-            ->each(function (RichiestaIscrizione $r) use ($voci): void {
-                $dati = $r->dati_form;
-                $voci->push([
-                    'tipo' => 'warn',
-                    'titolo' => 'Richiesta di iscrizione',
-                    'dettaglio' => trim(($dati['nome'] ?? '').' '.($dati['cognome'] ?? '')) ?: 'Dal modulo online',
-                    'quando' => $r->created_at,
-                ]);
-            });
+        if ($iscrizioni) {
+            RichiestaIscrizione::query()->latest('created_at')->limit(4)->get()
+                ->each(function (RichiestaIscrizione $r) use ($voci): void {
+                    $dati = $r->dati_form;
+                    $voci->push([
+                        'tipo' => 'warn',
+                        'titolo' => 'Richiesta di iscrizione',
+                        'dettaglio' => trim(($dati['nome'] ?? '').' '.($dati['cognome'] ?? '')) ?: 'Dal modulo online',
+                        'quando' => $r->created_at,
+                    ]);
+                });
+        }
 
-        Evento::query()->latest('created_at')->limit(3)->get(['id', 'titolo', 'data_evento', 'created_at'])
-            ->each(fn (Evento $e) => $voci->push([
-                'tipo' => 'muted',
-                'titolo' => 'Evento creato',
-                'dettaglio' => $e->titolo.' · '.$e->data_evento->format('d/m'),
-                'quando' => $e->created_at,
-            ]));
+        if ($eventi) {
+            Evento::query()->latest('created_at')->limit(3)->get(['id', 'titolo', 'data_evento', 'created_at'])
+                ->each(fn (Evento $e) => $voci->push([
+                    'tipo' => 'muted',
+                    'titolo' => 'Evento creato',
+                    'dettaglio' => $e->titolo.' · '.$e->data_evento->format('d/m'),
+                    'quando' => $e->created_at,
+                ]));
+        }
 
         return $voci->filter(fn ($v) => $v['quando'] !== null)->sortByDesc('quando')->take(5)->values();
     }

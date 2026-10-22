@@ -259,7 +259,9 @@
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-templates.*') ? 'active' : '' }}" href="{{ $nav('email-templates.index') }}"><i class="bi bi-palette me-2"></i>Template Email</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-coda.*') ? 'active' : '' }}" href="{{ $nav('email-coda.index') }}"><i class="bi bi-hourglass-split me-2"></i>Coda Invio</a></li>
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-log.*') ? 'active' : '' }}" href="{{ $nav('email-log.index') }}"><i class="bi bi-clock-history me-2"></i>Storico Email</a></li>
+                            @if ($isSuperAdmin || $utente?->isAdminAssociazione())
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-impostazioni.*') ? 'active' : '' }}" href="{{ $nav('email-impostazioni.index') }}"><i class="bi bi-gear me-2"></i>Impostazioni SMTP</a></li>
+                            @endif
                             <li class="nav-item"><a class="nav-link py-1 {{ request()->routeIs('email-anteprime.*') ? 'active' : '' }}" href="{{ $nav('email-anteprime.index') }}"><i class="bi bi-eye me-2"></i>Anteprime email</a></li>
                             @endif
                             @if ($can('comunicazione.view'))

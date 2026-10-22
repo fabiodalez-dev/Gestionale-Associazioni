@@ -4,6 +4,7 @@ namespace Tests\Feature\Struttura;
 
 use App\Models\Associazione;
 use App\Models\Movimento;
+use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Models\Turno;
 use App\Models\Utente;
@@ -101,6 +102,16 @@ class RuoliTest extends TestCase
         $this->assertFalse(Gate::forUser($volontario)->allows('viewAny', Movimento::class));
         $this->assertTrue(Gate::forUser($volontario)->allows('viewAny', Turno::class));
         $this->assertFalse(Gate::forUser($volontario)->allows('create', Turno::class));
+    }
+
+    public function test_solo_l_admin_modifica_l_smtp_dell_associazione(): void
+    {
+        foreach (['presidente', 'vicepresidente', 'segretario'] as $carica) {
+            $utente = $this->staff([$carica]);
+            $this->assertTrue($utente->can('email.view'), $carica);
+            $this->assertFalse(Gate::forUser($utente)->allows('update', SmtpSetting::class), $carica);
+        }
+        $this->assertTrue(Gate::forUser($this->admin)->allows('update', SmtpSetting::class));
     }
 
     public function test_admin_assegna_cariche_a_un_operatore(): void

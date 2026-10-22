@@ -69,11 +69,6 @@ class UpdateService
         $this->root = rtrim(str_replace('\\', '/', $root), '/');
     }
 
-    public function root(): string
-    {
-        return $this->root;
-    }
-
     public function versioneCorrente(): string
     {
         $file = $this->root.'/VERSION';
@@ -649,7 +644,7 @@ class UpdateService
         foreach ($this->fileDelPacchetto($sorgente) as $rel) {
             $dest = $this->root.'/'.$rel;
             if (file_exists($dest)) {
-                if (! is_writable($dest) && ! (@chmod($dest, is_dir($dest) ? 0775 : 0664) && is_writable($dest))) {
+                if (! $this->scrivibileAncheDopoChmod($dest, is_dir($dest) ? 0775 : 0664)) {
                     $problemi[$rel] = true;
                 }
 
@@ -659,7 +654,7 @@ class UpdateService
             while (! file_exists($antenato) && $antenato !== $this->root && strlen($antenato) > strlen($this->root)) {
                 $antenato = dirname($antenato);
             }
-            if (! is_writable($antenato) && ! (@chmod($antenato, 0775) && is_writable($antenato))) {
+            if (! $this->scrivibileAncheDopoChmod($antenato, 0775)) {
                 $problemi[str_replace($this->root.'/', '', $antenato) ?: '.'] = true;
             }
         }
@@ -667,6 +662,18 @@ class UpdateService
         sort($lista);
 
         return $lista;
+    }
+
+    /** Scrivibile com'è, oppure dopo un chmod u+w (possibile solo se il file è nostro). */
+    private function scrivibileAncheDopoChmod(string $path, int $modo): bool
+    {
+        if (is_writable($path)) {
+            return true;
+        }
+        @chmod($path, $modo);
+        clearstatcache(true, $path);
+
+        return is_writable($path);
     }
 
     /**

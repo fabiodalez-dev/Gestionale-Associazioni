@@ -530,7 +530,7 @@ class PaymentService
 
         /** @var Associazione|null $associazione */
         $associazione = Associazione::find($socio->associazione_id);
-        $tipoScadenza = $associazione?->tipo_scadenza_default ?: Tessera::TIPO_SCADENZA_SOLARE;
+        $tipoScadenza = $associazione?->tesseramento()->tipo_scadenza_default ?? Tessera::TIPO_SCADENZA_SOLARE;
 
         $dataScadenza = $tipoScadenza === Tessera::TIPO_SCADENZA_ANNUALE
             ? now()->addYear()->toDateString()
@@ -584,7 +584,7 @@ class PaymentService
         /** @var Associazione|null $associazione */
         $associazione = Associazione::find($socio->associazione_id);
 
-        $dataScadenza = ($associazione->tipo_scadenza_default ?? 'solare') === 'annuale'
+        $dataScadenza = $associazione?->tesseramento()->scadenzaAnnuale()
             ? now()->addYear()->toDateString()
             : now()->endOfYear()->toDateString();
 

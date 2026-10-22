@@ -3,6 +3,7 @@
 namespace App\Notifications\Quote;
 
 use App\Models\Quota;
+use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Services\Email\TenantNotificationMailer;
 use Illuminate\Bus\Queueable;
@@ -27,11 +28,23 @@ class PagamentoQuotaNotification extends Notification implements ShouldQueue
     {
         $channels = ['database'];
 
-        if ($notifiable instanceof Socio && filled($notifiable->email) && ! $notifiable->email_opt_out) {
+        if ($notifiable instanceof Socio && filled($notifiable->email) && ! $notifiable->email_opt_out && $this->emailAttiva()) {
             $channels[] = 'mail';
         }
 
         return $channels;
+    }
+
+    /**
+     * Opzione "Conferma pagamento quota" in Email → Impostazioni: se l'associazione
+     * l'ha spenta, niente email (resta la notifica nel database). Senza impostazioni
+     * email salvate vale il comportamento predefinito: email inviata.
+     */
+    private function emailAttiva(): bool
+    {
+        $impostazioni = SmtpSetting::query()->withoutGlobalScopes()->where('associazione_id', $this->quota->associazione_id)->first();
+
+        return $impostazioni === null || (bool) $impostazioni->auto_pagamento_quota;
     }
 
     public function toMail(object $notifiable): MailMessage

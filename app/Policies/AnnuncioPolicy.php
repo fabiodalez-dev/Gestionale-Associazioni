@@ -26,29 +26,29 @@ class AnnuncioPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'email.view', self::FALLBACK_VIEW);
+        return $this->allowed($utente, 'comunicazione.view', self::FALLBACK_VIEW);
     }
 
     public function view(Utente $utente, Annuncio $annuncio): bool
     {
-        return $this->allowed($utente, 'email.view', self::FALLBACK_VIEW)
+        return $this->allowed($utente, 'comunicazione.view', self::FALLBACK_VIEW)
             && $this->stessoTenant($utente, $annuncio);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'email.create', self::FALLBACK_MANAGE);
+        return $this->allowed($utente, 'comunicazione.create', self::FALLBACK_MANAGE);
     }
 
     public function update(Utente $utente, Annuncio $annuncio): bool
     {
-        return $this->allowed($utente, 'email.update', self::FALLBACK_MANAGE)
+        return $this->allowed($utente, 'comunicazione.update', self::FALLBACK_MANAGE)
             && $this->stessoTenant($utente, $annuncio);
     }
 
     public function delete(Utente $utente, Annuncio $annuncio): bool
     {
-        return $this->allowed($utente, 'email.delete', self::FALLBACK_MANAGE)
+        return $this->allowed($utente, 'comunicazione.delete', self::FALLBACK_MANAGE)
             && $this->stessoTenant($utente, $annuncio);
     }
 

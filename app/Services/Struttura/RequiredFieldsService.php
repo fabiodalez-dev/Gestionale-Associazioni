@@ -52,7 +52,7 @@ class RequiredFieldsService
      */
     public function load(Associazione $associazione): array
     {
-        $config = $associazione->campi_obbligatori_config ?? [];
+        $config = $associazione->iscrizioni()->campi_obbligatori_config ?? [];
 
         $backend = [];
         foreach (self::BACKEND_FIELDS as $campo) {

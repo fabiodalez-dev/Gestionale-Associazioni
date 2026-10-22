@@ -3,64 +3,154 @@
 @section('title', 'Gestione Associazioni')
 
 @section('content')
-<div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="bi bi-buildings me-2"></i>Gestione Associazioni</h1>
-    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalAssociazione" id="btnNuovaAssociazione">
-        <i class="bi bi-plus-lg me-1"></i>Nuova Associazione
-    </button>
+@php
+    $iniziali = fn (?string $t) => mb_strtoupper(collect(preg_split('/\s+/', trim((string) $t)) ?: [])->filter()->take(2)->map(fn ($p) => mb_substr($p, 0, 1))->join('')) ?: '?';
+    $euroBreve = fn (float $v) => $v >= 1000 ? '€ '.number_format($v / 1000, $v >= 10000 ? 0 : 1, ',', '.').'k' : '€ '.number_format($v, 0, ',', '.');
+    $etichetteRegistrazione = ['disattivata' => 'Solo super admin', 'revisione' => 'Con approvazione', 'automatica' => 'Automatica'];
+    $tonoMatrice = ['Completo' => 'bg-success', 'Modifica' => 'bg-info', 'Lettura' => 'bg-secondary'];
+@endphp
+
+<div class="page-head">
+    <div>
+        <div class="crumb">Piattaforma / <span>Associazioni</span></div>
+        <h1>Associazioni</h1>
+    </div>
+    <div class="actions">
+        @if (Route::has('richieste-registrazione.index'))
+            <a href="{{ route('richieste-registrazione.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-inbox"></i>Richieste di iscrizione
+                @if ($piattaforma['richieste'] > 0)<span class="badge bg-danger">{{ $piattaforma['richieste'] }}</span>@endif
+            </a>
+        @endif
+        <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalAssociazione" id="btnNuovaAssociazione">
+            <i class="bi bi-plus-lg"></i>Nuova Associazione
+        </button>
+    </div>
 </div>
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Associazione</th>
-                    <th>Email</th>
-                    <th>Stato</th>
-                    <th class="text-center">Sedi</th>
-                    <th class="text-center">Soci</th>
-                    <th>Scadenza default</th>
-                    <th class="text-end">Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($associazioni as $assoc)
-                    <tr>
-                        <td>
-                            @if ($assoc->logo_url)
-                                <img src="{{ asset('storage/'.$assoc->logo_url) }}" alt="Logo {{ $assoc->nome }}" style="height: 28px; width: auto;" class="me-2 rounded">
-                            @endif
-                            <strong>{{ $assoc->nome }}</strong>
-                        </td>
-                        <td>{{ $assoc->email }}</td>
-                        <td>
-                            <span class="badge {{ $assoc->attiva ? 'bg-success' : 'bg-secondary' }}">
-                                {{ $assoc->attiva ? 'Attiva' : 'Disattiva' }}
-                            </span>
-                        </td>
-                        <td class="text-center">{{ $assoc->sedi_count }}</td>
-                        <td class="text-center">{{ $assoc->soci_count }}</td>
-                        <td>{{ $assoc->tipo_scadenza_default === 'annuale' ? 'Annuale (365 gg)' : 'Anno solare' }}</td>
-                        <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" href="{{ route('associazioni.index', ['edit' => $assoc->id]) }}" title="Modifica">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <button class="btn btn-sm btn-outline-danger" type="button"
-                                    data-bs-toggle="modal" data-bs-target="#modalElimina"
-                                    data-assoc-id="{{ $assoc->id }}" data-assoc-nome="{{ $assoc->nome }}" title="Elimina">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="7" class="text-center text-muted py-4">Nessuna associazione presente.</td></tr>
-                @endforelse
-            </tbody>
-            <tfoot>
-                <tr><td colspan="7" class="text-muted small">Totale: {{ $associazioni->count() }} associazioni</td></tr>
-            </tfoot>
-        </table>
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="facts-grid">
+            <div><span>Associazioni attive</span><b>{{ $piattaforma['attive'] }} di {{ $piattaforma['totali'] }}</b></div>
+            <div><span>Soci in totale</span><b>{{ number_format($piattaforma['soci'], 0, ',', '.') }}</b></div>
+            <div><span>Utenti dello staff attivi</span><b>{{ number_format($piattaforma['utenti'], 0, ',', '.') }}</b></div>
+            <div><span>Quote incassate {{ now()->year }}</span><b>{{ $euroBreve($piattaforma['incassi']) }}</b></div>
+            <div><span>Iscrizione nuove associazioni</span><b><a href="{{ route('impostazioni-sistema.index', ['sezione' => 'registrazione']) }}">{{ $etichetteRegistrazione[$piattaforma['registrazione']] }}</a></b></div>
+            <div><span>Dominio</span><b class="mono">{{ parse_url(config('app.url'), PHP_URL_HOST) ?: request()->getHost() }}</b></div>
+        </div>
+    </div>
+</div>
+
+@if ($associazioni->isEmpty())
+    <div class="card"><div class="empty-state"><span class="icon-tile tone-4"><i class="bi bi-buildings"></i></span><h3>Nessuna associazione</h3><p class="mb-0">Creane una o attiva l'iscrizione autonoma.</p></div></div>
+@else
+    <div class="assoc-grid mb-4">
+        @foreach ($associazioni as $assoc)
+            <article class="card assoc-card">
+                <div class="d-flex align-items-start gap-3">
+                    @if ($assoc->logoUrl())
+                        <img src="{{ $assoc->logoUrl('miniatura') }}" alt="Logo {{ $assoc->nome }}" class="assoc-logo">
+                    @else
+                        <span class="avatar avatar-lg avatar-square tone-{{ $loop->index % 6 }}">{{ $iniziali($assoc->nome) }}</span>
+                    @endif
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="fw-semibold text-body text-truncate">{{ $assoc->nome }}</div>
+                        <div class="who-sub text-truncate">{{ collect([$assoc->citta, $assoc->email])->filter()->join(' · ') }}</div>
+                    </div>
+                    <span class="badge {{ $assoc->attiva ? 'bg-success' : 'bg-secondary' }}">{{ $assoc->attiva ? 'Attiva' : 'Disattiva' }}</span>
+                </div>
+                <div class="assoc-stats">
+                    <div><span>Soci</span><b>{{ number_format($assoc->soci_count, 0, ',', '.') }}</b></div>
+                    <div><span>Admin</span><b>{{ $adminPerAssociazione[$assoc->id] ?? 0 }}</b></div>
+                    <div><span>Sedi</span><b>{{ $assoc->sedi_count }}</b></div>
+                    <div><span>Incassi</span><b>{{ isset($incassiPerAssociazione[$assoc->id]) ? $euroBreve((float) $incassiPerAssociazione[$assoc->id]) : '—' }}</b></div>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-auto">
+                    <span class="mono small text-muted text-truncate flex-grow-1">/a/{{ $assoc->slug }}</span>
+                    <a class="btn btn-sm btn-icon btn-ghost" href="{{ route('associazioni.index', ['edit' => $assoc->id]) }}" title="Modifica" aria-label="Modifica {{ $assoc->nome }}"><i class="bi bi-pencil"></i></a>
+                    <button class="btn btn-sm btn-icon btn-ghost btn-ghost-danger" type="button" data-bs-toggle="modal" data-bs-target="#modalElimina"
+                            data-assoc-id="{{ $assoc->id }}" data-assoc-nome="{{ $assoc->nome }}" title="Elimina" aria-label="Elimina {{ $assoc->nome }}"><i class="bi bi-trash"></i></button>
+                    <form method="POST" action="{{ route('tenant.switch') }}" class="m-0">
+                        @csrf
+                        <input type="hidden" name="associazione_id" value="{{ $assoc->id }}">
+                        <button type="submit" class="btn btn-sm btn-soft">Apri <i class="bi bi-arrow-right"></i></button>
+                    </form>
+                </div>
+            </article>
+        @endforeach
+    </div>
+    <p class="text-muted small">Totale: {{ $associazioni->count() }} associazioni</p>
+@endif
+
+<div class="row g-4">
+    <div class="col-xl-7">
+        <div class="card h-100">
+            <div class="card-head pb-3">
+                <div>
+                    <h2>Ruoli e permessi</h2>
+                    <div class="sub">Permessi predefiniti di ogni ruolo; ogni associazione assegna i ruoli ai suoi utenti.</div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle matrix">
+                    <thead>
+                        <tr>
+                            <th>Modulo</th>
+                            @foreach ($ruoliMatrice as $ruolo)
+                                <th class="text-center">{{ \App\Support\RuoliAssociazione::label($ruolo) }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($moduliMatrice as $modulo => $nomeModulo)
+                            <tr>
+                                <td>{{ $nomeModulo }}</td>
+                                @foreach ($ruoliMatrice as $ruolo)
+                                    @php $livello = $matrice[$modulo][$ruolo] ?? null; @endphp
+                                    <td class="text-center">
+                                        @if ($livello)
+                                            <span class="badge {{ $tonoMatrice[$livello] }}">{{ $livello }}</span>
+                                        @else
+                                            <span class="text-subtle">—</span>
+                                        @endif
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card h-100">
+            <div class="card-head pb-3">
+                <h2>Registro accessi</h2>
+                @if (Route::has('audit-accessi.index'))
+                    <a href="{{ route('audit-accessi.index') }}">Audit completo</a>
+                @endif
+            </div>
+            @if ($accessiRecenti->isEmpty())
+                <div class="panel-empty"><i class="bi bi-shield-check"></i>Nessun accesso registrato.</div>
+            @else
+                <ul class="panel-list">
+                    @foreach ($accessiRecenti as $accesso)
+                        <li>
+                            <div class="who-cell">
+                                <span class="avatar avatar-sm {{ $accesso->esito === \App\Models\Accesso::ESITO_FALLITO ? 'tone-danger' : 'tone-'.(abs(crc32((string) $accesso->email_tentata)) % 6) }}">{{ mb_strtoupper(mb_substr((string) $accesso->email_tentata, 0, 2)) }}</span>
+                                <div class="min-w-0">
+                                    <div class="text-body text-truncate">
+                                        <b>{{ $accesso->email_tentata ?: 'Utente' }}</b>
+                                        {{ match ($accesso->esito) { \App\Models\Accesso::ESITO_LOGIN => 'ha effettuato l\'accesso', \App\Models\Accesso::ESITO_LOGOUT => 'è uscito', default => 'accesso non riuscito' } }}
+                                    </div>
+                                    <div class="who-sub">{{ $accesso->associazione?->nome ?? 'Piattaforma' }} · {{ $accesso->created_at?->locale('it')->diffForHumans() }}</div>
+                                </div>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
     </div>
 </div>
 
@@ -79,101 +169,33 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
                 </div>
                 <div class="modal-body">
+                    @if ($errors->any())
+                        <div class="alert alert-danger">
+                            <strong>Associazione non salvata.</strong> Correggi questi campi:
+                            <ul class="mb-0 mt-1">
+                                @foreach ($errors->all() as $messaggio)
+                                    <li>{{ $messaggio }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                    @php
+                        $formAssociazione = new \App\Forms\AssociazioneForm($editAssociazione ?? \App\Models\Associazione::class);
+                    @endphp
                     <h6 class="text-muted text-uppercase small">Anagrafica</h6>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label" for="nome">Nome *</label>
-                            <input type="text" class="form-control" id="nome" name="nome" required maxlength="255"
-                                   value="{{ old('nome', $editAssociazione?->nome) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="email">Email *</label>
-                            <input type="email" class="form-control" id="email" name="email" required
-                                   value="{{ old('email', $editAssociazione?->email) }}">
-                        </div>
-                        {{-- Slug mini-sito editabile (f.22): kebab-case, unique, anteprima URL --}}
-                        <div class="col-md-12">
-                            <label class="form-label" for="slug">Slug mini-sito pubblico</label>
-                            <div class="input-group">
-                                <span class="input-group-text">{{ url('/a') }}/</span>
-                                <input type="text" class="form-control @error('slug') is-invalid @enderror" id="slug" name="slug"
-                                       maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                                       placeholder="{{ $editAssociazione?->slug ?: 'generato dal nome se vuoto' }}"
-                                       value="{{ old('slug', $editAssociazione?->slug) }}"
-                                       oninput="document.getElementById('slugAnteprima').textContent = '{{ url('/a') }}/' + (this.value || '{{ $editAssociazione?->slug ?: '...' }}');">
-                                @error('slug')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                            </div>
-                            <div class="form-text">
-                                Solo minuscole, numeri e trattini (kebab-case). Anteprima:
-                                <span id="slugAnteprima">{{ url('/a') }}/{{ old('slug', $editAssociazione?->slug) ?: '...' }}</span>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="partita_iva">Partita IVA</label>
-                            <input type="text" class="form-control" id="partita_iva" name="partita_iva" maxlength="20"
-                                   value="{{ old('partita_iva', $editAssociazione?->partita_iva) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="codice_fiscale">Codice fiscale</label>
-                            <input type="text" class="form-control" id="codice_fiscale" name="codice_fiscale" maxlength="16"
-                                   value="{{ old('codice_fiscale', $editAssociazione?->codice_fiscale) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="telefono">Telefono</label>
-                            <input type="text" class="form-control" id="telefono" name="telefono" maxlength="20"
-                                   value="{{ old('telefono', $editAssociazione?->telefono) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="indirizzo">Indirizzo</label>
-                            <input type="text" class="form-control" id="indirizzo" name="indirizzo"
-                                   value="{{ old('indirizzo', $editAssociazione?->indirizzo) }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label" for="citta">Città</label>
-                            <input type="text" class="form-control" id="citta" name="citta" maxlength="100"
-                                   value="{{ old('citta', $editAssociazione?->citta) }}">
-                        </div>
-                        <div class="col-md-1">
-                            <label class="form-label" for="provincia">Prov.</label>
-                            <input type="text" class="form-control" id="provincia" name="provincia" maxlength="2"
-                                   value="{{ old('provincia', $editAssociazione?->provincia) }}">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label" for="cap">CAP</label>
-                            <input type="text" class="form-control" id="cap" name="cap" maxlength="5"
-                                   value="{{ old('cap', $editAssociazione?->cap) }}">
-                        </div>
+                    @include('formello.campi', ['form' => $formAssociazione, 'solo' => ['nome', 'email', 'slug']])
+                    {{-- Anteprima dell'URL del mini-sito (f.22), aggiornata mentre si scrive lo slug --}}
+                    <div class="form-text mt-n2 mb-3">
+                        Anteprima: <span id="slugAnteprima" data-base="{{ url('/a') }}/" data-attuale="{{ $editAssociazione?->slug ?: '...' }}">{{ url('/a') }}/{{ old('slug', $editAssociazione?->slug) ?: '...' }}</span>
                     </div>
+                    @include('formello.campi', ['form' => $formAssociazione, 'solo' => array_values(array_diff(\App\Forms\AssociazioneForm::GRUPPO_ANAGRAFICA, ['nome', 'email', 'slug']))])
 
                     <h6 class="text-muted text-uppercase small">Configurazione</h6>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label" for="tipo_scadenza_default">Tipo scadenza tessere</label>
-                            <select class="form-select" id="tipo_scadenza_default" name="tipo_scadenza_default">
-                                <option value="solare" @selected(old('tipo_scadenza_default', $editAssociazione?->tipo_scadenza_default ?? 'solare') === 'solare')>Anno Solare (31 Dicembre)</option>
-                                <option value="annuale" @selected(old('tipo_scadenza_default', $editAssociazione?->tipo_scadenza_default) === 'annuale')>Annuale (365 giorni da iscrizione)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="giorni_notifica_scadenza">Giorni preavviso notifica</label>
-                            <input type="number" class="form-control" id="giorni_notifica_scadenza" name="giorni_notifica_scadenza" min="1" max="365"
-                                   value="{{ old('giorni_notifica_scadenza', $editAssociazione?->giorni_notifica_scadenza ?? 30) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label" for="costo_tessera">Costo tessera (€)</label>
-                            <input type="number" step="0.01" min="0" class="form-control" id="costo_tessera" name="costo_tessera"
-                                   value="{{ old('costo_tessera', $editAssociazione?->costo_tessera) }}">
-                        </div>
+                    @include('formello.campi', ['form' => $formAssociazione, 'solo' => \App\Forms\AssociazioneForm::GRUPPO_CONFIGURAZIONE])
+                    <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label" for="logo_file">Logo (JPG/PNG, max 2 MB)</label>
                             <input type="file" class="form-control" id="logo_file" name="logo_file" accept=".jpg,.jpeg,.png">
-                        </div>
-                        <div class="col-md-6 d-flex align-items-end">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="attiva" name="attiva" value="1"
-                                       @checked(old('attiva', $editAssociazione?->attiva ?? true))>
-                                <label class="form-check-label" for="attiva">Associazione attiva</label>
-                            </div>
                         </div>
                     </div>
 
@@ -212,12 +234,7 @@
                             <label class="form-check-label" for="switch_create_admin">Crea un nuovo admin per questa associazione</label>
                         </div>
                         <div id="blocco_create_admin" class="mt-2 {{ old('create_admin') ? '' : 'd-none' }}">
-                            <div class="row g-2">
-                                <div class="col-md-3"><input type="text" class="form-control" name="admin_nome" placeholder="Nome" value="{{ old('admin_nome') }}"></div>
-                                <div class="col-md-3"><input type="text" class="form-control" name="admin_cognome" placeholder="Cognome" value="{{ old('admin_cognome') }}"></div>
-                                <div class="col-md-3"><input type="email" class="form-control" name="admin_email" placeholder="Email" value="{{ old('admin_email') }}"></div>
-                                <div class="col-md-3"><input type="password" class="form-control" name="admin_password" placeholder="Password (min 8)" autocomplete="new-password"></div>
-                            </div>
+                            @include('formello.campi', ['form' => $formAssociazione, 'solo' => \App\Forms\AssociazioneForm::GRUPPO_ADMIN])
                         </div>
                     </div>
 
@@ -316,6 +333,15 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Anteprima URL del mini-sito mentre si modifica lo slug
+    var campoSlug = document.getElementById('slug');
+    var anteprimaSlug = document.getElementById('slugAnteprima');
+    if (campoSlug && anteprimaSlug) {
+        campoSlug.addEventListener('input', function () {
+            anteprimaSlug.textContent = anteprimaSlug.dataset.base + (campoSlug.value || anteprimaSlug.dataset.attuale);
+        });
+    }
+
     // Apertura automatica della modale in modalità edit (?edit=<id>) o dopo errori di validazione
     @if ($editAssociazione || $errors->any())
         new bootstrap.Modal(document.getElementById('modalAssociazione')).show();

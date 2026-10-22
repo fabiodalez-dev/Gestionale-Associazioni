@@ -13,6 +13,8 @@ use App\Models\Tessera;
 use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraPdfRenderer;
 use App\Services\Tessere\TesseraQrService;
+use App\Settings\TesseramentoSettings;
+use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TesseraController extends Controller
 {
@@ -36,6 +39,45 @@ class TesseraController extends Controller
      * Lista tessere con filtri (anno, ricerca, stato), grafici aggregati
      * e modalità AJAX (?ajax=1 → JSON {count, html}). Spec §4.6–4.8.
      */
+    /**
+     * Export CSV delle tessere con gli stessi filtri dell'elenco (anno, ricerca, stato).
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $this->authorize('viewAny', Tessera::class);
+
+        $anno = (int) $request->input('anno', now()->year);
+        $query = $this->queryFiltrata($anno, trim((string) $request->input('search', '')), (string) $request->input('stato', 'all'))
+            ->with(['socio.tipoSocio'])
+            ->select('tessere.*')
+            ->orderBy('soci.cognome');
+
+        return response()->streamDownload(function () use ($query): void {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, CellaSicura::riga(['Numero tessera', 'Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo socio', 'Anno', 'Emessa il', 'Scade il', 'Stato', 'Template']), ';');
+            foreach ($query->cursor() as $tessera) {
+                if (! $tessera instanceof Tessera) {
+                    continue;
+                }
+                fputcsv($out, CellaSicura::riga([
+                    $tessera->numero_tessera,
+                    $tessera->socio?->numero_socio,
+                    $tessera->socio?->cognome,
+                    $tessera->socio?->nome,
+                    $tessera->socio?->email,
+                    $tessera->socio?->tipoSocio?->nome,
+                    $tessera->anno_validita,
+                    $tessera->data_emissione->format('d/m/Y'),
+                    $tessera->data_scadenza->format('d/m/Y'),
+                    $tessera->stato,
+                    $tessera->template_tessera,
+                ]), ';');
+            }
+            fclose($out);
+        }, 'tessere-'.$anno.'-'.now()->format('Ymd').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
     public function index(Request $request): View|JsonResponse
     {
         $this->authorize('viewAny', Tessera::class);
@@ -56,7 +98,7 @@ class TesseraController extends Controller
             ->orderBy('soci.cognome')
             ->get();
 
-        $sogliaInScadenza = (int) ($associazione->giorni_notifica_scadenza ?? 30);
+        $sogliaInScadenza = $associazione?->tesseramento()->giorni_notifica_scadenza ?? TesseramentoSettings::GIORNI_PREAVVISO_DEFAULT;
 
         if ($request->boolean('ajax')) {
             return response()->json([

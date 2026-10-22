@@ -53,27 +53,10 @@
                         @csrf
                         @method('PATCH')
 
-                        <div class="mb-3">
-                            <label for="password_corrente" class="form-label">Password corrente</label>
-                            <input type="password" class="form-control @error('password_corrente') is-invalid @enderror"
-                                   id="password_corrente" name="password_corrente" required autocomplete="current-password">
-                            @error('password_corrente')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Nuova password</label>
-                            <input type="password" class="form-control @error('password') is-invalid @enderror"
-                                   id="password" name="password" required autocomplete="new-password"
-                                   aria-describedby="passwordHelp">
-                            <div id="passwordHelp" class="form-text">Minimo 10 caratteri, con lettere e numeri.</div>
-                            @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="password_confirmation" class="form-label">Conferma nuova password</label>
-                            <input type="password" class="form-control" id="password_confirmation"
-                                   name="password_confirmation" required autocomplete="new-password">
-                        </div>
+                        @include('formello.campi', ['form' => new \App\Forms\ImpostaPasswordForm($account, [
+                            'password_attuale' => 'password_corrente',
+                            'dati_utente' => [$account->email, $account->nome, $account->cognome],
+                        ])])
 
                         <button type="submit" class="btn btn-primary">Aggiorna password</button>
                     </form>

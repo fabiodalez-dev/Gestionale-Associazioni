@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\FrontendPubblico\Account;
 
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Cambio password dall'area riservata: richiede la password CORRENTE
@@ -24,7 +24,7 @@ class CambiaPasswordRequest extends FormRequest
     {
         return [
             'password_corrente' => ['required', 'string', 'current_password:account'],
-            'password' => ['required', 'string', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', 'different:password_corrente', ...PasswordPolicy::rules([$this->user('account')?->email, $this->user('account')?->nome, $this->user('account')?->cognome])],
         ];
     }
 
@@ -35,6 +35,8 @@ class CambiaPasswordRequest extends FormRequest
     {
         return [
             'password_corrente.current_password' => 'La password corrente non è corretta.',
+            'password.different' => 'La nuova password deve essere diversa da quella attuale.',
+            ...PasswordPolicy::messages(),
         ];
     }
 

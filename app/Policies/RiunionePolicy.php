@@ -25,29 +25,29 @@ class RiunionePolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.view', self::FALLBACK);
+        return $this->allowed($utente, 'riunioni.view', self::FALLBACK);
     }
 
     public function view(Utente $utente, Riunione $riunione): bool
     {
-        return $this->allowed($utente, 'struttura.view', self::FALLBACK)
+        return $this->allowed($utente, 'riunioni.view', self::FALLBACK)
             && $this->stessoTenant($utente, $riunione);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.create', self::FALLBACK);
+        return $this->allowed($utente, 'riunioni.create', self::FALLBACK);
     }
 
     public function update(Utente $utente, Riunione $riunione): bool
     {
-        return $this->allowed($utente, 'struttura.update', self::FALLBACK)
+        return $this->allowed($utente, 'riunioni.update', self::FALLBACK)
             && $this->stessoTenant($utente, $riunione);
     }
 
     public function delete(Utente $utente, Riunione $riunione): bool
     {
-        return $this->allowed($utente, 'struttura.delete', self::FALLBACK)
+        return $this->allowed($utente, 'riunioni.delete', self::FALLBACK)
             && $this->stessoTenant($utente, $riunione);
     }
 

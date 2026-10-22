@@ -5,8 +5,10 @@ namespace App\Policies;
 use App\Models\Utente;
 
 /**
- * Impostazioni SMTP: solo chi ha email.update può vederle e modificarle
- * (contengono la configurazione del mittente; l'operatore non vi accede).
+ * Impostazioni SMTP dell'associazione: solo admin dell'associazione e super_admin.
+ * Chi controlla il server di posta può leggere tutte le email in uscita (compresi
+ * i link di reset password degli account pubblici), quindi non basta email.update:
+ * le cariche (presidente, segretario…) inviano comunicazioni ma non cambiano l'SMTP.
  */
 class SmtpSettingPolicy
 {
@@ -17,16 +19,16 @@ class SmtpSettingPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $utente->can('email.update');
+        return $utente->isAdminAssociazione() && $utente->can('email.update');
     }
 
     public function update(Utente $utente): bool
     {
-        return $utente->can('email.update');
+        return $utente->isAdminAssociazione() && $utente->can('email.update');
     }
 
     public function test(Utente $utente): bool
     {
-        return $utente->can('email.update');
+        return $utente->isAdminAssociazione() && $utente->can('email.update');
     }
 }

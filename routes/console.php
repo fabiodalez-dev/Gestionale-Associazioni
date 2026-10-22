@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\RichiestaRegistrazione;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -72,6 +73,11 @@ Schedule::command('queue:prune-failed', ['--hours' => 168])
     ->withoutOverlapping();
 
 Schedule::command('queue:prune-batches', ['--hours' => 168])
+    ->daily()
+    ->withoutOverlapping();
+
+// Richieste di iscrizione delle associazioni mai confermate via email (7 giorni)
+Schedule::command('model:prune', ['--model' => [RichiestaRegistrazione::class]])
     ->daily()
     ->withoutOverlapping();
 
@@ -226,4 +232,12 @@ Schedule::command('prestiti:promemoria')
 
 Schedule::command('adempimenti:promemoria')
     ->monthlyOn(1, '08:00')
+    ->withoutOverlapping();
+
+/*
+| Archivi dei dati personali (GDPR): cancella quelli più vecchi di
+| personal-data-export.delete_after_days.
+*/
+Schedule::command('personal-data-export:clean')
+    ->dailyAt('03:30')
     ->withoutOverlapping();

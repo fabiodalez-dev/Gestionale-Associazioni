@@ -27,29 +27,29 @@ class SondaggioPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'email.view', self::FALLBACK_VIEW);
+        return $this->allowed($utente, 'comunicazione.view', self::FALLBACK_VIEW);
     }
 
     public function view(Utente $utente, Sondaggio $sondaggio): bool
     {
-        return $this->allowed($utente, 'email.view', self::FALLBACK_VIEW)
+        return $this->allowed($utente, 'comunicazione.view', self::FALLBACK_VIEW)
             && $this->stessoTenant($utente, $sondaggio);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'email.create', self::FALLBACK_MANAGE);
+        return $this->allowed($utente, 'comunicazione.create', self::FALLBACK_MANAGE);
     }
 
     public function update(Utente $utente, Sondaggio $sondaggio): bool
     {
-        return $this->allowed($utente, 'email.update', self::FALLBACK_MANAGE)
+        return $this->allowed($utente, 'comunicazione.update', self::FALLBACK_MANAGE)
             && $this->stessoTenant($utente, $sondaggio);
     }
 
     public function delete(Utente $utente, Sondaggio $sondaggio): bool
     {
-        return $this->allowed($utente, 'email.delete', self::FALLBACK_MANAGE)
+        return $this->allowed($utente, 'comunicazione.delete', self::FALLBACK_MANAGE)
             && $this->stessoTenant($utente, $sondaggio);
     }
 

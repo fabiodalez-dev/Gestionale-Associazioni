@@ -5,14 +5,18 @@ namespace App\Http\Controllers\Quote;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Quote\StoreQuotaRequest;
 use App\Http\Requests\Quote\UpdateQuotaRequest;
+use App\Models\Associazione;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Quota;
 use App\Models\Socio;
+use App\Models\TipoSocio;
+use App\Support\CellaSicura;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class QuotaController extends Controller
 {
@@ -62,7 +66,39 @@ class QuotaController extends Controller
         $hasStripe = $config !== null && $config->isStripeOperational();
         $hasPayPal = $config !== null && $config->isPayPalOperational();
 
+        // KPI dell'anno scelto (anno corrente se il filtro è "Tutti")
+        $annoKpi = $year !== 'Tutti' && $year !== '' ? (int) $year : (int) $oggi->year;
+        $base = fn () => Quota::query()->where('anno', $annoKpi);
+        $incassato = (float) $base()->whereNotNull('data_pagamento')->sum('importo');
+        $incassatoPrecedente = (float) Quota::query()->where('anno', $annoKpi - 1)->whereNotNull('data_pagamento')->sum('importo');
+        $kpi = [
+            'anno' => $annoKpi,
+            'incassato' => $incassato,
+            'variazione' => $incassatoPrecedente > 0 ? round(($incassato - $incassatoPrecedente) * 100 / $incassatoPrecedente, 1) : null,
+            'da_incassare' => (float) $base()->whereNull('data_pagamento')->sum('importo'),
+            'aperte' => $base()->whereNull('data_pagamento')->count(),
+            'scadute' => (float) $base()->whereNull('data_pagamento')->whereDate('data_scadenza', '<', $oggi)->sum('importo'),
+            'numero_scadute' => $base()->whereNull('data_pagamento')->whereDate('data_scadenza', '<', $oggi)->count(),
+            'pagate' => $base()->whereNotNull('data_pagamento')->count(),
+            'online' => $base()->whereNotNull('data_pagamento')->whereIn('metodo_pagamento', ['stripe', 'paypal', 'carta'])->count(),
+        ];
+        $perAnno = fn () => Quota::query()->when($year !== 'Tutti' && $year !== '', fn ($q) => $q->where('anno', (int) $year));
+        $conteggiStato = [
+            'Tutti' => $perAnno()->count(),
+            Quota::STATO_PAGATA => $perAnno()->whereNotNull('data_pagamento')->count(),
+            Quota::STATO_DA_PAGARE => $perAnno()->whereNull('data_pagamento')->whereDate('data_scadenza', '>', $sogliaInScadenza)->count(),
+            Quota::STATO_IN_SCADENZA => $perAnno()->whereNull('data_pagamento')->whereDate('data_scadenza', '>=', $oggi)->whereDate('data_scadenza', '<=', $sogliaInScadenza)->count(),
+            Quota::STATO_SCADUTA => $perAnno()->whereNull('data_pagamento')->whereDate('data_scadenza', '<', $oggi)->count(),
+        ];
+
+        $associazione = Associazione::query()->find(Quota::currentAssociazioneId());
+
         return view('quote.index', [
+            'kpi' => $kpi,
+            'conteggiStato' => $conteggiStato,
+            'listino' => TipoSocio::query()->orderBy('nome')->get(['id', 'nome', 'costo_tessera']),
+            'costoBase' => $associazione?->costo_tessera,
+            'gateway' => $config,
             'quote' => $quote,
             'anni' => $anni,
             'filtroAnno' => $year,
@@ -70,6 +106,53 @@ class QuotaController extends Controller
             'hasStripe' => $hasStripe,
             'hasPayPal' => $hasPayPal,
         ]);
+    }
+
+    /**
+     * Export CSV delle quote con gli stessi filtri dell'elenco (anno, stato).
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $this->authorize('viewAny', Quota::class);
+
+        $year = (string) $request->query('year', 'Tutti');
+        $status = (string) $request->query('status', 'Tutti');
+        $oggi = now()->startOfDay();
+
+        $query = Quota::query()->with(['socio' => fn ($q) => $q->withTrashed()])->orderBy('anno')->orderBy('data_scadenza');
+        if ($year !== 'Tutti' && $year !== '') {
+            $query->where('anno', (int) $year);
+        }
+
+        $nome = 'quote-'.($year !== 'Tutti' ? $year.'-' : '').now()->format('Ymd').'.csv';
+
+        return response()->streamDownload(function () use ($query, $status): void {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM: Excel apre correttamente gli accenti
+            fputcsv($out, CellaSicura::riga(['Numero socio', 'Cognome', 'Nome', 'Email', 'Tipo', 'Anno', 'Importo', 'Scadenza', 'Stato', 'Data pagamento', 'Metodo']), ';');
+            $query->chunk(500, function ($quote) use ($out, $status): void {
+                foreach ($quote as $quota) {
+                    $stato = $quota->statoCalcolato();
+                    if ($status !== 'Tutti' && $status !== $stato) {
+                        continue;
+                    }
+                    fputcsv($out, CellaSicura::riga([
+                        $quota->socio?->numero_socio,
+                        $quota->socio?->cognome,
+                        $quota->socio?->nome,
+                        $quota->socio?->email,
+                        $quota->tipo,
+                        $quota->anno,
+                        number_format((float) $quota->importo, 2, ',', ''),
+                        $quota->data_scadenza->format('d/m/Y'),
+                        $stato,
+                        $quota->data_pagamento?->format('d/m/Y'),
+                        $quota->metodo_pagamento,
+                    ]), ';');
+                }
+            });
+            fclose($out);
+        }, $nome, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function store(StoreQuotaRequest $request): RedirectResponse

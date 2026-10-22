@@ -117,6 +117,9 @@
                             <a href="{{ route('verbali.pdf', $verbale) }}" class="btn btn-sm btn-outline-primary" title="Esporta PDF">
                                 <i class="bi bi-file-pdf"></i>
                             </a>
+                            <a href="{{ route('allegati.index', ['verbali', $verbale->id]) }}" class="btn btn-sm btn-outline-secondary" title="Allegati">
+                                <i class="bi bi-paperclip"></i><span class="visually-hidden">Allegati</span>
+                            </a>
                             @can('update', $verbale)
                             <a href="{{ route('verbali.index', array_merge(request()->query(), ['edit' => $verbale->id])) }}"
                                class="btn btn-sm btn-outline-warning" title="Modifica">

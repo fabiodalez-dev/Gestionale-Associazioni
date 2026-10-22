@@ -21,6 +21,7 @@ use App\Models\PrestitoAttrezzatura;
 use App\Models\Progetto;
 use App\Models\Quota;
 use App\Models\RichiestaIscrizione;
+use App\Models\RichiestaRegistrazione;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
@@ -33,6 +34,7 @@ use App\Models\Utente;
 use App\Models\VotazioneRiunione;
 use App\Services\Economia\PrimaNotaService;
 use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
+use App\Services\Piattaforma\RegistrazioneAssociazioni;
 use App\Services\Prenotazioni\BigliettoService;
 use App\Services\Prenotazioni\PrenotazioneService;
 use App\Services\Soci\NumeroProgressivoService;
@@ -119,12 +121,42 @@ class E2eFixtureCommand extends Command
             'crea-sponsor' => $this->creaSponsor(),
             'referral-socio' => $this->referralSocio(),
             'crea-evento-galleria' => $this->creaEventoGalleria(),
+            // ---- Iscrizione delle associazioni alla piattaforma ----
+            'link-verifica-registrazione' => $this->linkVerificaRegistrazione(),
+            'stato-registrazione' => $this->statoRegistrazione(),
             default => ['error' => 'azione sconosciuta'],
         };
 
         $this->line((string) json_encode($risultato));
 
         return isset($risultato['error']) ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Link di conferma email dell'ultima richiesta di iscrizione per --email (admin).
+     *
+     * @return array<string, mixed>
+     */
+    private function linkVerificaRegistrazione(): array
+    {
+        $richiesta = RichiestaRegistrazione::query()->where('admin_email', mb_strtolower((string) $this->option('email')))->latest()->first();
+
+        return $richiesta === null
+            ? ['error' => 'richiesta non trovata']
+            : ['url' => app(RegistrazioneAssociazioni::class)->linkVerifica($richiesta)];
+    }
+
+    /** @return array<string, mixed> */
+    private function statoRegistrazione(): array
+    {
+        $richiesta = RichiestaRegistrazione::query()->with('associazione')->where('admin_email', mb_strtolower((string) $this->option('email')))->latest()->first();
+
+        return $richiesta === null ? ['error' => 'richiesta non trovata'] : [
+            'stato' => $richiesta->stato,
+            'verificata' => $richiesta->isVerificata(),
+            'associazione_id' => $richiesta->associazione_id,
+            'slug' => $richiesta->associazione?->slug,
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -548,7 +580,7 @@ class E2eFixtureCommand extends Command
             $config = ($config ?? []) + ['intro_html' => (string) $this->option('intro')];
         }
 
-        $associazione->forceFill([
+        $associazione->iscrizioni()->aggiorna([
             'iscrizioni_socio_aperte' => $this->option('aperte') === null || $this->option('aperte') === ''
                 ? true
                 : (bool) (int) $this->option('aperte'),
@@ -556,7 +588,7 @@ class E2eFixtureCommand extends Command
                 ? $this->option('modalita')
                 : 'preiscrizione',
             'iscrizione_form_config' => $config,
-        ])->save();
+        ]);
 
         return ['ok' => true, 'associazione_id' => $associazione->id];
     }

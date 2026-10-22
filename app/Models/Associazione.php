@@ -3,18 +3,28 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Services\Struttura\LogoAssociazione;
+use App\Settings\ImpostazioniAssociazione;
+use App\Settings\IscrizioniSettings;
+use App\Settings\ModuliSettings;
+use App\Settings\TesseramentoSettings;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Associazione extends Model
+class Associazione extends Model implements HasMedia
 {
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use InteractsWithMedia;
 
     /** Iscrizione socio: l'admin approva la richiesta (Socio "In Attesa"). */
     public const MODALITA_PREISCRIZIONE = 'preiscrizione';
@@ -34,6 +44,9 @@ class Associazione extends Model
     public const PROMEMORIA_RINNOVO_DEFAULT = [30, 15, 3];
 
     protected $table = 'associazioni';
+
+    /** @var array<class-string<ImpostazioniAssociazione>, ImpostazioniAssociazione> */
+    private array $impostazioniCaricate = [];
 
     /**
      * Default in-memory allineati ai default DB (modelli non ancora
@@ -90,6 +103,78 @@ class Associazione extends Model
     }
 
     /**
+     * Impostazioni dell'associazione (spatie/laravel-settings, una istanza per
+     * modello): $associazione->impostazioni(TesseramentoSettings::class).
+     *
+     * @template T of ImpostazioniAssociazione
+     *
+     * @param  class-string<T>  $classe
+     * @return T
+     */
+    public function impostazioni(string $classe): ImpostazioniAssociazione
+    {
+        return $this->impostazioniCaricate[$classe] ??= $classe::per($this);
+    }
+
+    public function tesseramento(): TesseramentoSettings
+    {
+        return $this->impostazioni(TesseramentoSettings::class);
+    }
+
+    public function iscrizioni(): IscrizioniSettings
+    {
+        return $this->impostazioni(IscrizioniSettings::class);
+    }
+
+    public function moduli(): ModuliSettings
+    {
+        return $this->impostazioni(ModuliSettings::class);
+    }
+
+    /** Usato da ImpostazioniAssociazione::save() perché il modello veda i valori salvati. */
+    public function ricordaImpostazioni(ImpostazioniAssociazione $impostazioni): void
+    {
+        $this->impostazioniCaricate[$impostazioni::class] = $impostazioni;
+    }
+
+    public function refresh()
+    {
+        $this->impostazioniCaricate = [];
+
+        return parent::refresh();
+    }
+
+    /**
+     * Logo (LogoAssociazione): pubblico perché serve a pagine pubbliche ed email.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(LogoAssociazione::COLLEZIONE)
+            ->useDisk('public')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->singleFile();
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('miniatura')
+            ->performOnCollections(LogoAssociazione::COLLEZIONE)
+            ->nonQueued()
+            ->fit(Fit::Contain, 400, 400);
+
+        $this->addMediaConversion('email')
+            ->performOnCollections(LogoAssociazione::COLLEZIONE)
+            ->nonQueued()
+            ->fit(Fit::Contain, 300, 100);
+    }
+
+    /** URL assoluto del logo, null se assente. */
+    public function logoUrl(string $conversione = ''): ?string
+    {
+        return app(LogoAssociazione::class)->url($this, $conversione);
+    }
+
+    /**
      * Step promemoria rinnovo del tenant (giorni prima della scadenza,
      * ordinati decrescenti); default PROMEMORIA_RINNOVO_DEFAULT.
      *
@@ -97,21 +182,12 @@ class Associazione extends Model
      */
     public function promemoriaRinnovoSteps(): array
     {
-        $steps = $this->promemoria_rinnovo_config;
-
-        if (! is_array($steps) || $steps === []) {
-            $steps = self::PROMEMORIA_RINNOVO_DEFAULT;
-        }
-
-        $steps = array_values(array_unique(array_map('intval', $steps)));
-        rsort($steps);
-
-        return $steps;
+        return $this->tesseramento()->promemoriaRinnovoSteps();
     }
 
     public function isIscrizioneDiretta(): bool
     {
-        return $this->modalita_iscrizione === self::MODALITA_DIRETTA;
+        return $this->iscrizioni()->diretta();
     }
 
     protected static function booted(): void

@@ -162,10 +162,10 @@ return [
     */
 
     'features' => [
-        // Niente registrazione pubblica né reset self-service:
-        // gli utenti backend sono creati e gestiti dagli amministratori.
+        // Niente registrazione pubblica: gli utenti backend sono creati dagli amministratori.
+        // Il recupero password self-service è attivo (link via email, broker 'utenti').
         // Features::registration(),
-        // Features::resetPasswords(),
+        Features::resetPasswords(),
         // Features::emailVerification(),
         // Features::updateProfileInformation(),
         Features::updatePasswords(),

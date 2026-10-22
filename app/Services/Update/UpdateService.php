@@ -21,7 +21,7 @@ use ZipArchive;
  *     .sha256 è presente nella release) + anti zip-slip;
  *  4. maintenance mode (artisan down), sovrascrittura file applicativi
  *     (preservando .env/storage/VERSION), aggiornamento del file VERSION;
- *  5. php artisan migrate --force, pulizia cache, queue:restart, artisan up;
+ *  5. php artisan migrate --force, allineamento ruoli/permessi, pulizia cache, queue:restart, artisan up;
  *  6. su errore: ripristino dei file dal backup pre-update e artisan up
  *     (rollback), stato 'rollback'/'fallito' nel log.
  *
@@ -127,6 +127,7 @@ class UpdateService
 
             // 4. Migrazioni + cache + queue
             Artisan::call('migrate', ['--force' => true]);
+            Artisan::call('app:aggiorna-permessi');
             Artisan::call('config:clear');
             Artisan::call('cache:clear');
             Artisan::call('view:clear');

@@ -5,11 +5,15 @@ namespace App\Http\Controllers\Struttura;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Struttura\StoreAssociazioneRequest;
 use App\Http\Requests\Struttura\UpdateAssociazioneRequest;
+use App\Models\Accesso;
 use App\Models\Associazione;
+use App\Models\Quota;
+use App\Models\RichiestaRegistrazione;
 use App\Models\Sede;
 use App\Models\Utente;
 use App\Services\Struttura\CloneAssociazioneConfigService;
-use App\Services\Struttura\LogoStorageService;
+use App\Services\Struttura\LogoAssociazione;
+use App\Support\RuoliAssociazione;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +29,7 @@ use Spatie\Permission\Models\Role;
 class AssociazioneController extends Controller
 {
     public function __construct(
-        private readonly LogoStorageService $logoStorage,
+        private readonly LogoAssociazione $logo,
         private readonly CloneAssociazioneConfigService $cloneService,
     ) {}
 
@@ -35,6 +39,7 @@ class AssociazioneController extends Controller
 
         // withCount senza scope tenant: i conteggi sono cross-tenant per definizione
         $associazioni = Associazione::query()
+            ->with('media')
             ->withCount([
                 'soci' => fn ($q) => $q->withoutGlobalScope('associazione'),
                 'sedi' => fn ($q) => $q->withoutGlobalScope('associazione'),
@@ -56,7 +61,44 @@ class AssociazioneController extends Controller
                 ->get()
             : collect();
 
+        // Panoramica della piattaforma (super admin): conteggi senza scope di tenant
+        $anno = (int) now()->year;
+        $adminPerAssociazione = Utente::query()->where('ruolo', Utente::RUOLO_ADMIN_ASSOCIAZIONE)
+            ->selectRaw('associazione_id, count(*) as n')->groupBy('associazione_id')->pluck('n', 'associazione_id');
+        $incassiPerAssociazione = Quota::query()->withoutGlobalScopes()->whereNotNull('data_pagamento')->where('anno', $anno)
+            ->selectRaw('associazione_id, sum(importo) as totale')->groupBy('associazione_id')->pluck('totale', 'associazione_id');
+        $moduli = RuoliAssociazione::MODULI;
+        $ruoliMatrice = array_merge(['admin_associazione'], array_keys(RuoliAssociazione::RUOLI_STAFF));
+        $matrice = [];
+        foreach ($ruoliMatrice as $ruolo) {
+            $permessi = RuoliAssociazione::permessi($ruolo);
+            foreach (array_keys($moduli) as $modulo) {
+                $azioni = array_map(fn ($p) => substr($p, strlen($modulo) + 1), array_filter($permessi, fn ($p) => str_starts_with($p, $modulo.'.')));
+                $matrice[$modulo][$ruolo] = match (true) {
+                    $azioni === [] => null,
+                    count($azioni) === 4 => 'Completo',
+                    in_array('update', $azioni, true) || in_array('create', $azioni, true) => 'Modifica',
+                    default => 'Lettura',
+                };
+            }
+        }
+
         return view('struttura.associazioni.index', [
+            'adminPerAssociazione' => $adminPerAssociazione,
+            'incassiPerAssociazione' => $incassiPerAssociazione,
+            'piattaforma' => [
+                'attive' => $associazioni->where('attiva', true)->count(),
+                'totali' => $associazioni->count(),
+                'soci' => (int) $associazioni->sum('soci_count'),
+                'utenti' => Utente::query()->where('attivo', true)->count(),
+                'incassi' => (float) $incassiPerAssociazione->sum(),
+                'registrazione' => RichiestaRegistrazione::modalita(),
+                'richieste' => RichiestaRegistrazione::query()->daEsaminare()->count(),
+            ],
+            'moduliMatrice' => $moduli,
+            'ruoliMatrice' => $ruoliMatrice,
+            'matrice' => $matrice,
+            'accessiRecenti' => Accesso::query()->withoutGlobalScopes()->with('associazione:id,nome')->latest()->limit(6)->get(),
             'associazioni' => $associazioni,
             'editAssociazione' => $editAssociazione,
             'adminCorrenti' => $adminCorrenti,
@@ -156,10 +198,13 @@ class AssociazioneController extends Controller
                     'citta' => $dati['citta'] ?? null,
                     'provincia' => $dati['provincia'] ?? null,
                     'cap' => $dati['cap'] ?? null,
-                    'tipo_scadenza_default' => $dati['tipo_scadenza_default'] ?? 'solare',
-                    'giorni_notifica_scadenza' => $dati['giorni_notifica_scadenza'] ?? 30,
                     'costo_tessera' => $dati['costo_tessera'] ?? null,
                     'attiva' => $request->boolean('attiva'),
+                ]);
+
+                $associazione->tesseramento()->aggiorna([
+                    'tipo_scadenza_default' => $dati['tipo_scadenza_default'] ?? 'solare',
+                    'giorni_notifica_scadenza' => $dati['giorni_notifica_scadenza'] ?? 30,
                 ]);
 
                 $this->salvaLogo($request, $associazione, $warnings);
@@ -253,10 +298,7 @@ class AssociazioneController extends Controller
         }
 
         try {
-            $vecchioLogo = $associazione->logo_url;
-            $path = $this->logoStorage->store($request->file('logo_file'));
-            $associazione->update(['logo_url' => $path]);
-            $this->logoStorage->delete($vecchioLogo);
+            $this->logo->salva($associazione, $request->file('logo_file'));
         } catch (\Throwable $e) {
             Log::warning('Upload logo fallito: '.$e->getMessage());
             $warnings[] = '(Logo non salvato)';

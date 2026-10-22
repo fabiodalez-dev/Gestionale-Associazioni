@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Installer;
 
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
 
 class AdminRequest extends FormRequest
 {
@@ -21,7 +21,15 @@ class AdminRequest extends FormRequest
             'nome' => ['required', 'string', 'max:100'],
             'cognome' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:255'],
-            'password' => ['required', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', ...PasswordPolicy::rules([$this->input('email'), $this->input('nome'), $this->input('cognome'), $this->input('associazione_email')])],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return PasswordPolicy::messages();
     }
 }

@@ -164,6 +164,10 @@
     </div>
 </div>
 
+<div class="row mt-4"><div class="col-lg-8">
+    @include('allegati._elenco', ['tipo' => 'riunioni', 'modello' => $riunione])
+</div></div>
+
 {{-- Modal modifica riunione --}}
 <div class="modal fade" id="riunioneEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">

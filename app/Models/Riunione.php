@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\HaAllegati;
 use App\Models\Concerns\HasDefaultActivityLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\MediaLibrary\HasMedia;
 
 /**
  * Riunione del direttivo (f.17 del piano "Organizzazione 3"): ordine del
@@ -17,9 +19,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * (round 1), votazioni per punto (f.18) e verbale generato dalla bozza
  * (modulo Verbale esistente con numerazione automatica).
  */
-class Riunione extends Model
+class Riunione extends Model implements HasMedia
 {
     use BelongsToAssociazione;
+    use HaAllegati;
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;

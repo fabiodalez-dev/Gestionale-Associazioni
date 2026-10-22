@@ -99,7 +99,7 @@ test.describe('Tessere e QR', () => {
 
         await loginSocio(page, email);
 
-        await expect(page.getByRole('heading', { name: 'Ciao, Socio!' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /^(Buongiorno|Buon pomeriggio|Buonasera), Socio$/ })).toBeVisible();
         await expect(page.getByText('Nessuna tessera attiva')).toBeVisible();
     });
 
@@ -110,7 +110,7 @@ test.describe('Tessere e QR', () => {
         await loginSocio(page, email);
 
         // Dashboard: card tessera con numero e immagine QR renderizzata
-        await expect(page.getByText(`N. ${socio.numero_tessera}`)).toBeVisible();
+        await expect(page.locator('.mc-num', { hasText: socio.numero_tessera! })).toBeVisible();
         const qr = page.locator(`img[alt="QR code tessera ${socio.numero_tessera}"]`);
         await expect(qr).toBeVisible();
         const box = await qr.boundingBox();

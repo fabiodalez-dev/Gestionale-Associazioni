@@ -47,14 +47,18 @@ class CompleanniTest extends ComunicazioneTestCase
             'data_nascita' => now()->subYears(35)->toDateString(),
         ]);
 
-        $this->actingAs($this->admin)
+        $html = $this->actingAs($this->admin)
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Compleanni di')
-            ->assertSee('DelMese')
-            ->assertDontSee('MeseDiverso')
-            ->assertDontSee('Escluso')
-            ->assertDontSee('AltroTenant');
+            ->assertDontSee('AltroTenant')
+            ->getContent();
+
+        // Solo il widget: la dashboard elenca altrove anche i soci appena creati
+        $widget = \Illuminate\Support\Str::between((string) $html, '<!-- widget:compleanni -->', '<!-- /widget:compleanni -->');
+        $this->assertStringContainsString('DelMese', $widget);
+        $this->assertStringNotContainsString('MeseDiverso', $widget);
+        $this->assertStringNotContainsString('Escluso', $widget);
     }
 
     // ── Toggle configurazioni ────────────────────────────────────────

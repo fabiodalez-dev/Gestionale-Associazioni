@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,7 @@ class ValoreCampoPersonalizzato extends Model
 {
     use HasDefaultActivityLog;
     use HasUuids;
+    use NelPerimetroSedeTramite;
 
     protected $table = 'valori_campi_personalizzati';
 

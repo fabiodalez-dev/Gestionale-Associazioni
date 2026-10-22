@@ -17,38 +17,70 @@
         $documentiInScadenza = $socio->documenti->filter->isInScadenza();
     @endphp
 
-    <div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <div>
-            <h1 class="h2 mb-1">{{ $socio->nome_completo }}</h1>
-            <p class="text-muted mb-1">Socio n. {{ $socio->numero_socio }}
-                <span class="badge bg-{{ $badgeStato }}">{{ $socio->stato }}</span>
-                @if ($socio->isMinorenne())
-                    <span class="badge bg-info text-dark" title="Socio minorenne (f.22)"><i class="bi bi-person-exclamation me-1"></i>Minorenne</span>
+    @php
+        $haFoto = $socio->getFirstMedia(\App\Models\Socio::COLLEZIONE_FOTO) !== null;
+        $tesseraCorrente = $socio->ultimaTessera;
+        $associazioneSocio = $socio->associazione;
+        $inizialiSocio = mb_strtoupper(mb_substr((string) $socio->nome, 0, 1).mb_substr((string) $socio->cognome, 0, 1));
+        $versatoTotale = (float) $socio->quote()->where('stato', 'Pagata')->sum('importo');
+        $anniSocio = $socio->data_iscrizione ? (int) $socio->data_iscrizione->diffInYears(now()) : null;
+        $numeroTessere = $socio->tessere()->count();
+    @endphp
+
+    <div class="profile-hero">
+        <div class="profile-cover"></div>
+        <div class="profile-main">
+            @if ($haFoto)
+                <img src="{{ route('soci.foto.show', $socio) }}" alt="Foto di {{ $socio->nome }} {{ $socio->cognome }}" class="avatar avatar-xl" style="object-fit: cover">
+            @else
+                <span class="avatar avatar-xl tone-{{ abs(crc32((string) $socio->id)) % 6 }}" aria-hidden="true">{{ $inizialiSocio }}</span>
+            @endif
+            <div class="profile-id">
+                <h1>
+                    {{ $socio->nome_completo }}
+                    <span class="badge bg-{{ $badgeStato }}">{{ $socio->stato }}</span>
+                    @if ($socio->isMinorenne())
+                        <span class="badge bg-info" title="Socio minorenne (f.22)"><i class="bi bi-person-exclamation"></i>Minorenne</span>
+                    @endif
+                    @if ($documentiScaduti->isNotEmpty())
+                        <span class="badge bg-danger" title="Documenti scaduti"><i class="bi bi-exclamation-triangle"></i>{{ $documentiScaduti->count() }} {{ $documentiScaduti->count() === 1 ? 'documento scaduto' : 'documenti scaduti' }}</span>
+                    @endif
+                    @if ($documentiInScadenza->isNotEmpty())
+                        <span class="badge bg-warning" title="Documenti in scadenza"><i class="bi bi-hourglass-split"></i>{{ $documentiInScadenza->count() }} in scadenza</span>
+                    @endif
+                    {{-- Contatore "porta un amico" (f.23 piano "Organizzazione 3" — modulo relazioni) --}}
+                    @includeIf('relazioni.soci._referral-badge', ['socio' => $socio])
+                </h1>
+                <div class="profile-facts">
+                    <span><i class="bi bi-person-vcard"></i>Socio n. {{ $socio->numero_socio }}</span>
+                    @if ($socio->citta)
+                        <span><i class="bi bi-geo-alt"></i>{{ $socio->citta }}{{ $socio->provincia ? ' ('.$socio->provincia.')' : '' }}</span>
+                    @endif
+                    @if ($socio->data_iscrizione)
+                        <span><i class="bi bi-calendar3"></i>Socio dal {{ $socio->data_iscrizione->locale('it')->translatedFormat('F Y') }}</span>
+                    @endif
+                    @if ($socio->sede)
+                        <span><i class="bi bi-building"></i>{{ $socio->sede->nome }}</span>
+                    @endif
+                </div>
+                @if ($socio->tags->isNotEmpty())
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        @foreach ($socio->tags as $tag)
+                            <span class="badge tag-chip" style="--tag: {{ $tag->colore ?: '#8A90A0' }}">{{ $tag->nome_tag }}</span>
+                        @endforeach
+                    </div>
                 @endif
-                @if ($documentiScaduti->isNotEmpty())
-                    <span class="badge bg-danger" title="Documenti scaduti"><i class="bi bi-exclamation-triangle me-1"></i>{{ $documentiScaduti->count() }} {{ $documentiScaduti->count() === 1 ? 'documento scaduto' : 'documenti scaduti' }}</span>
-                @endif
-                @if ($documentiInScadenza->isNotEmpty())
-                    <span class="badge bg-warning text-dark" title="Documenti in scadenza"><i class="bi bi-hourglass-split me-1"></i>{{ $documentiInScadenza->count() }} in scadenza</span>
-                @endif
-                {{-- Contatore "porta un amico" (f.23 piano "Organizzazione 3" — modulo relazioni) --}}
-                @includeIf('relazioni.soci._referral-badge', ['socio' => $socio])
-            </p>
-            <div>
-                @foreach ($socio->tags as $tag)
-                    <span class="badge" style="background-color: {{ $tag->colore }}">{{ $tag->nome_tag }}</span>
-                @endforeach
+            </div>
+            <div class="profile-actions">
+                {{-- Contatti rapidi (f.10) + email diretta (f.12) — modulo comunicazione --}}
+                @includeIf('comunicazione.soci._contatti-rapidi', ['socio' => $socio, 'dimensione' => 'md'])
+                @includeIf('comunicazione.soci._invia-email', ['socio' => $socio])
+                @can('esportaDatiPersonali', $socio)
+                    <a href="{{ route('soci.dati-personali', $socio) }}" class="btn btn-outline-secondary" title="Archivio ZIP con tutti i dati personali del socio (richiesta di accesso GDPR)"><i class="bi bi-file-earmark-zip"></i>Dati personali</a>
+                @endcan
+                <a href="{{ route('soci.edit', $socio) }}" class="btn btn-primary"><i class="bi bi-pencil"></i>Modifica</a>
             </div>
         </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-            {{-- Contatti rapidi (f.10) + email diretta (f.12) — modulo comunicazione --}}
-            @includeIf('comunicazione.soci._contatti-rapidi', ['socio' => $socio, 'dimensione' => 'md'])
-            @includeIf('comunicazione.soci._invia-email', ['socio' => $socio])
-            <a href="{{ route('soci.edit', $socio) }}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Modifica</a>
-            <a href="{{ route('soci.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Lista</a>
-        </div>
-    </div>
-
     @php
         $tabs = ['anagrafica' => 'Anagrafica', 'quote-tessere' => 'Quote e Tessere', 'tesseramento' => 'Tesseramento', 'vita-sociale' => 'Vita sociale', 'documenti' => 'Documenti'];
         // Tab Note interne (f.3 piano "Gestione 2" — modulo operativita)
@@ -65,53 +97,165 @@
         }
         $tabs['storico'] = 'Storico';
     @endphp
-    <ul class="nav nav-tabs" role="tablist">
-        @foreach ($tabs as $key => $label)
-            <li class="nav-item" role="presentation">
-                <button class="nav-link {{ $tab === $key ? 'active' : '' }}" data-bs-toggle="tab"
-                        data-bs-target="#tab-{{ $key }}" type="button" role="tab">{{ $label }}</button>
-            </li>
-        @endforeach
-    </ul>
+        <ul class="nav nav-tabs" role="tablist">
+            @foreach ($tabs as $key => $label)
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {{ $tab === $key ? 'active' : '' }}" data-bs-toggle="tab"
+                            data-bs-target="#tab-{{ $key }}" type="button" role="tab">{{ $label }}</button>
+                </li>
+            @endforeach
+        </ul>
+    </div>
 
-    <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white mb-4">
+    <div class="tab-content mb-4">
         {{-- Tab Anagrafica --}}
         <div class="tab-pane fade {{ $tab === 'anagrafica' ? 'show active' : '' }}" id="tab-anagrafica" role="tabpanel">
-            <dl class="row mb-0">
-                <dt class="col-sm-3">Email</dt><dd class="col-sm-9">{{ $socio->email ?: 'N/D' }}</dd>
-                <dt class="col-sm-3">Telefono</dt><dd class="col-sm-9">{{ $socio->telefono ?: 'N/D' }}</dd>
-                <dt class="col-sm-3">Codice Fiscale</dt><dd class="col-sm-9">{{ $socio->codice_fiscale ?: 'N/D' }}</dd>
-                <dt class="col-sm-3">Data di Nascita</dt><dd class="col-sm-9">{{ $socio->data_nascita?->format('d/m/Y') ?? 'N/D' }}</dd>
-                @if ($socio->isMinorenne() || $socio->hasTutore())
-                    <dt class="col-sm-3">Tutore</dt>
-                    <dd class="col-sm-9">
-                        {{ $socio->tutore_nome ?: 'N/D' }}
-                        @if ($socio->tutore_telefono)<span class="text-muted">· <i class="bi bi-telephone me-1"></i>{{ $socio->tutore_telefono }}</span>@endif
-                        @if ($socio->tutore_email)<span class="text-muted">· <i class="bi bi-envelope me-1"></i>{{ $socio->tutore_email }}</span>@endif
-                    </dd>
-                @endif
-                <dt class="col-sm-3">Data Iscrizione</dt><dd class="col-sm-9">{{ $socio->data_iscrizione?->format('d/m/Y') ?? 'N/D' }}</dd>
-                <dt class="col-sm-3">Indirizzo</dt>
-                <dd class="col-sm-9">{{ trim(($socio->indirizzo ?? '').' '.($socio->cap ?? '').' '.($socio->citta ?? '').' '.($socio->provincia ?? '')) ?: 'N/D' }}</dd>
-                <dt class="col-sm-3">Tipo Socio</dt><dd class="col-sm-9">{{ $socio->tipoSocio?->nome ?? 'N/D' }}</dd>
-                <dt class="col-sm-3">Categoria</dt><dd class="col-sm-9">{{ $socio->categoriaSocio?->nome ?? 'N/D' }}</dd>
-                <dt class="col-sm-3">Sede</dt><dd class="col-sm-9">{{ $socio->sede?->nome ?? 'N/D' }}</dd>
-                <dt class="col-sm-3">Consenso Privacy</dt><dd class="col-sm-9">{{ $socio->privacy_consenso ? 'Sì' : 'No' }}</dd>
-                @if ($socio->note)
-                    <dt class="col-sm-3">Note</dt><dd class="col-sm-9">{{ $socio->note }}</dd>
-                @endif
-                @foreach ($socio->valoriCampiPersonalizzati as $valore)
-                    @if ($valore->campo && filled($valore->valore))
-                        <dt class="col-sm-3">{{ $valore->campo->nome_campo }}</dt>
-                        <dd class="col-sm-9">{{ $valore->campo->tipo_campo === 'checkbox' ? ($valore->valore === '1' ? 'Sì' : 'No') : $valore->valore }}</dd>
+            <div class="row g-4">
+                <div class="col-lg-5 d-flex flex-column gap-4">
+                    {{-- Tessera digitale --}}
+                    @if ($tesseraCorrente)
+                        @php
+                            $tesseraValida = $tesseraCorrente->stato === 'Attiva' && ($tesseraCorrente->data_scadenza === null || $tesseraCorrente->data_scadenza->gte(now()->startOfDay()));
+                        @endphp
+                        <div class="member-card">
+                            <div class="mc-assoc">
+                                <span class="avatar avatar-sm avatar-square">{{ mb_strtoupper(mb_substr((string) $associazioneSocio?->nome, 0, 2)) }}</span>
+                                <div>
+                                    <b>{{ $associazioneSocio?->nome }}</b>
+                                    <small>Tessera socio {{ $tesseraCorrente->anno_validita }}</small>
+                                </div>
+                                <span class="mc-state">{{ $tesseraValida ? 'Valida' : $tesseraCorrente->stato }}</span>
+                            </div>
+                            <div class="mc-name">{{ $socio->nome_completo }}</div>
+                            <div class="mc-num">{{ $tesseraCorrente->numero_tessera }}</div>
+                            <div class="mc-meta">
+                                {{ $socio->categoriaSocio?->nome ?? $socio->tipoSocio?->nome ?? 'Socio' }}
+                                @if ($tesseraCorrente->data_scadenza)
+                                    · scade {{ $tesseraCorrente->data_scadenza->format('d/m/Y') }}
+                                @endif
+                            </div>
+                            @php
+                                $qrTessera = rescue(fn () => app(\App\Services\Tessere\TesseraQrService::class)->generateDataUri(app(\App\Services\Tessere\TesseraQrService::class)->verificationUrl($tesseraCorrente)), null, false);
+                            @endphp
+                            @if ($qrTessera)
+                                <span class="mc-qr"><img src="{{ $qrTessera }}" alt="QR di verifica della tessera {{ $tesseraCorrente->numero_tessera }}"></span>
+                            @endif
+                        </div>
+                    @else
+                        <div class="member-card is-empty">
+                            <div class="fw-semibold text-body">Nessuna tessera</div>
+                            <div class="small mt-1">Il socio non ha ancora una tessera emessa.</div>
+                            @if (\Illuminate\Support\Facades\Route::has('tessere.index'))
+                                <a href="{{ route('tessere.index') }}" class="btn btn-sm btn-soft mt-3">Vai alle tessere</a>
+                            @endif
+                        </div>
                     @endif
-                @endforeach
-            </dl>
 
-            {{-- Nucleo familiare (f.20 piano "Gestione 2" — modulo membri) --}}
-            @if (\Illuminate\Support\Facades\Route::has('nuclei.store'))
-                @include('membri.partials.nucleo-socio', ['socio' => $socio])
-            @endif
+                    <div class="row g-3">
+                        <div class="col-6"><div class="mini-stat"><div class="l">Anni da socio</div><div class="v">{{ $anniSocio ?? '—' }}</div></div></div>
+                        <div class="col-6"><div class="mini-stat"><div class="l">Versato totale</div><div class="v">€ {{ number_format($versatoTotale, $versatoTotale >= 1000 ? 0 : 2, ',', '.') }}</div></div></div>
+                        <div class="col-6"><div class="mini-stat"><div class="l">Tessere emesse</div><div class="v">{{ $numeroTessere }}</div></div></div>
+                        <div class="col-6"><div class="mini-stat"><div class="l">Documenti</div><div class="v">{{ $socio->documenti->count() }}</div></div></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="section-label">Foto</div>
+                            <div class="d-flex flex-wrap align-items-start gap-3">
+                @can('update', $socio)
+                                <form method="POST" action="{{ route('soci.foto.store', $socio) }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-start">
+                                    @csrf
+                                    <div>
+                                        <label for="foto" class="form-label small mb-1">{{ $haFoto ? 'Sostituisci foto' : 'Foto per la tessera' }}</label>
+                                        <input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/webp" class="form-control form-control-sm @error('foto') is-invalid @enderror" required>
+                                        @error('foto')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-outline-primary mt-4"><i class="bi bi-upload me-1"></i>Carica</button>
+                                </form>
+                                @if ($haFoto)
+                                    <form method="POST" action="{{ route('soci.foto.destroy', $socio) }}" class="mt-4" onsubmit="return confirm('Rimuovere la foto?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Rimuovi</button>
+                                    </form>
+                                @endif
+                            @endcan
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7 d-flex flex-column gap-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="section-label">Dati personali</div>
+                            <dl class="kv">
+                                <dt>Email</dt><dd>{{ $socio->email ?: 'N/D' }}</dd>
+                                <dt>Telefono</dt><dd>{{ $socio->telefono ?: 'N/D' }}</dd>
+                                <dt>Codice Fiscale</dt><dd>{{ $socio->codice_fiscale ?: 'N/D' }}</dd>
+                                <dt>Data di Nascita</dt><dd>{{ $socio->data_nascita?->format('d/m/Y') ?? 'N/D' }}</dd>
+                                @if ($socio->isMinorenne() || $socio->hasTutore())
+                                    <dt>Tutore</dt>
+                                    <dd>
+                                        {{ $socio->tutore_nome ?: 'N/D' }}
+                                        @if ($socio->tutore_telefono)<span class="text-muted">· <i class="bi bi-telephone me-1"></i>{{ $socio->tutore_telefono }}</span>@endif
+                                        @if ($socio->tutore_email)<span class="text-muted">· <i class="bi bi-envelope me-1"></i>{{ $socio->tutore_email }}</span>@endif
+                                    </dd>
+                                @endif
+                                <dt>Data Iscrizione</dt><dd>{{ $socio->data_iscrizione?->format('d/m/Y') ?? 'N/D' }}</dd>
+                                <dt>Indirizzo</dt>
+                                <dd>{{ trim(($socio->indirizzo ?? '').' '.($socio->cap ?? '').' '.($socio->citta ?? '').' '.($socio->provincia ?? '')) ?: 'N/D' }}</dd>
+                                <dt>Tipo Socio</dt><dd>{{ $socio->tipoSocio?->nome ?? 'N/D' }}</dd>
+                                <dt>Categoria</dt><dd>{{ $socio->categoriaSocio?->nome ?? 'N/D' }}</dd>
+                                <dt>Sede</dt><dd>{{ $socio->sede?->nome ?? 'N/D' }}</dd>
+                                <dt>Consenso Privacy</dt><dd>{{ $socio->privacy_consenso ? 'Sì' : 'No' }}</dd>
+                                @if ($socio->note)
+                                    <dt>Note</dt><dd>{{ $socio->note }}</dd>
+                                @endif
+                                @foreach ($socio->valoriCampiPersonalizzati as $valore)
+                                    @if ($valore->campo && filled($valore->valore))
+                                        <dt>{{ $valore->campo->nome_campo }}</dt>
+                                        <dd>{{ $valore->campo->tipo_campo === 'checkbox' ? ($valore->valore === '1' ? 'Sì' : 'No') : $valore->valore }}</dd>
+                                    @endif
+                                @endforeach
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            @php
+                                $consensiSocio = $socio->consensi()->latest()->get()->unique('chiave');
+                            @endphp
+                            @if ($consensiSocio->isNotEmpty())
+                                <div class="section-label">Consensi</div>
+                                <ul class="consent-list">
+                                    @foreach ($consensiSocio as $consenso)
+                                        <li>
+                                            <div>
+                                                <div class="text-body">{{ $consenso->testo }}</div>
+                                                <div class="who-sub">{{ $consenso->created_at->format('d/m/Y H:i') }} · {{ str_replace('_', ' ', $consenso->origine) }}</div>
+                                            </div>
+                                            <span class="badge {{ $consenso->accettato ? 'bg-success' : 'bg-secondary' }}">
+                                                <span class="visually-hidden">{{ $consenso->accettato ? 'Dato' : 'Non dato' }}:</span>{{ $consenso->accettato ? 'Dato' : 'Negato' }}
+                                            </span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                            @if ($consensiSocio->isEmpty())
+                                <div class="section-label">Consensi</div>
+                                <p class="text-muted small mb-0">Nessun consenso registrato dai moduli online.</p>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Nucleo familiare (f.20 piano "Gestione 2" — modulo membri) --}}
+                    @if (\Illuminate\Support\Facades\Route::has('nuclei.store'))
+                        @include('membri.partials.nucleo-socio', ['socio' => $socio])
+                    @endif
+                </div>
+            </div>
         </div>
 
         {{-- Tab Quote e Tessere --}}

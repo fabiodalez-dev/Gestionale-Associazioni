@@ -21,12 +21,12 @@ class RichiestaIscrizionePolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'soci.view', self::RUOLI);
+        return $this->allowed($utente, 'iscrizioni.view', self::RUOLI);
     }
 
     public function view(Utente $utente, RichiestaIscrizione $richiesta): bool
     {
-        return $this->allowed($utente, 'soci.view', self::RUOLI);
+        return $this->allowed($utente, 'iscrizioni.view', self::RUOLI);
     }
 
     /**
@@ -34,6 +34,6 @@ class RichiestaIscrizionePolicy
      */
     public function gestisci(Utente $utente, RichiestaIscrizione $richiesta): bool
     {
-        return $this->allowed($utente, 'soci.update', self::RUOLI);
+        return $this->allowed($utente, 'iscrizioni.update', self::RUOLI);
     }
 }

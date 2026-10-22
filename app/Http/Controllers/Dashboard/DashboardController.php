@@ -12,6 +12,7 @@ use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
+use App\Services\Dashboard\PanoramicaDashboard;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,7 +26,7 @@ class DashboardController extends Controller
      * oppure vista globale (super_admin senza tenant): lo scoping è demandato
      * al global scope BelongsToAssociazione, che in vista globale non filtra.
      */
-    public function index(Request $request): View
+    public function index(Request $request, PanoramicaDashboard $panoramica): View
     {
         /** @var Utente $utente */
         $utente = $request->user();
@@ -67,6 +68,8 @@ class DashboardController extends Controller
             'vistaGlobale' => $utente->isSuperAdmin() && blank(session('associazione_id')),
             'kpiPrenotazioni' => $this->kpiPrenotazioni(),
             'caricheInScadenza' => $this->caricheInScadenza(),
+            'panoramica' => $panoramica->calcola($utente),
+            'associazioniGlobali' => $utente->isSuperAdmin() && blank(session('associazione_id')) ? $panoramica->associazioni() : collect(),
         ]);
     }
 

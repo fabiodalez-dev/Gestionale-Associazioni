@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\HaAllegati;
 use App\Models\Concerns\HasDefaultActivityLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\MediaLibrary\HasMedia;
 
 /**
  * Progetto dell'associazione (f.12 del piano "Organizzazione 3"): periodo,
@@ -18,9 +20,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property-read int<0, max>|null $milestones_completate_count alias withCount() (vedi ProgettoController)
  */
-class Progetto extends Model
+class Progetto extends Model implements HasMedia
 {
     use BelongsToAssociazione;
+    use HaAllegati;
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;

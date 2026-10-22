@@ -4,37 +4,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mobile Sidebar
     initializeMobileSidebar();
 
-    // Modal management
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        modal.style.display = 'none';
-
-        modal.addEventListener('show.bs.modal', function() {
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.style.display = 'none');
-            this.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        });
-
-        modal.addEventListener('hidden.bs.modal', function() {
-            this.style.display = 'none';
-            document.body.style.overflow = '';
-        });
-
-        modal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                const instance = bootstrap.Modal.getInstance(this);
-                if (instance) {
-                    instance.hide();
-                } else {
-                    this.style.display = 'none';
-                    document.body.style.overflow = '';
-                }
+    // Modali: focus sul primo campo, oppure sul primo campo con errore (scrollato in vista)
+    document.querySelectorAll('.modal').forEach(function (modal) {
+        modal.addEventListener('shown.bs.modal', function () {
+            var errore = this.querySelector('.is-invalid, .invalid-feedback.d-block, .alert-danger');
+            if (errore) {
+                errore.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                if (errore.matches('input, select, textarea')) errore.focus({ preventScroll: true });
+                return;
             }
-        });
-
-        modal.addEventListener('shown.bs.modal', function() {
-            const firstInput = this.querySelector('input, select, textarea');
-            if (firstInput) firstInput.focus();
+            var primo = this.querySelector('input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+            if (primo) primo.focus();
         });
     });
 
@@ -129,12 +109,12 @@ function initializeMobileSidebar() {
 
     sidebar.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', function() {
-            if (window.innerWidth < 768) closeSidebar();
+            if (window.innerWidth < 992 && !this.hasAttribute("data-bs-toggle")) closeSidebar();
         });
     });
 
     window.addEventListener('resize', function() {
-        if (window.innerWidth >= 768) closeSidebar();
+        if (window.innerWidth >= 992) closeSidebar();
     });
 
     document.addEventListener('keydown', function(e) {
@@ -410,7 +390,7 @@ function formatDate(dateString) {
         var icon = document.createElement('i');
         icon.className = 'bi bi-download';
         icon.style.fontSize = '1.25rem';
-        icon.style.color = '#FF7B11';
+        icon.style.color = '#0D9488';
 
         var text = document.createElement('span');
         text.className = 'flex-grow-1';
@@ -464,5 +444,66 @@ document.addEventListener('DOMContentLoaded', function () {
         var next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
         html.setAttribute('data-bs-theme', next);
         localStorage.setItem('theme', next);
+    });
+});
+
+// --- Selettore associazione (super admin): filtro per nome/città ---
+document.addEventListener('DOMContentLoaded', function () {
+    var input = document.querySelector('[data-tenant-filter]');
+    if (!input) return;
+    var opzioni = document.querySelectorAll('.tenant-list .tenant-option[data-nome]');
+    var vuoto = document.querySelector('.tenant-list .tenant-empty');
+    input.addEventListener('input', function () {
+        var q = input.value.trim().toLowerCase();
+        var visibili = 0;
+        opzioni.forEach(function (o) {
+            var ok = q === '' || o.getAttribute('data-nome').indexOf(q) !== -1;
+            o.hidden = !ok;
+            if (ok) visibili++;
+        });
+        if (vuoto) vuoto.hidden = visibili > 0;
+    });
+    var toggle = input.closest('.dropdown').querySelector('[data-bs-toggle="dropdown"]');
+    toggle.addEventListener('shown.bs.dropdown', function () { input.focus(); });
+});
+
+// --- Grafici Chart.js allineati al design system ---
+// I grafici vengono creati dagli script inline delle pagine; qui si
+// impostano i default e si ritoccano le istanze già create.
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.Chart) return;
+    var css = getComputedStyle(document.documentElement);
+    var colore = function (nome, riserva) { return (css.getPropertyValue(nome) || '').trim() || riserva; };
+    var testo = colore('--ds-text-muted', '#8A90A0');
+    var griglia = colore('--ds-line', '#ECEEF1');
+    var C = window.Chart;
+    C.defaults.font.family = colore('--ds-font', 'system-ui');
+    C.defaults.font.size = 12;
+    C.defaults.color = testo;
+    C.defaults.borderColor = griglia;
+    C.defaults.plugins.legend.labels.usePointStyle = true;
+    C.defaults.plugins.legend.labels.boxWidth = 8;
+    C.defaults.plugins.tooltip.backgroundColor = colore('--ds-text', '#2B2F38');
+    C.defaults.plugins.tooltip.padding = 10;
+    C.defaults.plugins.tooltip.cornerRadius = 8;
+    C.defaults.plugins.tooltip.displayColors = false;
+    if (C.defaults.datasets && C.defaults.datasets.bar) {
+        C.defaults.datasets.bar.borderRadius = 6;
+        C.defaults.datasets.bar.maxBarThickness = 34;
+    }
+    var istanze = C.instances ? Object.values(C.instances) : [];
+    istanze.forEach(function (grafico) {
+        (grafico.data.datasets || []).forEach(function (ds) {
+            if (grafico.config.type === 'bar') {
+                if (ds.borderRadius === undefined) ds.borderRadius = 6;
+                if (ds.maxBarThickness === undefined) ds.maxBarThickness = 34;
+            }
+        });
+        Object.values(grafico.options.scales || {}).forEach(function (scala) {
+            if (scala.grid) { scala.grid.color = griglia; scala.grid.drawTicks = false; }
+            if (scala.border) scala.border.display = false;
+            if (scala.ticks) { scala.ticks.color = testo; scala.ticks.padding = 8; }
+        });
+        grafico.update('none');
     });
 });

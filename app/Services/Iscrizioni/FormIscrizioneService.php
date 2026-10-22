@@ -9,6 +9,7 @@ use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\ValoreCampoPersonalizzato;
+use App\Services\Moduli\RegistroConsensi;
 use App\Services\Pagamenti\PaymentService;
 use App\Services\Soci\NumeroProgressivoService;
 use Illuminate\Support\Carbon;
@@ -90,9 +91,7 @@ class FormIscrizioneService
      */
     public function schema(Associazione $associazione): array
     {
-        $config = is_array($associazione->iscrizione_form_config)
-            ? $associazione->iscrizione_form_config
-            : [];
+        $config = $associazione->iscrizioni()->iscrizione_form_config ?? [];
 
         $introHtml = trim((string) ($config['intro_html'] ?? ''));
 
@@ -120,6 +119,9 @@ class FormIscrizioneService
             $rules['email'] = ['required', 'email', 'max:255'];
             $rules['privacy'] = ['required', 'accepted'];
         }
+
+        // Consensi aggiuntivi configurati dall'associazione (Moduli pubblici)
+        $rules += app(RegistroConsensi::class)->regole($associazione);
 
         foreach ($schema['campi_standard'] as $riga) {
             if (! $riga['visibile']) {
@@ -173,7 +175,7 @@ class FormIscrizioneService
     {
         $associazione ??= Associazione::query()->findOrFail($account?->associazione_id);
 
-        if (! $associazione->iscrizioni_socio_aperte) {
+        if (! $associazione->iscrizioni()->iscrizioni_socio_aperte) {
             throw IscrizioneException::iscrizioniChiuse();
         }
 
@@ -258,6 +260,10 @@ class FormIscrizioneService
                 'dati_form' => $dati,
                 'gestita_at' => $diretta ? now() : null,
             ]);
+
+            app(RegistroConsensi::class)->registra(
+                $associazione, $socio, (array) ($dati['consensi'] ?? []), 'iscrizione_online', request()->ip()
+            );
 
             $account?->forceFill(array_merge(
                 ['richiesta_socio_at' => now()],

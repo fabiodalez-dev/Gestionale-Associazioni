@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Privacy\DatiPersonaliController;
 use App\Http\Controllers\Soci\CampoPersonalizzatoController;
 use App\Http\Controllers\Soci\CategoriaSocioController;
 use App\Http\Controllers\Soci\DocumentoSocioController;
+use App\Http\Controllers\Soci\FotoSocioController;
 use App\Http\Controllers\Soci\GruppoDinamicoController;
 use App\Http\Controllers\Soci\SavedFilterController;
 use App\Http\Controllers\Soci\SocioController;
@@ -35,6 +37,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/soci/import', [SocioController::class, 'import'])->name('soci.import');
     Route::post('/soci/import', [SocioController::class, 'importStore'])->name('soci.import.store');
     Route::get('/soci/search', [SocioController::class, 'search'])->name('soci.search');
+    Route::get('/soci/verifica-dati', [SocioController::class, 'verificaDati'])->middleware('throttle:60,1')->name('soci.verifica-dati');
 
     // Preset filtri salvati (spec §11)
     Route::post('/soci/filtri', [SavedFilterController::class, 'store'])->name('soci.filtri.store');
@@ -54,6 +57,12 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/soci/{socio}/documenti/{documento}/download', [DocumentoSocioController::class, 'download'])->name('soci.documenti.download');
     Route::delete('/soci/{socio}/documenti/{documento}', [DocumentoSocioController::class, 'destroy'])->name('soci.documenti.destroy');
 
+    Route::get('/soci/{socio}/foto', [FotoSocioController::class, 'show'])->name('soci.foto.show');
+    Route::post('/soci/{socio}/foto', [FotoSocioController::class, 'store'])->middleware('throttle:20,1')->name('soci.foto.store');
+    Route::delete('/soci/{socio}/foto', [FotoSocioController::class, 'destroy'])->name('soci.foto.destroy');
+    Route::get('/soci/{socio}/dati-personali', [DatiPersonaliController::class, 'esportaPerSocio'])
+        ->middleware('throttle:10,1')
+        ->name('soci.dati-personali');
     Route::get('/soci/{socio}', [SocioController::class, 'show'])->name('soci.show');
     Route::get('/soci/{socio}/modifica', [SocioController::class, 'edit'])->name('soci.edit');
     Route::put('/soci/{socio}', [SocioController::class, 'update'])->name('soci.update');

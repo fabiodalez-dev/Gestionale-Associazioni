@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Struttura;
 
+use App\Models\Utente;
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -21,7 +23,7 @@ class AccettaInvitoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'confirmed', ...PasswordPolicy::rules($this->datiUtenteInvitato())],
         ];
     }
 
@@ -32,8 +34,19 @@ class AccettaInvitoRequest extends FormRequest
     {
         return [
             'password.required' => 'Inserisci la nuova password.',
-            'password.min' => 'La password deve avere almeno 8 caratteri.',
-            'password.confirmed' => 'Le due password non coincidono.',
+            ...PasswordPolicy::messages(),
         ];
+    }
+
+    /**
+     * Dati dell'amministratore invitato, per impedire password basate su nome ed email.
+     *
+     * @return list<string|null>
+     */
+    private function datiUtenteInvitato(): array
+    {
+        $utente = $this->route('utente');
+
+        return $utente instanceof Utente ? [$utente->email, $utente->nome, $utente->cognome] : [];
     }
 }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verifica Tessera Associativa</title>
-    <meta name="theme-color" content="#FF7B11">
+    <meta name="theme-color" content="#0D9488">
     <link rel="apple-touch-icon" href="{{ asset('assets/icons/icon-192.png') }}">
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
@@ -13,6 +13,7 @@
         .verify-card { max-width: 480px; margin: 60px auto; }
         .status-icon { font-size: 4rem; }
     </style>
+    @include('partials.pwa')
 </head>
 <body>
     <div class="container">

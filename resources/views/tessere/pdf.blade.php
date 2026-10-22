@@ -53,6 +53,9 @@
                     @endif
                 </table>
             </td>
+            @if (($fotoImg ?? '') !== '')
+            <td style="width:100px; vertical-align:top; text-align:center; padding-top:6px;">{!! $fotoImg !!}</td>
+            @endif
             <td style="width:120px; vertical-align:top; text-align:center; padding-top:6px;">
                 <div class="qr-block">
                     {!! $qrSvg !!}

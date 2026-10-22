@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,6 +24,7 @@ class RichiestaIscrizione extends Model
     use BelongsToAssociazione;
     use HasFactory;
     use HasUuids;
+    use NelPerimetroSedeTramite;
 
     public const STATO_IN_ATTESA = 'in_attesa';
 

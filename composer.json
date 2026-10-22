@@ -16,7 +16,8 @@
         "laravel/sanctum": "^4.0",
         "laravel/scout": "^11.2",
         "laravel/tinker": "^3.0",
-        "maatwebsite/excel": "^3.1",
+        "maatwebsite/excel": "^4.0",
+        "metalogico/laravel-formello": "^2.1",
         "mews/purifier": "^3.4",
         "propaganistas/laravel-phone": "^6.0",
         "robertogallea/laravel-codicefiscale": "^2.3",
@@ -24,15 +25,19 @@
         "spatie/laravel-backup": "^10.3",
         "spatie/laravel-csp": "^3.25",
         "spatie/laravel-data": "^4.23",
+        "spatie/laravel-failed-job-monitor": "^4.5",
+        "spatie/laravel-google-calendar": "^3.8",
         "spatie/laravel-health": "^1.40",
         "spatie/laravel-honeypot": "^4.7",
         "spatie/laravel-medialibrary": "^11.23",
         "spatie/laravel-permission": "^8.0",
+        "spatie/laravel-personal-data-export": "^4.3",
         "spatie/laravel-query-builder": "^7.3",
         "spatie/laravel-schedule-monitor": "^4.3",
         "spatie/laravel-settings": "^3.9",
         "srmklive/paypal": "^3.1",
-        "stripe/stripe-php": "^20.2"
+        "stripe/stripe-php": "^20.2",
+        "ziming/laravel-zxcvbn": "^2.4"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.3",
@@ -91,12 +96,18 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "pre-autoload-dump": [
+            "Google\\Task\\Composer::cleanup"
         ]
     },
     "extra": {
         "laravel": {
             "dont-discover": []
-        }
+        },
+        "google/apiclient-services": [
+            "Calendar"
+        ]
     },
     "config": {
         "optimize-autoloader": true,

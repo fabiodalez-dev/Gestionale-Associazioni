@@ -6,10 +6,10 @@
     <style>
         @page { size: A4; margin: 18mm; }
         body { font-family: DejaVu Sans, Helvetica, Arial, sans-serif; color: #222; font-size: 12pt; }
-        .header { border-bottom: 3px solid #FF7B11; padding-bottom: 10px; margin-bottom: 20px; }
+        .header { border-bottom: 3px solid #0D9488; padding-bottom: 10px; margin-bottom: 20px; }
         .header-table { width: 100%; border-collapse: collapse; }
         .brand-wrap img { display: block; height: 48px; width: auto; }
-        .brand { font-weight: bold; color: #FF7B11; font-size: 16pt; }
+        .brand { font-weight: bold; color: #0D9488; font-size: 16pt; }
         .doc-title { font-size: 11pt; color: #666; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
         .evento-titolo { font-size: 20pt; font-weight: bold; margin: 0 0 6px 0; }
         .evento-meta { font-size: 12pt; color: #444; margin-bottom: 18px; }
@@ -20,7 +20,7 @@
         .qr-block { text-align: center; margin-top: 22px; }
         .qr-block svg { width: 220px; height: 220px; }
         .qr-caption { font-size: 10pt; color: #666; margin-top: 8px; }
-        .box { border: 2px dashed #FF7B11; border-radius: 8px; padding: 16px; margin-top: 10px; }
+        .box { border: 2px dashed #0D9488; border-radius: 8px; padding: 16px; margin-top: 10px; }
         .note { font-size: 9pt; color: #777; margin-top: 22px; border-top: 1px solid #ddd; padding-top: 8px; }
     </style>
 </head>

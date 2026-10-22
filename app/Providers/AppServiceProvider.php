@@ -2,8 +2,14 @@
 
 namespace App\Providers;
 
+use App\Health\JobFallitiCheck;
 use App\Listeners\RegistraAccesso;
+use App\Models\Evento;
+use App\Observers\EventoGoogleCalendarObserver;
+use App\Services\Calendario\CalendarioEsterno;
+use App\Services\Calendario\GoogleCalendarSpatie;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\DebugModeCheck;
@@ -19,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(CalendarioEsterno::class, GoogleCalendarSpatie::class);
     }
 
     /**
@@ -28,10 +34,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerHealthChecks();
+        $this->forzaUrlApplicazione();
 
         // Audit accessi (f.25 piano "Gestione 2"): Login/Failed/Logout
         // di tutte le guard registrati best-effort nella tabella accessi
         Event::subscribe(RegistraAccesso::class);
+
+        // Sincronizzazione eventi → Google Calendar (solo associazioni che l'hanno attivata)
+        Evento::observe(EventoGoogleCalendarObserver::class);
     }
 
     /**
@@ -43,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
      * - coda attiva (heartbeat: health:queue-check-heartbeat);
      * - scheduler attivo (heartbeat: health:schedule-check-heartbeat);
      * - spazio disco usato (warning oltre 70%, errore oltre 90%);
+     * - job falliti nelle ultime 24 ore (warning da 1, errore oltre 10);
      * - debug mode spento — registrato solo in produzione, dove
      *   APP_DEBUG=true sarebbe un problema di sicurezza.
      */
@@ -55,6 +66,7 @@ class AppServiceProvider extends ServiceProvider
             UsedDiskSpaceCheck::new()
                 ->warnWhenUsedSpaceIsAbovePercentage(70)
                 ->failWhenUsedSpaceIsAbovePercentage(90),
+            JobFallitiCheck::new()->label('Job falliti (24 ore)')->failWhenMoreThan(10),
         ];
 
         if ($this->app->environment('production')) {
@@ -62,5 +74,24 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Health::checks($checks);
+    }
+
+    /**
+     * Fuori dallo sviluppo locale tutti gli URL generati (link nelle email, redirect)
+     * partono da APP_URL e non dall'Host della richiesta, che il client può falsificare
+     * (password reset poisoning). Prima dell'installazione APP_URL non è ancora affidabile.
+     */
+    private function forzaUrlApplicazione(): void
+    {
+        $url = (string) config('app.url');
+        if ($url === '' || $this->app->environment('local') || $this->app->runningUnitTests()
+            || ! is_file((string) config('installer.lock_file'))) {
+            return;
+        }
+
+        URL::forceRootUrl($url);
+        if (str_starts_with($url, 'https://')) {
+            URL::forceScheme('https');
+        }
     }
 }

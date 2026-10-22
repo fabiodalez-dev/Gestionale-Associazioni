@@ -48,7 +48,7 @@ class TesseraQuoteController extends Controller
             ->get();
 
         // Finestra "In Scadenza" configurata dall'associazione (default 30gg)
-        $giorniPreavviso = (int) ($associazione->giorni_notifica_scadenza ?? 30);
+        $giorniPreavviso = $associazione->tesseramento()->giorni_notifica_scadenza;
 
         return view('pubblico.account.tessera', [
             'associazione' => $associazione,

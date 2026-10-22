@@ -9,6 +9,7 @@ use App\Models\Tessera;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 /**
@@ -63,6 +64,34 @@ class ExportImportTest extends TestCase
             '.xlsx',
             (string) $response->headers->get('Content-Disposition')
         );
+    }
+
+    /**
+     * Round-trip con PhpSpreadsheet 5: il file xlsx esportato, reimportato senza
+     * modifiche, viene letto per intero e non produce differenze né errori.
+     */
+    public function test_export_xlsx_reimportato_senza_modifiche_non_produce_differenze(): void
+    {
+        Socio::factory()->count(2)->sequence(['numero_socio' => '001'], ['numero_socio' => '002'])
+            ->create(['associazione_id' => $this->associazione->id]);
+
+        $export = $this->actingAs($this->admin)->get('/export-import/export?anno='.now()->year);
+        $export->assertOk();
+        $this->assertInstanceOf(BinaryFileResponse::class, $export->baseResponse);
+        $percorso = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
+        copy($export->baseResponse->getFile()->getPathname(), $percorso);
+
+        $response = $this->actingAs($this->admin)->post('/export-import/import/anteprima', [
+            'file' => new UploadedFile($percorso, 'anagrafica.xlsx', null, null, true),
+        ]);
+        @unlink($percorso);
+
+        $response->assertOk();
+        $report = $response->viewData('report');
+        $this->assertSame(2, $report['invariati']);
+        $this->assertSame([], $report['modifiche']);
+        $this->assertSame([], $report['non_trovati']);
+        $this->assertSame([], $report['errori']);
     }
 
     public function test_anteprima_mostra_il_diff_senza_scrivere(): void

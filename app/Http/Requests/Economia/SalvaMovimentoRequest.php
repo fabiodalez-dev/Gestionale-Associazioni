@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Economia;
 
 use App\Models\Movimento;
+use App\Rules\SedeNelPerimetro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -38,6 +39,7 @@ class SalvaMovimentoRequest extends FormRequest
                     ->where('associazione_id', $tenantId)
                     ->where('tipo', (string) $this->input('tipo')),
             ],
+            'sede_id' => SedeNelPerimetro::regole($tenantId),
             'descrizione' => ['nullable', 'string', 'max:500'],
             'metodo' => ['nullable', 'string', 'max:50'],
             // f.13 piano "Organizzazione 3": imputazione opzionale a un progetto del tenant
@@ -61,6 +63,7 @@ class SalvaMovimentoRequest extends FormRequest
             'categoria_id' => 'categoria',
             'descrizione' => 'descrizione',
             'metodo' => 'metodo',
+            'sede_id' => 'sede',
         ];
     }
 

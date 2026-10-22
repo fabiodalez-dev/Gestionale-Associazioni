@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Struttura;
 
 use App\Models\Utente;
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -36,7 +37,7 @@ class UpdateAmministratoreRequest extends FormRequest
                 Rule::requiredIf(fn () => $this->input('ruolo') !== Utente::RUOLO_SUPER_ADMIN),
             ],
             // Password opzionale: vuota = invariata
-            'password' => ['nullable', 'string', 'min:8'],
+            'password' => ['nullable', ...PasswordPolicy::rules([$this->input('email'), $this->input('nome'), $this->input('cognome')])],
             'attivo' => ['nullable', 'boolean'],
         ];
     }
@@ -48,7 +49,7 @@ class UpdateAmministratoreRequest extends FormRequest
     {
         return [
             'associazione_id.required' => 'Gli admin di associazione devono essere collegati a un\'associazione!',
-            'password.min' => 'La password deve avere almeno 8 caratteri.',
+            ...PasswordPolicy::messages(),
         ];
     }
 }

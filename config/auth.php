@@ -31,6 +31,8 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'utenti',
+            // Durata del cookie "Ricordami" in minuti (AUTH_REMEMBER_DAYS giorni)
+            'remember' => (int) env('AUTH_REMEMBER_DAYS', 30) * 1440,
         ],
 
         'socio' => [
@@ -78,7 +80,7 @@ return [
         'utenti' => [
             'provider' => 'utenti',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
-            'expire' => 60,
+            'expire' => (int) env('AUTH_RESET_MINUTES', 60),
             'throttle' => 60,
         ],
 
@@ -102,6 +104,12 @@ return [
     | Password Confirmation Timeout
     |--------------------------------------------------------------------------
     */
+
+    // Tentativi di login al minuto per email+IP (FortifyServiceProvider)
+    'login_max_attempts' => (int) env('AUTH_LOGIN_ATTEMPTS', 5),
+
+    // Durata del blocco dopo troppi tentativi di accesso (minuti)
+    'login_lockout_minutes' => (int) env('AUTH_LOCKOUT_MINUTES', 1),
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 

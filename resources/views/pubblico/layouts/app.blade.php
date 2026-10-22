@@ -20,7 +20,7 @@
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/css/design-system.css') }}" rel="stylesheet">
-    <meta name="theme-color" content="#FF7B11">
+    @include('partials.stile-associazione')
     <style>
         body.pubblico-body { background: var(--ds-bg); color: var(--ds-text); }
         .pubblico-navbar { background: var(--ds-surface); border-bottom: 1px solid var(--ds-border); }
@@ -43,8 +43,8 @@
     <nav class="navbar navbar-expand-md pubblico-navbar">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('pubblico.home.show', $associazione->slug) }}">
-                @if (filled($associazione->logo_url))
-                    <img src="{{ $associazione->logo_url }}" alt="Logo {{ $associazione->nome }}" class="pubblico-logo">
+                @if ($associazione->moduli()->mostra_logo && filled($associazione->logoUrl()))
+                    <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}" class="pubblico-logo">
                 @else
                     <i class="bi bi-people-fill text-primary fs-4"></i>
                 @endif

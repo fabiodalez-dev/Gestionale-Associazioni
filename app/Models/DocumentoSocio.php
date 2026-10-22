@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,7 @@ class DocumentoSocio extends Model implements HasMedia
     use HasDefaultActivityLog;
     use HasUuids;
     use InteractsWithMedia;
+    use NelPerimetroSedeTramite;
     use SoftDeletes;
 
     public const COLLEZIONE_FILE = 'file';

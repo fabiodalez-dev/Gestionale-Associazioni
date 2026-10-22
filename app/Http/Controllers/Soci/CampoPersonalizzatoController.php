@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Soci;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Soci\CampoPersonalizzatoRequest;
+use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 /**
@@ -46,7 +48,22 @@ class CampoPersonalizzatoController extends Controller
     {
         $this->authorize('create', CampoPersonalizzato::class);
 
-        CampoPersonalizzato::create($request->validated());
+        // Creato dal costruttore del modulo di iscrizione: serve anche il permesso di modificare il modulo
+        $associazione = null;
+        if ($request->boolean('aggiungi_al_modulo')) {
+            $associazione = Associazione::query()->findOrFail(CampoPersonalizzato::currentAssociazioneId());
+            Gate::authorize('updateModuloIscrizione', $associazione);
+        }
+
+        $campo = CampoPersonalizzato::create($request->validated());
+
+        if ($associazione !== null) {
+            $config = $associazione->iscrizioni()->iscrizione_form_config ?? [];
+            $config['campi_personalizzati'] = array_values(array_unique([...($config['campi_personalizzati'] ?? []), $campo->id]));
+            $associazione->iscrizioni()->aggiorna(['iscrizione_form_config' => $config]);
+
+            return redirect()->route('configurazioni.modulo-iscrizione')->with('success', 'Campo "'.$campo->nome_campo.'" aggiunto al modulo.');
+        }
 
         return redirect()->route('config-campi.index')->with('success', 'Campo personalizzato creato.');
     }

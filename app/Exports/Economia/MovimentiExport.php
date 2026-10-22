@@ -43,7 +43,7 @@ class MovimentiExport implements FromCollection, ShouldAutoSize, WithHeadings, W
      * @param  Movimento  $movimento
      * @return list<mixed>
      */
-    public function map($movimento): array
+    public function map(mixed $movimento): array
     {
         return [
             $movimento->data->format('d/m/Y'),

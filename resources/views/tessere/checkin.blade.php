@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Check-in Evento</title>
-    <meta name="theme-color" content="#FF7B11">
+    <meta name="theme-color" content="#0D9488">
     <link rel="apple-touch-icon" href="{{ asset('assets/icons/icon-192.png') }}">
     <link href="{{ asset('assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css') }}" rel="stylesheet">
     <style>
-        :root { --brand: #FF7B11; }
+        :root { --brand: #0D9488; }
         body { background: #f5f5f5; min-height: 100vh; min-height: 100dvh; }
         .checkin-header { background: var(--brand); color: #fff; padding: 12px 16px; position: sticky; top: 0; z-index: 100; }
         .checkin-header h1 { font-size: 1.1rem; margin: 0; }
@@ -48,6 +48,7 @@
         .recent-item .ri-name { flex: 1; font-weight: 500; }
         .recent-item .ri-time { color: #888; font-size: .85rem; }
     </style>
+    @include('partials.pwa')
 </head>
 <body>
 

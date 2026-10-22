@@ -17,7 +17,7 @@ use App\Models\PaymentGatewaySetting;
 use App\Models\Sede;
 use App\Models\TesseraTemplate;
 use App\Models\TipoSocio;
-use App\Services\Struttura\LogoStorageService;
+use App\Services\Struttura\LogoAssociazione;
 use App\Services\Struttura\RequiredFieldsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,11 +34,11 @@ class ConfigurazioniController extends Controller
 {
     /** Whitelist HTML coerente con la toolbar TinyMCE legacy (spec §9.10). */
     private const PRIVACY_HTML_ALLOWED =
-        'p,h1,h2,h3,b,strong,i,em,u,ul,ol,li,a[href|title|target],table,thead,tbody,tr,td,th,br,span,div';
+        'p,h1,h2,h3,h4,b,strong,i,em,u,ul,ol,li,a[href|title|target],table,thead,tbody,tr,td,th,br,span,div';
 
     public function __construct(
         private readonly RequiredFieldsService $requiredFields,
-        private readonly LogoStorageService $logoStorage,
+        private readonly LogoAssociazione $logo,
     ) {}
 
     public function index(Request $request): View
@@ -96,24 +96,21 @@ class ConfigurazioniController extends Controller
     {
         $associazione = $request->associazioneCorrente();
 
-        $vecchioLogo = $associazione->logo_url;
-        $path = $this->logoStorage->store($request->file('logo_file'));
-        $associazione->update(['logo_url' => $path]);
-        $this->logoStorage->delete($vecchioLogo);
+        $this->logo->salva($associazione, $request->file('logo_file'));
 
         return $this->redirectToSection('logo', 'Logo aggiornato con successo.');
     }
 
     public function updateTesseramento(UpdateTesseramentoRequest $request): RedirectResponse
     {
-        $request->associazioneCorrente()->update($request->validated());
+        $request->associazioneCorrente()->tesseramento()->aggiorna($request->validated());
 
         return $this->redirectToSection('tesseramento', 'Impostazioni tesseramento aggiornate.');
     }
 
     public function updateTemplateEmail(UpdateTemplateEmailRequest $request): RedirectResponse
     {
-        $request->associazioneCorrente()->update([
+        $request->associazioneCorrente()->tesseramento()->aggiorna([
             'template_email_scadenza' => $request->validated('template_email_scadenza'),
         ]);
 
@@ -149,7 +146,7 @@ class ConfigurazioniController extends Controller
             (array) $request->input('required_preiscrizione', [])
         );
 
-        $associazione->update(['campi_obbligatori_config' => $config]);
+        $associazione->iscrizioni()->aggiorna(['campi_obbligatori_config' => $config]);
 
         // Flag obbligatorietà dei campi personalizzati (UPDATE scoped per tenant)
         $customBackend = array_values((array) $request->input('required_custom_backend', []));

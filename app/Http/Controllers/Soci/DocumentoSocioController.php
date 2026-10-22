@@ -7,8 +7,10 @@ use App\Http\Requests\Soci\UploadDocumentoSocioRequest;
 use App\Models\DocumentoSocio;
 use App\Models\Socio;
 use App\Services\Soci\SocioActivityLogger;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -23,6 +25,9 @@ class DocumentoSocioController extends Controller
 
     private const DISK = 'local';
 
+    /** Estensioni con cui salvare i documenti (dal contenuto); le altre diventano .bin. */
+    private const ESTENSIONI_DOCUMENTI = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'doc', 'docx', 'xls', 'xlsx', 'odt', 'ods', 'txt', 'csv'];
+
     public function __construct(private readonly SocioActivityLogger $activityLogger) {}
 
     public function store(UploadDocumentoSocioRequest $request, Socio $socio): RedirectResponse
@@ -30,21 +35,29 @@ class DocumentoSocioController extends Controller
         $this->authorize('update', $socio);
 
         $file = $request->file('file');
-        $percorso = $file->store(
-            "documenti-soci/{$socio->associazione_id}/{$socio->id}",
-            self::DISK
-        );
 
-        $documento = DocumentoSocio::create([
-            'socio_id' => $socio->id,
-            'associazione_id' => $socio->associazione_id,
-            'nome_file' => $file->getClientOriginalName(),
-            'percorso_file' => $percorso,
-            'descrizione' => $request->validated('descrizione'),
-            'tipo_documento' => $request->validated('tipo_documento'),
-            'data_scadenza' => $request->validated('data_scadenza'),
-            'caricato_da' => $request->user()->id,
-        ]);
+        // File su medialibrary (collezione "file", disco privato local);
+        // percorso_file resta valorizzato per download, export GDPR e cestino.
+        $documento = DB::transaction(function () use ($request, $socio, $file): DocumentoSocio {
+            $documento = DocumentoSocio::create([
+                'socio_id' => $socio->id,
+                'associazione_id' => $socio->associazione_id,
+                'nome_file' => $file->getClientOriginalName(),
+                'percorso_file' => '',
+                'descrizione' => $request->validated('descrizione'),
+                'tipo_documento' => $request->validated('tipo_documento'),
+                'data_scadenza' => $request->validated('data_scadenza'),
+                'caricato_da' => $request->user()->id,
+            ]);
+
+            $media = $documento->addMedia($file)
+                ->usingFileName(NomeFileSicuro::per($file, '', self::ESTENSIONI_DOCUMENTI))
+                ->toMediaCollection(DocumentoSocio::COLLEZIONE_FILE);
+
+            $documento->forceFill(['percorso_file' => $media->getPathRelativeToRoot()])->save();
+
+            return $documento;
+        });
 
         $this->activityLogger->log(
             $socio,

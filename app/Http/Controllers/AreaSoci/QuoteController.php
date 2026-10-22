@@ -4,6 +4,7 @@ namespace App\Http\Controllers\AreaSoci;
 
 use App\Http\Controllers\Controller;
 use App\Models\Socio;
+use App\Settings\TesseramentoSettings;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -24,7 +25,7 @@ class QuoteController extends Controller
             ->get();
 
         // Finestra "In Scadenza": configurazione dell'associazione (default 30gg come il legacy)
-        $giorniPreavviso = (int) ($socio->associazione->giorni_notifica_scadenza ?? 30);
+        $giorniPreavviso = $socio->associazione?->tesseramento()->giorni_notifica_scadenza ?? TesseramentoSettings::GIORNI_PREAVVISO_DEFAULT;
 
         return view('area-soci.quote', [
             'socio' => $socio,

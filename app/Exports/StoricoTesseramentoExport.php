@@ -39,7 +39,7 @@ class StoricoTesseramentoExport implements FromCollection, ShouldAutoSize, WithH
         ];
     }
 
-    public function collection()
+    public function collection(): Collection
     {
         return $this->storico->timeline($this->socio)->map(function (array $riga) {
             /** @var Collection<int, Tessera> $tessere */

@@ -51,7 +51,7 @@ class AssociazioniTest extends TestCase
             'admin_nome' => 'Mario',
             'admin_cognome' => 'Bianchi',
             'admin_email' => 'mario.bianchi@example.com',
-            'admin_password' => 'password123',
+            'admin_password' => 'Lampione-Viola-Treno-42',
         ]);
 
         $response->assertRedirect(route('associazioni.index'));

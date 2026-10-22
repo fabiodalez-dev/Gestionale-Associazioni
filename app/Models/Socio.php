@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSede;
+use App\Services\Privacy\ArchivioDatiPersonali;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,17 +18,25 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Spatie\PersonalDataExport\ExportsPersonalData;
+use Spatie\PersonalDataExport\PersonalDataSelection;
 
 /**
  * Socio dell'associazione. Funziona anche da Authenticatable per la guard 'socio'
  * (area soci: login via email + password_hash, NULL = nessun accesso).
  */
-class Socio extends Authenticatable
+class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
 {
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use InteractsWithMedia;
+    use NelPerimetroSede;
     use Notifiable;
     use Searchable;
     use SoftDeletes;
@@ -435,5 +445,59 @@ class Socio extends Authenticatable
             'codice_fiscale' => (string) $this->codice_fiscale,
             'numero_socio' => (string) $this->numero_socio,
         ];
+    }
+
+    /**
+     * Consensi espressi nei moduli pubblici (registro GDPR).
+     *
+     * @return HasMany<Consenso, $this>
+     */
+    public function consensi(): HasMany
+    {
+        return $this->hasMany(Consenso::class, 'socio_id');
+    }
+
+    public const COLLEZIONE_FOTO = 'foto';
+
+    /**
+     * Foto del socio (tessera): disco privato, servita solo da FotoSocioController.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::COLLEZIONE_FOTO)
+            ->useDisk('media_private')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->singleFile();
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('tessera')
+            ->performOnCollections(self::COLLEZIONE_FOTO)
+            ->nonQueued()
+            ->fit(Fit::Crop, 300, 300);
+    }
+
+    /** File locale della foto in formato tessera (quadrato), null se assente. */
+    public function fotoPercorso(): ?string
+    {
+        $media = $this->getFirstMedia(self::COLLEZIONE_FOTO);
+        if ($media === null) {
+            return null;
+        }
+        $path = $media->hasGeneratedConversion('tessera') ? $media->getPath('tessera') : $media->getPath();
+
+        return is_file($path) ? $path : null;
+    }
+
+    /** Contenuto dell'archivio dei dati personali (spatie/laravel-personal-data-export). */
+    public function selectPersonalData(PersonalDataSelection $personalDataSelection): void
+    {
+        app(ArchivioDatiPersonali::class)->riempi($personalDataSelection, $this);
+    }
+
+    public function personalDataExportName(): string
+    {
+        return 'dati-personali.zip';
     }
 }

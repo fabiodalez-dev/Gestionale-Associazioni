@@ -140,7 +140,8 @@
                                         data-categoria="{{ $movimento->categoria_id }}"
                                         data-descrizione="{{ $movimento->descrizione }}"
                                         data-metodo="{{ $movimento->metodo }}"
-                                        data-progetto="{{ $movimento->progetto_id }}">
+                                        data-progetto="{{ $movimento->progetto_id }}"
+                                        data-sede="{{ $movimento->sede_id }}">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                             @endcan
@@ -222,6 +223,7 @@
                     <input type="text" name="metodo" id="campoMetodo" class="form-control" maxlength="50"
                            placeholder="contanti, bonifico, POS, ..." value="{{ old('metodo') }}">
                 </div>
+                @include('partials.campo-sede', ['idCampo' => 'campoSede', 'valore' => null, 'vuoto' => "Tutta l'associazione"])
                 @if (isset($progetti) && $progetti->isNotEmpty())
                     <div class="mb-3">
                         <label for="campoProgetto" class="form-label">Progetto</label>
@@ -300,6 +302,8 @@
             document.getElementById('campoMetodo').value = btn.dataset.metodo || '';
             var campoProgetto = document.getElementById('campoProgetto');
             if (campoProgetto) campoProgetto.value = btn.dataset.progetto || '';
+            var campoSede = document.getElementById('campoSede');
+            if (campoSede && (btn.dataset.sede || campoSede.querySelector('option[value=""]'))) campoSede.value = btn.dataset.sede || '';
             if (modal) modal.show();
         });
     });

@@ -6,7 +6,7 @@
     <style>
         * { font-family: DejaVu Sans, sans-serif; }
         body { font-size: 12px; color: #222; }
-        .header { border-bottom: 3px solid #FF7B11; padding-bottom: 10px; margin-bottom: 20px; }
+        .header { border-bottom: 3px solid #0D9488; padding-bottom: 10px; margin-bottom: 20px; }
         .header h1 { font-size: 16px; margin: 0 0 4px 0; }
         .header .assoc-info { font-size: 10px; color: #666; }
         h2.titolo { font-size: 15px; margin: 0 0 6px 0; }

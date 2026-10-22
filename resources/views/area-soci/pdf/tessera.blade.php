@@ -8,12 +8,12 @@
         body { font-family: DejaVu Sans, sans-serif; color: #111827; background: #ffffff; }
         .card {
             width: 100%;
-            border: 2px solid #FF7B11;
+            border: 2px solid #0D9488;
             border-radius: 12px;
             padding: 24px;
         }
-        .header { border-bottom: 2px solid #FF7B11; padding-bottom: 12px; margin-bottom: 18px; }
-        .assoc { font-size: 20px; font-weight: bold; color: #FF7B11; }
+        .header { border-bottom: 2px solid #0D9488; padding-bottom: 12px; margin-bottom: 18px; }
+        .assoc { font-size: 20px; font-weight: bold; color: #0D9488; }
         .label { font-size: 9px; color: #6B7280; text-transform: uppercase; letter-spacing: 1px; }
         .value { font-size: 14px; font-weight: bold; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; }
@@ -21,7 +21,7 @@
         .qr { text-align: right; }
         .qr img { width: 130px; height: 130px; }
         .footer { margin-top: 14px; font-size: 9px; color: #9CA3AF; }
-        .stato { display: inline-block; background: #FF7B11; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: bold; }
+        .stato { display: inline-block; background: #0D9488; color: #fff; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: bold; }
     </style>
 </head>
 <body>

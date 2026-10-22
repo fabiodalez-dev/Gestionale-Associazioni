@@ -16,9 +16,13 @@ class SetPasswordController extends Controller
      */
     public function show(string $token): View
     {
+        $socio = $this->socioByToken($token);
+
         return view('area-soci.set-password', [
             'token' => $token,
-            'tokenValido' => $this->socioByToken($token) !== null,
+            'tokenValido' => $socio !== null,
+            // Per l'indicatore di robustezza: la password non deve contenere i dati del socio
+            'datiSocio' => $socio === null ? [] : [$socio->email, $socio->nome, $socio->cognome],
         ]);
     }
 

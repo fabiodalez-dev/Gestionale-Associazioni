@@ -23,13 +23,21 @@ class PrivacyPolicyTest extends TestCase
             ->assertSee('Trattiamo i tuoi dati con cura.');
     }
 
-    public function test_policy_vuota_mostra_avviso(): void
+    public function test_policy_vuota_mostra_l_informativa_predefinita_con_i_dati_dell_associazione(): void
     {
-        $associazione = Associazione::factory()->create(['privacy_policy_html' => null]);
+        $associazione = Associazione::factory()->create([
+            'privacy_policy_html' => null,
+            'email' => 'info@circolo.example',
+            'codice_fiscale' => '91234567890',
+        ]);
 
         $this->get('/privacy-policy/'.$associazione->id)
             ->assertOk()
-            ->assertSee('Privacy policy non ancora disponibile');
+            ->assertSee('Informativa sul trattamento dei dati personali')
+            ->assertSee('codice fiscale 91234567890')
+            ->assertSee('info@circolo.example')
+            ->assertSee('garanteprivacy.it')
+            ->assertDontSee('non ancora disponibile');
     }
 
     public function test_validazione_accesso(): void

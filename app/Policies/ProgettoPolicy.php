@@ -29,29 +29,29 @@ class ProgettoPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.view', self::FALLBACK);
+        return $this->allowed($utente, 'progetti.view', self::FALLBACK);
     }
 
     public function view(Utente $utente, Progetto $progetto): bool
     {
-        return $this->allowed($utente, 'struttura.view', self::FALLBACK)
+        return $this->allowed($utente, 'progetti.view', self::FALLBACK)
             && $this->stessoTenant($utente, $progetto);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.create', self::FALLBACK);
+        return $this->allowed($utente, 'progetti.create', self::FALLBACK);
     }
 
     public function update(Utente $utente, Progetto $progetto): bool
     {
-        return $this->allowed($utente, 'struttura.update', self::FALLBACK)
+        return $this->allowed($utente, 'progetti.update', self::FALLBACK)
             && $this->stessoTenant($utente, $progetto);
     }
 
     public function delete(Utente $utente, Progetto $progetto): bool
     {
-        return $this->allowed($utente, 'struttura.delete', self::FALLBACK)
+        return $this->allowed($utente, 'progetti.delete', self::FALLBACK)
             && $this->stessoTenant($utente, $progetto);
     }
 

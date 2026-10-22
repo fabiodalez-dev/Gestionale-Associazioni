@@ -160,6 +160,8 @@ class AuthenticateApiV1
         }
 
         $request->attributes->set('api_client', $context);
+        // Perimetro per sede del proprietario del token (PerimetroSedi)
+        $request->attributes->set('api_utente', $utente);
 
         return $next($request);
     }

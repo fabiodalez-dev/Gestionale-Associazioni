@@ -4,15 +4,16 @@ namespace App\Http\Controllers\DocumentiVerbaliScadenze;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DocumentiVerbaliScadenze\StoreDocumentoSocioRequest;
+use App\Models\Documento;
 use App\Models\DocumentoSocio;
 use App\Models\Socio;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -76,7 +77,7 @@ class DocumentoSocioController extends Controller
 
                 $media = $documento
                     ->addMedia($file)
-                    ->usingFileName(Str::uuid().'.'.strtolower($file->getClientOriginalExtension()))
+                    ->usingFileName(NomeFileSicuro::per($file, '', Documento::ESTENSIONI_PERMESSE))
                     ->toMediaCollection(DocumentoSocio::COLLEZIONE_FILE);
 
                 $documento->update(['percorso_file' => $media->getPathRelativeToRoot()]);

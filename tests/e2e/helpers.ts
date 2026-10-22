@@ -14,6 +14,7 @@ const E2E_ENV = {
     CACHE_STORE: 'file',
     SESSION_DRIVER: 'file',
     E2E_FIXTURES: '1',
+    REGISTRAZIONE_ASSOCIAZIONI: 'revisione',
 };
 
 /** Esegue un comando artisan nel contesto e2e e ritorna stdout. */

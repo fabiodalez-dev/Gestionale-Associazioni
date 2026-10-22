@@ -16,7 +16,7 @@
                 <a href="{{ route('pubblico.eventi.index', $associazione->slug) }}" class="btn btn-primary">
                     <i class="bi bi-calendar-event me-1"></i> Scopri gli eventi
                 </a>
-                @if ($associazione->iscrizioni_socio_aperte)
+                @if ($associazione->iscrizioni()->iscrizioni_socio_aperte)
                     <a href="{{ route('pubblico.iscriviti', $associazione->slug) }}" class="btn btn-outline-primary ms-2">
                         <i class="bi bi-person-heart me-1"></i> Diventa socio
                     </a>
@@ -27,9 +27,9 @@
                     </a>
                 @endguest
             </div>
-            @if (filled($associazione->logo_url))
+            @if (filled($associazione->logoUrl()))
                 <div class="col-md-4 text-center d-none d-md-block">
-                    <img src="{{ $associazione->logo_url }}" alt="Logo {{ $associazione->nome }}"
+                    <img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}"
                          class="img-fluid" style="max-height: 160px;">
                 </div>
             @endif

@@ -9,14 +9,14 @@
     <title>Ricevuta n. {{ $ricevuta->numero }}/{{ $ricevuta->anno }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #333; }
-        .header { border-bottom: 3px solid #FF7B11; padding-bottom: 12px; margin-bottom: 24px; }
-        .header h1 { color: #FF7B11; font-size: 20px; margin: 0 0 4px 0; }
+        .header { border-bottom: 3px solid #0D9488; padding-bottom: 12px; margin-bottom: 24px; }
+        .header h1 { color: #0D9488; font-size: 20px; margin: 0 0 4px 0; }
         .header .assoc { font-size: 14px; font-weight: bold; }
         .numero { font-size: 14px; font-weight: bold; margin: 12px 0; }
         table.dettagli { width: 100%; border-collapse: collapse; margin-top: 16px; }
         table.dettagli th, table.dettagli td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; }
         table.dettagli th { background: #f8f9fa; width: 40%; }
-        .importo { font-size: 18px; font-weight: bold; color: #FF7B11; }
+        .importo { font-size: 18px; font-weight: bold; color: #0D9488; }
         .footer { margin-top: 40px; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 8px; }
     </style>
 </head>

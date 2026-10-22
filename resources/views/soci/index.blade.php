@@ -3,40 +3,103 @@
 @section('title', 'Soci - '.session('app_name', config('app.name')))
 
 @section('content')
-    <div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    @php
+        $perStato = \App\Models\Socio::query()->selectRaw('stato, count(*) as n')->groupBy('stato')->pluck('n', 'stato');
+        $totaleSoci = (int) $perStato->sum();
+        $oggiSoci = now()->startOfDay();
+        $inScadenzaSoci = \App\Models\Tessera::query()->where('stato', 'Attiva')->whereBetween('data_scadenza', [$oggiSoci, $oggiSoci->copy()->addDays(30)->endOfDay()])->count();
+        $quoteAperte = \App\Models\Quota::query()->where('stato', '!=', 'Pagata')->where('anno', now()->year);
+        $importoAperto = (float) (clone $quoteAperte)->sum('importo');
+        $numeroAperte = (clone $quoteAperte)->count();
+        $schede = collect([
+            ['all', 'Tutti', $totaleSoci],
+            [\App\Models\Socio::STATO_ATTIVO, 'Attivi', (int) ($perStato[\App\Models\Socio::STATO_ATTIVO] ?? 0)],
+            ['pending', 'Da approvare', $pendingCount],
+            [\App\Models\Socio::STATO_SOSPESO, 'Sospesi', (int) ($perStato[\App\Models\Socio::STATO_SOSPESO] ?? 0)],
+            [\App\Models\Socio::STATO_RADIATO, 'Radiati', (int) ($perStato[\App\Models\Socio::STATO_RADIATO] ?? 0)],
+            [\App\Models\Socio::STATO_TRASFERITO, 'Trasferiti', (int) ($perStato[\App\Models\Socio::STATO_TRASFERITO] ?? 0)],
+            [\App\Models\Socio::STATO_DECEDUTO, 'Deceduti', (int) ($perStato[\App\Models\Socio::STATO_DECEDUTO] ?? 0)],
+        ])->filter(fn ($t) => $t[2] > 0 || in_array($t[0], ['all', \App\Models\Socio::STATO_ATTIVO], true) || $filtri['status'] === $t[0]);
+        $avanzatiAttivi = collect(['tessera_template', 'tessera_scadenza', 'gruppo_id', 'nucleo', 'has_tessera'])
+            ->filter(fn ($k) => ($filtri[$k] ?? 'all') !== 'all' && filled($filtri[$k] ?? null))->count();
+    @endphp
+
+    <div class="page-head">
         <div>
-            <h1 class="h2"><i class="bi bi-people me-2"></i>Soci</h1>
-            <p class="text-muted mb-0">
-                <span id="sociCount" class="badge bg-primary">{{ $soci->total() }}</span>
-                {{ $soci->total() === 1 ? 'socio' : 'soci' }} trovati
-            </p>
+            <div class="crumb">Anagrafica / <span>Soci</span></div>
+            <h1>Soci</h1>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ route('soci.create') }}" class="btn btn-primary">
-                <i class="bi bi-person-plus me-1"></i>Nuovo Socio
+        <div class="actions">
+            <a href="{{ route('soci.import') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-upload"></i>Importa
             </a>
             <div class="btn-group">
                 <a id="exportXlsx" href="{{ route('soci.export', array_merge($filtri, ['format' => 'xlsx'])) }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                    <i class="bi bi-download"></i>Excel
                 </a>
                 <a id="exportCsv" href="{{ route('soci.export', array_merge($filtri, ['format' => 'csv'])) }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-filetype-csv me-1"></i>CSV
+                    CSV
                 </a>
             </div>
-            <a href="{{ route('soci.import') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-upload me-1"></i>Importa
-            </a>
             @if (\Illuminate\Support\Facades\Route::has('nuclei.index'))
                 <a href="{{ route('nuclei.index') }}" class="btn btn-outline-secondary" title="Vista raggruppata per nucleo familiare">
-                    <i class="bi bi-house-heart me-1"></i>Per nucleo
+                    <i class="bi bi-house-heart"></i>Per nucleo
                 </a>
             @endif
-            <a href="{{ route('soci.cestino') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-trash me-1"></i>Cestino
+            <a href="{{ route('soci.cestino') }}" class="btn btn-outline-secondary" title="Cestino">
+                <i class="bi bi-trash"></i>Cestino
                 @if ($cestinoCount > 0)
-                    <span class="badge bg-secondary">{{ $cestinoCount }}</span>
+                    <span class="badge-count">{{ $cestinoCount }}</span>
                 @endif
             </a>
+            <a href="{{ route('soci.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i>Nuovo Socio
+            </a>
+        </div>
+    </div>
+
+    <div class="metrics-strip mb-4">
+        <div class="metric-cell">
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-people"></i></span>
+                <span class="metric-label">Soci totali</span>
+            </div>
+            <div class="metric-value">{{ number_format($totaleSoci, 0, ',', '.') }}</div>
+            <div class="metric-foot">{{ number_format((int) ($perStato[\App\Models\Socio::STATO_ATTIVO] ?? 0), 0, ',', '.') }} attivi</div>
+        </div>
+        <div class="metric-cell metric-warn">
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-clock-history"></i></span>
+                <span class="metric-label">Tessere in scadenza</span>
+            </div>
+            <div class="metric-value">{{ $inScadenzaSoci }}<span class="metric-delta text-warning">30 gg</span></div>
+            <div class="metric-foot">
+                @if (\Illuminate\Support\Facades\Route::has('campagna-rinnovi.index'))
+                    <a href="{{ route('campagna-rinnovi.index') }}">Avvia i rinnovi</a>
+                @else
+                    nei prossimi 30 giorni
+                @endif
+            </div>
+        </div>
+        <a class="metric-cell metric-info" href="{{ route('soci.index', ['status' => 'pending', 'tessera_stato' => 'all']) }}">
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-person-plus"></i></span>
+                <span class="metric-label">Da approvare</span>
+            </div>
+            <div class="metric-value">{{ $pendingCount }}<span class="metric-delta text-info">nuove</span></div>
+            <div class="metric-foot">pre-iscrizioni in attesa</div>
+        </a>
+        <div class="metric-cell metric-danger">
+            <div class="metric-head">
+                <span class="metric-chip"><i class="bi bi-exclamation-triangle"></i></span>
+                <span class="metric-label">Quote non pagate {{ now()->year }}</span>
+            </div>
+            <div class="metric-value">€ {{ number_format($importoAperto, 0, ',', '.') }}<span class="metric-delta text-danger">{{ $numeroAperte }} quote</span></div>
+            <div class="metric-foot">
+                @if (\Illuminate\Support\Facades\Route::has('quote.index'))
+                    <a href="{{ route('quote.index') }}">Vai alle quote</a>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -52,26 +115,69 @@
     @endif
 
     {{-- Banner pre-iscrizioni in attesa (spec §1.12) --}}
-    @if ($pendingCount > 0)
-        <div class="alert alert-warning d-flex justify-content-between align-items-center">
+    @if ($pendingCount > 0 && $filtri['status'] !== 'pending')
+        <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3">
             <span><i class="bi bi-hourglass-split me-1"></i>Ci sono <strong>{{ $pendingCount }}</strong> pre-iscrizioni in attesa di approvazione o pagamento.</span>
             <a href="{{ route('soci.index', ['status' => 'pending', 'tessera_stato' => 'all']) }}" class="btn btn-sm btn-warning">Vedi</a>
         </div>
     @endif
 
-    {{-- Filtri (spec §1.9) --}}
-    <div class="card mb-3">
-        <div class="card-body">
+    <div class="list-card mb-4">
+        {{-- Schede per stato: impostano il filtro "Stato" --}}
+        <nav class="nav nav-tabs" aria-label="Filtra per stato">
+            @foreach ($schede as [$valoreStato, $etichetta, $conteggio])
+                <a href="{{ route('soci.index', array_merge($filtri, ['status' => $valoreStato])) }}"
+                   class="nav-link {{ $filtri['status'] === $valoreStato ? 'active' : '' }}" data-stato="{{ $valoreStato }}">
+                    {{ $etichetta }} <span class="badge-count">{{ number_format($conteggio, 0, ',', '.') }}</span>
+                </a>
+            @endforeach
+        </nav>
+
+        <div class="filters-wrap">
             <form id="filtersForm" method="GET" action="{{ route('soci.index') }}">
                 <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-lg-4">
                         <label class="form-label small mb-1" for="search">Ricerca</label>
-                        <input type="text" class="form-control form-control-sm" id="search" name="search"
-                               value="{{ $filtri['search'] }}" placeholder="Nome, email, CF, numero socio...">
+                        <div class="search-field"><i class="bi bi-search"></i><input type="text" class="form-control" id="search" name="search"
+                               value="{{ $filtri['search'] }}" placeholder="Nome, email, codice fiscale, n. socio…"></div>
                     </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label small mb-1" for="categoria_ids">Categorie</label>
+                        <select class="form-select" id="categoria_ids" name="categoria_ids[]" multiple size="1">
+                            @foreach ($categorie as $categoria)
+                                <option value="{{ $categoria->id }}" @selected(in_array($categoria->id, (array) $filtri['categoria_ids'], true))>{{ $categoria->nome }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label small mb-1" for="sede_id">Sede</label>
+                        <select class="form-select" id="sede_id" name="sede_id">
+                            <option value="all">Tutte</option>
+                            @foreach ($sedi as $sede)
+                                <option value="{{ $sede->id }}" @selected($filtri['sede_id'] === $sede->id)>{{ $sede->nome }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6 col-lg-2">
+                        <label class="form-label small mb-1" for="tessera_stato">Stato tessera</label>
+                        <select class="form-select" id="tessera_stato" name="tessera_stato">
+                            <option value="attive" @selected($filtri['tessera_stato'] === 'attive')>Attive</option>
+                            <option value="scadute" @selected($filtri['tessera_stato'] === 'scadute')>Scadute</option>
+                            <option value="all" @selected($filtri['tessera_stato'] === 'all')>Tutte</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-lg-2 d-flex gap-2">
+                        <button type="button" class="btn btn-light flex-fill {{ $avanzatiAttivi > 0 ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target=".filtri-avanzati" aria-expanded="{{ $avanzatiAttivi > 0 ? 'true' : 'false' }}" aria-controls="filtriAvanzati">
+                            <i class="bi bi-funnel"></i>Filtri avanzati
+                            @if ($avanzatiAttivi > 0)<span class="badge-count badge-solid">{{ $avanzatiAttivi }}</span>@endif
+                        </button>
+                    </div>
+                </div>
+                <div class="collapse filtri-avanzati {{ $avanzatiAttivi > 0 || $filtri['status'] !== 'all' ? 'show' : '' }}" id="filtriAvanzati">
+                    <div class="row g-2 align-items-end pt-2">
+                    <div class="col-6 col-lg-2">
                         <label class="form-label small mb-1" for="status">Stato</label>
-                        <select class="form-select form-select-sm" id="status" name="status">
+                        <select class="form-select" id="status" name="status">
                             <option value="all">Tutti</option>
                             <option value="pending" @selected($filtri['status'] === 'pending')>Pre-iscrizioni (in attesa)</option>
                             @foreach (\App\Models\Socio::STATI as $stato)
@@ -79,59 +185,34 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label small mb-1" for="sede_id">Sede</label>
-                        <select class="form-select form-select-sm" id="sede_id" name="sede_id">
-                            <option value="all">Tutte</option>
-                            @foreach ($sedi as $sede)
-                                <option value="{{ $sede->id }}" @selected($filtri['sede_id'] === $sede->id)>{{ $sede->nome }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label small mb-1" for="categoria_ids">Categorie</label>
-                        <select class="form-select form-select-sm" id="categoria_ids" name="categoria_ids[]" multiple size="1">
-                            @foreach ($categorie as $categoria)
-                                <option value="{{ $categoria->id }}" @selected(in_array($categoria->id, (array) $filtri['categoria_ids'], true))>{{ $categoria->nome }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-6 col-md-1">
+                    <div class="col-6 col-lg-2">
                         <label class="form-label small mb-1" for="has_tessera">Tessera</label>
-                        <select class="form-select form-select-sm" id="has_tessera" name="has_tessera">
+                        <select class="form-select" id="has_tessera" name="has_tessera">
                             <option value="all" @selected($filtri['has_tessera'] === 'all')>Tutti</option>
                             <option value="yes" @selected($filtri['has_tessera'] === 'yes')>Con</option>
                             <option value="no" @selected($filtri['has_tessera'] === 'no')>Senza</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
-                        <label class="form-label small mb-1" for="tessera_stato">Stato tessera</label>
-                        <select class="form-select form-select-sm" id="tessera_stato" name="tessera_stato">
-                            <option value="attive" @selected($filtri['tessera_stato'] === 'attive')>Attive</option>
-                            <option value="scadute" @selected($filtri['tessera_stato'] === 'scadute')>Scadute</option>
-                            <option value="all" @selected($filtri['tessera_stato'] === 'all')>Tutte</option>
-                        </select>
-                    </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-lg-2">
                         <label class="form-label small mb-1" for="tessera_template">Template tessera</label>
-                        <select class="form-select form-select-sm" id="tessera_template" name="tessera_template">
+                        <select class="form-select" id="tessera_template" name="tessera_template">
                             <option value="all">Tutti</option>
                             @foreach ($templatesTessera as $template)
                                 <option value="{{ $template }}" @selected($filtri['tessera_template'] === $template)>{{ $template }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-lg-2">
                         <label class="form-label small mb-1" for="tessera_scadenza">Scadenza tessera</label>
-                        <select class="form-select form-select-sm" id="tessera_scadenza" name="tessera_scadenza">
+                        <select class="form-select" id="tessera_scadenza" name="tessera_scadenza">
                             <option value="all" @selected($filtri['tessera_scadenza'] === 'all')>Tutte</option>
                             <option value="in_scadenza" @selected($filtri['tessera_scadenza'] === 'in_scadenza')>In scadenza</option>
                             <option value="scadute" @selected($filtri['tessera_scadenza'] === 'scadute')>Scadute</option>
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-lg-2">
                         <label class="form-label small mb-1" for="gruppo_id">Gruppo dinamico</label>
-                        <select class="form-select form-select-sm" id="gruppo_id" name="gruppo_id">
+                        <select class="form-select" id="gruppo_id" name="gruppo_id">
                             <option value="all">Nessuno</option>
                             @foreach ($gruppi as $gruppo)
                                 <option value="{{ $gruppo->id }}" @selected($filtri['gruppo_id'] === $gruppo->id)>{{ $gruppo->nome_gruppo }}</option>
@@ -139,9 +220,9 @@
                         </select>
                     </div>
                     {{-- Filtro nucleo familiare (f.20 piano "Gestione 2" — modulo membri) --}}
-                    <div class="col-6 col-md-2">
+                    <div class="col-6 col-lg-2">
                         <label class="form-label small mb-1" for="nucleo">Nucleo familiare</label>
-                        <select class="form-select form-select-sm" id="nucleo" name="nucleo">
+                        <select class="form-select" id="nucleo" name="nucleo">
                             <option value="all" @selected(($filtri['nucleo'] ?? 'all') === 'all')>Tutti</option>
                             <option value="con" @selected(($filtri['nucleo'] ?? '') === 'con')>Con nucleo</option>
                             <option value="senza" @selected(($filtri['nucleo'] ?? '') === 'senza')>Senza nucleo</option>
@@ -150,64 +231,65 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-6 col-md-2">
-                        <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel me-1"></i>Filtra</button>
                     </div>
-                    <div class="col-6 col-md-2">
-                        <a href="{{ route('soci.index') }}" class="btn btn-sm btn-outline-secondary w-100">Azzera</a>
+                    <div class="d-flex gap-2 flex-wrap align-items-center pt-3">
+                        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i>Applica</button>
+                        <a href="{{ route('soci.index') }}" class="btn btn-sm btn-outline-secondary">Azzera filtri</a>
                     </div>
                 </div>
             </form>
-
-            {{-- Preset filtri salvati (spec §11) --}}
-            <hr class="my-2">
-            <div class="d-flex gap-2 flex-wrap align-items-center">
-                <form method="GET" action="{{ route('soci.index') }}" class="d-flex gap-2 align-items-center">
-                    <label class="small text-muted" for="preset_id">Preset:</label>
-                    <select class="form-select form-select-sm" id="preset_id" name="preset_id" onchange="this.form.submit()" style="width:auto">
-                        <option value="">— Nessuno —</option>
-                        @foreach ($presets as $preset)
-                            <option value="{{ $preset->id }}" @selected($presetCorrente?->id === $preset->id)>
-                                {{ $preset->name }}{{ $preset->isCondiviso() ? ' (condiviso)' : '' }}
-                            </option>
-                        @endforeach
-                    </select>
-                </form>
-                <form method="POST" action="{{ route('soci.filtri.store') }}" class="d-flex gap-2 align-items-center">
-                    @csrf
-                    @foreach ($filtri as $chiave => $valore)
-                        @if (is_array($valore))
-                            @foreach ($valore as $v)
-                                <input type="hidden" name="{{ $chiave }}[]" value="{{ $v }}">
+            <div class="collapse filtri-avanzati {{ $avanzatiAttivi > 0 || $filtri['status'] !== 'all' ? 'show' : '' }}" id="filtriPreset">
+                {{-- Preset filtri salvati (spec §11) --}}
+                <div class="preset-row">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <form method="GET" action="{{ route('soci.index') }}" class="d-flex gap-2 align-items-center">
+                        <label class="small text-muted" for="preset_id">Preset:</label>
+                        <select class="form-select form-select-sm" id="preset_id" name="preset_id" onchange="this.form.submit()" style="width:auto">
+                            <option value="">— Nessuno —</option>
+                            @foreach ($presets as $preset)
+                                <option value="{{ $preset->id }}" @selected($presetCorrente?->id === $preset->id)>
+                                    {{ $preset->name }}{{ $preset->isCondiviso() ? ' (condiviso)' : '' }}
+                                </option>
                             @endforeach
-                        @else
-                            <input type="hidden" name="{{ $chiave }}" value="{{ $valore }}">
-                        @endif
-                    @endforeach
-                    <input type="text" class="form-control form-control-sm" name="preset_name" placeholder="Nome preset" required style="width:160px">
-                    <div class="form-check form-check-inline small">
-                        <input class="form-check-input" type="checkbox" name="condiviso" id="condiviso" value="1">
-                        <label class="form-check-label" for="condiviso">Condiviso</label>
-                    </div>
-                    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-bookmark-plus"></i> Salva filtri</button>
-                </form>
-                @if ($presetCorrente)
-                    <form method="POST" action="{{ route('soci.filtri.destroy', $presetCorrente) }}"
-                          onsubmit="return confirm('Eliminare il preset «{{ $presetCorrente->name }}»?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-bookmark-x"></i> Elimina preset</button>
+                        </select>
                     </form>
-                @endif
+                    <form method="POST" action="{{ route('soci.filtri.store') }}" class="d-flex gap-2 align-items-center">
+                        @csrf
+                        @foreach ($filtri as $chiave => $valore)
+                            @if (is_array($valore))
+                                @foreach ($valore as $v)
+                                    <input type="hidden" name="{{ $chiave }}[]" value="{{ $v }}">
+                                @endforeach
+                            @else
+                                <input type="hidden" name="{{ $chiave }}" value="{{ $valore }}">
+                            @endif
+                        @endforeach
+                        <input type="text" class="form-control form-control-sm" name="preset_name" placeholder="Nome preset" required style="width:160px">
+                        <div class="form-check form-check-inline small">
+                            <input class="form-check-input" type="checkbox" name="condiviso" id="condiviso" value="1">
+                            <label class="form-check-label" for="condiviso">Condiviso</label>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-bookmark-plus"></i> Salva filtri</button>
+                    </form>
+                    @if ($presetCorrente)
+                        <form method="POST" action="{{ route('soci.filtri.destroy', $presetCorrente) }}"
+                              onsubmit="return confirm('Eliminare il preset «{{ $presetCorrente->name }}»?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-bookmark-x"></i> Elimina preset</button>
+                        </form>
+                    @endif
+                </div>
+                </div>
             </div>
         </div>
-    </div>
 
     {{-- Barra azioni in blocco (f.2 piano "Gestione 2" — modulo operativita) --}}
     @includeIf('operativita._azioni-blocco')
 
     <div id="sociResults">
         @include('soci.partials.lista', ['soci' => $soci, 'associazione' => $associazione, 'isSuperAdmin' => $isSuperAdmin])
+    </div>
     </div>
 
     {{-- Modal conferma pagamento (spec §2.4) --}}

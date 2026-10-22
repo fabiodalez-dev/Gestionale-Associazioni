@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Struttura\UpdateModuloIscrizioneRequest;
 use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
+use App\Models\RichiestaIscrizione;
 use App\Services\Iscrizioni\FormIscrizioneService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -48,9 +49,7 @@ class ModuloIscrizioneController extends Controller
                 'obbligatorio' => false,
             ]);
 
-        $config = is_array($associazione->iscrizione_form_config)
-            ? $associazione->iscrizione_form_config
-            : [];
+        $config = $associazione->iscrizioni()->iscrizione_form_config ?? [];
 
         return view('struttura.modulo-iscrizione.edit', [
             'associazione' => $associazione,
@@ -65,6 +64,11 @@ class ModuloIscrizioneController extends Controller
             'idSelezionati' => $schema['campi_personalizzati']->pluck('id')->all(),
             // Anteprima del form pubblico (rotta del modulo frontend: /a/{slug}/iscriviti)
             'urlAnteprima' => url('/a/'.$associazione->slug.'/iscriviti'),
+            'statistiche' => [
+                'invii' => RichiestaIscrizione::query()->where('created_at', '>=', now()->subDays(30))->count(),
+                'approvate' => RichiestaIscrizione::query()->where('created_at', '>=', now()->subDays(30))->where('stato', RichiestaIscrizione::STATO_APPROVATA)->count(),
+                'in_attesa' => RichiestaIscrizione::query()->inAttesa()->count(),
+            ],
         ]);
     }
 
@@ -73,7 +77,7 @@ class ModuloIscrizioneController extends Controller
         $associazione = $request->associazioneCorrente();
         $dati = $request->validated();
 
-        $associazione->update([
+        $associazione->iscrizioni()->aggiorna([
             'iscrizioni_socio_aperte' => $request->boolean('iscrizioni_socio_aperte'),
             'modalita_iscrizione' => $dati['modalita_iscrizione'],
             'iscrizione_form_config' => [

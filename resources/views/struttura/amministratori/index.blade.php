@@ -89,66 +89,10 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label" for="adm_nome">Nome *</label>
-                            <input type="text" class="form-control" id="adm_nome" name="nome" required maxlength="100"
-                                   value="{{ old('nome', $editUtente?->nome) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="adm_cognome">Cognome</label>
-                            <input type="text" class="form-control" id="adm_cognome" name="cognome" maxlength="100"
-                                   value="{{ old('cognome', $editUtente?->cognome) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="adm_email">Email *</label>
-                            <input type="email" class="form-control" id="adm_email" name="email" required
-                                   value="{{ old('email', $editUtente?->email) }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="adm_ruolo">Ruolo *</label>
-                            <select class="form-select" id="adm_ruolo" name="ruolo" required>
-                                @foreach ($ruoli as $ruolo)
-                                    <option value="{{ $ruolo }}" @selected(old('ruolo', $editUtente?->ruolo) === $ruolo)>
-                                        {{ ['super_admin' => 'Super Admin', 'admin_associazione' => 'Admin Associazione', 'operatore' => 'Operatore'][$ruolo] ?? $ruolo }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6" id="campoAssociazione">
-                            <label class="form-label" for="adm_associazione">Associazione *</label>
-                            <select class="form-select" id="adm_associazione" name="associazione_id">
-                                <option value="">-- Seleziona --</option>
-                                @foreach ($associazioni as $assoc)
-                                    <option value="{{ $assoc->id }}" @selected(old('associazione_id', $editUtente?->associazione_id) === $assoc->id)>{{ $assoc->nome }}</option>
-                                @endforeach
-                            </select>
-                            <div class="form-text">Obbligatoria per admin di associazione e operatori; i super admin non sono legati a un'associazione.</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="adm_password">Password {{ $editUtente ? '(vuota = invariata)' : '' }}</label>
-                            <input type="password" class="form-control" id="adm_password" name="password" minlength="8" autocomplete="new-password">
-                        </div>
-                        @unless ($editUtente)
-                            <div class="col-12">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="invia_invito" name="invia_invito" value="1" @checked(old('invia_invito'))>
-                                    <label class="form-check-label" for="invia_invito">
-                                        Invia invito via email (l'utente imposterà la propria password — la password qui sopra diventa facoltativa)
-                                    </label>
-                                </div>
-                            </div>
-                        @else
-                            <div class="col-12">
-                                <div class="form-check form-switch">
-                                    <input type="hidden" name="attivo" value="0">
-                                    <input class="form-check-input" type="checkbox" id="adm_attivo" name="attivo" value="1"
-                                           @checked(old('attivo', $editUtente->attivo))>
-                                    <label class="form-check-label" for="adm_attivo">Account attivo</label>
-                                </div>
-                            </div>
-                        @endunless
-                    </div>
+                    @include('formello.campi', ['form' => new \App\Forms\AmministratoreForm($editUtente ?? \App\Models\Utente::class, [
+                        'ruoli' => $ruoli,
+                        'associazioni' => $associazioni->pluck('nome', 'id')->all(),
+                    ])])
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
@@ -168,9 +112,9 @@ document.addEventListener('DOMContentLoaded', function () {
     @endif
 
     // Il campo associazione è visibile/required solo per ruoli diversi da super_admin (spec §3.3)
-    var ruolo = document.getElementById('adm_ruolo');
-    var campoAssoc = document.getElementById('campoAssociazione');
-    var selectAssoc = document.getElementById('adm_associazione');
+    var ruolo = document.getElementById('ruolo');
+    var campoAssoc = document.querySelector('[data-formello-field="associazione_id"]');
+    var selectAssoc = document.getElementById('associazione_id');
 
     function aggiornaCampoAssociazione() {
         var isSuper = ruolo.value === 'super_admin';

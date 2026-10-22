@@ -72,7 +72,7 @@ class EmailsSendReminders extends Command
             return 0;
         }
 
-        $giorni = (int) ($associazione->giorni_notifica_scadenza ?: 30);
+        $giorni = $associazione->tesseramento()->giorni_notifica_scadenza;
         $deadline = today()->addDays($giorni);
 
         $tessere = Tessera::forAssociazione($associazione->id)

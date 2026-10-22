@@ -13,6 +13,8 @@
         'campi-obbligatori' => ['bi-ui-checks', 'Campi obbligatori'],
         'tessera-template' => ['bi-postcard', 'Template tessera'],
         'pagamenti' => ['bi-credit-card', 'Pagamenti online'],
+        'google-calendar' => ['bi-calendar-week', 'Google Calendar'],
+        'moduli' => ['bi-palette', 'Moduli pubblici'],
         'comunicazione' => ['bi-megaphone', 'Comunicazione'],
         'invito' => ['bi-qr-code', 'Invita al mini-sito'],
     ];
@@ -110,8 +112,8 @@
             <div class="card">
                 <div class="card-header"><i class="bi bi-image me-2"></i>Logo associazione</div>
                 <div class="card-body">
-                    @if ($associazione->logo_url)
-                        <p><img src="{{ asset('storage/'.$associazione->logo_url) }}" alt="Logo {{ $associazione->nome }}" style="max-height: 120px;" class="rounded border p-2"></p>
+                    @if ($associazione->logoUrl())
+                        <p><img src="{{ $associazione->logoUrl('miniatura') }}" alt="Logo {{ $associazione->nome }}" style="max-height: 120px;" class="rounded border p-2"></p>
                     @else
                         <p class="text-muted">Nessun logo caricato.</p>
                     @endif
@@ -234,14 +236,14 @@
                             <div class="col-md-6">
                                 <label class="form-label" for="cfg_scadenza">Tipo scadenza default</label>
                                 <select class="form-select" id="cfg_scadenza" name="tipo_scadenza_default">
-                                    <option value="solare" @selected(old('tipo_scadenza_default', $associazione->tipo_scadenza_default) === 'solare')>Anno Solare (31 Dicembre)</option>
-                                    <option value="annuale" @selected(old('tipo_scadenza_default', $associazione->tipo_scadenza_default) === 'annuale')>Annuale (365 giorni da iscrizione)</option>
+                                    <option value="solare" @selected(old('tipo_scadenza_default', $associazione->tesseramento()->tipo_scadenza_default) === 'solare')>Anno Solare (31 Dicembre)</option>
+                                    <option value="annuale" @selected(old('tipo_scadenza_default', $associazione->tesseramento()->tipo_scadenza_default) === 'annuale')>Annuale (365 giorni da iscrizione)</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="cfg_giorni">Giorni di preavviso notifiche scadenza</label>
                                 <input type="number" class="form-control" id="cfg_giorni" name="giorni_notifica_scadenza" min="1" max="365"
-                                       value="{{ old('giorni_notifica_scadenza', $associazione->giorni_notifica_scadenza) }}">
+                                       value="{{ old('giorni_notifica_scadenza', $associazione->tesseramento()->giorni_notifica_scadenza) }}">
                             </div>
                         </div>
                         <button class="btn btn-primary mt-3" type="submit">Salva tesseramento</button>
@@ -259,7 +261,7 @@
                         @csrf
                         <div class="mb-2">
                             <textarea class="form-control" name="template_email_scadenza" rows="6"
-                                      placeholder="Ciao {NOME_SOCIO}, ti ricordiamo che la tua quota scade il {DATA_SCADENZA}.">{{ old('template_email_scadenza', $associazione->template_email_scadenza) }}</textarea>
+                                      placeholder="Ciao {NOME_SOCIO}, ti ricordiamo che la tua quota scade il {DATA_SCADENZA}.">{{ old('template_email_scadenza', $associazione->tesseramento()->template_email_scadenza) }}</textarea>
                         </div>
                         <p class="text-muted small">
                             Placeholder disponibili: <code>{NOME_SOCIO}</code>, <code>{COGNOME_SOCIO}</code>, <code>{DATA_SCADENZA}</code>, <code>{IMPORTO_QUOTA}</code>
@@ -278,14 +280,32 @@
                     <p class="text-muted small">
                         Il testo viene mostrato sulla pagina pubblica
                         <a href="{{ route('privacy-policy.show', ['associazione' => $associazione->id]) }}" target="_blank" rel="noopener">privacy policy</a>
-                        e linkato dal form di pre-iscrizione. L'HTML viene sanitizzato al salvataggio
+                        e linkato dai moduli di pre-iscrizione e iscrizione. L'HTML viene sanitizzato al salvataggio
                         (consentiti: titoli, grassetti, liste, link, tabelle).
                     </p>
+                    @if (blank($associazione->privacy_policy_html))
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>Finché non scrivi un testo, la pagina pubblica mostra un'<strong>informativa predefinita</strong> compilata con i dati dell'associazione e i consensi dei moduli. Puoi inserirla qui sotto come base e adattarla.
+                        </div>
+                    @endif
                     <form method="POST" action="{{ route('configurazioni.privacy-policy') }}">
                         @csrf
                         <textarea class="form-control" name="privacy_policy_html" id="privacy_policy_html" rows="14">{{ old('privacy_policy_html', $associazione->privacy_policy_html) }}</textarea>
-                        <button class="btn btn-primary mt-3" type="submit">Salva privacy policy</button>
+                        <template id="informativaPredefinita">@include('privacy.informativa-predefinita', ['associazione' => $associazione])</template>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button class="btn btn-primary" type="submit">Salva privacy policy</button>
+                            <button class="btn btn-outline-secondary" type="button" id="btnInformativaPredefinita">
+                                <i class="bi bi-file-earmark-text me-1"></i>Inserisci il modello predefinito
+                            </button>
+                        </div>
                     </form>
+                    <script>
+                        document.getElementById('btnInformativaPredefinita')?.addEventListener('click', function () {
+                            var area = document.getElementById('privacy_policy_html');
+                            if (area.value.trim() !== '' && ! confirm('Sostituire il testo attuale con il modello predefinito?')) return;
+                            area.value = document.getElementById('informativaPredefinita').innerHTML.trim();
+                        });
+                    </script>
                 </div>
             </div>
         @endif
@@ -481,6 +501,14 @@
         @endif
 
         {{-- ============ INVITA AL MINI-SITO (f.22) ============ --}}
+        @if ($section === 'moduli')
+            @include('struttura.configurazioni._moduli')
+        @endif
+
+        @if ($section === 'google-calendar')
+            @include('struttura.configurazioni._google-calendar')
+        @endif
+
         @if ($section === 'invito')
             @php
                 $linkIscrizione = \Illuminate\Support\Facades\Route::has('pubblico.iscriviti')

@@ -232,4 +232,7 @@
         </div>
     </div>
 </div>
+<div class="row mt-4"><div class="col-lg-8">
+    @include('allegati._elenco', ['tipo' => 'progetti', 'modello' => $progetto])
+</div></div>
 @endsection

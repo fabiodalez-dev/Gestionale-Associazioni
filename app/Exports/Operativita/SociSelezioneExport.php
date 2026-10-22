@@ -5,6 +5,7 @@ namespace App\Exports\Operativita;
 use App\Exports\SociExport;
 use App\Models\Socio;
 use App\Services\Soci\SociFilter;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -28,7 +29,7 @@ class SociSelezioneExport implements FromQuery, ShouldAutoSize, WithHeadings, Wi
         $this->base = new SociExport(new SociFilter([]));
     }
 
-    public function query()
+    public function query(): Builder
     {
         return Socio::query()
             ->with(['tipoSocio', 'categoriaSocio', 'sede', 'tags', 'ultimaTessera'])
@@ -49,7 +50,7 @@ class SociSelezioneExport implements FromQuery, ShouldAutoSize, WithHeadings, Wi
      * @param  Socio  $socio
      * @return list<mixed>
      */
-    public function map($socio): array
+    public function map(mixed $socio): array
     {
         return $this->base->map($socio);
     }

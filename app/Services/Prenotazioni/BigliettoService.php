@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\Prenotazione;
+use App\Services\Struttura\LogoAssociazione;
 use App\Services\Tessere\TesseraQrService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as PdfBuilder;
@@ -97,33 +98,9 @@ class BigliettoService
             ->setOption('defaultFont', 'DejaVu Sans');
     }
 
-    /**
-     * Tag <img> del logo per il PDF: URL remoto così com'è, path locale
-     * convertito in data URI (con protezione path traversal confinata a
-     * public/), come TesseraPdfRenderer.
-     */
+    /** Tag <img> del logo per dompdf (LogoAssociazione). */
     private function logoImg(Associazione $associazione): string
     {
-        $logo = $associazione->logo_url;
-
-        if (empty($logo)) {
-            return '';
-        }
-
-        if (preg_match('~^https?://~i', $logo)) {
-            return '<img src="'.e($logo).'" style="height:48px; width:auto;">';
-        }
-
-        $root = realpath(public_path());
-        $path = realpath(public_path(ltrim($logo, '/')));
-
-        if ($root === false || $path === false || ! is_file($path) || ! str_starts_with($path, $root)) {
-            return '';
-        }
-
-        $mime = mime_content_type($path) ?: 'image/png';
-        $data = base64_encode((string) file_get_contents($path));
-
-        return '<img src="data:'.e($mime).';base64,'.$data.'" style="height:48px; width:auto;">';
+        return app(LogoAssociazione::class)->imgPdf($associazione);
     }
 }

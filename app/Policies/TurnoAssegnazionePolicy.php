@@ -27,6 +27,6 @@ class TurnoAssegnazionePolicy
 
     public function delete(Utente $utente, TurnoAssegnazione $assegnazione): bool
     {
-        return $this->allowed($utente, 'soci.update', self::RUOLI);
+        return $this->allowed($utente, 'volontari.update', self::RUOLI);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\AreaSoci;
 
 use App\Models\Socio;
+use App\Support\LimiteAccessi;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -62,7 +63,7 @@ class LoginSocioRequest extends FormRequest
             ->first();
 
         if ($socio === null || ! Hash::check($this->string('password')->toString(), (string) $socio->password_hash)) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), LimiteAccessi::secondiBlocco());
 
             throw ValidationException::withMessages([
                 'email' => 'Credenziali non valide.',
@@ -94,6 +95,6 @@ class LoginSocioRequest extends FormRequest
 
     public function throttleKey(): string
     {
-        return 'area-soci-login|'.Str::transliterate(Str::lower($this->string('email')->toString()).'|'.$this->ip());
+        return LimiteAccessi::chiave('area-soci-login|'.Str::transliterate(Str::lower($this->string('email')->toString()).'|'.$this->ip()));
     }
 }

@@ -8,6 +8,7 @@ use App\Http\Controllers\AreaSoci\ProfiloController;
 use App\Http\Controllers\AreaSoci\QuoteController;
 use App\Http\Controllers\AreaSoci\SetPasswordController;
 use App\Http\Controllers\AreaSoci\TessereController;
+use App\Http\Controllers\Privacy\DatiPersonaliController;
 use App\Http\Middleware\AreaSoci\AutenticaSocio;
 use App\Http\Middleware\AreaSoci\EnsureSocioValido;
 use Illuminate\Support\Facades\Route;
@@ -81,6 +82,14 @@ Route::prefix('area-soci')->name('area-soci.')->group(function () {
 
         Route::get('/tessere', [TessereController::class, 'index'])->name('tessere');
         Route::get('/tessere/{tessera}/pdf', [TessereController::class, 'pdf'])->name('tessere.pdf');
+
+        // Archivio dei dati personali (GDPR): richiesta (email con link) e download firmato
+        Route::post('/dati-personali', [DatiPersonaliController::class, 'richiediSocio'])
+            ->middleware('throttle:5,1')
+            ->name('dati-personali.richiedi');
+        Route::get('/dati-personali/{file}', [DatiPersonaliController::class, 'scaricaSocio'])
+            ->middleware('signed:relative')
+            ->name('dati-personali.scarica');
 
         Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     });

@@ -4,6 +4,7 @@ namespace App\Exports\AnagraficaPro;
 
 use App\Models\Associazione;
 use App\Models\Quota;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -25,7 +26,7 @@ class QuoteAnnoSheet implements FromQuery, ShouldAutoSize, WithHeadings, WithMap
         return 'Quote '.$this->anno;
     }
 
-    public function query()
+    public function query(): Builder
     {
         return Quota::allTenants()
             ->where('associazione_id', $this->associazione->id)
@@ -49,7 +50,7 @@ class QuoteAnnoSheet implements FromQuery, ShouldAutoSize, WithHeadings, WithMap
      * @param  Quota  $quota
      * @return list<mixed>
      */
-    public function map($quota): array
+    public function map(mixed $quota): array
     {
         return [
             $quota->anno,

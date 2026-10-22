@@ -3,9 +3,9 @@
 namespace App\Http\Requests\FrontendPubblico;
 
 use App\Models\Associazione;
+use App\Support\PasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 /**
  * Registrazione di un account dal frontend pubblico (/a/{slug}/registrati).
@@ -38,7 +38,7 @@ class RegistrazioneAccountRequest extends FormRequest
                     ->where('associazione_id', $this->associazioneCorrente()?->id),
             ],
             'telefono' => ['nullable', 'string', 'max:30'],
-            'password' => ['required', 'string', 'confirmed', Password::min(10)->letters()->numbers()],
+            'password' => ['required', 'confirmed', ...PasswordPolicy::rules([$this->input('email'), $this->input('nome'), $this->input('cognome')])],
             'privacy' => ['accepted'],
         ];
     }
@@ -51,6 +51,7 @@ class RegistrazioneAccountRequest extends FormRequest
         return [
             'email.unique' => 'Esiste già un account registrato con questo indirizzo email.',
             'privacy.accepted' => 'Devi accettare l\'informativa sulla privacy per registrarti.',
+            ...PasswordPolicy::messages(),
         ];
     }
 

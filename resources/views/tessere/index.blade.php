@@ -17,6 +17,9 @@
            class="btn btn-outline-secondary" target="_blank" rel="noopener">
             <i class="bi bi-printer me-1"></i>Stampa PDF
         </a>
+        <a href="{{ route('tessere.export', ['anno' => $anno, 'search' => $search, 'stato' => $stato]) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-download me-1"></i>CSV
+        </a>
         <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#generaMassivoModal">
             <i class="bi bi-stack me-1"></i>Genera Tessere {{ $annoCorrente }}
         </button>
@@ -213,7 +216,7 @@
     var aggregati = @json($aggregati);
     var indexUrl = @json(route('tessere.index'));
     var storeUrl = @json(route('tessere.store'));
-    var brand = '#FF7B11';
+    var brand = '#0D9488';
 
     // ---- Grafici ----
     if (aggregati.length && window.Chart) {
@@ -225,7 +228,7 @@
         });
         new Chart(document.getElementById('chartRicavi'), {
             type: 'bar',
-            data: { labels: labels, datasets: [{ label: 'Ricavi (€)', data: aggregati.map(function(r) { return r.ricavi; }), backgroundColor: '#003366' }] },
+            data: { labels: labels, datasets: [{ label: 'Ricavi (€)', data: aggregati.map(function(r) { return r.ricavi; }), backgroundColor: '#A7DCD5' }] },
             options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
         });
     }

@@ -35,9 +35,9 @@ class CampagnaRinnoviTest extends RinnoviTestCase
         $this->configuraTenant();
         $anno = (int) now()->year;
 
-        $daRinnovare = $this->creaSocio(['cognome' => 'Rossi', 'nome' => 'Mario']);
+        $daRinnovare = $this->creaSocio(['cognome' => 'Darinnovare', 'nome' => 'Mario']);
 
-        $giaRinnovato = $this->creaSocio(['cognome' => 'Verdi', 'nome' => 'Anna']);
+        $giaRinnovato = $this->creaSocio(['cognome' => 'Giarinnovato', 'nome' => 'Anna']);
         Tessera::factory()->create([
             'socio_id' => $giaRinnovato->id,
             'associazione_id' => $this->associazione->id,
@@ -56,8 +56,8 @@ class CampagnaRinnoviTest extends RinnoviTestCase
 
         $response->assertOk();
         $response->assertSee('Campagna rinnovi '.$anno);
-        $response->assertSee('Rossi');
-        $response->assertDontSee('Verdi');
+        $response->assertSee('Darinnovare');
+        $response->assertDontSee('Giarinnovato');
         $response->assertDontSee('Sospesini');
         $response->assertDontSee('Altrotenant');
     }

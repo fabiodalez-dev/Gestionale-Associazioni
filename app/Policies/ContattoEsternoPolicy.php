@@ -26,29 +26,29 @@ class ContattoEsternoPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.view', self::FALLBACK);
+        return $this->allowed($utente, 'relazioni.view', self::FALLBACK);
     }
 
     public function view(Utente $utente, ContattoEsterno $contatto): bool
     {
-        return $this->allowed($utente, 'struttura.view', self::FALLBACK)
+        return $this->allowed($utente, 'relazioni.view', self::FALLBACK)
             && $this->stessoTenant($utente, $contatto);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.update', self::FALLBACK);
+        return $this->allowed($utente, 'relazioni.update', self::FALLBACK);
     }
 
     public function update(Utente $utente, ContattoEsterno $contatto): bool
     {
-        return $this->allowed($utente, 'struttura.update', self::FALLBACK)
+        return $this->allowed($utente, 'relazioni.update', self::FALLBACK)
             && $this->stessoTenant($utente, $contatto);
     }
 
     public function delete(Utente $utente, ContattoEsterno $contatto): bool
     {
-        return $this->allowed($utente, 'struttura.update', self::FALLBACK)
+        return $this->allowed($utente, 'relazioni.update', self::FALLBACK)
             && $this->stessoTenant($utente, $contatto);
     }
 

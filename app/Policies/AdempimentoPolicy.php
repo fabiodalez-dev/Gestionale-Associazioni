@@ -39,18 +39,18 @@ class AdempimentoPolicy
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'struttura.create', self::FALLBACK);
+        return $this->allowed($utente, 'riunioni.create', self::FALLBACK);
     }
 
     public function update(Utente $utente, Adempimento $adempimento): bool
     {
-        return $this->allowed($utente, 'struttura.update', self::FALLBACK)
+        return $this->allowed($utente, 'riunioni.update', self::FALLBACK)
             && $this->stessoTenant($utente, $adempimento);
     }
 
     public function delete(Utente $utente, Adempimento $adempimento): bool
     {
-        return $this->allowed($utente, 'struttura.delete', self::FALLBACK)
+        return $this->allowed($utente, 'riunioni.delete', self::FALLBACK)
             && $this->stessoTenant($utente, $adempimento);
     }
 

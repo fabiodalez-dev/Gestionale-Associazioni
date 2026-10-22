@@ -6,12 +6,12 @@
     <style>
         * { font-family: DejaVu Sans, sans-serif; }
         body { font-size: 12px; color: #222; }
-        .header { border-bottom: 3px solid #FF7B11; padding-bottom: 10px; margin-bottom: 24px; }
+        .header { border-bottom: 3px solid #0D9488; padding-bottom: 10px; margin-bottom: 24px; }
         .header h1 { font-size: 16px; margin: 0 0 4px 0; }
         .header .assoc-info { font-size: 10px; color: #666; }
         h2.titolo { font-size: 18px; text-align: center; margin: 10px 0 18px 0; }
         .intro { font-size: 12px; line-height: 1.6; margin-bottom: 16px; }
-        .totale { font-size: 14px; font-weight: bold; margin: 14px 0; padding: 8px; border: 1px solid #FF7B11; background: #fff6ef; text-align: center; }
+        .totale { font-size: 14px; font-weight: bold; margin: 14px 0; padding: 8px; border: 1px solid #0D9488; background: #effaf8; text-align: center; }
         table.voci { width: 100%; border-collapse: collapse; margin-top: 10px; }
         table.voci th, table.voci td { border: 1px solid #ccc; padding: 5px 8px; font-size: 11px; text-align: left; }
         table.voci th { background: #f2f2f2; }

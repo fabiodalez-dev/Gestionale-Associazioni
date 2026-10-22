@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\DocumentiVerbaliScadenze\SalvaScadenzaRequest;
 use App\Models\Scadenza;
 use App\Models\Utente;
+use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -148,10 +149,10 @@ class ScadenzaController extends Controller
             $out = fopen('php://output', 'w');
             // BOM UTF-8 per compatibilità Excel
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Titolo', 'Descrizione', 'Data Scadenza', 'Tipo', 'Priorità', 'Stato', 'Assegnato a', 'Promemoria (giorni)'], ';');
+            fputcsv($out, CellaSicura::riga(['Titolo', 'Descrizione', 'Data Scadenza', 'Tipo', 'Priorità', 'Stato', 'Assegnato a', 'Promemoria (giorni)']), ';');
 
             foreach ($scadenze as $scadenza) {
-                fputcsv($out, [
+                fputcsv($out, CellaSicura::riga([
                     $scadenza->titolo,
                     (string) $scadenza->descrizione,
                     $scadenza->data_scadenza->format('d/m/Y'),
@@ -160,7 +161,7 @@ class ScadenzaController extends Controller
                     $scadenza->stato,
                     $scadenza->assegnatoA->nome_completo ?? 'Non assegnato',
                     $scadenza->promemoria_giorni,
-                ], ';');
+                ]), ';');
             }
 
             fclose($out);

@@ -24,29 +24,29 @@ class PrenotazioneSpazioPolicy
 
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'eventi.view', self::FALLBACK);
+        return $this->allowed($utente, 'spazi.view', self::FALLBACK);
     }
 
     public function view(Utente $utente, PrenotazioneSpazio $prenotazione): bool
     {
-        return $this->allowed($utente, 'eventi.view', self::FALLBACK)
+        return $this->allowed($utente, 'spazi.view', self::FALLBACK)
             && $this->stessoTenant($utente, $prenotazione);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'eventi.create', self::FALLBACK);
+        return $this->allowed($utente, 'spazi.create', self::FALLBACK);
     }
 
     public function update(Utente $utente, PrenotazioneSpazio $prenotazione): bool
     {
-        return $this->allowed($utente, 'eventi.update', self::FALLBACK)
+        return $this->allowed($utente, 'spazi.update', self::FALLBACK)
             && $this->stessoTenant($utente, $prenotazione);
     }
 
     public function delete(Utente $utente, PrenotazioneSpazio $prenotazione): bool
     {
-        return $this->allowed($utente, 'eventi.delete', self::FALLBACK)
+        return $this->allowed($utente, 'spazi.delete', self::FALLBACK)
             && $this->stessoTenant($utente, $prenotazione);
     }
 

@@ -65,7 +65,7 @@ test.describe('Catalogo pubblico e autenticazione account', () => {
         await page.getByRole('button', { name: /registrati/i }).click();
 
         await expect(page.locator('#password')).toHaveClass(/is-invalid/);
-        await expect(page.locator('#password ~ .invalid-feedback')).toContainText(/10 caratteri/i);
+        await expect(page.locator('[data-formello-field="password"] .invalid-feedback')).toContainText(/10 caratteri/i);
         await expect(
             page.getByText("Devi accettare l'informativa sulla privacy per registrarti.").first(),
         ).toBeVisible();

@@ -121,12 +121,12 @@
                 {
                     label: 'Entrate',
                     data: JSON.parse(canvas.dataset.entrate),
-                    backgroundColor: 'rgba(25, 135, 84, .7)'
+                    backgroundColor: '#22A06B'
                 },
                 {
                     label: 'Uscite',
                     data: JSON.parse(canvas.dataset.uscite),
-                    backgroundColor: 'rgba(220, 53, 69, .7)'
+                    backgroundColor: '#E5484D'
                 }
             ]
         },

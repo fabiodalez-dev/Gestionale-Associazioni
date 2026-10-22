@@ -4,6 +4,7 @@ namespace App\Exports\AnagraficaPro;
 
 use App\Models\Associazione;
 use App\Models\Socio;
+use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -22,7 +23,7 @@ class SociSheet implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping,
         return 'Soci';
     }
 
-    public function query()
+    public function query(): Builder
     {
         return Socio::forAssociazione($this->associazione->id)
             ->with(['tipoSocio', 'categoriaSocio', 'sede', 'ultimaTessera'])
@@ -47,7 +48,7 @@ class SociSheet implements FromQuery, ShouldAutoSize, WithHeadings, WithMapping,
      * @param  Socio  $socio
      * @return list<mixed>
      */
-    public function map($socio): array
+    public function map(mixed $socio): array
     {
         return [
             $socio->numero_socio,

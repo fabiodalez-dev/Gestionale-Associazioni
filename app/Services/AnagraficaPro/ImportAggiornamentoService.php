@@ -162,7 +162,10 @@ class ImportAggiornamentoService
     }
 
     /**
-     * @return Collection<int, Collection<string, mixed>>
+     * Righe del primo foglio indicizzate per intestazione; le colonne senza
+     * intestazione restano con chiave numerica.
+     *
+     * @return Collection<int, Collection<int|string, mixed>>
      */
     private function leggiRighe(string $percorsoAssoluto): Collection
     {
@@ -272,7 +275,7 @@ class ImportAggiornamentoService
     }
 
     /**
-     * @param  Collection<string, mixed>|array<string, mixed>  $riga
+     * @param  Collection<int|string, mixed>|array<int|string, mixed>  $riga  riga indicizzata per intestazione
      * @return array<string, mixed>
      */
     private function normalizza($riga): array

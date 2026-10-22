@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FrontendPubblico;
 
+use App\Forms\RegistrazioneAccountForm;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FrontendPubblico\RegistrazioneAccountRequest;
 use App\Models\Account;
@@ -25,7 +26,10 @@ class RegistrazioneController extends Controller
             return redirect()->route('pubblico.home.show', $associazione->slug);
         }
 
-        return view('pubblico.auth.registrazione', ['associazione' => $associazione]);
+        return view('pubblico.auth.registrazione', [
+            'associazione' => $associazione,
+            'form' => new RegistrazioneAccountForm(Account::class, ['associazione' => $associazione]),
+        ]);
     }
 
     public function store(RegistrazioneAccountRequest $request, Associazione $associazione): RedirectResponse

@@ -14,7 +14,7 @@
             Clicca sul pulsante qui sotto per scegliere la tua password:
         </p>
         <p style="text-align: center; margin: 28px 0;">
-            <a href="{{ $url }}" style="background: #FF7B11; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+            <a href="{{ $url }}" style="background: #0D9488; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
                 Imposta la password
             </a>
         </p>

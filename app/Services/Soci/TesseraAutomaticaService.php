@@ -38,7 +38,7 @@ class TesseraAutomaticaService
         }
 
         $associazione = $socio->associazione;
-        $tipoScadenza = $associazione?->tipo_scadenza_default ?: Tessera::TIPO_SCADENZA_SOLARE;
+        $tipoScadenza = $associazione?->tesseramento()->tipo_scadenza_default ?? Tessera::TIPO_SCADENZA_SOLARE;
 
         if (! in_array($tipoScadenza, [Tessera::TIPO_SCADENZA_SOLARE, Tessera::TIPO_SCADENZA_ANNUALE], true)) {
             $tipoScadenza = Tessera::TIPO_SCADENZA_SOLARE;

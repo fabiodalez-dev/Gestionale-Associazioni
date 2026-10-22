@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -20,6 +21,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Turno extends Model
 {
+    use NelPerimetroSedeTramite;
+
+    /** Perimetro tramite l'evento; i turni senza evento sono di tutta l'associazione. */
+    public const PERIMETRO_TRAMITE = 'evento';
+
+    public const PERIMETRO_FACOLTATIVO = true;
+
     use BelongsToAssociazione;
     use HasDefaultActivityLog;
     use HasFactory;

@@ -28,6 +28,16 @@ class InstallerTest extends TestCase
             'installer.lock_file' => $this->lockFile,
             'installer.in_progress_file' => $this->inCorsoFile,
         ]);
+
+        // Il .env di prova (INSTALLER_ENV_FILE in phpunit.xml) deve esistere:
+        // altrimenti il middleware lo crea al primo passaggio e risponde con
+        // un redirect alla stessa pagina, e il primo test della suite su una
+        // macchina pulita fallirebbe. Qui serve un file già presente.
+        $env = (string) config('installer.env_file');
+        if (! file_exists($env)) {
+            File::ensureDirectoryExists(dirname($env));
+            File::copy(base_path('.env.example'), $env);
+        }
     }
 
     protected function tearDown(): void

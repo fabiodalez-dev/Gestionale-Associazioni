@@ -12,7 +12,7 @@ use Spatie\Activitylog\Support\ActivityLogStatus;
  * Importa i dati dal database della vecchia app procedurale (`associazione_soci_saas`).
  *
  * Lo schema legacy e quello nuovo condividono le stesse tabelle e le stesse
- * chiavi UUID CHAR(36) (fonte di verità: docs/schema-reale-mysql.sql), quindi
+ * chiavi UUID CHAR(36) (stesso schema della vecchia app), quindi
  * l'import è una copia riga-per-riga limitata alle colonne comuni alle due
  * tabelle (le colonne nuove restano ai loro default, quelle rimosse vengono ignorate).
  *

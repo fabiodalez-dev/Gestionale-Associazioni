@@ -1111,7 +1111,7 @@ class Percorso02_TesseramentoQuoteTest extends TestCase
         $csv = implode("\n", [
             'nome,cognome,email,data_nascita',
             'Luca,Moretti,luca.moretti@example.com,1988-02-14',
-            'Giulia,Ferrari,g.ferrari@gmail.com,01/05/1990',               // stessa persona con un'altra email
+            'Giulia,Ferrari,g.ferrari@esempio.test,01/05/1990',               // stessa persona con un'altra email
             'Paolo,Conti,marco.esposito@example.com,1975-11-03',            // email già di Marco: riga scartata
         ]);
 
@@ -1139,7 +1139,7 @@ class Percorso02_TesseramentoQuoteTest extends TestCase
         /** @var Socio $luca */
         $luca = Socio::query()->where('email', 'luca.moretti@example.com')->firstOrFail();
         /** @var Socio $giuliaDoppia */
-        $giuliaDoppia = Socio::query()->where('email', 'g.ferrari@gmail.com')->firstOrFail();
+        $giuliaDoppia = Socio::query()->where('email', 'g.ferrari@esempio.test')->firstOrFail();
 
         $this->assertSame('003', $luca->numero_socio);
         $this->assertSame('004', $giuliaDoppia->numero_socio);
@@ -1164,7 +1164,7 @@ class Percorso02_TesseramentoQuoteTest extends TestCase
             ->assertOk()
             ->assertSee('Stessi nome, cognome e data di nascita')
             ->assertSee('giulia.ferrari@example.com')
-            ->assertSee('g.ferrari@gmail.com')
+            ->assertSee('g.ferrari@esempio.test')
             ->assertDontSee('Moretti')
             ->assertViewHas('gruppi', fn (array $gruppi) => count($gruppi) === 1 && $gruppi[0]['soci']->count() === 2);
 

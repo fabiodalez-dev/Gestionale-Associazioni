@@ -39,3 +39,4 @@ test-results/
 # Pacchetti di release (bin/build-release.sh)
 /build
 /releases
+/.playwright-mcp

@@ -1,8 +1,8 @@
 # Gestionale Associazioni
 
-Piattaforma **SaaS multi-tenant** per la gestione completa della vita di un'associazione: soci e tesseramento, eventi con prenotazioni online, quote e pagamenti, registro ufficiale e governance, comunicazione, economia, volontari e organizzazione interna. Ogni associazione ha il proprio mini-sito pubblico brandizzato dove i cittadini si iscrivono e prenotano gli eventi.
+Piattaforma **multi-tenant** per la gestione completa della vita di un'associazione: soci e tesseramento, iscrizioni dal sito, quote e pagamenti, eventi con prenotazioni e biglietti, economia, registro e organi sociali, comunicazione, volontari, spazi, progetti e riunioni. Una sola installazione serve molte associazioni; ognuna ha il proprio mini-sito pubblico su `/a/{slug}` dove i cittadini si iscrivono, prenotano e pagano, e un'area riservata per i soci.
 
-Costruita in **Laravel 13 / PHP 8.5**, con isolamento multi-tenant a livello di framework, un'area pubblica per ogni associazione, un'area riservata per i soci, API REST documentate e oltre **1.700 test automatici** (PHPUnit + Playwright E2E).
+Costruita con **Laravel 13 / PHP 8.4+**. Si installa anche su un **hosting condiviso senza terminale**: si carica il pacchetto via FTP, si apre il sito e un wizard fa il resto. Gli aggiornamenti si applicano **dalla dashboard**, con backup e rollback, sul modello dell'updater di [Pinakes](https://github.com/fabiodalez-dev/Pinakes).
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -13,117 +13,118 @@ Costruita in **Laravel 13 / PHP 8.5**, con isolamento multi-tenant a livello di 
 - [Caratteristiche principali](#caratteristiche-principali)
 - [Screenshot](#screenshot)
 - [Funzionalità in dettaglio](#funzionalità-in-dettaglio)
-- [Architettura](#architettura)
-- [Stack e librerie](#stack-e-librerie)
 - [Requisiti](#requisiti)
 - [Installazione](#installazione)
-- [Aggiornamenti in-app](#aggiornamenti-in-app)
-- [Test](#test)
+- [Aggiornamenti](#aggiornamenti)
+- [Pubblicare una versione](#pubblicare-una-versione)
+- [Architettura](#architettura)
+- [Sviluppo e test](#sviluppo-e-test)
+- [Sicurezza e privacy](#sicurezza-e-privacy)
 - [Licenza](#licenza)
 
 ---
 
 ## Caratteristiche principali
 
-- 🏢 **Multi-tenant** — una sola installazione serve molte associazioni, con isolamento dei dati garantito da un global scope a livello di framework.
-- 🌐 **Mini-sito pubblico per associazione** — catalogo eventi, iscrizione soci, prenotazioni, area riservata, pagina trasparenza, sezione sostenitori, a `/a/{slug}`.
-- 🎫 **Tesseramento** — tessere con QR, verifica pubblica, rinnovi self-service, campagna rinnovi, stampa massiva, apertura anno sociale.
-- 🗓️ **Eventi e prenotazioni** — pubblicazione, capienza con lista d'attesa e promozione automatica, eventi a pagamento (Stripe/PayPal), check-in con QR, calendario, ricorrenze, feedback post-evento.
-- 👤 **Account ospite e soci** — registrazione pubblica, verifica email, area riservata ricca (prenotazioni, tessera, quote, GDPR), promozione a socio.
-- 💶 **Economia** — quote e ricevute numerate, prima nota con movimenti automatici, donazioni online, report economici, budget eventi.
-- 📋 **Registro e governance** — libro soci ufficiale, cessazioni formali, organi sociali, verbali numerati, riunioni del direttivo con votazioni e bozza verbale.
-- 🤝 **Organizzazione** — volontari e turni con registro ore, spazi e prenotazioni interne, inventario e prestiti, progetti con rendicontazione.
-- ✉️ **Comunicazione** — email brandizzate per tenant, template, newsletter, annunci, convocazioni assemblea, sondaggi, compleanni.
-- 🔐 **Sicurezza** — 2FA, ruoli e permessi granulari, audit trail, rate limiting, CSP, honeypot, backup pianificati.
-- 🔄 **Aggiornamenti dalla dashboard** — il super admin aggiorna l'applicazione con un clic, con backup automatico e rollback.
+- 🏢 **Multi-tenant** — isolamento dei dati per associazione a livello di framework; il super admin passa da un'associazione all'altra; le associazioni possono iscriversi da sole alla piattaforma (con conferma email e approvazione).
+- 🌐 **Mini-sito pubblico per associazione** — catalogo eventi, iscrizione soci con modulo configurabile, prenotazioni, donazioni, trasparenza, sostenitori, galleria, calendario ICS.
+- 📝 **Iscrizioni** — modulo pubblico costruito dall'associazione (campi standard e personalizzati, consensi, testi), richieste da approvare con tutti i dati della persona in vista, modalità diretta o con approvazione, preiscrizione via QR.
+- 🎫 **Tesseramento** — tessere con QR e PDF, verifica pubblica, check-in con scanner e kiosk, rinnovi self-service, campagna rinnovi, apertura anno sociale, stampa massiva.
+- 💶 **Quote e pagamenti** — quote per tipo socio, link di pagamento, Stripe e PayPal con credenziali per associazione, ricevute numerate, solleciti, prima nota automatica.
+- 🗓️ **Eventi** — capienza e lista d'attesa con promozione automatica, approvazione, eventi a pagamento, biglietti con QR, presenze, serie ricorrenti, feedback, galleria, budget e spese.
+- 📋 **Registro e governance** — libro soci ufficiale (PDF/Excel), cessazioni, organi sociali e cariche, riunioni del direttivo con votazioni e verbale, verbali firmati, decisioni, adempimenti, scadenzario.
+- 🤝 **Organizzazione** — volontari con turni, candidature e registro ore con attestato; spazi con prenotazioni e conflitti; attrezzature e prestiti; progetti con milestone e report; CRM a colonne, contatti esterni, sponsor, referral.
+- ✉️ **Comunicazione** — email brandizzate con SMTP per associazione, coda e log, template, newsletter con opt-out, annunci e convocazioni, sondaggi, compleanni, notifiche.
+- 👤 **Account e area soci** — registrazione con verifica email, area riservata (tessera, quote, prenotazioni, dati personali), richieste di modifica dati, export e cancellazione GDPR.
+- 🔐 **Sicurezza** — 2FA, ruoli e permessi per modulo, perimetro per sede, audit di accessi e modifiche, blocco tentativi, CSP, honeypot, backup pianificati, API REST documentate con token.
+- 📦 **Installazione e aggiornamento senza terminale** — pacchetto di release con tutto dentro, wizard web che inietta lo schema SQL nel database vuoto, aggiornamenti dalla dashboard con verifica del pacchetto, backup e rollback.
 
 ---
 
 ## Screenshot
 
-### Dashboard amministrativa
-![Dashboard](docs/screenshots/dashboard.png)
+### Installazione guidata
+Requisiti del server e configurazione del database: lo schema viene iniettato nel database indicato, senza terminale.
 
-### Anagrafica soci
+![Installer: requisiti](docs/screenshots/installer-requisiti.png)
+![Installer: database](docs/screenshots/installer-database.png)
+
+### Soci e richieste di iscrizione
 ![Soci](docs/screenshots/soci.png)
+![Richieste iscrizione](docs/screenshots/richieste-iscrizione.png)
 
-### Eventi
+### Tessere, quote e rinnovi
+![Tessere](docs/screenshots/tessere.png)
+![Quote e pagamenti](docs/screenshots/quote.png)
+![Campagna rinnovi](docs/screenshots/campagna-rinnovi.png)
+
+### Eventi e calendario
 ![Eventi](docs/screenshots/eventi.png)
+![Calendario](docs/screenshots/calendario.png)
 
-### Statistiche annuali (l'anno in cifre)
+### Economia e statistiche
+![Prima nota](docs/screenshots/prima-nota.png)
 ![Statistiche annuali](docs/screenshots/statistiche.png)
 
-### Prima nota economica
-![Prima nota](docs/screenshots/prima-nota.png)
+### Organizzazione
+![Riunioni del direttivo](docs/screenshots/riunioni.png)
+![Volontari e turni](docs/screenshots/volontari-turni.png)
+![CRM a colonne](docs/screenshots/crm.png)
 
-### Mini-sito pubblico dell'associazione
-![Frontend pubblico](docs/screenshots/frontend-eventi.png)
+### Configurazione e modulo di iscrizione
+![Configurazioni](docs/screenshots/configurazioni.png)
+![Costruttore del modulo di iscrizione](docs/screenshots/modulo-iscrizione.png)
 
-### Login
-![Login](docs/screenshots/login.png)
+### Mini-sito pubblico
+![Home pubblica](docs/screenshots/frontend-home.png)
+![Eventi pubblici](docs/screenshots/frontend-eventi.png)
+![Modulo di iscrizione pubblico](docs/screenshots/frontend-iscriviti.png)
+
+### Aggiornamenti dalla dashboard
+![Aggiornamenti](docs/screenshots/aggiornamenti.png)
 
 ---
 
 ## Funzionalità in dettaglio
 
-Il sistema è stato costruito in round successivi. Ogni area è coperta da test automatici.
+### Soci
+Anagrafica completa con stati (in attesa, attivo, sospeso, radiato…), tipi e categorie, sedi, tag, gruppi dinamici, filtri salvati, ricerca globale ⌘K, note interne, storico attività, documenti del socio, foto. **Campi personalizzati** di nove tipi (testo, email, telefono, numero, data, url, area di testo, scelta, casella) con validazione per tipo, obbligatorietà separata per segreteria e modulo pubblico, modificabili anche con dati già inseriti. Import CSV con report degli errori, export CSV/Excel, rilevazione e unione dei duplicati, azioni in blocco, nuclei familiari, soci minorenni con tutore, cestino con ripristino, registro delle modifiche.
 
-### Base — gestione associativa
-Anagrafica soci con campi personalizzati, tag, gruppi dinamici, filtri salvati, ricerca full-text, import/export Excel. Tessere con QR, template, PDF, verifica pubblica e scanner. Quote e pagamenti online (Stripe/PayPal). Eventi e partecipanti. Email per tenant (template, coda, log, SMTP dedicato). Documenti, verbali, scadenze. Gestione associazioni, sedi, amministratori, configurazioni. API REST v1 con Sanctum e documentazione OpenAPI.
+### Iscrizioni dal sito
+Ogni associazione costruisce il proprio modulo (`/a/{slug}/iscriviti`): campi standard da mostrare o nascondere, campi personalizzati, obbligatorietà, testi e consensi. La richiesta crea un socio preiscritto e arriva agli admin con tutti i dati della persona in vista; approvazione con delibera, tessera e quota in un clic (email di benvenuto con link di pagamento), oppure rifiuto motivato. Modalità diretta senza approvazione. Preiscrizione da QR di invito, anche senza account. Richieste di modifica dati dall'area soci con approvazione.
 
-### Prenotazioni eventi (frontend pubblico)
-Mini-sito brandizzato per ogni associazione: catalogo eventi, **account ospite** con verifica email, prenotazioni con **capienza e lista d'attesa** (promozione FIFO automatica), **eventi a pagamento** con Stripe/PayPal, **biglietto con QR** e PDF, **check-in** dallo scanner admin. Area riservata account completa: prenotazioni, storico, profilo, preferenze, **export e cancellazione GDPR**.
+### Tessere e rinnovi
+Tessere con numero progressivo, QR e PDF da template configurabile, verifica pubblica (HTML e JSON), scanner e kiosk per il check-in, tessere automatiche all'approvazione. Rinnovo dall'area soci con pagamento online, campagna rinnovi con email personalizzate e promemoria multi-step, apertura del nuovo anno sociale con generazione delle quote, stampa massiva, storico tesseramento esportabile.
 
-### Iscrizioni e preiscrizioni
-**Form di iscrizione personalizzabile** per ogni associazione (campi configurabili, validazione codice fiscale e telefono), aperto anche agli **ospiti senza account**. Modalità preiscrizione (con approvazione) o diretta. Preiscrizione anche alle prenotazioni evento. Gestione delle richieste lato admin con approvazione, tessera e quota automatiche.
+### Quote e pagamenti
+Quote per anno e tipo socio, pagamento registrato in sede o online (Stripe, PayPal, credenziali per associazione), link pubblico di pagamento, ricevute PDF numerate, solleciti ai morosi con tracciamento, webhook idempotenti. Ogni incasso finisce in prima nota.
 
-### Vita sociale (25 funzionalità)
-Rinnovi self-service, campagna rinnovi, promemoria multi-step, apertura anno sociale. Calendario eventi con export ICS, eventi ricorrenti, feedback post-evento, eventi riservati ai soci. **Libro soci ufficiale**, cessazioni formali, organi sociali, verbali numerati. Layout email brandizzato, ricevute quote PDF, centro anteprime email. Slug editabile con QR di invito, documenti con scadenza, rilevazione duplicati, export multi-foglio.
+### Eventi
+Eventi pubblici o riservati ai soci, bozze, capienza con **lista d'attesa e promozione automatica**, prenotazioni con o senza approvazione, eventi a pagamento con conferma offline o online, biglietti PDF con QR e check-in la sera dell'evento (doppio passaggio rifiutato), partecipanti e foglio presenze, serie ricorrenti modificabili in blocco, feedback post-evento solo a chi ha partecipato, galleria pubblica o privata, budget e spese, sincronizzazione con Google Calendar, export ICS.
 
-### Gestione semplificata (25 funzionalità)
-**Ricerca globale ⌘K**, azioni in blocco sui soci, note interne, attività admin, registro modifiche. Bacheca annunci, newsletter, sondaggi, compleanni, contatti rapidi. **Prima nota** con movimenti automatici da quote e prenotazioni, report economico, **donazioni online**, solleciti quote, scadenzario unificato. Richieste modifica dati, nuclei familiari, **kiosk check-in**, soci minorenni con tutore. Onboarding, cestino unificato, audit accessi.
+### Economia
+Prima nota con categorie e movimenti automatici da quote, prenotazioni e donazioni, report economico per anno con export, donazioni dal sito pubblico, scadenzario unificato, solleciti.
 
-### Organizzazione (25 funzionalità)
-**Volontari e turni** con disponibilità, mansioni, auto-candidatura, registro ore e attestato PDF. **Spazi** con prenotazioni e rilevazione conflitti, **inventario e prestiti** attrezzature. **Progetti** con milestone, rendicontazione e report PDF. **Riunioni del direttivo** con ordine del giorno, votazioni e generazione bozza verbale, archivio decisioni, adempimenti ricorrenti. **Mini-CRM** contatti esterni, sponsor con sezione pubblica, **referral porta-un-amico**, galleria foto eventi, **statistiche annuali** con confronto anno-su-anno ed export PDF.
+### Registro e governance
+Libro soci ufficiale in PDF ed Excel, cessazioni formali con delibera, organi sociali e cariche con mandati in scadenza, riunioni del direttivo (convocazione, presenze, votazioni, bozza del verbale), verbali numerati con firmatari e approvazione, archivio delle decisioni, adempimenti ricorrenti con promemoria, documenti con cestino e link temporanei, sezione pubblica **Trasparenza**.
 
-### Convocazioni e trasparenza
-Annunci di tipo **convocazione assemblea** (data, luogo, ordine del giorno, invio email ai soci) e sezione pubblica **Trasparenza** dove pubblicare bilanci, statuto e documenti per categoria.
+### Organizzazione
+Volontari con mansioni, disponibilità, turni a posti limitati, candidature dall'area soci, conferme, presenze, registro ore e attestato PDF. Spazi con prenotazioni e rilevazione dei conflitti. Attrezzature con prestiti e restituzioni. Progetti con milestone, avanzamento e report PDF. CRM a colonne (kanban), contatti esterni, sponsor con sezione pubblica, referral porta-un-amico, statistiche annuali con confronto e PDF.
 
----
+### Comunicazione
+SMTP per associazione, layout email brandizzato, template modificabili, centro anteprime, coda con retry e log, notifiche di piattaforma. Annunci in bacheca, convocazioni di assemblea con email ai soci, newsletter con anteprima e opt-out (doppio), sondaggi votabili dall'area soci e dagli account, auguri di compleanno, contatti rapidi.
 
-## Architettura
-
-| Aspetto | Implementazione |
-|---|---|
-| **Multi-tenancy** | Trait `BelongsToAssociazione` → global scope su `associazione_id`; middleware `tenant`; il super_admin opera sull'associazione selezionata |
-| **Chiavi** | UUID (`HasUuids`) su tutte le entità di dominio |
-| **Autenticazione** | Fortify + 2FA per gli admin (`utenti`); guard `socio` per l'area soci; guard `account` per il frontend pubblico; Sanctum per le API |
-| **Autorizzazione** | Policy + permessi granulari spatie/permission (ruoli `super_admin`, `admin_associazione`, `operatore`) |
-| **Audit** | spatie/activitylog su tutti i modelli |
-| **Frontend pubblico** | Per associazione su `/a/{slug}`, risolto da `RisolviTenantPubblico` senza sessione admin |
-| **Pagamenti** | Interfaccia `Pagabile` (quote, prenotazioni, donazioni) con dispatch webhook per tipo |
-| **Code & scheduler** | Driver `database`; scheduler in `routes/console.php` monitorato |
-
-Convenzioni: rotte per modulo in `routes/modules/`, controller in `app/Http/Controllers/<Modulo>/`, validazione via Form Request, viste sul design system condiviso (Bootstrap 5.3, tema chiaro/scuro, brand `#FF7B11`).
-
-A colpo d'occhio: **68 modelli**, **159 controller**, **232 rotte**, **58 migration**, **1.716 test**.
-
----
-
-## Stack e librerie
-
-**Laravel 13 · PHP 8.4–8.5 · MySQL 8** (test su SQLite in-memory).
-
-Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activitylog, backup, medialibrary, query-builder, data, settings, csp, honeypot, health, schedule-monitor), maatwebsite/excel, barryvdh/laravel-dompdf, chillerlan/php-qrcode, propaganistas/laravel-phone, robertogallea/laravel-codicefiscale, mews/purifier, dedoc/scramble, stripe/stripe-php, srmklive/paypal, larastan, debugbar.
+### Piattaforma e amministrazione
+Registrazione autonoma delle associazioni (conferma email, revisione del super admin), sedi e **perimetro per sede** (operatori che vedono solo la propria sede), amministratori su invito, ruoli dell'associazione (presidente, tesoriere, segretario…) con matrice dei permessi, configurazioni (dati, logo, tesseramento, campi obbligatori, pagamenti, email, moduli pubblici), impostazioni di sistema, audit accessi, job falliti, cestino unificato, health check, backup pianificati, API REST v1 (Sanctum e chiavi API) con documentazione OpenAPI, app installabile (PWA).
 
 ---
 
 ## Requisiti
 
-- PHP **8.4+** (consigliato 8.5) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`, `curl`, `openssl`
-- **MySQL 8** (o MariaDB compatibile)
-- Composer 2, Node.js 20+ e npm
-- `mysqldump` nel PATH (per i backup)
+- PHP **8.4 o successivo** con `pdo_mysql`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `curl`, `fileinfo`, `gd`, `zip`, `intl`
+- **MySQL 5.7.8+** o **MariaDB 10.2.7+** (colonne `json`, collation `utf8mb4_unicode_ci`); consigliato MySQL 8
+- Un cron ogni minuto (vedi sotto)
+- Solo per lavorare sui sorgenti: Composer 2, Node.js 22 e npm
 
 ---
 
@@ -131,42 +132,28 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 
 ### Su hosting condiviso, senza terminale (consigliato)
 
-1. Scarica `gestionale-associazioni-vX.Y.Z.zip` dall'ultima [release](https://github.com/fabiodalez-dev/gestionale-associazioni/releases): contiene già tutto (`vendor/`, asset compilati), non serve né Composer né npm.
+1. Scarica `gestionale-associazioni-vX.Y.Z.zip` dall'ultima [release](https://github.com/fabiodalez-dev/Gestionale-Associazioni/releases): contiene già tutto (`vendor/`, asset compilati), non serve né Composer né npm.
 2. Estrai lo zip: trovi una cartella `gestionale-associazioni/`. Carica via FTP o File Manager **il contenuto** di quella cartella in `public_html` (l'app risponde su `https://tuodominio.it`), oppure l'intera cartella (risponde su `https://tuodominio.it/gestionale-associazioni`).
-3. Nel pannello dell'hosting seleziona **PHP 8.4 o successivo** e crea un database MySQL con un utente (annota nome, utente e password).
-4. Apri il sito nel browser: parte da solo il wizard `/install`, che crea `.env` e chiave dell'applicazione, verifica i requisiti, inietta lo schema nel database e crea il primo super admin.
+3. Nel pannello dell'hosting seleziona **PHP 8.4 o successivo** e crea un database MySQL con un utente.
+4. Apri il sito nel browser: parte il wizard `/install`, che crea `.env` e chiave dell'applicazione, verifica i requisiti, inietta lo schema nel database e crea la prima associazione con il super admin.
 5. Alla fine il wizard mostra il comando per il cron (cPanel → Cron Jobs, ogni minuto): manda le email in coda, i promemoria e i backup.
 
-Il `.htaccess` nella radice del progetto fa passare tutte le richieste da `public/`, quindi `app/`, `storage/`, `vendor/` e `.env` non sono raggiungibili dal browser; ogni cartella non pubblica ha inoltre un proprio `.htaccess` di diniego, che vale anche se l'hosting non ha mod_rewrite (in quel caso l'app risponde su `/public/`). Se puoi scegliere la document root (VPS, hosting che lo permette), puntala direttamente a `public/`. Il pacchetto si costruisce con `bash bin/build-release.sh` (lo fa la GitHub Action a ogni tag `v*`, e l'aggiornatore in-app scarica lo stesso pacchetto).
+Il `.htaccess` nella radice fa passare tutte le richieste da `public/`; `app/`, `storage/`, `vendor/` e `.env` non sono raggiungibili dal browser e ogni cartella interna ha il proprio `.htaccess` di diniego, valido anche senza mod_rewrite (in quel caso l'app risponde su `/public/`). Se puoi scegliere la document root, puntala a `public/`.
 
-### Installer web da sorgenti
+Lo schema non viene creato eseguendo le migration a runtime ma importando `database/installer/schema.sql`, un dump del database vuoto (struttura più registro delle migration) eseguito istruzione per istruzione via PDO: funziona anche senza `exec()` né client `mysql`, in pochi secondi, sempre uguale. Le tabelle dell'applicazione già presenti vengono ricreate vuote solo dietro conferma esplicita; un database con un'installazione completa non viene mai toccato dal wizard; le tabelle estranee restano intatte. Dettagli in [docs/INSTALLER.md](docs/INSTALLER.md).
+
+### Da sorgenti
 
 ```bash
-git clone https://github.com/fabiodalez-dev/gestionale-associazioni.git
-cd gestionale-associazioni
+git clone https://github.com/fabiodalez-dev/Gestionale-Associazioni.git
+cd Gestionale-Associazioni
 composer install --no-dev
 npm install && npm run build
 ```
 
-Apri **`/install`** nel browser (in sviluppo con `php artisan serve --no-reload`: il wizard scrive il `.env` e senza quell'opzione il server di sviluppo si riavvierebbe a metà richiesta): il wizard in 5 passi (requisiti → database → super admin → email → fine) crea il `.env` da `.env.example` se manca, genera l'`APP_KEY`, inietta lo schema del database vuoto nel database indicato, crea il primo super admin e il collegamento `public/storage`. Al termine l'installer si blocca da solo.
+Apri `/install` nel browser (in sviluppo con `php artisan serve --no-reload`: il wizard scrive il `.env` e senza quell'opzione il server di sviluppo si riavvierebbe a metà richiesta).
 
-Server supportati: MySQL 5.7.8 o successivo, MariaDB 10.2.7 o successivo (colonne `json` e collation `utf8mb4_unicode_ci`); il wizard rifiuta versioni più vecchie. Lo schema non viene creato eseguendo le migration a runtime ma importando `database/installer/schema.sql`, un dump del database vuoto (struttura + registro delle migration già applicate) eseguito istruzione per istruzione via PDO: funziona anche sugli hosting condivisi senza `exec()` né client `mysql`, è veloce e produce sempre lo stesso risultato. Le tabelle dell'applicazione già presenti nel database vengono ricreate vuote solo dietro conferma esplicita; le tabelle estranee restano intatte. Dopo l'installazione `php artisan migrate` (anche quello dell'aggiornamento in-app) applica soltanto le migration nuove.
-
-#### Rigenerare lo schema dell'installer
-
-Dopo ogni nuova migration va rigenerato il file, altrimenti il test `SchemaSqlTest` fallisce:
-
-```bash
-php artisan installer:genera-schema
-```
-
-Il comando crea un database temporaneo `gestione_associazioni_schema_tmp` con le credenziali MySQL del `.env`, ci esegue tutte le migration, scrive il dump e cancella il database temporaneo. Per provare l'iniezione su un MySQL reale:
-
-```bash
-INSTALLER_TEST_MYSQL_DSN="mysql://root:segreta@127.0.0.1:3306/gestione_installer_test" php artisan test --filter=InstallaSchemaMysqlTest
-```
-
-### Installazione manuale (CLI)
+In alternativa, installazione manuale da terminale:
 
 ```bash
 composer install
@@ -178,25 +165,35 @@ npm install && npm run build
 php artisan storage:link
 ```
 
-### Avvio
+### Avvio e attività in background
 
 ```bash
 php artisan serve            # applicazione
-php artisan queue:work       # coda email e job (obbligatorio)
+php artisan queue:work       # coda email e job
 # cron: * * * * * php artisan schedule:run
 ```
 
-Su hosting condiviso, dove un worker permanente non si può tenere acceso, basta un cron ogni minuto che esegue entrambi:
+Su hosting condiviso, dove un worker permanente non si può tenere acceso, basta un cron ogni minuto:
 
 ```bash
 cd /home/utente/public_html && php artisan schedule:run >> /dev/null 2>&1 && php artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
 ```
 
+### Comandi utili
+
+```bash
+php artisan app:disinstalla          # backup, poi svuota database e file caricati e riapre l'installer
+php artisan admin:recupera-accesso   # recupero dell'accesso di un amministratore
+php artisan installer:genera-schema  # rigenera database/installer/schema.sql dopo una migration
+```
+
 ---
 
-## Aggiornamenti in-app
+## Aggiornamenti
 
-Stesso meccanismo dell'updater di Pinakes, adattato a Laravel. Il **super admin** trova in `/aggiornamenti` versione installata e ultima release GitHub, i requisiti (PHP, zip, cartelle scrivibili, spazio, prova di scrittura reale), il pulsante di aggiornamento, l'upload di un pacchetto per i server che non raggiungono GitHub, i backup e lo storico. L'aggiornamento: lock, backup del database (spatie/laravel-backup o dump in PHP puro se manca `mysqldump`), download del pacchetto `gestionale-associazioni-vX.Y.Z.zip` della release verificato con il **digest sha256 dell'API GitHub**, estrazione con controllo anti zip-slip, prova a secco dei permessi, manutenzione, backup dei file, copia (preservando `.env`, `storage/`, upload), pulizia dei file orfani, `migrate --force`, permessi, cache, coda. Se qualcosa fallisce dopo la copia i file tornano com'erano (rollback); la manutenzione viene tolta sempre, e una manutenzione rimasta accesa si sblocca dalla pagina.
+Il **super admin** trova in `/aggiornamenti` la versione installata e l'ultima release GitHub, i requisiti per aggiornare (PHP, zip, cartelle scrivibili, spazio libero, prova di scrittura reale), il pulsante di aggiornamento, il caricamento di un pacchetto per i server che non raggiungono GitHub, i backup scaricabili e lo storico.
+
+L'aggiornamento, sul modello dell'updater di Pinakes: lock esclusivo, backup del database (spatie/laravel-backup, altrimenti dump in PHP puro se manca `mysqldump`), download del pacchetto della release verificato con il **digest sha256 dell'API GitHub** (fail-closed), estrazione con controllo anti zip-slip, prova a secco dei permessi prima di toccare un byte, manutenzione, backup dei file, copia preservando `.env`, `storage/` e upload, pulizia dei file orfani, `migrate` e pulizia cache in un processo separato, riavvio della coda. Se qualcosa fallisce dopo la copia i file tornano com'erano; se anche il ripristino fallisce il sito resta in manutenzione con il percorso del backup nel messaggio. Un pacchetto più vecchio di quello installato viene rifiutato.
 
 Da terminale, come proprietario dei file (utile dove PHP del web server non può scrivere l'app):
 
@@ -208,16 +205,73 @@ php artisan app:aggiorna
 php artisan app:aggiorna --pacchetto=/percorso/gestionale-associazioni-vX.Y.Z.zip
 ```
 
-Per pubblicare una versione: aggiorna `VERSION`, rigenera lo schema se ci sono migration nuove, committa, poi `bash bin/create-release.sh X.Y.Z` (tag, Action, verifica degli asset). Dettagli in [docs/AGGIORNAMENTI.md](docs/AGGIORNAMENTI.md).
+Dettagli in [docs/AGGIORNAMENTI.md](docs/AGGIORNAMENTI.md).
 
-## Test
+---
+
+## Pubblicare una versione
+
+1. Se ci sono migration nuove: `php artisan installer:genera-schema` (il test `SchemaSqlTest` fallisce altrimenti).
+2. Aggiorna `VERSION` (semver; con `-rc.N` è una prerelease, proposta solo alle installazioni con `UPDATE_CHANNEL=rc`), committa e pusha.
+3. `bash bin/create-release.sh X.Y.Z`: controlla il tree, crea e pusha il tag, aspetta la GitHub Action `release.yml` (che costruisce il pacchetto con `bin/build-release.sh` su PHP 8.4 e lo carica nella release con lo SHA256) e verifica asset, checksum e digest.
+
+Il pacchetto si può costruire anche in locale con `bash bin/build-release.sh`.
+
+---
+
+## Architettura
+
+| Aspetto | Implementazione |
+|---|---|
+| **Multi-tenancy** | Trait `BelongsToAssociazione` → global scope su `associazione_id`; middleware `tenant`; il super admin opera sull'associazione selezionata; perimetro per sede con scope dedicato |
+| **Chiavi** | UUID (`HasUuids`) su tutte le entità di dominio |
+| **Autenticazione** | Fortify + 2FA per gli amministratori (`utenti`); guard `socio` per l'area soci; guard `account` per il frontend pubblico; Sanctum e chiavi API per le API |
+| **Autorizzazione** | Policy + permessi per modulo e azione (spatie/permission) con ruoli di piattaforma (`super_admin`, `admin_associazione`, `operatore`) e ruoli dell'associazione |
+| **Audit** | spatie/activitylog sui modelli, registro degli accessi, registro delle modifiche |
+| **Frontend pubblico** | Per associazione su `/a/{slug}`, risolto da `RisolviTenantPubblico` senza sessione admin; moduli pubblici configurabili |
+| **Pagamenti** | Interfaccia `Pagabile` (quote, prenotazioni, donazioni) con webhook per gateway |
+| **Installer** | `EnsureInstalled` (prepend al gruppo web) + `InstallerService`: schema SQL iniettato via PDO, lock, marcatore del wizard legato al browser |
+| **Updater** | `UpdateService`: release GitHub, digest, preflight, backup, copia, orfani, rollback; `DumpDatabasePhp` come backup senza `mysqldump` |
+| **Code & scheduler** | Driver `database`; scheduler in `routes/console.php` monitorato (schedule-monitor) |
+
+Convenzioni: rotte per modulo in `routes/modules/`, controller in `app/Http/Controllers/<Modulo>/`, validazione con Form Request, viste sul design system condiviso (Bootstrap 5.3, tema chiaro/scuro). Specifiche dei moduli in [docs/specs](docs/specs).
+
+A colpo d'occhio: **71 modelli**, **170 controller**, **574 rotte**, **66 migration**, **23 comandi artisan**, **1.962 test PHPUnit**, **110 test E2E**.
+
+### Stack e librerie
+
+**Laravel 13 · PHP 8.4–8.5 · MySQL 8** (test su SQLite in memoria). Fortify, Sanctum, Scout, spatie (permission, activitylog, backup, medialibrary, query-builder, data, settings, csp, honeypot, health, schedule-monitor, personal-data-export), Formello, maatwebsite/excel, barryvdh/laravel-dompdf, chillerlan/php-qrcode, propaganistas/laravel-phone, robertogallea/laravel-codicefiscale, mews/purifier, dedoc/scramble, stripe/stripe-php, srmklive/paypal; in sviluppo larastan, shipmonk/dead-code-detector, pint, debugbar.
+
+---
+
+## Sviluppo e test
 
 ```bash
-php artisan test            # ~1.716 test PHPUnit (SQLite in-memory)
-npm run test:e2e            # 109 test E2E Playwright (DB dedicato, server automatico)
-vendor/bin/pint             # code style
-vendor/bin/phpstan analyse --memory-limit=1G   # analisi statica livello 5
+php artisan test            # 1.962 test PHPUnit (SQLite in memoria)
+npm run test:e2e            # 110 test E2E Playwright (DB dedicato, server automatico)
+composer analyse            # phpstan: larastan livello 5 + rilevatore di codice morto, zero errori
+vendor/bin/pint             # stile del codice
 ```
+
+La suite comprende **60 percorsi reali** (`tests/Feature/Percorsi`): ogni test segue passo per passo quello che succede davvero in un'associazione, con più richieste HTTP fatte da attori diversi (richiedente sul sito, admin, operatore di sede, socio, volontario, scheduler): adesione e account, tesseramento e rinnovi, struttura e permessi, eventi, comunicazione e operatività, campi personalizzati e moduli.
+
+I test che toccano un MySQL reale (iniezione dello schema, dump PHP) si attivano con una variabile:
+
+```bash
+INSTALLER_TEST_MYSQL_DSN="mysql://utente:password@127.0.0.1:3306/gestione_installer_test" php artisan test --filter=Mysql
+```
+
+Analisi statica: [docs/ANALISI-STATICA.md](docs/ANALISI-STATICA.md).
+
+---
+
+## Sicurezza e privacy
+
+- Nessun dato dell'installazione nel repository: `.env` ignorato, il pacchetto di release non contiene `.env`; il wizard lo crea in produzione (`APP_DEBUG=false`).
+- Il wizard non sovrascrive mai un database già installato; a schema installato gli step successivi restano al browser che ha avviato l'installazione; a installazione finita `/install` si chiude da solo.
+- Export CSV/Excel protetti dalla formula injection, CSP, honeypot, blocco dei tentativi di accesso con audit per associazione, 2FA.
+- Export dei dati personali e cancellazione dell'account (GDPR) dall'area riservata, con anonimizzazione e rimozione dei dati non ancora approvati.
+- Backup del database prima di ogni aggiornamento; backup pianificati con spatie/laravel-backup.
 
 ---
 

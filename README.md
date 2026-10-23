@@ -112,7 +112,7 @@ A colpo d'occhio: **68 modelli**, **159 controller**, **232 rotte**, **58 migrat
 
 ## Stack e librerie
 
-**Laravel 13 · PHP 8.3–8.5 · MySQL 8** (test su SQLite in-memory).
+**Laravel 13 · PHP 8.4–8.5 · MySQL 8** (test su SQLite in-memory).
 
 Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activitylog, backup, medialibrary, query-builder, data, settings, csp, honeypot, health, schedule-monitor), maatwebsite/excel, barryvdh/laravel-dompdf, chillerlan/php-qrcode, propaganistas/laravel-phone, robertogallea/laravel-codicefiscale, mews/purifier, dedoc/scramble, stripe/stripe-php, srmklive/paypal, larastan, debugbar.
 
@@ -120,7 +120,7 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 
 ## Requisiti
 
-- PHP **8.3+** (consigliato 8.5) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`, `curl`, `openssl`
+- PHP **8.4+** (consigliato 8.5) con `pdo_mysql`, `mbstring`, `zip`, `gd`, `intl`, `curl`, `openssl`
 - **MySQL 8** (o MariaDB compatibile)
 - Composer 2, Node.js 20+ e npm
 - `mysqldump` nel PATH (per i backup)
@@ -133,7 +133,7 @@ Le 25 librerie principali: Fortify, Sanctum, Scout, spatie (permission, activity
 
 1. Scarica `gestionale-associazioni-vX.Y.Z.zip` dall'ultima [release](https://github.com/fabiodalez-dev/gestionale-associazioni/releases): contiene già tutto (`vendor/`, asset compilati), non serve né Composer né npm.
 2. Estrai lo zip: trovi una cartella `gestionale-associazioni/`. Carica via FTP o File Manager **il contenuto** di quella cartella in `public_html` (l'app risponde su `https://tuodominio.it`), oppure l'intera cartella (risponde su `https://tuodominio.it/gestionale-associazioni`).
-3. Nel pannello dell'hosting seleziona **PHP 8.3 o successivo** e crea un database MySQL con un utente (annota nome, utente e password).
+3. Nel pannello dell'hosting seleziona **PHP 8.4 o successivo** e crea un database MySQL con un utente (annota nome, utente e password).
 4. Apri il sito nel browser: parte da solo il wizard `/install`, che crea `.env` e chiave dell'applicazione, verifica i requisiti, inietta lo schema nel database e crea il primo super admin.
 5. Alla fine il wizard mostra il comando per il cron (cPanel → Cron Jobs, ogni minuto): manda le email in coda, i promemoria e i backup.
 

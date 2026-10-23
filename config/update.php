@@ -71,7 +71,7 @@ return [
     'download_timeout' => 300,
 
     // Preflight
-    'min_php' => '8.3.0',
+    'min_php' => '8.4.1',
     'min_free_bytes' => 200 * 1024 * 1024,
     'probe_bytes' => 1024 * 1024,
 

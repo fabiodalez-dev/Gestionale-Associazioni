@@ -40,7 +40,7 @@ return [
     'enforce_in_tests' => false,
 
     'requirements' => [
-        'php' => '8.3.0',
+        'php' => '8.4.1',
         'extensions' => [
             'pdo_mysql', 'mbstring', 'openssl', 'tokenizer', 'xml',
             'ctype', 'json', 'curl', 'fileinfo', 'gd', 'zip', 'intl',

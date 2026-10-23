@@ -60,12 +60,16 @@ fi
 
 info "Tag $TAG"
 git tag -a "$TAG" -m "Release $TAG"
+AVVIO_PUSH="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 git push origin "refs/tags/$TAG"
 
 info "Attendo la GitHub Action Release"
+# Solo l'esecuzione partita per QUESTO push del tag: un run vecchio con lo
+# stesso nome di tag (tentativo precedente fallito) non deve essere scambiato
+AVVIO="$AVVIO_PUSH"
 RUN_ID=""
 for _ in $(seq 1 24); do
-    RUN_ID="$(gh run list --workflow=release.yml --event=push --json databaseId,headBranch --jq ".[] | select(.headBranch==\"$TAG\") | .databaseId" | head -1)"
+    RUN_ID="$(gh run list --workflow=release.yml --event=push --json databaseId,headBranch,createdAt --jq ".[] | select(.headBranch==\"$TAG\" and .createdAt >= \"$AVVIO\") | .databaseId" | head -1)"
     [[ -n "$RUN_ID" ]] && break
     sleep 5
 done

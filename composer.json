@@ -1,7 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "fabiodalez-dev/gestione-associazioni",
-    "version": "0.1.0",
     "type": "project",
     "description": "Piattaforma SaaS multi-tenant per la gestione completa di associazioni.",
     "keywords": ["laravel", "associazioni", "crm", "multi-tenant"],

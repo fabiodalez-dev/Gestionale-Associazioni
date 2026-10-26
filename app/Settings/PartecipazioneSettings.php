@@ -2,11 +2,13 @@
 
 namespace App\Settings;
 
+use App\Models\RubricaScheda;
+
 /**
  * Partecipazione dei soci alla vita associativa: proposte con raccolta di
  * adesioni (issue #10), raccolta annuale delle dichiarazioni sui conflitti
- * di interesse di chi ricopre una carica (issue #11) e regolamento dello
- * spazio di discussione tra soci (issue #13).
+ * di interesse di chi ricopre una carica (issue #11), regolamento dello
+ * spazio di discussione tra soci (issue #13) e rubrica interna (issue #14).
  */
 class PartecipazioneSettings extends ImpostazioniAssociazione
 {
@@ -24,6 +26,15 @@ class PartecipazioneSettings extends ImpostazioniAssociazione
 
     /** Regolamento delle discussioni, da accettare al primo accesso. */
     public string $discussioni_regolamento;
+
+    /** Rubrica interna dei soci disponibile nell'area riservata. */
+    public bool $rubrica_attiva;
+
+    /** Se vero vede la rubrica solo chi vi compare a sua volta. */
+    public bool $rubrica_reciprocita;
+
+    /** Campi che i soci possono scegliere di mostrare (sottoinsieme di RubricaScheda::CAMPI). */
+    public array $rubrica_campi;
 
     public const REGOLAMENTO_PREDEFINITO = "Le discussioni sono uno spazio dei soci per confrontarsi sulla vita dell'associazione.\n\n"
         ."- Scrivi con rispetto: niente insulti, attacchi personali o linguaggio offensivo.\n"
@@ -51,6 +62,11 @@ class PartecipazioneSettings extends ImpostazioniAssociazione
             'proposte_moderazione' => filter_var($valori['proposte_moderazione'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'dichiarazioni_anno_campagna' => filled($valori['dichiarazioni_anno_campagna'] ?? null) ? (int) $valori['dichiarazioni_anno_campagna'] : null,
             'discussioni_regolamento' => filled($valori['discussioni_regolamento'] ?? null) ? (string) $valori['discussioni_regolamento'] : self::REGOLAMENTO_PREDEFINITO,
+            'rubrica_attiva' => filter_var($valori['rubrica_attiva'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'rubrica_reciprocita' => filter_var($valori['rubrica_reciprocita'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            'rubrica_campi' => is_array($valori['rubrica_campi'] ?? null)
+                ? array_values(array_intersect(array_keys(RubricaScheda::CAMPI), $valori['rubrica_campi']))
+                : array_keys(RubricaScheda::CAMPI),
         ];
     }
 }

@@ -1702,6 +1702,46 @@ CREATE TABLE `roles` (
   UNIQUE KEY `roles_name_guard_name_unique` (`name`,`guard_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `rubrica_contatti`;
+CREATE TABLE `rubrica_contatti` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mittente_socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `destinatario_socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `oggetto` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `segnalato_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_rubrica_contatti_mittente` (`mittente_socio_id`,`created_at`),
+  KEY `rubrica_contatti_destinatario_socio_id_foreign` (`destinatario_socio_id`),
+  KEY `rubrica_contatti_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `rubrica_contatti_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `rubrica_contatti_destinatario_socio_id_foreign` FOREIGN KEY (`destinatario_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `rubrica_contatti_mittente_socio_id_foreign` FOREIGN KEY (`mittente_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `rubrica_schede`;
+CREATE TABLE `rubrica_schede` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `attiva` tinyint(1) NOT NULL DEFAULT '0',
+  `campi_visibili` json DEFAULT NULL,
+  `presentazione` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `interessi` json DEFAULT NULL,
+  `consenso_at` datetime DEFAULT NULL,
+  `revocata_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `rubrica_schede_socio_id_unique` (`socio_id`),
+  KEY `idx_rubrica_schede_attiva` (`associazione_id`,`attiva`),
+  KEY `rubrica_schede_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `rubrica_schede_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `rubrica_schede_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `saved_filters`;
 CREATE TABLE `saved_filters` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2422,6 +2462,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_140000_create_proposte_tables', 1),
 ('2026_10_27_150000_create_conflitti_interesse_tables', 1),
 ('2026_10_27_160000_create_manuale_operativo_tables', 1),
-('2026_10_27_170000_create_discussioni_tables', 1);
+('2026_10_27_170000_create_discussioni_tables', 1),
+('2026_10_27_180000_create_rubrica_soci_tables', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -35,7 +35,7 @@ Costruita con **Laravel 13 / PHP 8.4+**. Si installa anche su un **hosting condi
 - 📋 **Registro e governance** — libro soci ufficiale (PDF/Excel), cessazioni, organi sociali e cariche, riunioni del direttivo con votazioni e verbale, assemblee dei soci con aventi diritto, appello, quorum, deleghe, voto online ed elezioni, verbali firmati, decisioni, adempimenti, scadenzario.
 - 🤝 **Organizzazione** — volontari con turni, candidature e registro ore con attestato; spazi con prenotazioni e conflitti; attrezzature e prestiti; progetti con milestone e report; CRM a colonne, contatti esterni, sponsor, referral.
 - ✉️ **Comunicazione** — email brandizzate con SMTP per associazione, coda e log, template, newsletter con opt-out, annunci e convocazioni, sondaggi, compleanni, notifiche.
-- 👤 **Account e area soci** — registrazione con verifica email, area riservata (tessera, quote, prenotazioni, dati personali), richieste di modifica dati, export e cancellazione GDPR.
+- 👤 **Account e area soci** — registrazione con verifica email, area riservata (tessera, quote, prenotazioni, dati personali), richieste di modifica dati, **rubrica interna dei soci** con consenso e contatto mediato, export e cancellazione GDPR.
 - 🔐 **Sicurezza** — 2FA, ruoli e permessi per modulo, perimetro per sede, audit di accessi e modifiche, blocco tentativi, CSP, honeypot, backup pianificati, API REST documentate con token.
 - 📦 **Installazione e aggiornamento senza terminale** — pacchetto di release con tutto dentro, wizard web che inietta lo schema SQL nel database vuoto, aggiornamenti dalla dashboard con verifica del pacchetto, backup e rollback.
 

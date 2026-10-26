@@ -17,7 +17,7 @@
     $can = fn (string $permission) => $isSuperAdmin || ($utente?->can($permission) ?? false);
     $isAdmin = $isSuperAdmin || ($utente?->isAdminAssociazione() ?? false);
 
-    $emailActive = request()->routeIs('comunicazioni.*', 'email-templates.*', 'email-coda.*', 'email-log.*', 'email-impostazioni.*', 'email-anteprime.*', 'annunci.*', 'newsletter.*', 'sondaggi.*', 'discussioni.*');
+    $emailActive = request()->routeIs('comunicazioni.*', 'email-templates.*', 'email-coda.*', 'email-log.*', 'email-impostazioni.*', 'email-anteprime.*', 'annunci.*', 'newsletter.*', 'sondaggi.*', 'discussioni.*', 'rubrica-soci.*');
     $apiActive = request()->routeIs('api-keys.*', 'api-docs.*');
     $registroActive = request()->routeIs('libro-soci.*', 'cessazioni.*', 'organi-sociali.*');
     $economiaActive = request()->routeIs('prima-nota.*', 'report-economico.*', 'donazioni.*');
@@ -323,6 +323,9 @@
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('newsletter.*') ? 'active' : '' }}" href="{{ $nav('newsletter.index') }}"><i class="bi bi-envelope-paper"></i>Newsletter</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('sondaggi.*') ? 'active' : '' }}" href="{{ $nav('sondaggi.index') }}"><i class="bi bi-bar-chart"></i>Sondaggi</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('discussioni.*') ? 'active' : '' }}" href="{{ $nav('discussioni.index') }}"><i class="bi bi-chat-square-text"></i>Discussioni</a></li>
+                            @if ($isAdmin)
+                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('rubrica-soci.*') ? 'active' : '' }}" href="{{ $nav('rubrica-soci.index') }}"><i class="bi bi-person-lines-fill"></i>Rubrica dei soci</a></li>
+                            @endif
                             @endif
                         </ul>
                     </div>

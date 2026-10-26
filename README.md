@@ -247,7 +247,7 @@ A colpo d'occhio: **71 modelli**, **170 controller**, **574 rotte**, **66 migrat
 ## Sviluppo e test
 
 ```bash
-php artisan test            # 1.962 test PHPUnit (SQLite in memoria)
+php artisan test            # 2.085 test PHPUnit (SQLite in memoria)
 npm run test:e2e            # 110 test E2E Playwright (DB dedicato, server automatico)
 composer analyse            # phpstan: larastan livello 5 + rilevatore di codice morto, zero errori
 vendor/bin/pint             # stile del codice
@@ -262,6 +262,21 @@ INSTALLER_TEST_MYSQL_DSN="mysql://utente:password@127.0.0.1:3306/gestione_instal
 ```
 
 Analisi statica: [docs/ANALISI-STATICA.md](docs/ANALISI-STATICA.md).
+
+### Controlli automatici (CI)
+
+Ogni pull request verso `main` (e ogni push su `main`) passa dai workflow in `.github/workflows`, sul modello di Pinakes:
+
+| Workflow | Cosa verifica |
+|---|---|
+| **Qualità del codice** | `composer validate --strict` e `composer audit`, Pint, PHPStan, compilazione di viste/rotte/config, PHPUnit su PHP 8.4 e 8.5, build Vite, `npm audit`, pacchetto di release costruito e controllato come al tag |
+| **Compatibilità database** | migration su database vuoto e test MySQL reali (schema dell'installer, dump PHP) su MySQL 5.7, 8.0, 8.4, 9.6 e MariaDB 10.11, 11.4; su MySQL 9.6 `schema.sql` rigenerato deve coincidere con quello committato |
+| **E2E** | suite Playwright completa su MySQL 8.4 e Chromium, con report e tracce come artifact se fallisce |
+| **Sicurezza e supply chain** | zizmor, actionlint, yamllint, ShellCheck; dependency review delle PR; gitleaks su tutta la storia (`.gitleaks.toml`); Trivy |
+| **CodeQL** | JavaScript dell'applicazione e workflow GitHub Actions (PHP è coperto da PHPStan) |
+| **Pullfrog** | review su richiesta (`workflow_dispatch`), in sola lettura |
+
+Le action sono fissate per SHA e nessun checkout conserva le credenziali; i workflow settimanali (database, sicurezza, CodeQL) girano anche senza commit, perché cambiano le immagini e le CVE.
 
 ---
 

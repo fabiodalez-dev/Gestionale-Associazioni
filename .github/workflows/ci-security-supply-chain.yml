@@ -1,0 +1,114 @@
+name: Sicurezza e supply chain
+
+# Workflow GitHub Actions (zizmor, actionlint, yamllint), script di shell
+# (ShellCheck), nuove dipendenze nelle PR (vulnerabilità e licenze), segreti
+# nella storia git (gitleaks) e vulnerabilità/segreti/configurazioni nel
+# repository (Trivy).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Settimanale: nuove CVE emergono anche senza commit
+    - cron: '17 3 * * 2'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-security:
+    name: Workflow, YAML e script di shell
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read # Legge workflow e script.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Audit dei workflow con zizmor
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          advanced-security: false
+          persona: pedantic
+
+      - name: Go per actionlint
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - name: Semantica dei workflow con actionlint
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+
+      - name: Struttura YAML con yamllint
+        run: |
+          python3 -m venv "$RUNNER_TEMP/yamllint"
+          "$RUNNER_TEMP/yamllint/bin/pip" install --disable-pip-version-check --no-input yamllint==1.37.1
+          "$RUNNER_TEMP/yamllint/bin/yamllint" .github .yamllint.yml
+
+      - name: Script di shell con ShellCheck
+        run: |
+          mapfile -t script < <(git ls-files '*.sh')
+          test "${#script[@]}" -gt 0
+          shellcheck --severity=warning -x "${script[@]}"
+
+  dependency-review:
+    name: Nuove dipendenze della PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # Confronta i manifest delle dipendenze della PR.
+    steps:
+      - name: Rifiuta dipendenze vulnerabili o con licenze non ammesse
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime
+          vulnerability-check: true
+          license-check: true
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, BUSL-1.1, SSPL-1.0
+          show-openssf-scorecard: true
+
+  repository-security:
+    name: Segreti, vulnerabilità e configurazioni
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read # Analizza il repository e tutta la storia git.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Segreti nella storia git con gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Versione provata con .gitleaks.toml (eccezioni mirate)
+          GITLEAKS_VERSION: 8.28.0
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+
+      - name: Dipendenze, segreti e configurazioni con Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: table
+          skip-dirs: vendor,node_modules,public/assets/vendor
+          version: v0.73.0

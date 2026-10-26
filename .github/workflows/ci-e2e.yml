@@ -1,0 +1,94 @@
+name: E2E
+
+# Suite Playwright completa (tests/e2e/specs) sull'app vera: php artisan serve
+# (tests/e2e/serve.sh), MySQL 8.4, asset Vite di produzione e Chromium.
+# global-setup.ts ricrea il database e2e con migrate:fresh e le fixture.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright · MySQL 8.4 · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read # Legge i sorgenti.
+
+    services:
+      mysql:
+        image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          # Nome fisso di tests/e2e/serve.sh e helpers.ts
+          MYSQL_DATABASE: associazione_soci_e2e
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, pdo_mysql, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: Node 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Dipendenze bloccate e build Vite
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: .env di CI
+        run: |
+          cp .env.example .env
+          sed -i -e 's/^DB_PASSWORD=.*/DB_PASSWORD=root/' .env
+          php artisan key:generate --no-interaction
+
+      - name: Chromium per Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Suite E2E
+        run: npx playwright test
+
+      - name: Report e tracce dei test falliti
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: e2e-report-${{ github.run_id }}
+          path: |
+            tests/e2e/report/
+            test-results/
+            storage/logs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Rimuovi il .env di CI
+        if: always()
+        run: rm -f .env

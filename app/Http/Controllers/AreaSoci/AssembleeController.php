@@ -173,6 +173,11 @@ class AssembleeController extends Controller
                 'daVotare' => $e->stato === Elezione::STATO_VOTO ? $this->elezioni->daVotare($e, $socio) : collect(),
             ]);
 
+        // Per ogni votazione, i rappresentati senza chi è in conflitto sul punto (issue #11)
+        $rappresentatiPerVotazione = $votazioni->mapWithKeys(fn (VotazioneRiunione $v) => [
+            $v->id => $this->voto->rappresentati($riunione, $socio, $v->punto_indice),
+        ]);
+
         $giaVotati = VotanteRiunione::query()
             ->whereIn('votazione_id', $votazioni->pluck('id'))
             ->whereIn('rappresentato_socio_id', $rappresentati->keys())
@@ -186,6 +191,7 @@ class AssembleeController extends Controller
             'partecipante' => $partecipante,
             'votazioni' => $votazioni,
             'rappresentati' => $rappresentati,
+            'rappresentatiPerVotazione' => $rappresentatiPerVotazione,
             'giaVotati' => $giaVotati,
             'elezioni' => $elezioni,
             'opzioni' => VotoRiunione::OPZIONI,

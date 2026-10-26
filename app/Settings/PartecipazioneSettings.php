@@ -4,7 +4,8 @@ namespace App\Settings;
 
 /**
  * Partecipazione dei soci alla vita associativa: proposte con raccolta di
- * adesioni (issue #10).
+ * adesioni (issue #10) e raccolta annuale delle dichiarazioni sui conflitti
+ * di interesse di chi ricopre una carica (issue #11).
  */
 class PartecipazioneSettings extends ImpostazioniAssociazione
 {
@@ -16,6 +17,9 @@ class PartecipazioneSettings extends ImpostazioniAssociazione
 
     /** Se vero le proposte restano in revisione finché la segreteria non le pubblica. */
     public bool $proposte_moderazione;
+
+    /** Anno della raccolta delle dichiarazioni in corso (promemoria mensili), null se ferma. */
+    public ?int $dichiarazioni_anno_campagna;
 
     public static function group(): string
     {
@@ -34,6 +38,7 @@ class PartecipazioneSettings extends ImpostazioniAssociazione
             'proposte_soglia' => max(1, (int) ($valori['proposte_soglia'] ?? 10)),
             'proposte_soglia_percentuale' => filter_var($valori['proposte_soglia_percentuale'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'proposte_moderazione' => filter_var($valori['proposte_moderazione'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            'dichiarazioni_anno_campagna' => filled($valori['dichiarazioni_anno_campagna'] ?? null) ? (int) $valori['dichiarazioni_anno_campagna'] : null,
         ];
     }
 }

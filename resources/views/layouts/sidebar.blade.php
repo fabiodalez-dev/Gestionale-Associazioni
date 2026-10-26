@@ -22,7 +22,7 @@
     $registroActive = request()->routeIs('libro-soci.*', 'cessazioni.*', 'organi-sociali.*');
     $economiaActive = request()->routeIs('prima-nota.*', 'report-economico.*', 'donazioni.*');
     // Piano "Organizzazione 3": volontari/turni, spazi, inventario, progetti, riunioni e decisioni
-    $organizzazioneActive = request()->routeIs('turni.*', 'volontari.*', 'spazi.*', 'attrezzature.*', 'prestiti.*', 'progetti.*', 'riunioni.*', 'decisioni.*', 'elezioni.*', 'proposte.*');
+    $organizzazioneActive = request()->routeIs('turni.*', 'volontari.*', 'spazi.*', 'attrezzature.*', 'prestiti.*', 'progetti.*', 'riunioni.*', 'decisioni.*', 'elezioni.*', 'proposte.*', 'conflitti.*');
     // Piano "Organizzazione 3": mini-CRM, sponsor e referral
     $relazioniActive = request()->routeIs('contatti-esterni.*', 'sponsor.*', 'ambasciatori.*');
     $configurazioneActive = request()->routeIs('config-campi.*', 'config-tags.*', 'categorie-socio.*', 'tipi-socio.*', 'config-gruppi.*')
@@ -272,6 +272,7 @@
                             @if ($can('riunioni.view'))
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('riunioni.*', 'elezioni.*') ? 'active' : '' }}" href="{{ $nav('riunioni.index') }}"><i class="bi bi-people"></i>Riunioni e assemblee</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('decisioni.*') ? 'active' : '' }}" href="{{ $nav('decisioni.index') }}"><i class="bi bi-check2-circle"></i>Decisioni</a></li>
+                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('conflitti.*') ? 'active' : '' }}" href="{{ $nav('conflitti.index') }}"><i class="bi bi-shield-exclamation"></i>Conflitti di interesse</a></li>
                             @endif
                             @if ($can('proposte.view'))
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('proposte.*') ? 'active' : '' }}" href="{{ $nav('proposte.index') }}"><i class="bi bi-lightbulb"></i>Proposte dei soci</a></li>

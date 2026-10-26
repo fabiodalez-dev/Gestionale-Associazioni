@@ -214,6 +214,16 @@ class Riunione extends Model implements HasMedia
     }
 
     /**
+     * Conflitti di interesse dichiarati sui punti dell'OdG (issue #11).
+     *
+     * @return HasMany<ConflittoRiunione, $this>
+     */
+    public function conflitti(): HasMany
+    {
+        return $this->hasMany(ConflittoRiunione::class, 'riunione_id');
+    }
+
+    /**
      * Elezioni che si tengono nell'assemblea (issue #9).
      *
      * @return HasMany<Elezione, $this>

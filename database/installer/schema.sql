@@ -385,6 +385,25 @@ CREATE TABLE `cessazioni` (
   CONSTRAINT `cessazioni_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `conflitti_riunione`;
+CREATE TABLE `conflitti_riunione` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `riunione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `punto_indice` smallint unsigned NOT NULL,
+  `socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `motivazione` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_conflitti_riunione_punto_socio` (`riunione_id`,`punto_indice`,`socio_id`),
+  KEY `conflitti_riunione_socio_id_foreign` (`socio_id`),
+  KEY `conflitti_riunione_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `conflitti_riunione_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `conflitti_riunione_riunione_id_foreign` FOREIGN KEY (`riunione_id`) REFERENCES `riunioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `conflitti_riunione_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `consensi`;
 CREATE TABLE `consensi` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -480,6 +499,27 @@ CREATE TABLE `deleghe_riunione` (
   CONSTRAINT `deleghe_riunione_delegato_socio_id_foreign` FOREIGN KEY (`delegato_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
   CONSTRAINT `deleghe_riunione_registrata_da_foreign` FOREIGN KEY (`registrata_da`) REFERENCES `utenti` (`id`) ON DELETE SET NULL,
   CONSTRAINT `deleghe_riunione_riunione_id_foreign` FOREIGN KEY (`riunione_id`) REFERENCES `riunioni` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `dichiarazioni_interessi`;
+CREATE TABLE `dichiarazioni_interessi` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `anno` smallint unsigned NOT NULL,
+  `nessun_conflitto` tinyint(1) NOT NULL DEFAULT '0',
+  `interessi` text COLLATE utf8mb4_unicode_ci,
+  `dichiarata_at` datetime NOT NULL,
+  `registrata_da` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_dichiarazioni_interessi_socio_anno` (`socio_id`,`anno`),
+  KEY `dichiarazioni_interessi_registrata_da_foreign` (`registrata_da`),
+  KEY `dichiarazioni_interessi_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `dichiarazioni_interessi_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `dichiarazioni_interessi_registrata_da_foreign` FOREIGN KEY (`registrata_da`) REFERENCES `utenti` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `dichiarazioni_interessi_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `documenti`;
@@ -2198,6 +2238,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_110000_create_deleghe_riunione_table', 1),
 ('2026_10_27_120000_add_voto_online_assemblea', 1),
 ('2026_10_27_130000_create_elezioni_tables', 1),
-('2026_10_27_140000_create_proposte_tables', 1);
+('2026_10_27_140000_create_proposte_tables', 1),
+('2026_10_27_150000_create_conflitti_interesse_tables', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

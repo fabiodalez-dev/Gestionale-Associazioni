@@ -18,6 +18,7 @@ use App\Models\VotazioneRiunione;
 use App\Models\VotoRiunione;
 use App\Notifications\Struttura\ConvocazioneRiunioneNotification;
 use App\Services\Struttura\AssembleaService;
+use App\Services\Struttura\ConflittiService;
 use App\Services\Struttura\DelegaNonValidaException;
 use App\Services\Struttura\DelegheService;
 use App\Services\Struttura\ElezioniService;
@@ -96,6 +97,7 @@ class RiunioneController extends Controller
             'spazio',
             'verbale',
             'votazioni' => fn ($q) => $q->orderBy('punto_indice')->withCount('votanti'),
+            'conflitti.socio' => fn ($q) => $q->withoutGlobalScope('sede')->withTrashed(),
         ]);
 
         // In assemblea l'elenco può contare centinaia di soci: si consulta
@@ -511,14 +513,18 @@ class RiunioneController extends Controller
 
         // In assemblea l'esito discende dai numeri e dalla maggioranza del
         // punto; "rinviato" resta una scelta della presidenza
-        if ($riunione->isAssemblea()) {
-            $presenti = $this->assemblea->quorum($riunione)['presenti'];
-            $votanti = $dati['favorevoli'] + $dati['contrari'] + $dati['astenuti'];
+        // Chi è in conflitto sul punto non vota e non conta nella base (issue #11)
+        $inConflitto = app(ConflittiService::class)->presentiInConflitto($riunione, (int) $dati['punto_indice']);
+        $votanti = $dati['favorevoli'] + $dati['contrari'] + $dati['astenuti'];
 
-            if ($presenti > 0 && $votanti > $presenti) {
+        if ($riunione->isAssemblea()) {
+            $presentiTotali = $this->assemblea->quorum($riunione)['presenti'];
+            $presenti = $presentiTotali - $inConflitto;
+
+            if ($presentiTotali > 0 && $votanti > $presenti) {
                 return redirect()
                     ->route('riunioni.show', $riunione)
-                    ->with('error', "I voti espressi ({$votanti}) superano i presenti con diritto di voto ({$presenti}).");
+                    ->with('error', "I voti espressi ({$votanti}) superano i presenti che possono votare sul punto ({$presenti}).");
             }
 
             if ($dati['esito'] !== VotazioneRiunione::ESITO_RINVIATO) {
@@ -528,6 +534,14 @@ class RiunioneController extends Controller
                     $dati['contrari'],
                     $presenti,
                 );
+            }
+        } elseif ($inConflitto > 0) {
+            $presenti = $riunione->partecipanti()->where('stato', RiunionePartecipante::STATO_CONFERMATO)->count() - $inConflitto;
+
+            if ($votanti > $presenti) {
+                return redirect()
+                    ->route('riunioni.show', $riunione)
+                    ->with('error', "I voti espressi ({$votanti}) superano i presenti che possono votare sul punto ({$presenti}): chi è in conflitto non vota.");
             }
         }
 
@@ -748,6 +762,12 @@ class RiunioneController extends Controller
             return 'Nessuna votazione registrata.';
         }
 
+        // Conflitti di interesse dichiarati per punto (issue #11)
+        $conflitti = $riunione->conflitti()
+            ->with(['socio' => fn ($q) => $q->withoutGlobalScope('sede')->withTrashed()])
+            ->get()
+            ->groupBy('punto_indice');
+
         $righe = [];
 
         foreach ($riunione->votazioni as $votazione) {
@@ -776,6 +796,11 @@ class RiunioneController extends Controller
 
             if ($votazione->isOnline()) {
                 $righe[] = '   '.$this->dettaglioVotoOnline($votazione);
+            }
+
+            foreach ($conflitti->get($votazione->punto_indice, collect()) as $conflitto) {
+                $righe[] = "   {$conflitto->socio?->nome_completo} dichiara un conflitto di interesse e non partecipa al voto"
+                    .(filled($conflitto->motivazione) ? " ({$conflitto->motivazione})." : '.');
             }
         }
 

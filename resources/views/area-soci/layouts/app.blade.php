@@ -25,6 +25,10 @@
                 $voce('area-soci.bacheca', 'area-soci.bacheca', 'bi-megaphone', 'Bacheca'),
                 $voce('area-soci.assemblee', 'area-soci.assemblee*', 'bi-people', 'Assemblee'),
                 $voce('area-soci.proposte', 'area-soci.proposte*', 'bi-lightbulb', 'Proposte'),
+                // Solo per chi ricopre una carica (issue #11)
+                $socioLayout?->cariche()->attive()->exists()
+                    ? $voce('area-soci.dichiarazione-interessi', 'area-soci.dichiarazione-interessi*', 'bi-shield-check', 'Conflitti di interesse')
+                    : null,
                 $voce('area-soci.sondaggi', 'area-soci.sondaggi*', 'bi-bar-chart', 'Sondaggi'),
                 $voce('area-soci.volontariato', 'area-soci.volontariato*', 'bi-person-raised-hand', 'Volontariato'),
             ]),

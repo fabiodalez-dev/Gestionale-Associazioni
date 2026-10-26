@@ -31,6 +31,7 @@ class VotoAssembleaService
 {
     public function __construct(
         private readonly AssembleaService $assemblea,
+        private readonly ConflittiService $conflitti,
     ) {}
 
     public function apri(Riunione $riunione, int $puntoIndice, bool $segreta): VotazioneRiunione
@@ -107,7 +108,9 @@ class VotoAssembleaService
             $contrari = (int) ($online[VotoRiunione::CONTRARIO] ?? 0) + (int) ($sala['contrari'] ?? 0);
             $astenuti = (int) ($online[VotoRiunione::ASTENUTO] ?? 0) + (int) ($sala['astenuti'] ?? 0);
 
-            $presenti = $this->assemblea->quorum($riunione)['presenti'];
+            // Chi è in conflitto sul punto non vota e non conta nella base (issue #11)
+            $presenti = $this->assemblea->quorum($riunione)['presenti']
+                - $this->conflitti->presentiInConflitto($riunione, $votazione->punto_indice);
             $votanti = $favorevoli + $contrari + $astenuti;
 
             if ($votanti > $presenti) {
@@ -139,12 +142,20 @@ class VotoAssembleaService
     /**
      * Soci per cui il socio può votare ora: sé stesso se presente con diritto
      * di voto, più i deleganti con delega valida. Chiave = id del
-     * rappresentato, valore = nome da mostrare.
+     * rappresentato, valore = nome da mostrare. Sul punto indicato sono
+     * esclusi i soci in conflitto di interesse; se il votante stesso è in
+     * conflitto non vota nemmeno per delega (issue #11).
      *
      * @return Collection<string, string>
      */
-    public function rappresentati(Riunione $riunione, Socio $socio): Collection
+    public function rappresentati(Riunione $riunione, Socio $socio, ?int $puntoIndice = null): Collection
     {
+        $inConflitto = $puntoIndice !== null ? $this->conflitti->inConflitto($riunione, $puntoIndice) : [];
+
+        if (in_array($socio->id, $inConflitto, true)) {
+            return collect();
+        }
+
         $presente = RiunionePartecipante::query()
             ->where('riunione_id', $riunione->id)
             ->where('socio_id', $socio->id)
@@ -162,7 +173,7 @@ class VotoAssembleaService
             ->get()
             ->mapWithKeys(fn ($delega) => [$delega->delegante_socio_id => 'Per delega di '.$delega->delegante?->nome_completo]);
 
-        return collect([$socio->id => 'Il tuo voto'])->union($deleganti);
+        return collect([$socio->id => 'Il tuo voto'])->union($deleganti)->except($inConflitto);
     }
 
     /**
@@ -175,7 +186,7 @@ class VotoAssembleaService
     public function vota(VotazioneRiunione $votazione, Socio $votante, array $voti): int
     {
         $riunione = $votazione->riunione;
-        $ammessi = $this->rappresentati($riunione, $votante);
+        $ammessi = $this->rappresentati($riunione, $votante, $votazione->punto_indice);
 
         if ($ammessi->isEmpty()) {
             throw new VotoNonValidoException('Per votare devi risultare presente all\'assemblea con diritto di voto.');

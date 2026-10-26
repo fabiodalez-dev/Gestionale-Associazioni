@@ -234,6 +234,11 @@ Schedule::command('adempimenti:promemoria')
     ->monthlyOn(1, '08:00')
     ->withoutOverlapping();
 
+// Conflitti di interesse (issue #11): promemoria mensile ai titolari di cariche
+Schedule::command('conflitti:promemoria-dichiarazioni')
+    ->monthlyOn(1, '08:30')
+    ->withoutOverlapping();
+
 /*
 | Archivi dei dati personali (GDPR): cancella quelli più vecchi di
 | personal-data-export.delete_after_days.

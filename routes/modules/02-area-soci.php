@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AreaSoci\AssembleeController;
 use App\Http\Controllers\AreaSoci\DashboardController;
+use App\Http\Controllers\AreaSoci\DichiarazioneInteressiController;
 use App\Http\Controllers\AreaSoci\EmailOptOutController;
 use App\Http\Controllers\AreaSoci\LoginController;
 use App\Http\Controllers\AreaSoci\PasswordResetController;
@@ -108,6 +109,12 @@ Route::prefix('area-soci')->name('area-soci.')->group(function () {
         Route::post('/assemblee/{riunione}/votazioni/{votazione}', [AssembleeController::class, 'vota'])
             ->middleware('throttle:30,1')
             ->name('assemblee.vota');
+        // Dichiarazione annuale sui conflitti di interesse (issue #11)
+        Route::get('/dichiarazione-interessi', [DichiarazioneInteressiController::class, 'show'])->name('dichiarazione-interessi');
+        Route::post('/dichiarazione-interessi', [DichiarazioneInteressiController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('dichiarazione-interessi.store');
+
         // Elezioni: candidature e scheda (issue #9)
         Route::post('/elezioni/{elezione}/candidatura', [AssembleeController::class, 'candida'])
             ->middleware('throttle:10,1')

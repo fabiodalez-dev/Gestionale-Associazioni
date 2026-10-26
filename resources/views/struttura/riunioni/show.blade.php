@@ -78,6 +78,42 @@
                         @if ($riunione->isAssemblea() && $riunione->maggioranzaPunto($i) !== 'semplice')
                             <div class="small text-muted">Maggioranza {{ mb_strtolower(\App\Models\Riunione::MAGGIORANZE[$riunione->maggioranzaPunto($i)]) }}</div>
                         @endif
+
+                        {{-- Conflitti di interesse sul punto (issue #11) --}}
+                        @php $conflittiPunto = $riunione->conflitti->where('punto_indice', $i); @endphp
+                        <div class="small mb-2">
+                            @foreach ($conflittiPunto as $conflitto)
+                                <span class="badge text-bg-light border me-1">
+                                    <i class="bi bi-shield-exclamation me-1"></i>{{ $conflitto->socio?->nome_completo }} in conflitto
+                                    @if ($riunione->stato !== 'annullata')
+                                        <form method="POST" action="{{ route('riunioni.conflitti.destroy', [$riunione, $conflitto]) }}" class="d-inline">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-link btn-sm p-0 ms-1 align-baseline" title="Rimuovi" aria-label="Rimuovi conflitto"><i class="bi bi-x"></i></button>
+                                        </form>
+                                    @endif
+                                </span>
+                            @endforeach
+                            @if ($riunione->stato !== 'annullata')
+                                <a class="text-decoration-none" data-bs-toggle="collapse" href="#conflitto-{{ $i }}" role="button" aria-expanded="false">Dichiara un conflitto</a>
+                                <form method="POST" action="{{ route('riunioni.conflitti.store', $riunione) }}" class="collapse row g-2 mt-1" id="conflitto-{{ $i }}">
+                                    @csrf
+                                    <input type="hidden" name="punto_indice" value="{{ $i }}">
+                                    <div class="col-md-4">
+                                        @if ($riunione->isAssemblea())
+                                            <input type="text" name="socio" class="form-control form-control-sm" placeholder="N. socio o tessera" maxlength="255" required aria-label="Socio">
+                                        @else
+                                            <select name="socio" class="form-select form-select-sm" required aria-label="Socio">
+                                                @foreach ($riunione->partecipanti->whereNotNull('socio_id') as $p)
+                                                    <option value="{{ $p->socio_id }}">{{ $p->nomeCompleto() }}</option>
+                                                @endforeach
+                                            </select>
+                                        @endif
+                                    </div>
+                                    <div class="col-md-6"><input type="text" name="motivazione" class="form-control form-control-sm" maxlength="1000" placeholder="Motivazione (facoltativa)" aria-label="Motivazione"></div>
+                                    <div class="col-md-2"><button type="submit" class="btn btn-sm btn-outline-primary w-100">Registra</button></div>
+                                </form>
+                            @endif
+                        </div>
                         @if ($descrizione)<div class="text-muted small mb-2">{{ $descrizione }}</div>@endif
 
                         @if ($votazione && $votazione->isAperta())

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Struttura\AdempimentoController;
+use App\Http\Controllers\Struttura\ConflittoController;
 use App\Http\Controllers\Struttura\DecisioneController;
 use App\Http\Controllers\Struttura\ElezioneController;
 use App\Http\Controllers\Struttura\RiunioneController;
@@ -50,6 +51,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('{riunione}/deleghe', [RiunioneController::class, 'registraDelega'])->name('deleghe.store');
         Route::delete('{riunione}/deleghe/{delega}', [RiunioneController::class, 'revocaDelega'])->name('deleghe.destroy');
 
+        // Conflitti di interesse per punto dell'OdG (issue #11)
+        Route::post('{riunione}/conflitti', [ConflittoController::class, 'storeConflitto'])->name('conflitti.store');
+        Route::delete('{riunione}/conflitti/{conflitto}', [ConflittoController::class, 'destroyConflitto'])->name('conflitti.destroy');
+
         // Elezioni in assemblea (issue #9)
         Route::post('{riunione}/elezioni', [ElezioneController::class, 'store'])->name('elezioni.store');
 
@@ -61,6 +66,15 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('{riunione}/votazioni', [RiunioneController::class, 'registraVotazione'])->name('votazioni.store');
         // Genera bozza verbale precompilato (f.18)
         Route::post('{riunione}/genera-verbale', [RiunioneController::class, 'generaVerbale'])->name('genera-verbale');
+    });
+
+    // ----- Registro dei conflitti di interesse (issue #11) -----
+    Route::prefix('conflitti-interesse')->name('conflitti.')->group(function () {
+        Route::get('/', [ConflittoController::class, 'index'])->name('index');
+        Route::get('pdf', [ConflittoController::class, 'pdf'])->name('pdf');
+        Route::post('raccolta', [ConflittoController::class, 'avviaRaccolta'])->name('raccolta');
+        Route::delete('raccolta', [ConflittoController::class, 'fermaRaccolta'])->name('raccolta.ferma');
+        Route::post('dichiarazioni', [ConflittoController::class, 'registraDichiarazione'])->name('dichiarazioni.store');
     });
 
     // ----- Elezioni e rinnovo delle cariche (issue #9) -----

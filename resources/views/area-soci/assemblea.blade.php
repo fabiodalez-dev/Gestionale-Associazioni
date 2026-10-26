@@ -86,7 +86,8 @@
     @foreach ($votazioni as $votazione)
         @php
             $votati = $giaVotati->get($votazione->id, []);
-            $daVotare = $rappresentati->except($votati);
+            $ammessi = $rappresentatiPerVotazione->get($votazione->id, collect());
+            $daVotare = $ammessi->except($votati);
         @endphp
         <div class="card mb-3">
             <div class="card-header d-flex justify-content-between align-items-center gap-2">
@@ -97,6 +98,8 @@
                 @if ($votazione->isAperta())
                     @if ($rappresentati->isEmpty())
                         <p class="text-muted mb-0">Per votare devi risultare presente con diritto di voto.</p>
+                    @elseif ($ammessi->isEmpty())
+                        <p class="text-muted mb-0">Hai dichiarato un conflitto di interesse su questo punto: non partecipi al voto.</p>
                     @elseif ($daVotare->isEmpty())
                         <p class="text-success mb-0"><i class="bi bi-check2-circle me-1"></i>Hai votato. Il risultato sarà visibile alla chiusura.</p>
                     @else

@@ -415,6 +415,31 @@ CREATE TABLE `crm_opportunita` (
   CONSTRAINT `crm_opportunita_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `deleghe_riunione`;
+CREATE TABLE `deleghe_riunione` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `riunione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `delegante_socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `delegato_socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `origine` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `registrata_da` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_deleghe_riunione_delegante` (`riunione_id`,`delegante_socio_id`),
+  KEY `idx_deleghe_riunione_delegato` (`riunione_id`,`delegato_socio_id`),
+  KEY `deleghe_riunione_delegante_socio_id_foreign` (`delegante_socio_id`),
+  KEY `deleghe_riunione_delegato_socio_id_foreign` (`delegato_socio_id`),
+  KEY `deleghe_riunione_registrata_da_foreign` (`registrata_da`),
+  KEY `deleghe_riunione_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `deleghe_riunione_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `deleghe_riunione_delegante_socio_id_foreign` FOREIGN KEY (`delegante_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `deleghe_riunione_delegato_socio_id_foreign` FOREIGN KEY (`delegato_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `deleghe_riunione_registrata_da_foreign` FOREIGN KEY (`registrata_da`) REFERENCES `utenti` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `deleghe_riunione_riunione_id_foreign` FOREIGN KEY (`riunione_id`) REFERENCES `riunioni` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `documenti`;
 CREATE TABLE `documenti` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -1280,7 +1305,16 @@ CREATE TABLE `riunioni` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `titolo` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `organo` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'direttivo',
   `data_ora` datetime NOT NULL,
+  `seconda_convocazione_at` datetime DEFAULT NULL,
+  `quorum_prima` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `quorum_seconda` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `requisito_quota_pagata` tinyint(1) NOT NULL DEFAULT '0',
+  `escludi_minorenni_voto` tinyint(1) NOT NULL DEFAULT '1',
+  `max_deleghe_per_socio` tinyint unsigned NOT NULL DEFAULT '1',
+  `deleghe_vietate_cariche` tinyint(1) NOT NULL DEFAULT '0',
+  `aventi_diritto_at` datetime DEFAULT NULL,
   `luogo` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `spazio_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `odg` json DEFAULT NULL,
@@ -1307,7 +1341,9 @@ CREATE TABLE `riunioni_partecipanti` (
   `socio_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `utente_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `carica_ruolo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `avente_diritto_voto` tinyint(1) NOT NULL DEFAULT '1',
   `stato` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'invitato',
+  `presente_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -1316,6 +1352,7 @@ CREATE TABLE `riunioni_partecipanti` (
   KEY `riunioni_partecipanti_socio_id_foreign` (`socio_id`),
   KEY `riunioni_partecipanti_utente_id_foreign` (`utente_id`),
   KEY `riunioni_partecipanti_associazione_id_index` (`associazione_id`),
+  KEY `idx_riunioni_partecipanti_stato` (`riunione_id`,`stato`),
   CONSTRAINT `riunioni_partecipanti_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
   CONSTRAINT `riunioni_partecipanti_riunione_id_foreign` FOREIGN KEY (`riunione_id`) REFERENCES `riunioni` (`id`) ON DELETE CASCADE,
   CONSTRAINT `riunioni_partecipanti_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
@@ -1983,6 +2020,8 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_23_120000_add_limitato_sedi_to_utenti_table', 1),
 ('2026_10_24_100000_create_richieste_registrazione_table', 1),
 ('2026_10_24_110000_add_email_verificata_to_richieste_registrazione', 1),
-('2026_10_25_100000_create_crm_opportunita_table', 1);
+('2026_10_25_100000_create_crm_opportunita_table', 1),
+('2026_10_27_100000_add_assemblea_soci_to_riunioni', 1),
+('2026_10_27_110000_create_deleghe_riunione_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

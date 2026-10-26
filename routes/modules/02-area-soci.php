@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AreaSoci\AssembleeController;
 use App\Http\Controllers\AreaSoci\DashboardController;
 use App\Http\Controllers\AreaSoci\EmailOptOutController;
 use App\Http\Controllers\AreaSoci\LoginController;
@@ -90,6 +91,15 @@ Route::prefix('area-soci')->name('area-soci.')->group(function () {
         Route::get('/dati-personali/{file}', [DatiPersonaliController::class, 'scaricaSocio'])
             ->middleware('signed:relative')
             ->name('dati-personali.scarica');
+
+        // Assemblee dei soci e deleghe (issues #6 e #7)
+        Route::get('/assemblee', [AssembleeController::class, 'index'])->name('assemblee');
+        Route::post('/assemblee/{riunione}/delega', [AssembleeController::class, 'delega'])
+            ->middleware('throttle:10,1')
+            ->name('assemblee.delega');
+        Route::delete('/assemblee/{riunione}/delega', [AssembleeController::class, 'revoca'])
+            ->middleware('throttle:10,1')
+            ->name('assemblee.revoca');
 
         Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     });

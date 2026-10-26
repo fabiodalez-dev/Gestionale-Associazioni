@@ -13,7 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Partecipante invitato a una riunione (f.17 del piano "Organizzazione 3"):
  * socio intestatario di carica (round 1) oppure utente admin, con snapshot
- * del ruolo al momento dell'invito e stato di presenza.
+ * del ruolo al momento dell'invito e stato di presenza. Nelle assemblee
+ * (issue #6) è un socio dell'elenco aventi diritto: avente_diritto_voto
+ * è false per chi partecipa senza voto (es. minorenni) e presente_at
+ * registra l'ora dell'appello.
  */
 class RiunionePartecipante extends Model
 {
@@ -42,8 +45,18 @@ class RiunionePartecipante extends Model
         'socio_id',
         'utente_id',
         'carica_ruolo',
+        'avente_diritto_voto',
         'stato',
+        'presente_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'avente_diritto_voto' => 'boolean',
+            'presente_at' => 'datetime',
+        ];
+    }
 
     public function isPresente(): bool
     {
@@ -67,6 +80,17 @@ class RiunionePartecipante extends Model
     public function scopeConfermati(Builder $query): Builder
     {
         return $query->where('stato', self::STATO_CONFERMATO);
+    }
+
+    /**
+     * Partecipanti con diritto di voto (base del quorum in assemblea).
+     *
+     * @param  Builder<RiunionePartecipante>  $query
+     * @return Builder<RiunionePartecipante>
+     */
+    public function scopeConDirittoDiVoto(Builder $query): Builder
+    {
+        return $query->where('avente_diritto_voto', true);
     }
 
     /**

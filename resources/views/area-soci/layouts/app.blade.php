@@ -23,6 +23,7 @@
             ]),
             'Vita associativa' => array_filter([
                 $voce('area-soci.bacheca', 'area-soci.bacheca', 'bi-megaphone', 'Bacheca'),
+                $voce('area-soci.assemblee', 'area-soci.assemblee*', 'bi-people', 'Assemblee'),
                 $voce('area-soci.sondaggi', 'area-soci.sondaggi*', 'bi-bar-chart', 'Sondaggi'),
                 $voce('area-soci.volontariato', 'area-soci.volontariato*', 'bi-person-raised-hand', 'Volontariato'),
             ]),

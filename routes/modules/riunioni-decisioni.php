@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Route;
 |
 | Riunioni del direttivo con OdG strutturato, inviti agli intestatari delle
 | cariche (round 1) + convocazione email brandizzata, votazioni per punto e
-| generazione bozza Verbale (modulo verbali esistente). Pagina Decisioni
+| generazione bozza Verbale (modulo verbali esistente). Assemblee dei soci
+| (issue #6): elenco aventi diritto, appello e quorum; deleghe (issue #7). Pagina Decisioni
 | aggregata e ricercabile. Adempimenti ricorrenti con checklist per anno
 | dentro lo Scadenzario esistente.
 |
@@ -35,6 +36,17 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         // Stato presenza di un partecipante (f.17)
         Route::put('{riunione}/partecipanti/{partecipante}/presenza', [RiunioneController::class, 'aggiornaPresenza'])
             ->name('partecipanti.presenza');
+
+        // Assemblea dei soci (issue #6): aventi diritto e appello
+        Route::post('{riunione}/aventi-diritto', [RiunioneController::class, 'aventiDiritto'])->name('aventi-diritto');
+        Route::get('{riunione}/appello', [RiunioneController::class, 'appello'])->name('appello');
+        Route::post('{riunione}/appello', [RiunioneController::class, 'registraPresenzaCodice'])
+            ->middleware('throttle:120,1')
+            ->name('appello.codice');
+
+        // Deleghe registrate dalla segreteria (issue #7)
+        Route::post('{riunione}/deleghe', [RiunioneController::class, 'registraDelega'])->name('deleghe.store');
+        Route::delete('{riunione}/deleghe/{delega}', [RiunioneController::class, 'revocaDelega'])->name('deleghe.destroy');
 
         // Votazioni per punto OdG (f.18)
         Route::post('{riunione}/votazioni', [RiunioneController::class, 'registraVotazione'])->name('votazioni.store');

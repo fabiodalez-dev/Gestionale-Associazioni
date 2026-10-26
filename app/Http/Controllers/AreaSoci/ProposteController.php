@@ -4,6 +4,7 @@ namespace App\Http\Controllers\AreaSoci;
 
 use App\Http\Controllers\Controller;
 use App\Models\AdesioneProposta;
+use App\Models\Discussione;
 use App\Models\Proposta;
 use App\Models\Socio;
 use App\Services\Struttura\PropostaNonValidaException;
@@ -43,9 +44,18 @@ class ProposteController extends Controller
             ->pluck('proposta_id')
             ->flip();
 
+        // Da una propria discussione (issue #13): titolo e testo precompilati
+        $daDiscussione = $request->filled('da_discussione')
+            ? Discussione::query()->whereKey($request->query('da_discussione'))->where('socio_id', $socio->id)->first()
+            : null;
+
         return view('area-soci.proposte', [
             'socio' => $socio,
             'proposte' => $proposte,
+            'precompilata' => $daDiscussione === null ? null : [
+                'titolo' => $daDiscussione->titolo,
+                'testo' => (string) $daDiscussione->messaggi()->orderBy('created_at')->value('testo'),
+            ],
             'mieAdesioni' => $mieAdesioni,
             'soglia' => $this->proposte->soglia($socio->associazione),
         ]);

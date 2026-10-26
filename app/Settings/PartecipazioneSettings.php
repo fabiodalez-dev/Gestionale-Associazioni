@@ -4,8 +4,9 @@ namespace App\Settings;
 
 /**
  * Partecipazione dei soci alla vita associativa: proposte con raccolta di
- * adesioni (issue #10) e raccolta annuale delle dichiarazioni sui conflitti
- * di interesse di chi ricopre una carica (issue #11).
+ * adesioni (issue #10), raccolta annuale delle dichiarazioni sui conflitti
+ * di interesse di chi ricopre una carica (issue #11) e regolamento dello
+ * spazio di discussione tra soci (issue #13).
  */
 class PartecipazioneSettings extends ImpostazioniAssociazione
 {
@@ -20,6 +21,16 @@ class PartecipazioneSettings extends ImpostazioniAssociazione
 
     /** Anno della raccolta delle dichiarazioni in corso (promemoria mensili), null se ferma. */
     public ?int $dichiarazioni_anno_campagna;
+
+    /** Regolamento delle discussioni, da accettare al primo accesso. */
+    public string $discussioni_regolamento;
+
+    public const REGOLAMENTO_PREDEFINITO = "Le discussioni sono uno spazio dei soci per confrontarsi sulla vita dell'associazione.\n\n"
+        ."- Scrivi con rispetto: niente insulti, attacchi personali o linguaggio offensivo.\n"
+        ."- Resta in tema con lo spazio in cui scrivi.\n"
+        ."- Non pubblicare dati personali di altri (telefoni, indirizzi, email) né pubblicità.\n"
+        ."- Quello che scrivi è visibile agli altri soci che hanno accesso allo spazio.\n"
+        .'- La segreteria può nascondere i messaggi che non rispettano queste regole e sospendere chi le viola.';
 
     public static function group(): string
     {
@@ -39,6 +50,7 @@ class PartecipazioneSettings extends ImpostazioniAssociazione
             'proposte_soglia_percentuale' => filter_var($valori['proposte_soglia_percentuale'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'proposte_moderazione' => filter_var($valori['proposte_moderazione'] ?? true, FILTER_VALIDATE_BOOLEAN),
             'dichiarazioni_anno_campagna' => filled($valori['dichiarazioni_anno_campagna'] ?? null) ? (int) $valori['dichiarazioni_anno_campagna'] : null,
+            'discussioni_regolamento' => filled($valori['discussioni_regolamento'] ?? null) ? (string) $valori['discussioni_regolamento'] : self::REGOLAMENTO_PREDEFINITO,
         ];
     }
 }

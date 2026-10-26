@@ -12,16 +12,16 @@
 
     <p class="text-muted">Proponi un'attività, una modifica al regolamento o una mozione. Con {{ $soglia }} adesioni la proposta viene esaminata dal direttivo o dall'assemblea.</p>
 
-    <div class="collapse mb-4 @if ($errors->any()) show @endif" id="nuovaProposta">
+    <div class="collapse mb-4 @if ($errors->any() || $precompilata) show @endif" id="nuovaProposta">
         <form method="POST" action="{{ route('area-soci.proposte.store') }}" class="card card-body">
             @csrf
             <div class="mb-2">
                 <label class="form-label" for="propTitolo">Titolo</label>
-                <input type="text" name="titolo" id="propTitolo" class="form-control" maxlength="200" value="{{ old('titolo') }}" required>
+                <input type="text" name="titolo" id="propTitolo" class="form-control" maxlength="200" value="{{ old('titolo', $precompilata['titolo'] ?? '') }}" required>
             </div>
             <div class="mb-2">
                 <label class="form-label" for="propTesto">Proposta</label>
-                <textarea name="testo" id="propTesto" class="form-control" rows="5" maxlength="5000" required>{{ old('testo') }}</textarea>
+                <textarea name="testo" id="propTesto" class="form-control" rows="5" maxlength="5000" required>{{ old('testo', $precompilata['testo'] ?? '') }}</textarea>
             </div>
             <div class="row g-2 mb-3">
                 <div class="col-md-6">

@@ -257,6 +257,31 @@ CREATE TABLE `attrezzature` (
   CONSTRAINT `attrezzature_spazio_id_foreign` FOREIGN KEY (`spazio_id`) REFERENCES `spazi` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `bilanci_sociali`;
+CREATE TABLE `bilanci_sociali` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `anno` smallint unsigned NOT NULL,
+  `stato` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'bozza',
+  `dati` json DEFAULT NULL,
+  `testi` json DEFAULT NULL,
+  `verbale_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `documento_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `generato_at` datetime DEFAULT NULL,
+  `approvato_at` datetime DEFAULT NULL,
+  `pubblicato_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_bilanci_sociali_anno` (`associazione_id`,`anno`),
+  KEY `bilanci_sociali_verbale_id_foreign` (`verbale_id`),
+  KEY `bilanci_sociali_documento_id_foreign` (`documento_id`),
+  KEY `bilanci_sociali_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `bilanci_sociali_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `bilanci_sociali_documento_id_foreign` FOREIGN KEY (`documento_id`) REFERENCES `documenti` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `bilanci_sociali_verbale_id_foreign` FOREIGN KEY (`verbale_id`) REFERENCES `verbali` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `cache`;
 CREATE TABLE `cache` (
   `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2463,6 +2488,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_150000_create_conflitti_interesse_tables', 1),
 ('2026_10_27_160000_create_manuale_operativo_tables', 1),
 ('2026_10_27_170000_create_discussioni_tables', 1),
-('2026_10_27_180000_create_rubrica_soci_tables', 1);
+('2026_10_27_180000_create_rubrica_soci_tables', 1),
+('2026_10_27_190000_create_bilanci_sociali_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -137,6 +137,13 @@
                         <i class="bi bi-graph-up-arrow"></i>Statistiche annuali
                     </a>
                 </li>
+                @if ($can('documenti.view'))
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('bilancio-sociale.*') ? 'active' : '' }}" href="{{ $nav('bilancio-sociale.index') }}">
+                        <i class="bi bi-journal-richtext"></i>Bilancio sociale
+                    </a>
+                </li>
+                @endif
             </ul>
 
             @if ($can('soci.view') || $can('tessere.view') || $can('quote.view'))

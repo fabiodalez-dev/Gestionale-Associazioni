@@ -115,6 +115,20 @@
                 <label class="form-check-label" for="delegheCariche">Chi ricopre una carica non può ricevere deleghe</label>
             </div>
         </div>
+        <div class="col-12">
+            <input type="hidden" name="voto_online" value="0">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="voto_online" value="1" id="votoOnline"
+                       @checked(old('voto_online', $riunione?->voto_online ?? false))>
+                <label class="form-check-label" for="votoOnline">Voto online: i presenti votano dall'area soci, anche dallo smartphone</label>
+            </div>
+            <input type="hidden" name="partecipazione_remota" value="0">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="partecipazione_remota" value="1" id="partecipazioneRemota"
+                       @checked(old('partecipazione_remota', $riunione?->partecipazione_remota ?? false))>
+                <label class="form-check-label" for="partecipazioneRemota">Partecipazione a distanza: il socio registra la propria presenza dall'area soci</label>
+            </div>
+        </div>
     </div>
     <div class="form-text mt-2">Predefiniti: ordinaria con maggioranza assoluta in prima e qualunque numero in seconda; straordinaria con tre quarti in prima e maggioranza assoluta in seconda. Adeguali al tuo statuto.</div>
 </fieldset>

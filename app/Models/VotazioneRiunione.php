@@ -9,11 +9,16 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Votazione su un punto dell'OdG (f.18 del piano "Organizzazione 3"):
  * esito con conteggio favorevoli/contrari/astenuti, unica per
  * riunione+punto; le approvate alimentano l'archivio Decisioni (f.19).
+ *
+ * Voto online in assemblea (issue #8): aperta_at/chiusa_at delimitano il
+ * periodo in cui i soci votano dall'area soci; i voti sono in voti_riunione
+ * (anonimi se segreta) e chi ha votato in votanti_riunione.
  */
 class VotazioneRiunione extends Model
 {
@@ -44,6 +49,9 @@ class VotazioneRiunione extends Model
         'favorevoli',
         'contrari',
         'astenuti',
+        'segreta',
+        'aperta_at',
+        'chiusa_at',
         'note',
     ];
 
@@ -54,7 +62,38 @@ class VotazioneRiunione extends Model
             'favorevoli' => 'integer',
             'contrari' => 'integer',
             'astenuti' => 'integer',
+            'segreta' => 'boolean',
+            'aperta_at' => 'datetime',
+            'chiusa_at' => 'datetime',
         ];
+    }
+
+    /** Voto online in corso: aperto e non ancora chiuso. */
+    public function isAperta(): bool
+    {
+        return $this->aperta_at !== null && $this->chiusa_at === null;
+    }
+
+    /** Votazione nata dal voto online (aperta almeno una volta). */
+    public function isOnline(): bool
+    {
+        return $this->aperta_at !== null;
+    }
+
+    /**
+     * @return HasMany<VotoRiunione, $this>
+     */
+    public function voti(): HasMany
+    {
+        return $this->hasMany(VotoRiunione::class, 'votazione_id');
+    }
+
+    /**
+     * @return HasMany<VotanteRiunione, $this>
+     */
+    public function votanti(): HasMany
+    {
+        return $this->hasMany(VotanteRiunione::class, 'votazione_id');
     }
 
     public function isApprovata(): bool

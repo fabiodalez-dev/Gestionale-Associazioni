@@ -26,7 +26,12 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span class="fw-semibold">{{ $riunione->titolo }}</span>
-                <span class="text-muted small">{{ $riunione->organoLabel() }}</span>
+                <span class="d-flex align-items-center gap-2">
+                    <span class="text-muted small">{{ $riunione->organoLabel() }}</span>
+                    @if ($riunione->voto_online || $riunione->partecipazione_remota)
+                        <a href="{{ route('area-soci.assemblee.show', $riunione) }}" class="btn btn-sm btn-primary">{{ $riunione->data_ora->isFuture() ? 'Dettagli' : 'Partecipa e vota' }}</a>
+                    @endif
+                </span>
             </div>
             <div class="card-body">
                 <dl class="row mb-3">

@@ -14,6 +14,7 @@ use App\Models\Spazio;
 use App\Models\Utente;
 use App\Models\Verbale;
 use App\Models\VotazioneRiunione;
+use App\Models\VotoRiunione;
 use App\Notifications\Struttura\ConvocazioneRiunioneNotification;
 use App\Services\Struttura\AssembleaService;
 use App\Services\Struttura\DelegaNonValidaException;
@@ -91,7 +92,7 @@ class RiunioneController extends Controller
         $riunione->load([
             'spazio',
             'verbale',
-            'votazioni' => fn ($q) => $q->orderBy('punto_indice'),
+            'votazioni' => fn ($q) => $q->orderBy('punto_indice')->withCount('votanti'),
         ]);
 
         // In assemblea l'elenco può contare centinaia di soci: si consulta
@@ -489,6 +490,18 @@ class RiunioneController extends Controller
 
         $dati = $request->validated();
 
+        // Il risultato del voto online non si riscrive a mano (issue #8)
+        $esistente = VotazioneRiunione::query()
+            ->where('riunione_id', $riunione->id)
+            ->where('punto_indice', $dati['punto_indice'])
+            ->first();
+
+        if ($esistente?->isOnline()) {
+            return redirect()
+                ->route('riunioni.show', $riunione)
+                ->with('warning', 'Questo punto è stato votato online: il risultato non si modifica a mano.');
+        }
+
         // In assemblea l'esito discende dai numeri e dalla maggioranza del
         // punto; "rinviato" resta una scelta della presidenza
         if ($riunione->isAssemblea()) {
@@ -586,6 +599,34 @@ class RiunioneController extends Controller
         return redirect()
             ->route('verbali.index', ['edit' => $verbale->id])
             ->with('success', "Bozza di verbale n. {$verbale->numero_completo} generata dalla riunione. Rivedila e approvala.");
+    }
+
+    /**
+     * Voto online nel verbale (issue #8): segreto, oppure palese con i nomi
+     * dei soci per opzione (i voti espressi in sala restano solo nei totali).
+     */
+    private function dettaglioVotoOnline(VotazioneRiunione $votazione): string
+    {
+        if ($votazione->segreta) {
+            return 'Votazione a scrutinio segreto con voto elettronico.';
+        }
+
+        $perOpzione = VotoRiunione::query()
+            ->where('votazione_id', $votazione->id)
+            ->with(['socio' => fn ($q) => $q->withoutGlobalScope('sede')->withTrashed()])
+            ->get()
+            ->groupBy('opzione');
+
+        $parti = [];
+        foreach (VotoRiunione::OPZIONI as $opzione => $etichetta) {
+            $nomi = $perOpzione->get($opzione, collect())->map(fn (VotoRiunione $v) => $v->socio?->nome_completo)->filter()->sort()->values();
+
+            if ($nomi->isNotEmpty()) {
+                $parti[] = "{$etichetta}: ".$nomi->implode(', ');
+            }
+        }
+
+        return 'Voto palese online. '.($parti === [] ? 'Nessun voto online.' : implode('; ', $parti).'.');
     }
 
     /**
@@ -715,6 +756,10 @@ class RiunioneController extends Controller
                 $maggioranza,
                 filled($votazione->note) ? ' '.$votazione->note : ''
             );
+
+            if ($votazione->isOnline()) {
+                $righe[] = '   '.$this->dettaglioVotoOnline($votazione);
+            }
         }
 
         return implode("\n", $righe);

@@ -80,7 +80,23 @@
                         @endif
                         @if ($descrizione)<div class="text-muted small mb-2">{{ $descrizione }}</div>@endif
 
-                        @if ($votazione)
+                        @if ($votazione && $votazione->isAperta())
+                            {{-- Voto online in corso (issue #8) --}}
+                            <div class="alert alert-info py-2 mb-0">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <span><strong>Voto {{ $votazione->segreta ? 'segreto' : 'palese' }} aperto</strong> dalle {{ $votazione->aperta_at->format('H:i') }} — <span class="tabular">{{ $votazione->votanti_count }}</span> voti ricevuti online</span>
+                                </div>
+                                <form method="POST" action="{{ route('riunioni.voto-online.chiudi', [$riunione, $votazione]) }}" class="row g-2 align-items-end"
+                                      onsubmit="return confirm('Chiudere il voto e calcolare l\'esito?');">
+                                    @csrf
+                                    <div class="col-12 small">Voti espressi in sala da aggiungere (facoltativo):</div>
+                                    <div class="col-4 col-md-3"><input type="number" name="favorevoli" class="form-control form-control-sm" min="0" placeholder="Favorevoli" aria-label="Favorevoli in sala"></div>
+                                    <div class="col-4 col-md-3"><input type="number" name="contrari" class="form-control form-control-sm" min="0" placeholder="Contrari" aria-label="Contrari in sala"></div>
+                                    <div class="col-4 col-md-3"><input type="number" name="astenuti" class="form-control form-control-sm" min="0" placeholder="Astenuti" aria-label="Astenuti in sala"></div>
+                                    <div class="col-12 col-md-3"><button type="submit" class="btn btn-sm btn-primary w-100">Chiudi il voto</button></div>
+                                </form>
+                            </div>
+                        @elseif ($votazione)
                             @php
                                 $esitoColore = ['approvato' => 'success', 'respinto' => 'danger', 'rinviato' => 'warning'][$votazione->esito] ?? 'secondary';
                             @endphp
@@ -89,8 +105,9 @@
                                     <strong>{{ ucfirst($votazione->esito) }}</strong>
                                     — Favorevoli {{ $votazione->favorevoli }}, Contrari {{ $votazione->contrari }}, Astenuti {{ $votazione->astenuti }}
                                     @if ($votazione->note)<div class="small mt-1">{{ $votazione->note }}</div>@endif
+                                    @if ($votazione->isOnline())<div class="small mt-1">Voto online {{ $votazione->segreta ? 'segreto' : 'palese' }}, chiuso alle {{ $votazione->chiusa_at?->format('H:i') }}.</div>@endif
                                 </span>
-                                @if ($riunione->isSvolta())
+                                @if ($riunione->isSvolta() && ! $votazione->isOnline())
                                     <button type="button" class="btn btn-sm btn-outline-dark"
                                             data-bs-toggle="modal" data-bs-target="#votazioneModal"
                                             data-punto="{{ $i }}" data-titolo="{{ $titolo }}"
@@ -99,6 +116,17 @@
                                             data-note="{{ $votazione->note }}">Modifica</button>
                                 @endif
                             </div>
+                        @elseif ($riunione->isAssemblea() && $riunione->voto_online && $riunione->stato === 'pianificata')
+                            <form method="POST" action="{{ route('riunioni.voto-online.apri', $riunione) }}" class="d-flex align-items-center gap-3 flex-wrap">
+                                @csrf
+                                <input type="hidden" name="punto_indice" value="{{ $i }}">
+                                <div class="form-check mb-0">
+                                    <input type="hidden" name="segreta" value="0">
+                                    <input class="form-check-input" type="checkbox" name="segreta" value="1" id="segreta-{{ $i }}">
+                                    <label class="form-check-label small" for="segreta-{{ $i }}">Voto segreto</label>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-phone me-1"></i>Apri il voto online</button>
+                            </form>
                         @elseif ($riunione->isSvolta())
                             <button type="button" class="btn btn-sm btn-outline-primary"
                                     data-bs-toggle="modal" data-bs-target="#votazioneModal"

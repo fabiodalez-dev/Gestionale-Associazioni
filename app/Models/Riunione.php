@@ -24,7 +24,8 @@ use Spatie\MediaLibrary\HasMedia;
  * calcolato alla data della riunione, quorum costitutivo per prima e seconda
  * convocazione, esiti calcolati dalla maggioranza richiesta da ogni punto.
  * Deleghe (issue #7): limite per delegato ed eventuale divieto per chi
- * ricopre una carica.
+ * ricopre una carica. Voto online dall'area soci ed eventuale
+ * partecipazione a distanza (issue #8).
  */
 class Riunione extends Model implements HasMedia
 {
@@ -95,6 +96,8 @@ class Riunione extends Model implements HasMedia
         'escludi_minorenni_voto',
         'max_deleghe_per_socio',
         'deleghe_vietate_cariche',
+        'voto_online',
+        'partecipazione_remota',
         'luogo',
         'spazio_id',
         'odg',
@@ -113,6 +116,8 @@ class Riunione extends Model implements HasMedia
             'escludi_minorenni_voto' => 'boolean',
             'max_deleghe_per_socio' => 'integer',
             'deleghe_vietate_cariche' => 'boolean',
+            'voto_online' => 'boolean',
+            'partecipazione_remota' => 'boolean',
             'aventi_diritto_at' => 'datetime',
             'convocazione_inviata_at' => 'datetime',
         ];

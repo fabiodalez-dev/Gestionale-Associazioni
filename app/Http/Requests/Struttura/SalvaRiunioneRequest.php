@@ -49,6 +49,8 @@ class SalvaRiunioneRequest extends FormRequest
                 ? $this->boolean('escludi_minorenni_voto')
                 : true,
             'deleghe_vietate_cariche' => $this->boolean('deleghe_vietate_cariche'),
+            'voto_online' => $this->boolean('voto_online'),
+            'partecipazione_remota' => $this->boolean('partecipazione_remota'),
         ]);
 
         if (! $this->filled('max_deleghe_per_socio')) {
@@ -105,6 +107,8 @@ class SalvaRiunioneRequest extends FormRequest
             'escludi_minorenni_voto' => ['boolean'],
             'max_deleghe_per_socio' => ['integer', 'min:0', 'max:20'],
             'deleghe_vietate_cariche' => ['boolean'],
+            'voto_online' => ['boolean'],
+            'partecipazione_remota' => ['boolean'],
             'luogo' => ['nullable', 'string', 'max:200'],
             'spazio_id' => [
                 'nullable',

@@ -7,16 +7,22 @@ use App\Models\DelegaRiunione;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
+use App\Models\VotanteRiunione;
+use App\Models\VotazioneRiunione;
+use App\Models\VotoRiunione;
 use App\Services\Struttura\DelegaNonValidaException;
 use App\Services\Struttura\DelegheService;
+use App\Services\Struttura\VotoAssembleaService;
+use App\Services\Struttura\VotoNonValidoException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Assemblee nell'area soci (issues #6 e #7): le assemblee in cui il socio
+ * Assemblee nell'area soci (issues #6, #7 e #8): le assemblee in cui il socio
  * è tra gli aventi diritto, con la possibilità di delegare un altro socio
- * e di revocare la delega fino all'ora della prima convocazione.
+ * e di revocare la delega fino all'ora della prima convocazione; durante
+ * l'assemblea, presenza a distanza e voto online sui punti aperti.
  *
  * Il delegato si indica con numero socio e cognome: l'area soci non mostra
  * l'elenco degli altri soci.
@@ -25,6 +31,7 @@ class AssembleeController extends Controller
 {
     public function __construct(
         private readonly DelegheService $deleghe,
+        private readonly VotoAssembleaService $voto,
     ) {}
 
     public function index(Request $request): View
@@ -119,5 +126,80 @@ class AssembleeController extends Controller
     private function indietro(string $tipo, string $messaggio): RedirectResponse
     {
         return redirect()->route('area-soci.assemblee')->with($tipo, $messaggio);
+    }
+
+    /**
+     * Assemblea in corso: presenza, voti aperti con i rappresentati del
+     * socio e risultati dei punti già votati.
+     */
+    public function show(Request $request, Riunione $riunione): View|RedirectResponse
+    {
+        /** @var Socio $socio */
+        $socio = $request->user('socio');
+
+        $partecipante = RiunionePartecipante::query()
+            ->where('riunione_id', $riunione->id)
+            ->where('socio_id', $socio->id)
+            ->first();
+
+        if ($partecipante === null || ! $riunione->isAssemblea()) {
+            return $this->indietro('warning', 'Non risulti tra gli aventi diritto di questa assemblea.');
+        }
+
+        $votazioni = VotazioneRiunione::query()
+            ->where('riunione_id', $riunione->id)
+            ->whereNotNull('aperta_at')
+            ->orderBy('punto_indice')
+            ->get();
+
+        $rappresentati = $this->voto->rappresentati($riunione, $socio);
+
+        $giaVotati = VotanteRiunione::query()
+            ->whereIn('votazione_id', $votazioni->pluck('id'))
+            ->whereIn('rappresentato_socio_id', $rappresentati->keys())
+            ->get(['votazione_id', 'rappresentato_socio_id'])
+            ->groupBy('votazione_id')
+            ->map(fn ($righe) => $righe->pluck('rappresentato_socio_id')->all());
+
+        return view('area-soci.assemblea', [
+            'socio' => $socio,
+            'riunione' => $riunione,
+            'partecipante' => $partecipante,
+            'votazioni' => $votazioni,
+            'rappresentati' => $rappresentati,
+            'giaVotati' => $giaVotati,
+            'opzioni' => VotoRiunione::OPZIONI,
+        ]);
+    }
+
+    public function presenza(Request $request, Riunione $riunione): RedirectResponse
+    {
+        try {
+            $this->voto->partecipaDaRemoto($riunione, $request->user('socio'));
+        } catch (VotoNonValidoException $e) {
+            return redirect()->route('area-soci.assemblee.show', $riunione)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('area-soci.assemblee.show', $riunione)->with('success', 'La tua presenza è registrata.');
+    }
+
+    public function vota(Request $request, Riunione $riunione, VotazioneRiunione $votazione): RedirectResponse
+    {
+        abort_unless($votazione->riunione_id === $riunione->id, 404);
+
+        $dati = $request->validate([
+            'voti' => ['required', 'array'],
+            'voti.*' => ['required', 'string'],
+        ]);
+
+        try {
+            $registrati = $this->voto->vota($votazione, $request->user('socio'), $dati['voti']);
+        } catch (VotoNonValidoException $e) {
+            return redirect()->route('area-soci.assemblee.show', $riunione)->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('area-soci.assemblee.show', $riunione)
+            ->with('success', $registrati === 1 ? 'Voto registrato.' : "{$registrati} voti registrati.");
     }
 }

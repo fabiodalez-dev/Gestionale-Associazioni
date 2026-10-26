@@ -3,6 +3,7 @@
 use App\Http\Controllers\Struttura\AdempimentoController;
 use App\Http\Controllers\Struttura\DecisioneController;
 use App\Http\Controllers\Struttura\RiunioneController;
+use App\Http\Controllers\Struttura\VotazioneOnlineController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,6 +48,10 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         // Deleghe registrate dalla segreteria (issue #7)
         Route::post('{riunione}/deleghe', [RiunioneController::class, 'registraDelega'])->name('deleghe.store');
         Route::delete('{riunione}/deleghe/{delega}', [RiunioneController::class, 'revocaDelega'])->name('deleghe.destroy');
+
+        // Voto online in assemblea (issue #8)
+        Route::post('{riunione}/voto-online', [VotazioneOnlineController::class, 'apri'])->name('voto-online.apri');
+        Route::post('{riunione}/voto-online/{votazione}/chiudi', [VotazioneOnlineController::class, 'chiudi'])->name('voto-online.chiudi');
 
         // Votazioni per punto OdG (f.18)
         Route::post('{riunione}/votazioni', [RiunioneController::class, 'registraVotazione'])->name('votazioni.store');

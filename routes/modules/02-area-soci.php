@@ -100,6 +100,14 @@ Route::prefix('area-soci')->name('area-soci.')->group(function () {
         Route::delete('/assemblee/{riunione}/delega', [AssembleeController::class, 'revoca'])
             ->middleware('throttle:10,1')
             ->name('assemblee.revoca');
+        // Assemblea in corso: presenza a distanza e voto online (issue #8)
+        Route::get('/assemblee/{riunione}', [AssembleeController::class, 'show'])->name('assemblee.show');
+        Route::post('/assemblee/{riunione}/presenza', [AssembleeController::class, 'presenza'])
+            ->middleware('throttle:10,1')
+            ->name('assemblee.presenza');
+        Route::post('/assemblee/{riunione}/votazioni/{votazione}', [AssembleeController::class, 'vota'])
+            ->middleware('throttle:30,1')
+            ->name('assemblee.vota');
 
         Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     });

@@ -1314,6 +1314,8 @@ CREATE TABLE `riunioni` (
   `escludi_minorenni_voto` tinyint(1) NOT NULL DEFAULT '1',
   `max_deleghe_per_socio` tinyint unsigned NOT NULL DEFAULT '1',
   `deleghe_vietate_cariche` tinyint(1) NOT NULL DEFAULT '0',
+  `voto_online` tinyint(1) NOT NULL DEFAULT '0',
+  `partecipazione_remota` tinyint(1) NOT NULL DEFAULT '0',
   `aventi_diritto_at` datetime DEFAULT NULL,
   `luogo` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `spazio_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -1933,6 +1935,26 @@ CREATE TABLE `verbali` (
   CONSTRAINT `verbali_evento_id_foreign` FOREIGN KEY (`evento_id`) REFERENCES `eventi` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `votanti_riunione`;
+CREATE TABLE `votanti_riunione` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `votazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `votante_socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `rappresentato_socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_votanti_riunione_rappresentato` (`votazione_id`,`rappresentato_socio_id`),
+  KEY `votanti_riunione_votante_socio_id_foreign` (`votante_socio_id`),
+  KEY `votanti_riunione_rappresentato_socio_id_foreign` (`rappresentato_socio_id`),
+  KEY `votanti_riunione_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `votanti_riunione_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `votanti_riunione_rappresentato_socio_id_foreign` FOREIGN KEY (`rappresentato_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `votanti_riunione_votante_socio_id_foreign` FOREIGN KEY (`votante_socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `votanti_riunione_votazione_id_foreign` FOREIGN KEY (`votazione_id`) REFERENCES `votazioni_riunione` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `votazioni_riunione`;
 CREATE TABLE `votazioni_riunione` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -1943,6 +1965,9 @@ CREATE TABLE `votazioni_riunione` (
   `favorevoli` smallint unsigned NOT NULL DEFAULT '0',
   `contrari` smallint unsigned NOT NULL DEFAULT '0',
   `astenuti` smallint unsigned NOT NULL DEFAULT '0',
+  `segreta` tinyint(1) NOT NULL DEFAULT '0',
+  `aperta_at` datetime DEFAULT NULL,
+  `chiusa_at` datetime DEFAULT NULL,
   `note` text COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
@@ -1951,6 +1976,22 @@ CREATE TABLE `votazioni_riunione` (
   KEY `votazioni_riunione_associazione_id_index` (`associazione_id`),
   CONSTRAINT `votazioni_riunione_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
   CONSTRAINT `votazioni_riunione_riunione_id_foreign` FOREIGN KEY (`riunione_id`) REFERENCES `riunioni` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `voti_riunione`;
+CREATE TABLE `voti_riunione` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `votazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `opzione` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `socio_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_voti_riunione_opzione` (`votazione_id`,`opzione`),
+  KEY `voti_riunione_socio_id_foreign` (`socio_id`),
+  KEY `voti_riunione_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `voti_riunione_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `voti_riunione_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `voti_riunione_votazione_id_foreign` FOREIGN KEY (`votazione_id`) REFERENCES `votazioni_riunione` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Migration già applicate dallo schema: `php artisan migrate` eseguirà solo quelle nuove.
@@ -2022,6 +2063,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_24_110000_add_email_verificata_to_richieste_registrazione', 1),
 ('2026_10_25_100000_create_crm_opportunita_table', 1),
 ('2026_10_27_100000_add_assemblea_soci_to_riunioni', 1),
-('2026_10_27_110000_create_deleghe_riunione_table', 1);
+('2026_10_27_110000_create_deleghe_riunione_table', 1),
+('2026_10_27_120000_add_voto_online_assemblea', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

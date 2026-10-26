@@ -288,6 +288,13 @@
                     </a>
                 </li>
                 @endif
+                @if ($can('manuale.view'))
+                <li class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('manuale.*') ? 'active' : '' }}" href="{{ $nav('manuale.index') }}">
+                        <i class="bi bi-book"></i>Manuale operativo
+                    </a>
+                </li>
+                @endif
             </ul>
 
             @if ($can('relazioni.view') || $can('soci.view') || $can('email.view') || $can('comunicazione.view'))

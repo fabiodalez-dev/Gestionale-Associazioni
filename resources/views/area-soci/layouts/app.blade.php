@@ -25,6 +25,7 @@
                 $voce('area-soci.bacheca', 'area-soci.bacheca', 'bi-megaphone', 'Bacheca'),
                 $voce('area-soci.assemblee', 'area-soci.assemblee*', 'bi-people', 'Assemblee'),
                 $voce('area-soci.proposte', 'area-soci.proposte*', 'bi-lightbulb', 'Proposte'),
+                $voce('area-soci.manuale', 'area-soci.manuale*', 'bi-book', 'Guide'),
                 // Solo per chi ricopre una carica (issue #11)
                 $socioLayout?->cariche()->attive()->exists()
                     ? $voce('area-soci.dichiarazione-interessi', 'area-soci.dichiarazione-interessi*', 'bi-shield-check', 'Conflitti di interesse')

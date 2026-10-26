@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Struttura\SalvaAdempimentoRequest;
 use App\Models\Adempimento;
 use App\Models\AdempimentoAnno;
+use App\Models\ManualePagina;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,7 @@ class AdempimentoController extends Controller
         $this->authorize('viewAny', Adempimento::class);
 
         $adempimenti = Adempimento::query()
+            ->with('paginaManuale:id,titolo')
             ->orderBy('mese_scadenza')
             ->orderBy('titolo')
             ->get();
@@ -45,6 +47,8 @@ class AdempimentoController extends Controller
             'adempimentoInModifica' => $adempimentoInModifica,
             'suggeriti' => Adempimento::SUGGERITI,
             'esistonoAdempimenti' => $adempimenti->isNotEmpty(),
+            // Procedure del manuale collegabili (issue #12)
+            'pagineManuale' => ManualePagina::query()->orderBy('sezione')->orderBy('titolo')->get(['id', 'sezione', 'titolo']),
         ]);
     }
 

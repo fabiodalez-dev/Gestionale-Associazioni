@@ -81,6 +81,7 @@ CREATE TABLE `adempimenti` (
   `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `titolo` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
   `descrizione` text COLLATE utf8mb4_unicode_ci,
+  `manuale_pagina_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `mese_scadenza` tinyint unsigned NOT NULL,
   `attivo` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` timestamp NULL DEFAULT NULL,
@@ -88,7 +89,9 @@ CREATE TABLE `adempimenti` (
   PRIMARY KEY (`id`),
   KEY `idx_adempimenti_assoc_mese` (`associazione_id`,`mese_scadenza`),
   KEY `adempimenti_associazione_id_index` (`associazione_id`),
-  CONSTRAINT `adempimenti_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE
+  KEY `adempimenti_manuale_pagina_id_foreign` (`manuale_pagina_id`),
+  CONSTRAINT `adempimenti_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `adempimenti_manuale_pagina_id_foreign` FOREIGN KEY (`manuale_pagina_id`) REFERENCES `manuale_pagine` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `adempimenti_anni`;
@@ -863,6 +866,68 @@ CREATE TABLE `mansioni` (
   UNIQUE KEY `uq_mansioni_assoc_nome` (`associazione_id`,`nome`),
   KEY `mansioni_associazione_id_index` (`associazione_id`),
   CONSTRAINT `mansioni_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `manuale_esecuzioni`;
+CREATE TABLE `manuale_esecuzioni` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `pagina_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `titolo` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `avviata_da` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `completata_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `manuale_esecuzioni_pagina_id_foreign` (`pagina_id`),
+  KEY `manuale_esecuzioni_avviata_da_foreign` (`avviata_da`),
+  KEY `manuale_esecuzioni_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `manuale_esecuzioni_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `manuale_esecuzioni_avviata_da_foreign` FOREIGN KEY (`avviata_da`) REFERENCES `utenti` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `manuale_esecuzioni_pagina_id_foreign` FOREIGN KEY (`pagina_id`) REFERENCES `manuale_pagine` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `manuale_esecuzioni_passi`;
+CREATE TABLE `manuale_esecuzioni_passi` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `esecuzione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `indice` smallint unsigned NOT NULL,
+  `testo` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `completato_at` datetime DEFAULT NULL,
+  `completato_da` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `note` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_manuale_esecuzioni_passi_indice` (`esecuzione_id`,`indice`),
+  KEY `manuale_esecuzioni_passi_completato_da_foreign` (`completato_da`),
+  KEY `manuale_esecuzioni_passi_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `manuale_esecuzioni_passi_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `manuale_esecuzioni_passi_completato_da_foreign` FOREIGN KEY (`completato_da`) REFERENCES `utenti` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `manuale_esecuzioni_passi_esecuzione_id_foreign` FOREIGN KEY (`esecuzione_id`) REFERENCES `manuale_esecuzioni` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `manuale_pagine`;
+CREATE TABLE `manuale_pagine` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sezione` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `titolo` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `contenuto` longtext COLLATE utf8mb4_unicode_ci,
+  `passi` json DEFAULT NULL,
+  `visibilita` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'staff',
+  `responsabile_utente_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `revisionata_at` datetime DEFAULT NULL,
+  `ordine` smallint unsigned NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_manuale_pagine_sezione` (`associazione_id`,`sezione`,`ordine`),
+  KEY `manuale_pagine_responsabile_utente_id_foreign` (`responsabile_utente_id`),
+  KEY `manuale_pagine_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `manuale_pagine_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `manuale_pagine_responsabile_utente_id_foreign` FOREIGN KEY (`responsabile_utente_id`) REFERENCES `utenti` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `media`;
@@ -2239,6 +2304,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_120000_add_voto_online_assemblea', 1),
 ('2026_10_27_130000_create_elezioni_tables', 1),
 ('2026_10_27_140000_create_proposte_tables', 1),
-('2026_10_27_150000_create_conflitti_interesse_tables', 1);
+('2026_10_27_150000_create_conflitti_interesse_tables', 1),
+('2026_10_27_160000_create_manuale_operativo_tables', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

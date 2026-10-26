@@ -31,6 +31,7 @@ final class RuoliAssociazione
         'spazi' => 'Spazi e inventario',
         'progetti' => 'Progetti',
         'riunioni' => 'Riunioni e decisioni',
+        'proposte' => 'Proposte dei soci',
         'verbali' => 'Verbali',
         'documenti' => 'Documenti',
         'scadenze' => 'Scadenze',
@@ -84,7 +85,7 @@ final class RuoliAssociazione
             'segretario' => [
                 'soci' => 'vcud', 'iscrizioni' => 'vcud', 'tessere' => 'vcud', 'quote' => 'v',
                 'eventi' => 'vcu', 'volontari' => 'v', 'spazi' => 'v', 'progetti' => 'v',
-                'riunioni' => 'vcud', 'verbali' => 'vcud', 'documenti' => 'vcud', 'scadenze' => 'vcud',
+                'riunioni' => 'vcud', 'proposte' => 'vcud', 'verbali' => 'vcud', 'documenti' => 'vcud', 'scadenze' => 'vcud',
                 'email' => 'vcu', 'comunicazione' => 'vcud', 'relazioni' => 'vcu', 'struttura' => 'v',
             ],
             'tesoriere' => [
@@ -93,7 +94,7 @@ final class RuoliAssociazione
                 'documenti' => 'vc', 'scadenze' => 'vcu', 'relazioni' => 'vcu',
             ],
             'consigliere' => array_fill_keys(
-                ['soci', 'iscrizioni', 'tessere', 'quote', 'economia', 'eventi', 'volontari', 'spazi', 'progetti', 'riunioni', 'verbali', 'documenti', 'scadenze', 'comunicazione', 'relazioni'],
+                ['soci', 'iscrizioni', 'tessere', 'quote', 'economia', 'eventi', 'volontari', 'spazi', 'progetti', 'riunioni', 'proposte', 'verbali', 'documenti', 'scadenze', 'comunicazione', 'relazioni'],
                 'v',
             ),
             'responsabile_sede' => [

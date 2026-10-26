@@ -90,7 +90,7 @@ class VotoAssembleaService
     {
         $riunione = $votazione->riunione;
 
-        return DB::transaction(function () use ($votazione, $riunione, $sala): VotazioneRiunione {
+        $chiusa = DB::transaction(function () use ($votazione, $riunione, $sala): VotazioneRiunione {
             $votazione = VotazioneRiunione::query()->whereKey($votazione->id)->lockForUpdate()->firstOrFail();
 
             if (! $votazione->isAperta()) {
@@ -129,6 +129,11 @@ class VotoAssembleaService
 
             return $votazione;
         });
+
+        // La proposta dei soci legata al punto prende l'esito (issue #10)
+        app(ProposteService::class)->daVotazione($chiusa);
+
+        return $chiusa;
     }
 
     /**

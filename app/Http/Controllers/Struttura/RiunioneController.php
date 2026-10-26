@@ -21,6 +21,7 @@ use App\Services\Struttura\AssembleaService;
 use App\Services\Struttura\DelegaNonValidaException;
 use App\Services\Struttura\DelegheService;
 use App\Services\Struttura\ElezioniService;
+use App\Services\Struttura\ProposteService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -268,6 +269,9 @@ class RiunioneController extends Controller
     public function update(SalvaRiunioneRequest $request, Riunione $riunione): RedirectResponse
     {
         $riunione->update($request->validated());
+
+        // L'OdG può essere stato riordinato: le proposte seguono il proprio punto
+        app(ProposteService::class)->riallineaOdg($riunione);
 
         return redirect()
             ->route('riunioni.show', $riunione)
@@ -527,7 +531,7 @@ class RiunioneController extends Controller
             }
         }
 
-        VotazioneRiunione::updateOrCreate(
+        $votazione = VotazioneRiunione::updateOrCreate(
             [
                 'riunione_id' => $riunione->id,
                 'punto_indice' => $dati['punto_indice'],
@@ -541,6 +545,9 @@ class RiunioneController extends Controller
                 'note' => $dati['note'] ?? null,
             ]
         );
+
+        // La proposta dei soci legata al punto prende l'esito (issue #10)
+        app(ProposteService::class)->daVotazione($votazione);
 
         return redirect()
             ->route('riunioni.show', $riunione)

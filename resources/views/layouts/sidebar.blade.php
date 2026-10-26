@@ -22,7 +22,7 @@
     $registroActive = request()->routeIs('libro-soci.*', 'cessazioni.*', 'organi-sociali.*');
     $economiaActive = request()->routeIs('prima-nota.*', 'report-economico.*', 'donazioni.*');
     // Piano "Organizzazione 3": volontari/turni, spazi, inventario, progetti, riunioni e decisioni
-    $organizzazioneActive = request()->routeIs('turni.*', 'volontari.*', 'spazi.*', 'attrezzature.*', 'prestiti.*', 'progetti.*', 'riunioni.*', 'decisioni.*');
+    $organizzazioneActive = request()->routeIs('turni.*', 'volontari.*', 'spazi.*', 'attrezzature.*', 'prestiti.*', 'progetti.*', 'riunioni.*', 'decisioni.*', 'elezioni.*', 'proposte.*');
     // Piano "Organizzazione 3": mini-CRM, sponsor e referral
     $relazioniActive = request()->routeIs('contatti-esterni.*', 'sponsor.*', 'ambasciatori.*');
     $configurazioneActive = request()->routeIs('config-campi.*', 'config-tags.*', 'categorie-socio.*', 'tipi-socio.*', 'config-gruppi.*')
@@ -250,7 +250,7 @@
                     </div>
                 </li>
                 @endif
-                @if ($can('volontari.view') || $can('spazi.view') || $can('progetti.view') || $can('riunioni.view'))
+                @if ($can('volontari.view') || $can('spazi.view') || $can('progetti.view') || $can('riunioni.view') || $can('proposte.view'))
                 <li class="nav-item">
                     <a class="nav-link {{ $organizzazioneActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" href="#organizzazioneSubmenu" role="button" aria-expanded="{{ $organizzazioneActive ? 'true' : 'false' }}">
                         <i class="bi bi-diagram-3"></i>Organizzazione
@@ -270,8 +270,11 @@
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('progetti.*') ? 'active' : '' }}" href="{{ $nav('progetti.index') }}"><i class="bi bi-kanban"></i>Progetti</a></li>
                             @endif
                             @if ($can('riunioni.view'))
-                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('riunioni.*') ? 'active' : '' }}" href="{{ $nav('riunioni.index') }}"><i class="bi bi-people"></i>Riunioni</a></li>
+                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('riunioni.*', 'elezioni.*') ? 'active' : '' }}" href="{{ $nav('riunioni.index') }}"><i class="bi bi-people"></i>Riunioni e assemblee</a></li>
                             <li class="nav-item"><a class="nav-link {{ request()->routeIs('decisioni.*') ? 'active' : '' }}" href="{{ $nav('decisioni.index') }}"><i class="bi bi-check2-circle"></i>Decisioni</a></li>
+                            @endif
+                            @if ($can('proposte.view'))
+                            <li class="nav-item"><a class="nav-link {{ request()->routeIs('proposte.*') ? 'active' : '' }}" href="{{ $nav('proposte.index') }}"><i class="bi bi-lightbulb"></i>Proposte dei soci</a></li>
                             @endif
                         </ul>
                     </div>

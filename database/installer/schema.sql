@@ -110,6 +110,23 @@ CREATE TABLE `adempimenti_anni` (
   CONSTRAINT `adempimenti_anni_completato_da_foreign` FOREIGN KEY (`completato_da`) REFERENCES `utenti` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `adesioni_proposta`;
+CREATE TABLE `adesioni_proposta` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `proposta_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_adesioni_proposta_socio` (`proposta_id`,`socio_id`),
+  KEY `adesioni_proposta_socio_id_foreign` (`socio_id`),
+  KEY `adesioni_proposta_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `adesioni_proposta_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `adesioni_proposta_proposta_id_foreign` FOREIGN KEY (`proposta_id`) REFERENCES `proposte` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `adesioni_proposta_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `annunci`;
 CREATE TABLE `annunci` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -1203,6 +1220,34 @@ CREATE TABLE `promemoria_inviati` (
   CONSTRAINT `promemoria_inviati_tessera_id_foreign` FOREIGN KEY (`tessera_id`) REFERENCES `tessere` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `proposte`;
+CREATE TABLE `proposte` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `socio_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `titolo` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `testo` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `categoria` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `destinatario` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stato` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'in_revisione',
+  `motivazione` text COLLATE utf8mb4_unicode_ci,
+  `riunione_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `punto_indice` smallint unsigned DEFAULT NULL,
+  `pubblicata_at` datetime DEFAULT NULL,
+  `soglia_raggiunta_at` datetime DEFAULT NULL,
+  `esito_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_proposte_assoc_stato` (`associazione_id`,`stato`),
+  KEY `proposte_socio_id_foreign` (`socio_id`),
+  KEY `proposte_riunione_id_foreign` (`riunione_id`),
+  KEY `proposte_associazione_id_index` (`associazione_id`),
+  CONSTRAINT `proposte_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `proposte_riunione_id_foreign` FOREIGN KEY (`riunione_id`) REFERENCES `riunioni` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `proposte_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `quote`;
 CREATE TABLE `quote` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2152,6 +2197,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_100000_add_assemblea_soci_to_riunioni', 1),
 ('2026_10_27_110000_create_deleghe_riunione_table', 1),
 ('2026_10_27_120000_add_voto_online_assemblea', 1),
-('2026_10_27_130000_create_elezioni_tables', 1);
+('2026_10_27_130000_create_elezioni_tables', 1),
+('2026_10_27_140000_create_proposte_tables', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

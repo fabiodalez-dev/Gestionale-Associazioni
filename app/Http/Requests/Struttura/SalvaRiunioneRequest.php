@@ -87,6 +87,11 @@ class SalvaRiunioneRequest extends FormRequest
                     $pulito['maggioranza'] = $maggioranza;
                 }
 
+                // Punto nato da una proposta dei soci (issue #10)
+                if (filled($riga['proposta_id'] ?? null)) {
+                    $pulito['proposta_id'] = (string) $riga['proposta_id'];
+                }
+
                 $puliti[] = $pulito;
             }
 
@@ -120,6 +125,11 @@ class SalvaRiunioneRequest extends FormRequest
             'odg.*.punto' => ['required', 'string', 'max:200'],
             'odg.*.descrizione' => ['nullable', 'string', 'max:1000'],
             'odg.*.maggioranza' => ['nullable', Rule::in(array_keys(Riunione::MAGGIORANZE))],
+            'odg.*.proposta_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('proposte', 'id')->where('associazione_id', session('associazione_id')),
+            ],
         ];
     }
 

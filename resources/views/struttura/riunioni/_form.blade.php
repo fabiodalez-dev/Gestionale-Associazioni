@@ -148,6 +148,10 @@
                                    placeholder="Titolo del punto" value="{{ is_array($riga) ? ($riga['punto'] ?? '') : '' }}" maxlength="200">
                             <textarea name="odg[{{ $i }}][descrizione]" class="form-control form-control-sm odg-descrizione"
                                       rows="1" placeholder="Descrizione (opzionale)" maxlength="1000">{{ is_array($riga) ? ($riga['descrizione'] ?? '') : '' }}</textarea>
+                            @if (is_array($riga) && filled($riga['proposta_id'] ?? null))
+                                <input type="hidden" name="odg[{{ $i }}][proposta_id]" class="odg-proposta" value="{{ $riga['proposta_id'] }}">
+                                <div class="small text-muted mb-1"><i class="bi bi-lightbulb me-1"></i>Proposta dei soci</div>
+                            @endif
                             <select name="odg[{{ $i }}][maggioranza]" class="form-select form-select-sm mt-1 odg-maggioranza" aria-label="Maggioranza richiesta">
                                 @foreach ($maggioranze as $valore => $etichetta)
                                     <option value="{{ $valore }}" @selected((is_array($riga) ? ($riga['maggioranza'] ?? 'semplice') : 'semplice') === $valore)>Maggioranza {{ mb_strtolower($etichetta) }}</option>
@@ -208,6 +212,8 @@
             if (descr) descr.name = `odg[${idx}][descrizione]`;
             const magg = row.querySelector('.odg-maggioranza');
             if (magg) magg.name = `odg[${idx}][maggioranza]`;
+            const prop = row.querySelector('.odg-proposta');
+            if (prop) prop.name = `odg[${idx}][proposta_id]`;
         });
     }
 

@@ -108,6 +108,17 @@ Route::prefix('area-soci')->name('area-soci.')->group(function () {
         Route::post('/assemblee/{riunione}/votazioni/{votazione}', [AssembleeController::class, 'vota'])
             ->middleware('throttle:30,1')
             ->name('assemblee.vota');
+        // Elezioni: candidature e scheda (issue #9)
+        Route::post('/elezioni/{elezione}/candidatura', [AssembleeController::class, 'candida'])
+            ->middleware('throttle:10,1')
+            ->name('elezioni.candida');
+        Route::post('/elezioni/{elezione}/candidatura/accetta', [AssembleeController::class, 'accettaCandidatura'])
+            ->name('elezioni.accetta');
+        Route::delete('/elezioni/{elezione}/candidatura', [AssembleeController::class, 'ritiraCandidatura'])
+            ->name('elezioni.ritira');
+        Route::post('/elezioni/{elezione}/vota', [AssembleeController::class, 'votaElezione'])
+            ->middleware('throttle:30,1')
+            ->name('elezioni.vota');
 
         Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     });

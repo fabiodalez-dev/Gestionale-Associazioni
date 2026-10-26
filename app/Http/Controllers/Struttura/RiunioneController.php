@@ -7,6 +7,7 @@ use App\Http\Requests\Struttura\SalvaRiunioneRequest;
 use App\Http\Requests\Struttura\SalvaVotazioneRiunioneRequest;
 use App\Models\Carica;
 use App\Models\DelegaRiunione;
+use App\Models\Elezione;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
@@ -19,6 +20,7 @@ use App\Notifications\Struttura\ConvocazioneRiunioneNotification;
 use App\Services\Struttura\AssembleaService;
 use App\Services\Struttura\DelegaNonValidaException;
 use App\Services\Struttura\DelegheService;
+use App\Services\Struttura\ElezioniService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -100,6 +102,7 @@ class RiunioneController extends Controller
         if ($riunione->isAssemblea()) {
             $riunione->load([
                 'deleghe' => fn ($q) => $q->orderBy('created_at'),
+                'elezioni' => fn ($q) => $q->withCount(['candidature' => fn ($c) => $c->valide()])->orderBy('created_at'),
                 'deleghe.delegante' => fn ($q) => $q->withoutGlobalScope('sede')->withTrashed(),
                 'deleghe.delegato' => fn ($q) => $q->withoutGlobalScope('sede')->withTrashed(),
             ]);
@@ -727,7 +730,14 @@ class RiunioneController extends Controller
     {
         $odg = is_array($riunione->odg) ? $riunione->odg : [];
 
-        if ($riunione->votazioni->isEmpty()) {
+        // Elezioni scrutinate (issue #9)
+        $elezioni = $riunione->elezioni()
+            ->whereIn('stato', [Elezione::STATO_SCRUTINIO, Elezione::STATO_PROCLAMATA])
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (Elezione $elezione) => app(ElezioniService::class)->testoVerbale($elezione));
+
+        if ($riunione->votazioni->isEmpty() && $elezioni->isEmpty()) {
             return 'Nessuna votazione registrata.';
         }
 
@@ -762,6 +772,6 @@ class RiunioneController extends Controller
             }
         }
 
-        return implode("\n", $righe);
+        return implode("\n", array_merge($righe, $elezioni->all()));
     }
 }

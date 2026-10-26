@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\AreaSoci;
 
 use App\Http\Controllers\Controller;
+use App\Models\Candidatura;
 use App\Models\DelegaRiunione;
+use App\Models\Elezione;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
@@ -12,6 +14,8 @@ use App\Models\VotazioneRiunione;
 use App\Models\VotoRiunione;
 use App\Services\Struttura\DelegaNonValidaException;
 use App\Services\Struttura\DelegheService;
+use App\Services\Struttura\ElezioneNonValidaException;
+use App\Services\Struttura\ElezioniService;
 use App\Services\Struttura\VotoAssembleaService;
 use App\Services\Struttura\VotoNonValidoException;
 use Illuminate\Http\RedirectResponse;
@@ -32,6 +36,7 @@ class AssembleeController extends Controller
     public function __construct(
         private readonly DelegheService $deleghe,
         private readonly VotoAssembleaService $voto,
+        private readonly ElezioniService $elezioni,
     ) {}
 
     public function index(Request $request): View
@@ -45,7 +50,11 @@ class AssembleeController extends Controller
                 ->whereIn('organo', [Riunione::ORGANO_ASSEMBLEA_ORDINARIA, Riunione::ORGANO_ASSEMBLEA_STRAORDINARIA])
                 ->where('stato', '!=', Riunione::STATO_ANNULLATA)
                 ->where('data_ora', '>=', now()->subDays(30)))
-            ->with('riunione.spazio')
+            ->with([
+                'riunione.spazio',
+                'riunione.elezioni.candidature' => fn ($q) => $q->whereNull('ritirata_at'),
+                'riunione.elezioni.candidature.socio:id,nome,cognome',
+            ])
             ->get()
             ->sortBy(fn (RiunionePartecipante $p) => $p->riunione->data_ora)
             ->values();
@@ -154,6 +163,16 @@ class AssembleeController extends Controller
 
         $rappresentati = $this->voto->rappresentati($riunione, $socio);
 
+        // Elezioni con il voto aperto: scheda per i rappresentati che non hanno votato
+        $elezioni = $riunione->elezioni()
+            ->whereIn('stato', [Elezione::STATO_VOTO, Elezione::STATO_SCRUTINIO, Elezione::STATO_PROCLAMATA])
+            ->with(['candidature' => fn ($q) => $q->valide()->orderBy('created_at'), 'candidature.socio:id,nome,cognome'])
+            ->get()
+            ->map(fn (Elezione $e) => [
+                'elezione' => $e,
+                'daVotare' => $e->stato === Elezione::STATO_VOTO ? $this->elezioni->daVotare($e, $socio) : collect(),
+            ]);
+
         $giaVotati = VotanteRiunione::query()
             ->whereIn('votazione_id', $votazioni->pluck('id'))
             ->whereIn('rappresentato_socio_id', $rappresentati->keys())
@@ -168,6 +187,7 @@ class AssembleeController extends Controller
             'votazioni' => $votazioni,
             'rappresentati' => $rappresentati,
             'giaVotati' => $giaVotati,
+            'elezioni' => $elezioni,
             'opzioni' => VotoRiunione::OPZIONI,
         ]);
     }
@@ -201,5 +221,78 @@ class AssembleeController extends Controller
         return redirect()
             ->route('area-soci.assemblee.show', $riunione)
             ->with('success', $registrati === 1 ? 'Voto registrato.' : "{$registrati} voti registrati.");
+    }
+
+    /**
+     * Autocandidatura (issue #9) nel periodo delle candidature.
+     */
+    public function candida(Request $request, Elezione $elezione): RedirectResponse
+    {
+        $dati = $request->validate(['presentazione' => ['nullable', 'string', 'max:2000']]);
+
+        try {
+            $this->elezioni->candida($elezione, $request->user('socio'), 'area_soci', $dati['presentazione'] ?? null);
+        } catch (ElezioneNonValidaException $e) {
+            return $this->indietro('error', $e->getMessage());
+        }
+
+        return $this->indietro('success', 'La tua candidatura è registrata.');
+    }
+
+    /**
+     * Il socio accetta la candidatura proposta dalla segreteria.
+     */
+    public function accettaCandidatura(Request $request, Elezione $elezione): RedirectResponse
+    {
+        return $this->suCandidatura($request, $elezione, fn (Candidatura $c) => $this->elezioni->accetta($c), 'Candidatura accettata.');
+    }
+
+    public function ritiraCandidatura(Request $request, Elezione $elezione): RedirectResponse
+    {
+        return $this->suCandidatura($request, $elezione, fn (Candidatura $c) => $this->elezioni->ritira($c), 'Candidatura ritirata.');
+    }
+
+    public function votaElezione(Request $request, Elezione $elezione): RedirectResponse
+    {
+        $dati = $request->validate([
+            'schede' => ['required', 'array'],
+            'schede.*' => ['nullable', 'array'],
+            'schede.*.*' => ['string'],
+        ]);
+
+        // Una scheda senza preferenze arriva come chiave assente: il socio
+        // conferma esplicitamente le schede bianche con "bianca"
+        $schede = array_map(fn ($preferenze) => array_values(array_filter((array) $preferenze, fn ($p) => $p !== 'bianca')), $dati['schede']);
+
+        try {
+            $votate = $this->elezioni->vota($elezione, $request->user('socio'), $schede);
+        } catch (ElezioneNonValidaException $e) {
+            return redirect()->route('area-soci.assemblee.show', $elezione->riunione_id)->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('area-soci.assemblee.show', $elezione->riunione_id)
+            ->with('success', $votate === 1 ? 'Scheda votata.' : "{$votate} schede votate.");
+    }
+
+    private function suCandidatura(Request $request, Elezione $elezione, callable $azione, string $successo): RedirectResponse
+    {
+        $candidatura = Candidatura::query()
+            ->where('elezione_id', $elezione->id)
+            ->where('socio_id', $request->user('socio')->id)
+            ->whereNull('ritirata_at')
+            ->first();
+
+        if ($candidatura === null) {
+            return $this->indietro('warning', 'Non hai candidature per questa elezione.');
+        }
+
+        try {
+            $azione($candidatura);
+        } catch (ElezioneNonValidaException $e) {
+            return $this->indietro('error', $e->getMessage());
+        }
+
+        return $this->indietro('success', $successo);
     }
 }

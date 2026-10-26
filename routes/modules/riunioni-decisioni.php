@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Struttura\AdempimentoController;
 use App\Http\Controllers\Struttura\DecisioneController;
+use App\Http\Controllers\Struttura\ElezioneController;
 use App\Http\Controllers\Struttura\RiunioneController;
 use App\Http\Controllers\Struttura\VotazioneOnlineController;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +50,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('{riunione}/deleghe', [RiunioneController::class, 'registraDelega'])->name('deleghe.store');
         Route::delete('{riunione}/deleghe/{delega}', [RiunioneController::class, 'revocaDelega'])->name('deleghe.destroy');
 
+        // Elezioni in assemblea (issue #9)
+        Route::post('{riunione}/elezioni', [ElezioneController::class, 'store'])->name('elezioni.store');
+
         // Voto online in assemblea (issue #8)
         Route::post('{riunione}/voto-online', [VotazioneOnlineController::class, 'apri'])->name('voto-online.apri');
         Route::post('{riunione}/voto-online/{votazione}/chiudi', [VotazioneOnlineController::class, 'chiudi'])->name('voto-online.chiudi');
@@ -57,6 +61,18 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('{riunione}/votazioni', [RiunioneController::class, 'registraVotazione'])->name('votazioni.store');
         // Genera bozza verbale precompilato (f.18)
         Route::post('{riunione}/genera-verbale', [RiunioneController::class, 'generaVerbale'])->name('genera-verbale');
+    });
+
+    // ----- Elezioni e rinnovo delle cariche (issue #9) -----
+    Route::prefix('elezioni')->name('elezioni.')->group(function () {
+        Route::get('{elezione}', [ElezioneController::class, 'show'])->name('show');
+        Route::delete('{elezione}', [ElezioneController::class, 'destroy'])->name('destroy');
+        Route::post('{elezione}/candidature', [ElezioneController::class, 'candida'])->name('candidature.store');
+        Route::post('{elezione}/candidature/{candidatura}/accetta', [ElezioneController::class, 'accetta'])->name('candidature.accetta');
+        Route::post('{elezione}/candidature/{candidatura}/ritira', [ElezioneController::class, 'ritira'])->name('candidature.ritira');
+        Route::post('{elezione}/apri-voto', [ElezioneController::class, 'apriVoto'])->name('apri-voto');
+        Route::post('{elezione}/scrutinio', [ElezioneController::class, 'scrutinio'])->name('scrutinio');
+        Route::post('{elezione}/proclama', [ElezioneController::class, 'proclama'])->name('proclama');
     });
 
     // ----- Archivio Decisioni (f.19) -----

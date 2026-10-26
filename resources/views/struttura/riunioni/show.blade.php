@@ -196,6 +196,81 @@
         </div>
         @endif
 
+        {{-- Elezioni (issue #9) --}}
+        @if ($riunione->isAssemblea())
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-award me-2"></i>Elezioni</span>
+                @if ($riunione->stato === 'pianificata')
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#nuovaElezione" aria-expanded="false" aria-controls="nuovaElezione">
+                        <i class="bi bi-plus-lg me-1"></i>Nuova elezione
+                    </button>
+                @endif
+            </div>
+            <ul class="list-group list-group-flush">
+                @forelse ($riunione->elezioni as $elezione)
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <a href="{{ route('elezioni.show', $elezione) }}" class="fw-semibold text-decoration-none">{{ $elezione->organoLabel() }}</a>
+                            <div class="small text-muted">{{ $elezione->posti }} posti · {{ $elezione->candidature_count }} candidature valide</div>
+                        </div>
+                        <span class="badge bg-secondary">{{ $elezione->statoLabel() }}</span>
+                    </li>
+                @empty
+                    <li class="list-group-item text-muted">Nessuna elezione in questa assemblea.</li>
+                @endforelse
+            </ul>
+            @if ($riunione->stato === 'pianificata')
+                <div class="collapse @if ($errors->hasAny(['organo', 'posti', 'max_preferenze', 'candidature_al'])) show @endif" id="nuovaElezione">
+                    <form method="POST" action="{{ route('riunioni.elezioni.store', $riunione) }}" class="card-body border-top row g-2">
+                        @csrf
+                        <div class="col-md-6">
+                            <label class="form-label small" for="elOrgano">Organo da eleggere</label>
+                            <select name="organo" id="elOrgano" class="form-select form-select-sm">
+                                @foreach (\App\Models\Elezione::ORGANI as $valore => $organo)
+                                    <option value="{{ $valore }}" @selected(old('organo') === $valore)>{{ $organo['label'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-3 col-md-2">
+                            <label class="form-label small" for="elPosti">Posti</label>
+                            <input type="number" name="posti" id="elPosti" min="1" max="50" class="form-control form-control-sm" value="{{ old('posti', 5) }}" required>
+                        </div>
+                        <div class="col-4 col-md-2">
+                            <label class="form-label small" for="elPref">Preferenze</label>
+                            <input type="number" name="max_preferenze" id="elPref" min="1" class="form-control form-control-sm" value="{{ old('max_preferenze', 3) }}" required>
+                        </div>
+                        <div class="col-5 col-md-2">
+                            <label class="form-label small" for="elDurata">Mandato (mesi)</label>
+                            <input type="number" name="durata_mandato_mesi" id="elDurata" min="1" max="120" class="form-control form-control-sm" value="{{ old('durata_mandato_mesi', 36) }}" required>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small" for="elDal">Candidature dal</label>
+                            <input type="date" name="candidature_dal" id="elDal" class="form-control form-control-sm" value="{{ old('candidature_dal', now()->toDateString()) }}" required>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small" for="elAl">al</label>
+                            <input type="date" name="candidature_al" id="elAl" class="form-control form-control-sm" value="{{ old('candidature_al', $riunione->data_ora->copy()->subDay()->toDateString()) }}" required>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small" for="elAnz">Anzianità (mesi)</label>
+                            <input type="number" name="anzianita_minima_mesi" id="elAnz" min="0" class="form-control form-control-sm" value="{{ old('anzianita_minima_mesi', 0) }}">
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label small" for="elParita">In caso di parità</label>
+                            <select name="regola_parita" id="elParita" class="form-select form-select-sm">
+                                @foreach (\App\Models\Elezione::REGOLE_PARITA as $valore => $etichetta)
+                                    <option value="{{ $valore }}" @selected(old('regola_parita') === $valore)>{{ $etichetta }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-12"><button type="submit" class="btn btn-sm btn-primary">Crea elezione</button></div>
+                    </form>
+                </div>
+            @endif
+        </div>
+        @endif
+
         {{-- Genera bozza verbale --}}
         @if ($riunione->isSvolta())
         <div class="card mb-4">

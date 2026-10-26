@@ -214,6 +214,16 @@ class Riunione extends Model implements HasMedia
     }
 
     /**
+     * Elezioni che si tengono nell'assemblea (issue #9).
+     *
+     * @return HasMany<Elezione, $this>
+     */
+    public function elezioni(): HasMany
+    {
+        return $this->hasMany(Elezione::class, 'riunione_id');
+    }
+
+    /**
      * Deleghe dell'assemblea (issue #7).
      *
      * @return HasMany<DelegaRiunione, $this>

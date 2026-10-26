@@ -53,6 +53,44 @@
                     </ol>
                 @endif
 
+                {{-- Elezioni (issue #9) --}}
+                @foreach ($riunione->elezioni as $elezione)
+                    @php
+                        $mia = $elezione->candidature->firstWhere('socio_id', $socio->id);
+                        $candidati = $elezione->candidature->filter->isValida();
+                    @endphp
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
+                            <h6 class="mb-0">Elezione: {{ $elezione->organoLabel() }}</h6>
+                            <span class="small text-muted">{{ $elezione->posti }} posti · candidature dal {{ $elezione->candidature_dal->format('d/m') }} al {{ $elezione->candidature_al->format('d/m/Y') }}</span>
+                        </div>
+                        @if ($candidati->isNotEmpty())
+                            <p class="small mb-2">Candidati: {{ $candidati->map(fn ($c) => $c->socio?->nome_completo)->filter()->join(', ') }}</p>
+                        @endif
+                        @if ($elezione->stato === 'proclamata')
+                            <p class="small mb-0">Eletti: {{ $elezione->candidature->where('eletta', true)->map(fn ($c) => $c->socio?->nome_completo)->join(', ') ?: '—' }}</p>
+                        @elseif ($mia && ! $mia->accettata_at && $elezione->stato === 'candidature')
+                            <p class="small mb-2">La segreteria ti ha proposto come candidato/a. Accetti?</p>
+                            <div class="d-flex gap-2">
+                                <form method="POST" action="{{ route('area-soci.elezioni.accetta', $elezione) }}">@csrf<button type="submit" class="btn btn-sm btn-primary">Accetto la candidatura</button></form>
+                                <form method="POST" action="{{ route('area-soci.elezioni.ritira', $elezione) }}">@csrf @method('DELETE')<button type="submit" class="btn btn-sm btn-outline-secondary">Rifiuto</button></form>
+                            </div>
+                        @elseif ($mia && $elezione->stato === 'candidature')
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span class="small text-success"><i class="bi bi-check-circle me-1"></i>Sei candidato/a.</span>
+                                <form method="POST" action="{{ route('area-soci.elezioni.ritira', $elezione) }}" onsubmit="return confirm('Ritirare la candidatura?');">@csrf @method('DELETE')<button type="submit" class="btn btn-sm btn-outline-danger">Ritira la candidatura</button></form>
+                            </div>
+                        @elseif ($elezione->candidatureAperte())
+                            <form method="POST" action="{{ route('area-soci.elezioni.candida', $elezione) }}">
+                                @csrf
+                                <label class="form-label small" for="pres-{{ $elezione->id }}">Vuoi candidarti? Presentati in poche righe (facoltativo)</label>
+                                <textarea name="presentazione" id="pres-{{ $elezione->id }}" class="form-control mb-2" rows="2" maxlength="2000"></textarea>
+                                <button type="submit" class="btn btn-sm btn-primary">Mi candido</button>
+                            </form>
+                        @endif
+                    </div>
+                @endforeach
+
                 @if ($voce['delegheRicevute']->isNotEmpty())
                     <div class="alert alert-info">
                         <i class="bi bi-person-check me-1"></i>

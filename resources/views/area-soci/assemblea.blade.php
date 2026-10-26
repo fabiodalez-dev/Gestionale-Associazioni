@@ -34,9 +34,49 @@
         </div>
     </div>
 
+    {{-- Elezioni (issue #9) --}}
+    @foreach ($elezioni as $voceElezione)
+        @php $elezione = $voceElezione['elezione']; @endphp
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span class="fw-semibold">Elezione: {{ $elezione->organoLabel() }}</span>
+                <span class="small text-muted">voto segreto · massimo {{ $elezione->max_preferenze }} {{ $elezione->max_preferenze === 1 ? 'preferenza' : 'preferenze' }}</span>
+            </div>
+            <div class="card-body">
+                @if ($elezione->stato !== 'voto')
+                    <p class="mb-0 text-muted">Il voto è chiuso.{{ $elezione->stato === 'proclamata' ? ' Eletti: '.$elezione->candidature->where('eletta', true)->map(fn ($c) => $c->socio?->nome_completo)->join(', ') : '' }}</p>
+                @elseif (! $riunione->voto_online)
+                    <p class="mb-0 text-muted">Si vota con la scheda cartacea in sala.</p>
+                @elseif ($rappresentati->isEmpty())
+                    <p class="mb-0 text-muted">Per votare devi risultare presente con diritto di voto.</p>
+                @elseif ($voceElezione['daVotare']->isEmpty())
+                    <p class="mb-0 text-success"><i class="bi bi-check2-circle me-1"></i>Hai votato.</p>
+                @else
+                    <form method="POST" action="{{ route('area-soci.elezioni.vota', $elezione) }}" onsubmit="return confirm('Confermi la scheda? Non potrai modificarla.');">
+                        @csrf
+                        @foreach ($voceElezione['daVotare'] as $rappresentatoId => $etichetta)
+                            <fieldset class="mb-3 scheda-elezione" data-max="{{ $elezione->max_preferenze }}">
+                                <legend class="fs-6 fw-semibold">{{ $etichetta }}</legend>
+                                <input type="hidden" name="schede[{{ $rappresentatoId }}][]" value="bianca">
+                                @foreach ($elezione->candidature as $candidatura)
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="schede[{{ $rappresentatoId }}][]" value="{{ $candidatura->id }}" id="pref-{{ $rappresentatoId }}-{{ $candidatura->id }}">
+                                        <label class="form-check-label" for="pref-{{ $rappresentatoId }}-{{ $candidatura->id }}">{{ $candidatura->socio?->nome_completo }}</label>
+                                    </div>
+                                @endforeach
+                                <div class="form-text">Nessuna scelta = scheda bianca.</div>
+                            </fieldset>
+                        @endforeach
+                        <button type="submit" class="btn btn-primary">Vota</button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    @endforeach
+
     @if (! $riunione->voto_online)
         <p class="text-muted">In questa assemblea si vota in sala.</p>
-    @elseif ($votazioni->isEmpty())
+    @elseif ($votazioni->isEmpty() && $elezioni->isEmpty())
         <div class="text-center text-muted py-5">
             <i class="bi bi-hourglass display-5 d-block mb-2"></i>
             Nessuna votazione aperta. Quando la presidenza apre il voto su un punto, lo trovi qui: premi "Aggiorna".
@@ -86,3 +126,16 @@
         </div>
     @endforeach
 @endsection
+
+@push('scripts')
+<script>
+// Non più preferenze del massimo consentito (il server lo verifica comunque)
+document.querySelectorAll('.scheda-elezione').forEach(function (scheda) {
+    var max = parseInt(scheda.dataset.max, 10);
+    scheda.addEventListener('change', function () {
+        var scelte = scheda.querySelectorAll('input[type=checkbox]:checked').length;
+        scheda.querySelectorAll('input[type=checkbox]:not(:checked)').forEach(function (c) { c.disabled = scelte >= max; });
+    });
+});
+</script>
+@endpush

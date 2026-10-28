@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Relazioni\AmbasciatoriController;
+use App\Http\Controllers\Relazioni\BilancioSocialeController;
 use App\Http\Controllers\Relazioni\ContattoEsternoController;
 use App\Http\Controllers\Relazioni\CrmPipelineController;
 use App\Http\Controllers\Relazioni\GalleriaEventoController;
@@ -80,6 +81,19 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->name('statistiche-annuali.index');
     Route::get('/statistiche-annuali/pdf', [StatisticheAnnualiController::class, 'pdf'])
         ->name('statistiche-annuali.pdf');
+
+    // ---- Bilancio sociale annuale (issue #15) ----
+    Route::prefix('bilancio-sociale')->name('bilancio-sociale.')->group(function () {
+        Route::get('/', [BilancioSocialeController::class, 'index'])->name('index');
+        Route::post('/', [BilancioSocialeController::class, 'store'])->name('store');
+        Route::get('{bilancio}', [BilancioSocialeController::class, 'show'])->name('show');
+        Route::put('{bilancio}', [BilancioSocialeController::class, 'update'])->name('update');
+        Route::post('{bilancio}/rigenera', [BilancioSocialeController::class, 'rigenera'])->name('rigenera');
+        Route::post('{bilancio}/approva', [BilancioSocialeController::class, 'approva'])->name('approva');
+        Route::post('{bilancio}/riapri', [BilancioSocialeController::class, 'riapri'])->name('riapri');
+        Route::post('{bilancio}/pubblica', [BilancioSocialeController::class, 'pubblica'])->name('pubblica');
+        Route::get('{bilancio}/pdf', [BilancioSocialeController::class, 'pdf'])->name('pdf');
+    });
 });
 
 /*

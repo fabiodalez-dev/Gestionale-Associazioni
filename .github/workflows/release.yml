@@ -8,27 +8,39 @@ on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
+permissions: {}
+
+# Un tag alla volta, senza annullare una pubblicazione già avviata
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   pacchetto:
+    name: Pacchetto installabile e GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # Crea la GitHub Release e ne carica gli asset.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: PHP 8.4 (versione minima supportata dall'app)
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.4'
           extensions: mbstring, intl, gd, zip, pdo_mysql, xml, curl, fileinfo, bcmath
           tools: composer:v2
           coverage: none
 
-      - uses: actions/setup-node@v4
+      # Senza cache npm: il pacchetto pubblicato non deve dipendere da una
+      # cache scrivibile da altri workflow (cache poisoning)
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: '22'
-          cache: npm
+          package-manager-cache: false
 
       - name: Il tag deve coincidere con il file VERSION
         run: |

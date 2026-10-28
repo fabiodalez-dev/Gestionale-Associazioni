@@ -3,9 +3,13 @@
 namespace App\Services\Privacy;
 
 use App\Models\Account;
+use App\Models\DichiarazioneInteressi;
+use App\Models\DiscussioneMessaggio;
 use App\Models\DocumentoSocio;
 use App\Models\Prenotazione;
+use App\Models\Proposta;
 use App\Models\RichiestaIscrizione;
+use App\Models\RubricaScheda;
 use App\Models\Socio;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -77,6 +81,12 @@ class DatiPersonali
                 ->map(fn (Model $c) => $c->only(['testo', 'accettato', 'origine', 'created_at']))->all(),
             'email_ricevute' => $socio->emailLogs()->orderBy('sent_at')->get()
                 ->map(fn (Model $e) => $e->only(['to_email', 'subject', 'status', 'sent_at']))->all(),
+            // Vita associativa (issues #10, #11, #13, #14)
+            'rubrica_interna' => $this->righe(RubricaScheda::query()->withoutGlobalScopes()->where('socio_id', $socio->id)->get()),
+            'proposte' => $this->righe(Proposta::query()->withoutGlobalScopes()->where('socio_id', $socio->id)->get()),
+            'dichiarazioni_interessi' => $this->righe(DichiarazioneInteressi::query()->withoutGlobalScopes()->where('socio_id', $socio->id)->get()),
+            'messaggi_discussioni' => DiscussioneMessaggio::query()->withoutGlobalScopes()->where('socio_id', $socio->id)->orderBy('created_at')->get()
+                ->map(fn (DiscussioneMessaggio $m) => $m->only(['testo', 'created_at', 'nascosto_at']))->all(),
             'account_collegati' => Account::query()->withoutGlobalScopes()->where('socio_id', $socio->id)->get()
                 ->map(fn (Account $a) => $this->account($a, conIntestazione: false))->all(),
         ];

@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AreaSoci\AssembleeController;
 use App\Http\Controllers\AreaSoci\DashboardController;
+use App\Http\Controllers\AreaSoci\DichiarazioneInteressiController;
 use App\Http\Controllers\AreaSoci\EmailOptOutController;
 use App\Http\Controllers\AreaSoci\LoginController;
 use App\Http\Controllers\AreaSoci\PasswordResetController;
@@ -90,6 +92,40 @@ Route::prefix('area-soci')->name('area-soci.')->group(function () {
         Route::get('/dati-personali/{file}', [DatiPersonaliController::class, 'scaricaSocio'])
             ->middleware('signed:relative')
             ->name('dati-personali.scarica');
+
+        // Assemblee dei soci e deleghe (issues #6 e #7)
+        Route::get('/assemblee', [AssembleeController::class, 'index'])->name('assemblee');
+        Route::post('/assemblee/{riunione}/delega', [AssembleeController::class, 'delega'])
+            ->middleware('throttle:10,1')
+            ->name('assemblee.delega');
+        Route::delete('/assemblee/{riunione}/delega', [AssembleeController::class, 'revoca'])
+            ->middleware('throttle:10,1')
+            ->name('assemblee.revoca');
+        // Assemblea in corso: presenza a distanza e voto online (issue #8)
+        Route::get('/assemblee/{riunione}', [AssembleeController::class, 'show'])->name('assemblee.show');
+        Route::post('/assemblee/{riunione}/presenza', [AssembleeController::class, 'presenza'])
+            ->middleware('throttle:10,1')
+            ->name('assemblee.presenza');
+        Route::post('/assemblee/{riunione}/votazioni/{votazione}', [AssembleeController::class, 'vota'])
+            ->middleware('throttle:30,1')
+            ->name('assemblee.vota');
+        // Dichiarazione annuale sui conflitti di interesse (issue #11)
+        Route::get('/dichiarazione-interessi', [DichiarazioneInteressiController::class, 'show'])->name('dichiarazione-interessi');
+        Route::post('/dichiarazione-interessi', [DichiarazioneInteressiController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('dichiarazione-interessi.store');
+
+        // Elezioni: candidature e scheda (issue #9)
+        Route::post('/elezioni/{elezione}/candidatura', [AssembleeController::class, 'candida'])
+            ->middleware('throttle:10,1')
+            ->name('elezioni.candida');
+        Route::post('/elezioni/{elezione}/candidatura/accetta', [AssembleeController::class, 'accettaCandidatura'])
+            ->name('elezioni.accetta');
+        Route::delete('/elezioni/{elezione}/candidatura', [AssembleeController::class, 'ritiraCandidatura'])
+            ->name('elezioni.ritira');
+        Route::post('/elezioni/{elezione}/vota', [AssembleeController::class, 'votaElezione'])
+            ->middleware('throttle:30,1')
+            ->name('elezioni.vota');
 
         Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     });

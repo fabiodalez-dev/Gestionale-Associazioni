@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operativita;
 use App\Http\Controllers\Controller;
 use App\Models\Documento;
 use App\Models\Evento;
+use App\Models\ManualePagina;
 use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Utente;
@@ -44,6 +45,7 @@ class RicercaGlobaleController extends Controller
             $this->gruppoEventi($utente, $q),
             $this->gruppoPrenotazioni($utente, $q),
             $this->gruppoDocumenti($utente, $q),
+            $this->gruppoManuale($utente, $q),
             $this->gruppoPagine($utente, $q),
         ]));
 
@@ -150,6 +152,36 @@ class RicercaGlobaleController extends Controller
             ]);
 
         return $this->gruppo('Documenti', 'bi-file-earmark-text', $risultati->all());
+    }
+
+    /**
+     * Pagine del manuale operativo (issue #12): titolo, sezione e testo.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function gruppoManuale(Utente $utente, string $q): ?array
+    {
+        if (! $this->can($utente, 'manuale.view') || ! Route::has('manuale.show')) {
+            return null;
+        }
+
+        $like = '%'.$this->escapeLike($q).'%';
+
+        $risultati = ManualePagina::query()
+            ->where(fn ($query) => $query
+                ->where('titolo', 'like', $like)
+                ->orWhere('sezione', 'like', $like)
+                ->orWhere('contenuto', 'like', $like))
+            ->orderBy('titolo')
+            ->limit(self::LIMITE_PER_GRUPPO)
+            ->get(['id', 'titolo', 'sezione'])
+            ->map(fn (ManualePagina $pagina) => [
+                'titolo' => (string) $pagina->titolo,
+                'sottotitolo' => 'Manuale · '.$pagina->sezione,
+                'url' => route('manuale.show', $pagina),
+            ]);
+
+        return $this->gruppo('Manuale operativo', 'bi-book', $risultati->all());
     }
 
     /**

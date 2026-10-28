@@ -12,7 +12,7 @@
 
 @section('content')
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="bi bi-people me-2"></i>Riunioni del direttivo</h1>
+    <h1 class="h2"><i class="bi bi-people me-2"></i>Riunioni e assemblee</h1>
     <div class="btn-toolbar mb-2 mb-md-0 gap-2">
         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#riunioneModal">
             <i class="bi bi-plus-lg me-1"></i>Nuova riunione
@@ -23,13 +23,21 @@
 @include('partials.flash')
 
 <form method="GET" action="{{ route('riunioni.index') }}" class="row g-2 mb-3">
-    <div class="col-md-5">
+    <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" name="search" class="form-control" placeholder="Cerca per titolo…" value="{{ $search }}">
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
+        <select name="organo" class="form-select" aria-label="Organo">
+            <option value="all">Tutti gli organi</option>
+            @foreach (\App\Models\Riunione::ORGANI as $valore => $etichetta)
+                <option value="{{ $valore }}" @selected($organo === $valore)>{{ $etichetta }}</option>
+            @endforeach
+        </select>
+    </div>
+    <div class="col-md-2">
         <select name="stato" class="form-select">
             <option value="all">Tutti gli stati</option>
             @foreach ($stati as $s)
@@ -51,7 +59,7 @@
                 <th>Titolo</th>
                 <th>Luogo</th>
                 <th class="text-center">Punti OdG</th>
-                <th class="text-center">Invitati</th>
+                <th class="text-center">Partecipanti</th>
                 <th>Stato</th>
                 <th>Verbale</th>
                 <th class="text-end"></th>
@@ -62,7 +70,10 @@
                 @php [$colore, $etichetta] = $statoBadge[$riunione->stato] ?? ['secondary', $riunione->stato]; @endphp
                 <tr>
                     <td>{{ $riunione->data_ora?->format('d/m/Y H:i') }}</td>
-                    <td><a href="{{ route('riunioni.show', $riunione) }}" class="fw-semibold text-decoration-none">{{ $riunione->titolo }}</a></td>
+                    <td>
+                        <a href="{{ route('riunioni.show', $riunione) }}" class="fw-semibold text-decoration-none">{{ $riunione->titolo }}</a>
+                        <div class="small text-muted">{{ $riunione->organoLabel() }}</div>
+                    </td>
                     <td class="text-muted">{{ $riunione->luogo ?? $riunione->spazio?->nome ?? '—' }}</td>
                     <td class="text-center">{{ is_array($riunione->odg) ? count($riunione->odg) : 0 }}</td>
                     <td class="text-center">{{ $riunione->partecipanti_count }}</td>

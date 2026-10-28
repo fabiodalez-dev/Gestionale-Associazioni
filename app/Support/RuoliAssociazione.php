@@ -31,8 +31,10 @@ final class RuoliAssociazione
         'spazi' => 'Spazi e inventario',
         'progetti' => 'Progetti',
         'riunioni' => 'Riunioni e decisioni',
+        'proposte' => 'Proposte dei soci',
         'verbali' => 'Verbali',
         'documenti' => 'Documenti',
+        'manuale' => 'Manuale operativo',
         'scadenze' => 'Scadenze',
         'email' => 'Email e SMTP',
         'comunicazione' => 'Annunci, newsletter e sondaggi',
@@ -77,31 +79,31 @@ final class RuoliAssociazione
                 'soci' => 'vcud', 'tessere' => 'vcud', 'quote' => 'vcud', 'eventi' => 'vcud',
                 'verbali' => 'vcud', 'scadenze' => 'vcud', 'documenti' => 'vc', 'email' => 'v',
                 'economia' => 'vcud', 'iscrizioni' => 'vcud', 'volontari' => 'vcud', 'spazi' => 'vcud',
-                'comunicazione' => 'v',
+                'comunicazione' => 'v', 'manuale' => 'v',
             ],
             'presidente' => $presidente,
             'vicepresidente' => array_map(fn (string $a) => str_replace('d', '', $a), $presidente),
             'segretario' => [
                 'soci' => 'vcud', 'iscrizioni' => 'vcud', 'tessere' => 'vcud', 'quote' => 'v',
                 'eventi' => 'vcu', 'volontari' => 'v', 'spazi' => 'v', 'progetti' => 'v',
-                'riunioni' => 'vcud', 'verbali' => 'vcud', 'documenti' => 'vcud', 'scadenze' => 'vcud',
+                'riunioni' => 'vcud', 'proposte' => 'vcud', 'verbali' => 'vcud', 'documenti' => 'vcud', 'manuale' => 'vcud', 'scadenze' => 'vcud',
                 'email' => 'vcu', 'comunicazione' => 'vcud', 'relazioni' => 'vcu', 'struttura' => 'v',
             ],
             'tesoriere' => [
                 'soci' => 'v', 'iscrizioni' => 'v', 'tessere' => 'vu', 'quote' => 'vcud', 'economia' => 'vcud',
                 'eventi' => 'v', 'progetti' => 'vu', 'riunioni' => 'v', 'verbali' => 'v',
-                'documenti' => 'vc', 'scadenze' => 'vcu', 'relazioni' => 'vcu',
+                'documenti' => 'vc', 'manuale' => 'v', 'scadenze' => 'vcu', 'relazioni' => 'vcu',
             ],
             'consigliere' => array_fill_keys(
-                ['soci', 'iscrizioni', 'tessere', 'quote', 'economia', 'eventi', 'volontari', 'spazi', 'progetti', 'riunioni', 'verbali', 'documenti', 'scadenze', 'comunicazione', 'relazioni'],
+                ['soci', 'iscrizioni', 'tessere', 'quote', 'economia', 'eventi', 'volontari', 'spazi', 'progetti', 'riunioni', 'proposte', 'verbali', 'documenti', 'manuale', 'scadenze', 'comunicazione', 'relazioni'],
                 'v',
             ),
             'responsabile_sede' => [
                 'soci' => 'vcu', 'iscrizioni' => 'v', 'tessere' => 'vcu', 'quote' => 'vcu', 'economia' => 'vc',
                 'eventi' => 'vcud', 'volontari' => 'vcud', 'spazi' => 'vcu', 'documenti' => 'vc',
-                'scadenze' => 'v', 'comunicazione' => 'v',
+                'manuale' => 'v', 'scadenze' => 'v', 'comunicazione' => 'v',
             ],
-            'volontario' => ['eventi' => 'v', 'volontari' => 'v', 'spazi' => 'v', 'documenti' => 'v'],
+            'volontario' => ['eventi' => 'v', 'volontari' => 'v', 'spazi' => 'v', 'documenti' => 'v', 'manuale' => 'v'],
         ];
     }
 

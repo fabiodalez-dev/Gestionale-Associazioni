@@ -20,7 +20,11 @@ concurrency:
 jobs:
   e2e:
     name: Playwright · MySQL 8.4 · Chromium
-    runs-on: ubuntu-latest
+    # Non ubuntu-latest: "npx playwright install --with-deps" supporta solo le
+    # versioni di Ubuntu note alla release di Playwright (la 1.60 non conosce
+    # la 26.04, diventata ubuntu-latest a ottobre 2026). Da aggiornare insieme
+    # a @playwright/test.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       contents: read # Legge i sorgenti.

@@ -267,8 +267,15 @@ class AssembleaSociTest extends TestCase
         $this->assertSame(6, $quorum['prima']['minimo']);
         $this->assertFalse($quorum['prima']['raggiunto']);
         $this->assertSame(1, $quorum['prima']['mancano']);
-        // Seconda convocazione ordinaria: qualunque numero
+        // Seconda convocazione ordinaria: qualunque numero, ma solo dalla sua ora
         $this->assertTrue($quorum['seconda']['raggiunto']);
+        $this->assertFalse($quorum['seconda']['iniziata']);
+        $this->assertNull($quorum['costituita_in']);
+
+        $this->travel(1)->days();
+        $this->travel(1)->minutes();
+        $quorum = $service->quorum($riunione);
+        $this->assertTrue($quorum['seconda']['iniziata']);
         $this->assertSame('seconda', $quorum['costituita_in']);
 
         RiunionePartecipante::query()
@@ -599,5 +606,35 @@ class AssembleaSociTest extends TestCase
         $this->assertStringContainsString('Presenti con diritto di voto: 3 (3 di persona, 0 per delega).', $verbale->presenti);
         $this->assertStringContainsString('validamente costituita in prima convocazione (maggioranza assoluta, minimo 3 presenti)', $verbale->presenti);
         $this->assertStringContainsString('maggioranza dei due terzi', $verbale->deliberazioni);
+    }
+
+    public function test_i_punti_con_votazioni_non_si_spostano_ne_si_tolgono(): void
+    {
+        $riunione = $this->assembleaConPresenti(3, 2, [
+            'odg' => [['punto' => 'Bilancio', 'descrizione' => null], ['punto' => 'Statuto', 'descrizione' => null, 'maggioranza' => 'due_terzi']],
+        ]);
+        VotazioneRiunione::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'riunione_id' => $riunione->id,
+            'punto_indice' => 1,
+        ]);
+
+        $modifica = fn (array $odg) => $this->actAsAdmin()->put(route('riunioni.update', $riunione), [
+            'titolo' => $riunione->titolo,
+            'organo' => $riunione->organo,
+            'data_ora' => $riunione->data_ora->format('Y-m-d\TH:i'),
+            'stato' => $riunione->stato,
+            'odg' => $odg,
+        ]);
+
+        // Punti scambiati: la votazione sullo statuto finirebbe sul bilancio
+        $modifica([['punto' => 'Statuto', 'maggioranza' => 'due_terzi'], ['punto' => 'Bilancio']])->assertSessionHasErrors('odg');
+        // Maggioranza cambiata dopo il voto
+        $modifica([['punto' => 'Bilancio'], ['punto' => 'Statuto', 'maggioranza' => 'semplice']])->assertSessionHasErrors('odg');
+        $this->assertSame('Bilancio', $riunione->fresh()->odg[0]['punto']);
+
+        // Un punto nuovo in fondo è ammesso, come cambiare un punto senza votazioni
+        $modifica([['punto' => 'Bilancio consuntivo'], ['punto' => 'Statuto', 'maggioranza' => 'due_terzi'], ['punto' => 'Varie']])->assertSessionHasNoErrors();
+        $this->assertCount(3, $riunione->fresh()->odg);
     }
 }

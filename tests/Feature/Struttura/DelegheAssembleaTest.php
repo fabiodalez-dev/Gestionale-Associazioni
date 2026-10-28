@@ -8,6 +8,7 @@ use App\Models\DelegaRiunione;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
+use App\Models\Tessera;
 use App\Models\Utente;
 use App\Models\Verbale;
 use App\Notifications\Struttura\DelegaAssembleaNotification;
@@ -349,5 +350,28 @@ class DelegheAssembleaTest extends TestCase
         $verbale = Verbale::query()->firstOrFail();
         $this->assertStringContainsString('(1 di persona, 1 per delega)', $verbale->presenti);
         $this->assertStringContainsString("{$delegante->nome_completo} rappresentato/a da {$delegato->nome_completo}", $verbale->presenti);
+    }
+
+    public function test_codice_di_una_tessera_di_un_socio_cancellato(): void
+    {
+        $delegato = $this->avente(['numero_socio' => 'S-2']);
+        $cancellato = $this->avente();
+        Tessera::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $cancellato->id,
+            'numero_tessera' => 'T-CANC-1',
+        ]);
+        $cancellato->delete();
+
+        $this->actingAs($this->admin)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('riunioni.deleghe.store', $this->riunione), [
+                'delegante' => 'T-CANC-1',
+                'delegato' => 'S-2',
+            ])
+            ->assertRedirect(route('riunioni.show', $this->riunione))
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, DelegaRiunione::query()->count());
     }
 }

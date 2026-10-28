@@ -48,8 +48,11 @@ class ConflittiService
             ->pluck('socio_id')
             ->unique();
 
+        // Tolti tenant e sede ma non SoftDeletes: i soci cancellati non
+        // ricevono richieste né promemoria
         return Socio::query()
             ->withoutGlobalScopes()
+            ->whereNull('deleted_at')
             ->where('associazione_id', $associazione->id)
             ->whereKey($sociId)
             ->with(['cariche' => fn ($q) => $q->withoutGlobalScopes()
@@ -213,8 +216,12 @@ class ConflittiService
             ->where('stato', RiunionePartecipante::STATO_CONFERMATO)
             ->count();
 
-        // Deleganti in conflitto rappresentati da un delegato presente
-        $perDelega = DelegheService::queryValide($riunione)->whereIn('delegante_socio_id', $conflitti)->count();
+        // Deleghe che sul punto non si possono esercitare: delegante in
+        // conflitto, oppure delegato in conflitto, che non vota nemmeno per
+        // conto d'altri (VotoAssembleaService::rappresentati)
+        $perDelega = DelegheService::queryValide($riunione)
+            ->where(fn ($q) => $q->whereIn('delegante_socio_id', $conflitti)->orWhereIn('delegato_socio_id', $conflitti))
+            ->count();
 
         return $diPersona + $perDelega;
     }

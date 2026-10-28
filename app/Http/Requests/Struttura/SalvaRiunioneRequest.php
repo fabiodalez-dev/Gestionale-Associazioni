@@ -2,9 +2,12 @@
 
 namespace App\Http\Requests\Struttura;
 
+use App\Models\ConflittoRiunione;
 use App\Models\Riunione;
+use App\Models\VotazioneRiunione;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Creazione/modifica riunione (f.17): organo, titolo, data/ora, luogo o
@@ -13,6 +16,8 @@ use Illuminate\Validation\Rule;
  * le righe senza testo vengono scartate in prepareForValidation.
  * Per le assemblee (issue #6) anche seconda convocazione, quorum e
  * requisiti degli aventi diritto; deleghe ammesse (issue #7).
+ * I punti a cui sono già legati votazioni o conflitti di interesse
+ * (per indice) non si possono spostare, togliere né cambiare.
  */
 class SalvaRiunioneRequest extends FormRequest
 {
@@ -131,6 +136,49 @@ class SalvaRiunioneRequest extends FormRequest
                 Rule::exists('proposte', 'id')->where('associazione_id', session('associazione_id')),
             ],
         ];
+    }
+
+    /**
+     * Votazioni e conflitti sono legati al punto per indice: riordinare,
+     * togliere o cambiare titolo e maggioranza di quei punti li farebbe
+     * puntare a un altro argomento (verbale, Decisioni, esclusioni dal voto).
+     *
+     * @return array<int, callable(Validator): void>
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $riunione = $this->route('riunione');
+
+            if (! $riunione instanceof Riunione || $validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $legati = VotazioneRiunione::query()->where('riunione_id', $riunione->id)->whereNotNull('punto_indice')->pluck('punto_indice')
+                ->merge(ConflittoRiunione::query()->where('riunione_id', $riunione->id)->pluck('punto_indice'))
+                ->map(fn ($indice) => (int) $indice)
+                ->unique();
+
+            $prima = is_array($riunione->odg) ? $riunione->odg : [];
+            $dopo = (array) $this->input('odg', []);
+
+            foreach ($legati as $indice) {
+                $vecchio = $prima[$indice] ?? null;
+                $nuovo = $dopo[$indice] ?? null;
+                $uguale = is_array($vecchio) && is_array($nuovo)
+                    && ($vecchio['punto'] ?? null) === ($nuovo['punto'] ?? null)
+                    && ($vecchio['maggioranza'] ?? 'semplice') === ($nuovo['maggioranza'] ?? 'semplice');
+
+                if (! $uguale) {
+                    $validator->errors()->add('odg', sprintf(
+                        'Il punto %d ha già votazioni o conflitti di interesse registrati: non si può spostare, togliere né cambiare titolo o maggioranza. Aggiungi i nuovi punti in fondo.',
+                        $indice + 1,
+                    ));
+
+                    return;
+                }
+            }
+        }];
     }
 
     public function messages(): array

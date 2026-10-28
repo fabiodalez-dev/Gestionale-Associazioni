@@ -10,12 +10,16 @@ use App\Models\Documento;
 use App\Models\Movimento;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
+use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Utente;
 use App\Models\Verbale;
 use App\Services\Relazioni\BilancioSocialeService;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -167,5 +171,45 @@ class BilancioSocialeTest extends TestCase
         $altra = Associazione::factory()->create();
         $estraneo = BilancioSociale::withoutEvents(fn () => BilancioSociale::create(['associazione_id' => $altra->id, 'anno' => 2024]));
         $this->actAsAdmin()->get(route('bilancio-sociale.show', $estraneo))->assertNotFound();
+    }
+
+    public function test_bilancio_approvato_non_si_riapprova_ne_cambia_i_testi(): void
+    {
+        $bilancio = app(BilancioSocialeService::class)->genera($this->associazione, (int) now()->year - 1);
+        $this->actAsAdmin()->put(route('bilancio-sociale.update', $bilancio), ['testi' => ['ente' => 'Testo approvato.']]);
+        $this->actAsAdmin()->post(route('bilancio-sociale.approva', $bilancio))->assertSessionHas('success');
+        $this->actAsAdmin()->post(route('bilancio-sociale.pubblica', $bilancio))->assertSessionHas('success');
+
+        // Pubblicato: una nuova approvazione lo riporterebbe ad approvato con il PDF ancora pubblico
+        $this->actAsAdmin()->post(route('bilancio-sociale.approva', $bilancio))->assertSessionHas('warning');
+        $this->actAsAdmin()->put(route('bilancio-sociale.update', $bilancio), ['testi' => ['ente' => 'Riscritto dopo.']])->assertSessionHas('warning');
+
+        $bilancio->refresh();
+        $this->assertSame(BilancioSociale::STATO_PUBBLICATO, $bilancio->stato);
+        $this->assertSame('Testo approvato.', $bilancio->testo('ente'));
+    }
+
+    public function test_staff_limitato_a_una_sede_lo_consulta_ma_non_lo_genera(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $bilancio = app(BilancioSocialeService::class)->genera($this->associazione, (int) now()->year - 2);
+
+        $ruolo = Role::findOrCreate('documenti_test', 'web');
+        $ruolo->syncPermissions(['documenti.view', 'documenti.create', 'documenti.update']);
+        $operatore = Utente::factory()->operatore()->create(['associazione_id' => $this->associazione->id]);
+        $operatore->syncRoles([$ruolo]);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $sessione = fn () => $this->actingAs($operatore)->withSession(['associazione_id' => $this->associazione->id]);
+
+        // Senza sedi assegnate vede tutta l'associazione: può generarlo
+        $sessione()->post(route('bilancio-sociale.store'), ['anno' => now()->year - 1])->assertSessionHas('success');
+
+        $sede = Sede::create(['associazione_id' => $this->associazione->id, 'nome' => 'Sede Nord']);
+        $operatore->assegnaSedi([$sede->id]);
+
+        $sessione()->get(route('bilancio-sociale.show', $bilancio))->assertOk();
+        $sessione()->post(route('bilancio-sociale.rigenera', $bilancio))->assertForbidden();
+        $sessione()->post(route('bilancio-sociale.store'), ['anno' => now()->year - 3])->assertForbidden();
     }
 }

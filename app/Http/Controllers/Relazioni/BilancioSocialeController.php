@@ -73,6 +73,11 @@ class BilancioSocialeController extends Controller
     {
         $this->authorize('update', $bilancio);
 
+        // I testi approvati dall'assemblea non si cambiano: prima si riapre
+        if ($bilancio->stato !== BilancioSociale::STATO_BOZZA) {
+            return redirect()->route('bilancio-sociale.show', $bilancio)->with('warning', 'Il bilancio è approvato: riportalo in bozza per modificare i testi.');
+        }
+
         $dati = $request->validate([
             'testi' => ['nullable', 'array'],
             'testi.*' => ['nullable', 'string', 'max:20000'],
@@ -100,6 +105,10 @@ class BilancioSocialeController extends Controller
     public function approva(Request $request, BilancioSociale $bilancio): RedirectResponse
     {
         $this->authorize('update', $bilancio);
+
+        if ($bilancio->stato !== BilancioSociale::STATO_BOZZA) {
+            return redirect()->route('bilancio-sociale.show', $bilancio)->with('warning', 'Il bilancio sociale è già approvato.');
+        }
 
         $dati = $request->validate([
             'verbale_id' => ['nullable', 'uuid', Rule::exists('verbali', 'id')->where('associazione_id', $bilancio->associazione_id)],

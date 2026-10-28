@@ -5,6 +5,7 @@ namespace Tests\Feature\Struttura;
 use App\Models\Associazione;
 use App\Models\Carica;
 use App\Models\ConflittoRiunione;
+use App\Models\DelegaRiunione;
 use App\Models\DichiarazioneInteressi;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
@@ -247,5 +248,46 @@ class ConflittiInteresseTest extends TestCase
 
         $this->assertSame(VotazioneRiunione::ESITO_APPROVATO, $voto->chiudi($votazione->fresh())->esito);
         $this->assertSame(1, ConflittoRiunione::query()->count());
+    }
+
+    public function test_le_deleghe_affidate_a_chi_e_in_conflitto_escono_dalla_base(): void
+    {
+        $riunione = Riunione::factory()->assemblea()->create([
+            'associazione_id' => $this->associazione->id,
+            'data_ora' => now()->subMinutes(5),
+        ]);
+        $delegato = $this->titolare();
+        $this->partecipante($riunione, $delegato);
+
+        foreach (range(1, 2) as $i) {
+            $delegante = $this->titolare();
+            $this->partecipante($riunione, $delegante, presente: false);
+            DelegaRiunione::create([
+                'associazione_id' => $this->associazione->id,
+                'riunione_id' => $riunione->id,
+                'delegante_socio_id' => $delegante->id,
+                'delegato_socio_id' => $delegato->id,
+                'origine' => DelegaRiunione::ORIGINE_SEGRETERIA,
+            ]);
+        }
+
+        $service = app(ConflittiService::class);
+        $service->dichiaraConflitto($riunione, 0, $delegato, null);
+
+        // Il delegato in conflitto non vota né per sé né per i deleganti: tre voti fuori dalla base
+        $this->assertTrue(app(VotoAssembleaService::class)->rappresentati($riunione, $delegato, 0)->isEmpty());
+        $this->assertSame(3, $service->presentiInConflitto($riunione, 0));
+        $this->assertSame(0, $service->presentiInConflitto($riunione, 1));
+    }
+
+    public function test_i_soci_cancellati_non_ricevono_la_richiesta_di_dichiarazione(): void
+    {
+        $attivo = $this->titolare('Presidente');
+        $cancellato = $this->titolare('Tesoriere');
+        $cancellato->delete();
+
+        $titolari = app(ConflittiService::class)->titolari($this->associazione, (int) now()->year);
+
+        $this->assertSame([$attivo->id], $titolari->pluck('id')->all());
     }
 }

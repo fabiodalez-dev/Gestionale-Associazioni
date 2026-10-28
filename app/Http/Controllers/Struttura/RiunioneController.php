@@ -385,6 +385,15 @@ class RiunioneController extends Controller
 
         $soci = Socio::query()->withoutGlobalScope('sede')->whereKey(array_values($sociId))->get()->keyBy('id');
 
+        // Codice di una tessera rimasta a un socio cancellato
+        foreach ($sociId as $ruolo => $id) {
+            if (! $soci->has($id)) {
+                return redirect()
+                    ->route('riunioni.show', $riunione)
+                    ->with('error', "Il codice del {$ruolo} \"{$dati[$ruolo]}\" appartiene a un socio non più in anagrafica.");
+            }
+        }
+
         try {
             $delega = $this->deleghe->registra(
                 $riunione,
@@ -592,7 +601,8 @@ class RiunioneController extends Controller
 
         $riunione->load([
             'partecipanti' => fn ($q) => $q->where('stato', RiunionePartecipante::STATO_CONFERMATO),
-            'partecipanti.socio' => fn ($q) => $q->withTrashed(),
+            // Il verbale elenca tutti i presenti, anche delle sedi fuori dal perimetro di chi lo genera
+            'partecipanti.socio' => fn ($q) => $q->withoutGlobalScope('sede')->withTrashed(),
             'partecipanti.utente',
             'votazioni' => fn ($q) => $q->orderBy('punto_indice'),
         ]);

@@ -133,7 +133,7 @@ class AssembleaService
      *     deleghe: int,
      *     presenti_totali: int,
      *     prima: array{regola: string, etichetta: string, minimo: int, raggiunto: bool, mancano: int},
-     *     seconda: array{regola: string, etichetta: string, minimo: int, raggiunto: bool, mancano: int}|null,
+     *     seconda: array{regola: string, etichetta: string, minimo: int, raggiunto: bool, mancano: int, iniziata: bool}|null,
      *     costituita_in: 'prima'|'seconda'|null
      * }
      */
@@ -154,6 +154,10 @@ class AssembleaService
         $prima = $this->statoConvocazione((string) $riunione->regolaQuorum(), $aventi, $presenti);
         $seconda = $riunione->seconda_convocazione_at !== null
             ? $this->statoConvocazione((string) $riunione->regolaQuorum(seconda: true), $aventi, $presenti)
+                // Il quorum ridotto vale solo dall'ora della seconda convocazione:
+                // prima di allora una prima convocazione andata deserta non
+                // costituisce l'assemblea
+                + ['iniziata' => now()->greaterThanOrEqualTo($riunione->seconda_convocazione_at)]
             : null;
 
         return [
@@ -166,7 +170,7 @@ class AssembleaService
             'seconda' => $seconda,
             'costituita_in' => match (true) {
                 $prima['raggiunto'] => 'prima',
-                $seconda !== null && $seconda['raggiunto'] => 'seconda',
+                $seconda !== null && $seconda['iniziata'] && $seconda['raggiunto'] => 'seconda',
                 default => null,
             },
         ];

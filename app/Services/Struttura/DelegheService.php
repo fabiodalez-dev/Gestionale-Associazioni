@@ -47,7 +47,8 @@ class DelegheService
             }
         }
 
-        if ($riunione->deleghe_vietate_cariche && Carica::query()->attive()->where('socio_id', $delegato->id)->exists()) {
+        // Senza scope sede: il divieto vale anche per le cariche di sedi fuori dal perimetro di chi registra
+        if ($riunione->deleghe_vietate_cariche && Carica::query()->withoutGlobalScope('sede')->attive()->where('socio_id', $delegato->id)->exists()) {
             throw new DelegaNonValidaException("{$delegato->nome_completo} ricopre una carica sociale e non può ricevere deleghe.");
         }
 

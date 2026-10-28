@@ -126,31 +126,42 @@ class RubricaService
     }
 
     /**
-     * Schede visibili, con i filtri limitati ai campi resi pubblici.
+     * Schede visibili, con i filtri limitati ai campi resi pubblici e
+     * ammessi oggi dall'associazione: un campo tolto dall'admin sparisce
+     * anche dalle schede già salvate, senza che i soci debbano risalvarle.
      *
      * @param  array{nome?: ?string, citta?: ?string, interesse?: ?string}  $filtri
+     * @param  list<string>  $ammessi  campi consentiti (PartecipazioneSettings::rubrica_campi)
      * @return LengthAwarePaginator<int, RubricaScheda>
      */
-    public function cerca(array $filtri): LengthAwarePaginator
+    public function cerca(array $filtri, array $ammessi): LengthAwarePaginator
     {
         $like = fn (?string $v) => '%'.str_replace(['%', '_'], ['\\%', '\\_'], trim((string) $v)).'%';
+        $citta = filled($filtri['citta'] ?? null);
+        $interesse = filled($filtri['interesse'] ?? null);
 
         return $this->visibili()
             ->when(filled($filtri['nome'] ?? null), fn ($q) => $q->whereHas('socio', fn ($s) => $s->withoutGlobalScope('sede')
                 ->where(fn ($w) => $w->where('nome', 'like', $like($filtri['nome']))->orWhere('cognome', 'like', $like($filtri['nome'])))))
-            ->when(filled($filtri['citta'] ?? null), fn ($q) => $q
+            ->when($citta && ! in_array('citta', $ammessi, true), fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($citta, fn ($q) => $q
                 ->whereJsonContains('campi_visibili', 'citta')
                 ->whereHas('socio', fn ($s) => $s->withoutGlobalScope('sede')->where('citta', 'like', $like($filtri['citta']))))
-            ->when(filled($filtri['interesse'] ?? null), fn ($q) => $q
-                ->whereJsonContains('campi_visibili', 'interessi')
-                ->where('interessi', 'like', $like($filtri['interesse'])))
+            ->when($interesse && ! in_array('interessi', $ammessi, true), fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($interesse, fn ($q) => $q->whereKey($this->conInteresse((string) $filtri['interesse'])))
             ->with(['socio' => fn ($s) => $s->withoutGlobalScope('sede')->with('sede:id,nome')])
             ->join('soci', 'soci.id', '=', 'rubrica_schede.socio_id')
             ->orderBy('soci.cognome')
             ->orderBy('soci.nome')
             ->select('rubrica_schede.*')
             ->paginate(20)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(function (RubricaScheda $scheda) use ($ammessi): RubricaScheda {
+                // Solo in memoria: la scelta del socio resta salvata com'è
+                $scheda->campi_visibili = array_values(array_intersect((array) $scheda->campi_visibili, $ammessi));
+
+                return $scheda;
+            });
     }
 
     public function contatta(Socio $mittente, RubricaScheda $scheda, string $oggetto, string $testo): void
@@ -198,6 +209,28 @@ class RubricaService
         }
 
         $contatto->update(['segnalato_at' => $contatto->segnalato_at ?? now()]);
+    }
+
+    /**
+     * Id delle schede con un interesse che contiene il testo cercato. Il
+     * confronto avviene in PHP perché la colonna JSON non si confronta allo
+     * stesso modo sui database supportati (collation binaria su MySQL,
+     * caratteri accentati scritti come \u00e8 su MariaDB e SQLite); le
+     * schede in rubrica sono poche, al più quanto i soci.
+     *
+     * @return list<string>
+     */
+    private function conInteresse(string $testo): array
+    {
+        $cercato = mb_strtolower(trim($testo));
+
+        return $this->visibili()
+            ->whereJsonContains('campi_visibili', 'interessi')
+            ->get(['rubrica_schede.id', 'rubrica_schede.interessi'])
+            ->filter(fn (RubricaScheda $scheda) => collect((array) $scheda->interessi)
+                ->contains(fn ($voce) => str_contains(mb_strtolower((string) $voce), $cercato)))
+            ->pluck('id')
+            ->all();
     }
 
     /**

@@ -29,15 +29,16 @@ class RubricaController extends Controller
         /** @var Socio $socio */
         $socio = $request->user('socio');
         $blocco = $this->rubrica->motivoBloccoConsultazione($socio);
+        $ammessi = $this->rubrica->impostazioni($socio)->rubrica_campi;
 
         return view('area-soci.rubrica.index', [
             'socio' => $socio,
             'scheda' => $this->rubrica->scheda($socio),
             'esclusione' => $this->rubrica->motivoEsclusione($socio),
             'blocco' => $blocco,
-            'schede' => $blocco === null ? $this->rubrica->cerca($request->only(['nome', 'citta', 'interesse'])) : null,
+            'schede' => $blocco === null ? $this->rubrica->cerca($request->only(['nome', 'citta', 'interesse']), $ammessi) : null,
             'filtri' => $request->only(['nome', 'citta', 'interesse']),
-            'campi' => array_intersect_key(RubricaScheda::CAMPI, array_flip($this->rubrica->impostazioni($socio)->rubrica_campi)),
+            'campi' => array_intersect_key(RubricaScheda::CAMPI, array_flip($ammessi)),
         ]);
     }
 

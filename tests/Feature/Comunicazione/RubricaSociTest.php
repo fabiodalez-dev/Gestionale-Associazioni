@@ -228,4 +228,35 @@ class RubricaSociTest extends TestCase
         $this->assertArrayHasKey('proposte', $dati);
         $this->assertArrayHasKey('messaggi_discussioni', $dati);
     }
+
+    public function test_campo_tolto_dall_admin_sparisce_anche_dalle_schede_salvate(): void
+    {
+        $visibile = $this->inRubrica(['telefono' => '3339998877', 'citta' => 'Parmaqx'], ['telefono', 'citta']);
+        $lettore = $this->inRubrica();
+
+        $this->actingAs($lettore, 'socio')->get(route('area-soci.rubrica'))->assertSee('3339998877');
+
+        $this->associazione->impostazioni(PartecipazioneSettings::class)->aggiorna(['rubrica_campi' => ['email', 'interessi']]);
+
+        // Istanza fresca: quella usata prima tiene in cache le impostazioni lette
+        $this->actingAs($lettore->fresh(), 'socio')->get(route('area-soci.rubrica'))
+            ->assertSee($visibile->nome_completo)
+            ->assertDontSee('3339998877')
+            ->assertDontSee('Parmaqx');
+        $this->actingAs($lettore->fresh(), 'socio')->get(route('area-soci.rubrica', ['citta' => 'Parmaqx']))
+            ->assertDontSee($visibile->nome_completo);
+
+        // La scelta del socio resta salvata: torna visibile se l'admin riammette il campo
+        $this->assertSame(['telefono', 'citta'], RubricaScheda::query()->where('socio_id', $visibile->id)->firstOrFail()->campi_visibili);
+    }
+
+    public function test_filtro_per_interesse_ignora_maiuscole_e_accetta_gli_accenti(): void
+    {
+        $this->inRubrica(['cognome' => 'Musicistaqx'], ['interessi'], ['Musica', 'Caffè letterario']);
+        $lettore = $this->inRubrica();
+
+        $this->actingAs($lettore, 'socio')->get(route('area-soci.rubrica', ['interesse' => 'musica']))->assertSee('Musicistaqx');
+        $this->actingAs($lettore, 'socio')->get(route('area-soci.rubrica', ['interesse' => 'CAFFÈ']))->assertSee('Musicistaqx');
+        $this->actingAs($lettore, 'socio')->get(route('area-soci.rubrica', ['interesse' => 'pittura']))->assertDontSee('Musicistaqx');
+    }
 }

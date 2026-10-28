@@ -34,7 +34,9 @@
                     <div class="fw-semibold">{{ $etichetta }}</div>
                     <div class="small text-muted">{{ $stato['etichetta'] }}: minimo <span class="tabular">{{ $stato['minimo'] }}</span></div>
                 </div>
-                @if ($stato['raggiunto'])
+                @if (($stato['iniziata'] ?? true) === false)
+                    <span class="text-muted small">Dalle {{ $riunione->seconda_convocazione_at->format('d/m/Y H:i') }}</span>
+                @elseif ($stato['raggiunto'])
                     <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Raggiunto</span>
                 @else
                     <span class="text-muted small">Mancano <span class="tabular">{{ $stato['mancano'] }}</span></span>

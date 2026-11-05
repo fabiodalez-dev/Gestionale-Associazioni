@@ -96,14 +96,57 @@ class CheckinBigliettoController extends Controller
         // Check-in e registrazione del socio collegato all'account tra i
         // partecipanti confermati nella stessa transazione: se la seconda
         // fallisce il biglietto non risulta usato e la scansione si ripete
-        DB::transaction(function () use ($prenotazione, $adesso, $request, $presenze): void {
-            $prenotazione->update([
-                'checkin_at' => $adesso,
-                'checkin_utente_id' => $request->user()?->getAuthIdentifier(),
-            ]);
+        // L'UPDATE è condizionato (confermata e non ancora usata): con due
+        // scansioni simultanee dello stesso QR una sola registra l'ingresso
+        $registrato = DB::transaction(function () use ($prenotazione, $adesso, $request, $presenze): bool {
+            $aggiornate = Prenotazione::query()
+                ->withoutGlobalScope('associazione')
+                ->whereKey($prenotazione->id)
+                ->where('stato', Prenotazione::STATO_CONFERMATA)
+                ->whereNull('checkin_at')
+                ->update([
+                    'checkin_at' => $adesso,
+                    'checkin_utente_id' => $request->user()?->getAuthIdentifier(),
+                ]);
+
+            if ($aggiornate === 0) {
+                return false;
+            }
 
             $presenze->registraSociDellePrenotazioni($prenotazione->evento, [$prenotazione->id]);
+
+            return true;
         });
+
+        if (! $registrato) {
+            // Corsa persa: esito calcolato sui dati aggiornati
+            $prenotazione->refresh();
+
+            if ($prenotazione->stato !== Prenotazione::STATO_CONFERMATA) {
+                return response()->json([
+                    'success' => false,
+                    'error' => $this->motivoStato($prenotazione->stato),
+                    'code' => 'stato_non_valido',
+                    'stato' => $prenotazione->stato,
+                    'biglietto' => $this->biglietto($prenotazione),
+                ], 409);
+            }
+
+            $checkinPrecedente = $prenotazione->checkin_at;
+
+            return response()->json([
+                'success' => true,
+                'already_checked_in' => true,
+                'message' => 'Biglietto già utilizzato alle '.$checkinPrecedente?->format('H:i').' del '.$checkinPrecedente?->format('d/m/Y').'.',
+                'checkin_at' => $checkinPrecedente?->toIso8601String(),
+                'biglietto' => $this->biglietto($prenotazione),
+            ]);
+        }
+
+        $prenotazione->forceFill([
+            'checkin_at' => $adesso,
+            'checkin_utente_id' => $request->user()?->getAuthIdentifier(),
+        ]);
 
         return response()->json([
             'success' => true,

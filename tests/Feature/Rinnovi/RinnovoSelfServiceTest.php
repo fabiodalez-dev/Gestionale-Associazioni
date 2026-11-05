@@ -5,6 +5,7 @@ namespace Tests\Feature\Rinnovi;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\Tessere\TesseraIssuer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
@@ -121,6 +122,30 @@ class RinnovoSelfServiceTest extends RinnoviTestCase
             ->assertSessionHas('success', fn (string $esito) => str_contains($esito, 'la tessera per il 2026 è stata emessa'));
 
         $this->assertTrue(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2026)->exists());
+    }
+
+    public function test_quota_pagata_con_emissione_della_tessera_fallita_mostra_un_avviso_dedicato(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-15 10:00:00'));
+        $this->configuraTenant();
+        $socio = $this->creaSocio(['password_hash' => 'password']);
+        Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => 2026,
+            'data_pagamento' => '2026-03-01',
+        ]);
+
+        // L'emissione della tessera fallisce (es. template non configurato)
+        $this->mock(TesseraIssuer::class)
+            ->shouldReceive('emettiSeAssente')
+            ->andThrow(new \RuntimeException('emissione non riuscita'));
+
+        $this->actingAs($socio, 'socio')->post('/area-soci/rinnova')
+            ->assertRedirect(route('area-soci.dashboard'))
+            ->assertSessionHas('warning', fn (string $avviso) => str_contains($avviso, 'risulta già pagata, ma la tessera non è stata emessa'));
+
+        $this->assertFalse(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2026)->exists());
     }
 
     public function test_quota_dell_anno_dopo_pagata_senza_tessera_permette_di_ritentare_l_emissione(): void

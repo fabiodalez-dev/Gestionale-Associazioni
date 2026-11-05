@@ -10,6 +10,7 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -113,17 +114,42 @@ class CheckinController extends Controller
             ], 400);
         }
 
-        $partecipante = EventoPartecipante::query()
-            ->where('evento_id', $evento->id)
-            ->where('socio_id', $socio->id)
-            ->first();
+        // Prenotazione e partecipazione nella stessa transazione: un errore
+        // sulla seconda scrittura annulla anche la prima
+        $giaRegistrato = DB::transaction(function () use ($evento, $socio, $presenze, $request, $associazioneId): bool {
+            $partecipante = EventoPartecipante::query()
+                ->where('evento_id', $evento->id)
+                ->where('socio_id', $socio->id)
+                ->first();
 
-        // La prenotazione del socio (account collegato) per l'evento risulta
-        // arrivata come dopo il check-in del biglietto: vita sociale,
-        // feedback e statistiche contano la stessa presenza
-        $presenze->segnaPrenotazioneDelSocio($evento, $socio, $request->user()?->getAuthIdentifier());
+            // La prenotazione del socio (account collegato) per l'evento risulta
+            // arrivata come dopo il check-in del biglietto: vita sociale,
+            // feedback e statistiche contano la stessa presenza
+            $presenze->segnaPrenotazioneDelSocio($evento, $socio, $request->user()?->getAuthIdentifier());
 
-        if ($partecipante !== null && $partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+            if ($partecipante !== null && $partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+                return true;
+            }
+
+            if ($partecipante !== null) {
+                $partecipante->update([
+                    'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                    'data_conferma' => now(),
+                ]);
+            } else {
+                EventoPartecipante::create([
+                    'associazione_id' => $associazioneId,
+                    'evento_id' => $evento->id,
+                    'socio_id' => $socio->id,
+                    'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                    'data_conferma' => now(),
+                ]);
+            }
+
+            return false;
+        });
+
+        if ($giaRegistrato) {
             return response()->json([
                 'success' => true,
                 'already_checked_in' => true,
@@ -133,21 +159,6 @@ class CheckinController extends Controller
                     'cognome' => $socio->cognome,
                     'numero_socio' => $socio->numero_socio,
                 ],
-            ]);
-        }
-
-        if ($partecipante !== null) {
-            $partecipante->update([
-                'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
-                'data_conferma' => now(),
-            ]);
-        } else {
-            EventoPartecipante::create([
-                'associazione_id' => $associazioneId,
-                'evento_id' => $evento->id,
-                'socio_id' => $socio->id,
-                'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
-                'data_conferma' => now(),
             ]);
         }
 

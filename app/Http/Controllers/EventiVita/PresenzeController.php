@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -48,19 +49,25 @@ class PresenzeController extends Controller
     {
         $this->authorize('update', $evento);
 
-        $registrate = Prenotazione::query()
-            ->where('evento_id', $evento->id)
-            ->whereIn('id', $request->validated('prenotazioni'))
-            ->where('stato', Prenotazione::STATO_CONFERMATA)
-            ->whereNull('checkin_at')
-            ->update([
-                'checkin_at' => now(),
-                'checkin_utente_id' => $request->user()?->id,
-            ]);
+        // Check-in e registrazione dei soci nella stessa transazione: se la
+        // seconda fallisce le prenotazioni non risultano segnate a metà
+        $registrate = DB::transaction(function () use ($request, $evento, $presenze): int {
+            $registrate = Prenotazione::query()
+                ->where('evento_id', $evento->id)
+                ->whereIn('id', $request->validated('prenotazioni'))
+                ->where('stato', Prenotazione::STATO_CONFERMATA)
+                ->whereNull('checkin_at')
+                ->update([
+                    'checkin_at' => now(),
+                    'checkin_utente_id' => $request->user()?->id,
+                ]);
 
-        // I soci collegati agli account presenti risultano anche tra i
-        // partecipanti confermati, come dopo il check-in con la tessera
-        $presenze->registraSociDellePrenotazioni($evento, $request->validated('prenotazioni'));
+            // I soci collegati agli account presenti risultano anche tra i
+            // partecipanti confermati, come dopo il check-in con la tessera
+            $presenze->registraSociDellePrenotazioni($evento, $request->validated('prenotazioni'));
+
+            return $registrate;
+        });
 
         return redirect()
             ->route('eventi.presenze.index', $evento)

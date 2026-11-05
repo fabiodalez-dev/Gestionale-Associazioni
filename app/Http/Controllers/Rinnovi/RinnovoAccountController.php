@@ -51,6 +51,15 @@ class RinnovoAccountController extends Controller
                 ->with('success', 'La quota '.$anno.' risulta già pagata: la tessera per il '.$anno.' è stata emessa.');
         }
 
+        // Quota già pagata ma emissione della tessera non riuscita: la tessera
+        // manca ancora, non è il caso "già emessa" dell'avviso generico
+        if ($quota === null && ! $this->rinnovi->haTesseraAnno($socio, $anno)
+            && $this->rinnovi->puoRinnovare($socio, $anno) && $this->rinnovi->quotaAnnoPagata($socio, $anno)) {
+            return redirect()
+                ->route('pubblico.account.tessera', $associazione)
+                ->with('warning', 'La quota '.$anno.' risulta già pagata, ma la tessera non è stata emessa. Riprova più tardi o contatta la segreteria.');
+        }
+
         if ($quota === null) {
             return redirect()
                 ->route('pubblico.account.tessera', $associazione)

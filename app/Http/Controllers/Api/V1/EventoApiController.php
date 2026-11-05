@@ -205,6 +205,11 @@ class EventoApiController extends Controller
                     ->lockForUpdate()
                     ->first();
 
+                // Stesso allineamento del check-in con la tessera da backoffice,
+                // nella stessa transazione della partecipazione: la prenotazione
+                // confermata dell'account collegato risulta arrivata. Idempotente.
+                app(PresenzeSociService::class)->segnaPrenotazioneDelSocio($evento, $socio, null);
+
                 if ($partecipazione && $partecipazione->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
                     return ['already_checked_in' => true];
                 }
@@ -236,11 +241,6 @@ class EventoApiController extends Controller
 
             return $this->error(500, 'db_error', 'Errore interno durante il check-in.');
         }
-
-        // Stesso allineamento del check-in con la tessera da backoffice: la
-        // prenotazione confermata dell'account collegato al socio risulta
-        // arrivata (feedback post-evento, vita sociale). Idempotente.
-        app(PresenzeSociService::class)->segnaPrenotazioneDelSocio($evento, $socio, null);
 
         $socioPayload = [
             'nome' => $socio->nome,

@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Eventi;
 
+use App\Models\Account;
 use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
+use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -212,6 +214,29 @@ class CheckinApiTest extends TestCase
             'socio_id' => $socio->id,
             'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
         ]);
+    }
+
+    public function test_checkin_segna_anche_la_prenotazione_dell_account_collegato(): void
+    {
+        $socio = $this->creaSocioAttivo();
+        $account = Account::factory()->verificato()->create([
+            'associazione_id' => $this->associazione->id,
+            'email' => $socio->email,
+            'socio_id' => $socio->id,
+        ]);
+        $prenotazione = Prenotazione::factory()->confermata()->create([
+            'evento_id' => $this->evento->id,
+            'associazione_id' => $this->associazione->id,
+            'account_id' => $account->id,
+        ]);
+
+        $this->postJson(
+            "/api/v1/eventi/{$this->evento->id}/checkin",
+            ['socio_id' => $socio->id],
+            $this->headers()
+        )->assertOk()->assertJsonPath('already_checked_in', false);
+
+        $this->assertNotNull($prenotazione->fresh()->checkin_at);
     }
 
     public function test_checkin_con_tessera_id(): void

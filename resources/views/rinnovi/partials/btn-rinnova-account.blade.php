@@ -7,10 +7,10 @@
 @php
     /** @var \App\Services\Rinnovi\RinnovoService $rinnovoService */
     $rinnovoService = app(\App\Services\Rinnovi\RinnovoService::class);
-    $annoRinnovo = $rinnovoService->annoCorrente();
+    $annoRinnovo = $rinnovoService->annoRinnovo($socio);
 @endphp
 
-@if ($rinnovoService->puoRinnovare($socio))
+@if ($rinnovoService->puoRinnovare($socio, $annoRinnovo))
     <form method="POST" action="{{ route('pubblico.account.rinnova', $associazione) }}" class="mt-3 mb-0">
         @csrf
         <button type="submit" class="btn btn-primary">

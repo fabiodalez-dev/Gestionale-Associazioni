@@ -8,6 +8,7 @@ use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
 
@@ -34,10 +35,11 @@ class CheckinController extends Controller
     }
 
     /**
-     * Registra il check-in (stato_partecipazione 'Confermato').
+     * Registra il check-in (stato_partecipazione 'Confermato') e segna
+     * l'eventuale prenotazione confermata del socio per lo stesso evento.
      * Identificazione socio: tessera_id (dal QR) → numero_tessera → numero_socio.
      */
-    public function store(CheckinTesseraRequest $request): JsonResponse
+    public function store(CheckinTesseraRequest $request, PresenzeSociService $presenze): JsonResponse
     {
         $dati = $request->validated();
         $associazioneId = (string) session('associazione_id');
@@ -115,6 +117,11 @@ class CheckinController extends Controller
             ->where('evento_id', $evento->id)
             ->where('socio_id', $socio->id)
             ->first();
+
+        // La prenotazione del socio (account collegato) per l'evento risulta
+        // arrivata come dopo il check-in del biglietto: vita sociale,
+        // feedback e statistiche contano la stessa presenza
+        $presenze->segnaPrenotazioneDelSocio($evento, $socio, $request->user()?->getAuthIdentifier());
 
         if ($partecipante !== null && $partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
             return response()->json([

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
+use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -48,12 +49,15 @@ class CheckinKioskController extends Controller
     /**
      * Presenze registrate: partecipanti soci confermati (check-in tessera
      * o registrazione manuale) + posti delle prenotazioni con check-in.
+     * Un socio presente anche con la prenotazione del proprio account è
+     * contato una sola volta (nei posti della prenotazione).
      */
     private function presenze(Evento $evento): int
     {
         $partecipanti = EventoPartecipante::query()
             ->where('evento_id', $evento->id)
             ->where('stato_partecipazione', EventoPartecipante::STATO_CONFERMATO)
+            ->whereNotIn('socio_id', app(PresenzeSociService::class)->sociGiaContatiInPrenotazione($evento))
             ->count();
 
         $postiPrenotazioni = (int) Prenotazione::query()

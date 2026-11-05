@@ -375,6 +375,61 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
     }
 
     /**
+     * Evento eliminato dall'organizzazione (singolo o intera serie): le
+     * prenotazioni ancora aperte (confermate, riservate, in approvazione,
+     * in lista d'attesa) vengono annullate con notifica, così il biglietto
+     * non resta "valido" per una data che non esiste più. Nessuna
+     * promozione della lista d'attesa: anche la coda viene annullata.
+     *
+     * Un evento già svolto non viene toccato: le sue prenotazioni restano
+     * come storico delle presenze.
+     *
+     * Va chiamato PRIMA del soft delete dell'evento. Ritorna il numero di
+     * prenotazioni annullate.
+     */
+    public function annullaPerEventoEliminato(Evento $evento): int
+    {
+        $fine = $evento->data_fine ?? $evento->data_evento;
+
+        if ($fine->isPast()) {
+            return 0;
+        }
+
+        // Titolo e data nel motivo: restano leggibili nello storico della
+        // prenotazione anche quando l'evento non è più visibile (cestino)
+        $motivo = 'Evento "'.$evento->titolo.'"'
+            .' del '.$evento->data_evento->format('d/m/Y H:i')
+            ." annullato dall'organizzazione";
+
+        $annullate = DB::transaction(function () use ($evento, $motivo): int {
+            $this->lockEvento($evento->id);
+
+            $aperte = Prenotazione::query()
+                ->withoutGlobalScope('associazione')
+                ->where('evento_id', $evento->id)
+                ->whereNotIn('stato', [Prenotazione::STATO_ANNULLATA, Prenotazione::STATO_SCADUTA])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($aperte as $prenotazione) {
+                $prenotazione->forceFill([
+                    'stato' => Prenotazione::STATO_ANNULLATA,
+                    'annullata_at' => now(),
+                    'motivo_annullamento' => $motivo,
+                ])->save();
+
+                $this->accodaNotifica('notificaAnnullata', $prenotazione);
+            }
+
+            return $aperte->count();
+        });
+
+        $this->inviaNotifichePendenti();
+
+        return $annullate;
+    }
+
+    /**
      * @throws PrenotazioneException
      */
     protected function verificaAnnullabile(Prenotazione $prenotazione, Evento $evento, Account|Utente $attore): void

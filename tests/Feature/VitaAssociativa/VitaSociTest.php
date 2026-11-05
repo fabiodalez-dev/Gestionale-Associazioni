@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\VitaAssociativa;
+namespace Tests\Feature\VitaAssociativa;
 
 use App\Mail\AreaSoci\ImpostaPasswordSocioMail;
 use App\Models\Account;
@@ -2512,15 +2512,16 @@ class VitaSociTest extends TestCase
         $this->assertTrue($quote->every(fn (Quota $q) => $q->isPagata()));
         $this->assertCount(10, $quote->pluck('anno')->unique());
 
-        // Ricevute: una per ogni quota pagata tramite PaymentService (2018–2026),
-        // ciascuna la n. 1 del suo anno; la quota 2017 confermata allo sportello non ne ha
+        // Ricevute: una per ogni quota pagata (2017–2026), ciascuna la n. 1 del suo
+        // anno; anche la quota 2017 confermata allo sportello ha la sua ricevuta
+        // e la conferma di pagamento, come ogni altro incasso offline
         $ricevute = Ricevuta::allTenants()->whereIn('quota_id', $quote->pluck('id'))->get();
-        $this->assertCount(9, $ricevute);
+        $this->assertCount(10, $ricevute);
         $this->assertTrue($ricevute->every(fn (Ricevuta $r) => (int) $r->numero === 1));
-        $this->assertSame(range(2018, 2026), $ricevute->pluck('anno')->map(fn ($a) => (int) $a)->sort()->values()->all());
+        $this->assertSame(range(2017, 2026), $ricevute->pluck('anno')->map(fn ($a) => (int) $a)->sort()->values()->all());
 
         Notification::assertSentToTimes($mario, SollecitoQuotaNotification::class, 1);
-        Notification::assertSentToTimes($mario, PagamentoQuotaNotification::class, 9);
+        Notification::assertSentToTimes($mario, PagamentoQuotaNotification::class, 10);
 
         $export = $this->comeAdmin()->get(route('soci.storico-tesseramento.export', $mario));
         $export->assertOk();
@@ -2993,7 +2994,8 @@ class VitaSociTest extends TestCase
             $partecipazioniAnno >= 4,
             'Test 24: le statistiche annuali contano '.$partecipazioniAnno.' partecipazioni per il 2026 pur con 4 presenze registrate: StatisticheAnnualiService::metriche (app/Services/Relazioni/StatisticheAnnualiService.php:84) conta solo eventi_partecipanti e ignora le presenze sulle prenotazioni (checkin_at).'
         );
-        Notification::assertSentToTimes($account, FeedbackEventoNotification::class, 3);
+        // Quattro presenze, quattro richieste di feedback: tre incontri e la festa
+        Notification::assertSentToTimes($account, FeedbackEventoNotification::class, 4);
 
         $this->assertNessunaDifformita();
     }

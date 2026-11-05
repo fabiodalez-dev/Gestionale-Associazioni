@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Prenotazioni;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Prenotazioni\CheckinBigliettoRequest;
 use App\Models\Prenotazione;
+use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,7 +21,7 @@ use Illuminate\Http\JsonResponse;
  */
 class CheckinBigliettoController extends Controller
 {
-    public function __invoke(CheckinBigliettoRequest $request): JsonResponse
+    public function __invoke(CheckinBigliettoRequest $request, PresenzeSociService $presenze): JsonResponse
     {
         $dati = $request->validated();
 
@@ -57,6 +58,16 @@ class CheckinBigliettoController extends Controller
             ], 409);
         }
 
+        // Evento eliminato (nel cestino): nessun ingresso per una data annullata
+        if ($prenotazione->evento === null) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Evento annullato: il biglietto non è più valido.',
+                'code' => 'evento_annullato',
+                'biglietto' => $this->biglietto($prenotazione),
+            ], 409);
+        }
+
         if ($prenotazione->stato !== Prenotazione::STATO_CONFERMATA) {
             return response()->json([
                 'success' => false,
@@ -85,6 +96,9 @@ class CheckinBigliettoController extends Controller
             'checkin_at' => $adesso,
             'checkin_utente_id' => $request->user()?->getAuthIdentifier(),
         ]);
+
+        // Socio collegato all'account: anche tra i partecipanti confermati
+        $presenze->registraSociDellePrenotazioni($prenotazione->evento, [$prenotazione->id]);
 
         return response()->json([
             'success' => true,

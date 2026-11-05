@@ -7,6 +7,7 @@ use App\Http\Requests\EventiVita\PresenzeBulkRequest;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
+use App\Services\EventiVita\PresenzeSociService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -40,9 +41,10 @@ class PresenzeController extends Controller
      * Registrazione presenze in blocco: marca il check-in (now) sulle
      * prenotazioni CONFERMATE selezionate non ancora arrivate. Gli id
      * estranei (altro evento/tenant, stati diversi, già check-in)
-     * vengono ignorati dalla UPDATE scoped.
+     * vengono ignorati dalla UPDATE scoped. I soci collegati agli account
+     * presenti vengono registrati tra i partecipanti (PresenzeSociService).
      */
-    public function store(PresenzeBulkRequest $request, Evento $evento): RedirectResponse
+    public function store(PresenzeBulkRequest $request, Evento $evento, PresenzeSociService $presenze): RedirectResponse
     {
         $this->authorize('update', $evento);
 
@@ -55,6 +57,10 @@ class PresenzeController extends Controller
                 'checkin_at' => now(),
                 'checkin_utente_id' => $request->user()?->id,
             ]);
+
+        // I soci collegati agli account presenti risultano anche tra i
+        // partecipanti confermati, come dopo il check-in con la tessera
+        $presenze->registraSociDellePrenotazioni($evento, $request->validated('prenotazioni'));
 
         return redirect()
             ->route('eventi.presenze.index', $evento)

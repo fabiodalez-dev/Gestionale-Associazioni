@@ -144,6 +144,8 @@ class EventoRequest extends FormRequest
     /**
      * In modifica la capienza non può scendere sotto i posti già occupati
      * da prenotazioni confermate o in attesa di pagamento (posti riservati).
+     * Una capienza invariata (o aumentata) resta ammessa anche se i posti
+     * occupati la superano già.
      */
     protected function validaCapienzaNonRiducibile(Validator $validator): void
     {
@@ -161,7 +163,11 @@ class EventoRequest extends FormRequest
 
         $occupati = Prenotazione::postiOccupati($evento->id);
 
-        if ((int) $capienza < $occupati) {
+        // Solo una vera riduzione è vietata: un evento già in overbooking
+        // (riconferma dopo la scadenza) resta modificabile a capienza invariata.
+        $riduzione = $evento->capienza === null || (int) $capienza < (int) $evento->capienza;
+
+        if ((int) $capienza < $occupati && $riduzione) {
             $validator->errors()->add(
                 'capienza',
                 "La capienza non può essere ridotta a {$capienza}: ci sono già {$occupati} posti occupati "

@@ -1221,6 +1221,17 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
         $this->assertNotNull($eventoCestinato);
         $this->assertTrue($eventoCestinato->trashed());
 
+        // La notifica di annullo (in coda) viene smaltita a evento già nel
+        // cestino: titolo e data reali, non quelli di ripiego
+        Notification::assertSentTo($lettore, AnnullataNotification::class, function (AnnullataNotification $n) use ($lettore, $seconda) {
+            $n->prenotazione->refresh();
+            $mail = $n->toMail($lettore);
+
+            return $mail->subject === 'Prenotazione annullata — Gruppo di lettura'
+                && str_contains(implode(' ', $mail->introLines), $seconda->data_evento->format('d/m/Y H:i'))
+                && ($n->toArray($lettore)['evento_titolo'] ?? null) === 'Gruppo di lettura';
+        });
+
         // La scheda account in admin elenca ancora la prenotazione
         $this->get(route('accounts.show', $lettore))
             ->assertOk()

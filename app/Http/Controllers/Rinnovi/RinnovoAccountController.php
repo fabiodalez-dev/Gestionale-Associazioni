@@ -42,7 +42,7 @@ class RinnovoAccountController extends Controller
         if ($quota === null) {
             return redirect()
                 ->route('pubblico.account.tessera', $associazione)
-                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoCorrente().' risulta già emessa oppure il profilo socio non è attivo.');
+                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoRinnovo($socio).' risulta già emessa oppure il profilo socio non è attivo.');
         }
 
         return redirect()->route('pagamento.show', ['token' => $quota->payment_token]);

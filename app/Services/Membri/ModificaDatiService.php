@@ -232,7 +232,7 @@ class ModificaDatiService
                 ->exists();
 
             if ($occupato) {
-                throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo] ?? $campo));
+                throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo]));
             }
         }
     }

@@ -64,6 +64,12 @@ class VerificaBigliettoController extends Controller
             return ['non_valida', null, 'Biglietto non trovato.'];
         }
 
+        // Evento eliminato (nel cestino, la relazione non lo carica): la
+        // data non esiste più, il biglietto non vale qualunque sia lo stato
+        if ($prenotazione->evento === null) {
+            return ['non_valida', $prenotazione, 'Evento annullato: il biglietto non è più valido.'];
+        }
+
         if ($prenotazione->stato !== Prenotazione::STATO_CONFERMATA) {
             return ['non_valida', $prenotazione, $this->motivoStato($prenotazione->stato)];
         }

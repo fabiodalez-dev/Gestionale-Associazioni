@@ -26,7 +26,7 @@ class AssociazioneForm extends ModuloFormello
      *
      * @api
      */
-    public const GRUPPO_CONFIGURAZIONE = ['tipo_scadenza_default', 'giorni_notifica_scadenza', 'costo_tessera', 'attiva'];
+    public const GRUPPO_CONFIGURAZIONE = ['tipo_scadenza_default', 'giorni_notifica_scadenza', 'costo_tessera', 'attiva', 'frontend_pubblico_attivo'];
 
     /**
      * Letta dalla vista struttura/associazioni/index.
@@ -45,6 +45,9 @@ class AssociazioneForm extends ModuloFormello
         $tipoScadenza = FormelloField::make('tipo_scadenza_default')->label('Tipo scadenza tessere')->widget('select')->columns(4)
             ->choices(['solare' => 'Anno Solare (31 Dicembre)', 'annuale' => 'Annuale (365 giorni da iscrizione)']);
         $attiva = FormelloField::make('attiva')->label('Associazione attiva')->widget('consenso')->columns(4)
+            ->extra('interruttore', true);
+        // Mini-sito pubblico /a/{slug} (iscrizioni, eventi, prenotazioni)
+        $miniSito = FormelloField::make('frontend_pubblico_attivo')->label('Mini-sito pubblico attivo')->widget('consenso')->columns(4)
             ->extra('interruttore', true);
         if ($nuova) {
             $giorni->value(30);
@@ -77,6 +80,7 @@ class AssociazioneForm extends ModuloFormello
                 ->attributes(['step' => '0.01', 'min' => 0])
                 ->extra('suffix', '€'),
             $attiva,
+            $miniSito,
 
             FormelloField::make('admin_nome')->label('Nome admin')->columns(6)->attributes(['maxlength' => 100]),
             FormelloField::make('admin_cognome')->label('Cognome admin')->columns(6)->attributes(['maxlength' => 100]),

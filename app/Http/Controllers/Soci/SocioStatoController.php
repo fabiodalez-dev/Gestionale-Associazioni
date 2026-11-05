@@ -6,14 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Soci\ConfermaPagamentoRequest;
 use App\Models\Quota;
 use App\Models\Socio;
+use App\Services\Pagamenti\PaymentService;
 use App\Services\Soci\EmailBenvenutoService;
 use App\Services\Soci\SocioActivityLogger;
 use App\Services\Soci\TesseraAutomaticaService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
 
 /**
  * Macchina a stati del flusso pre-iscrizione (spec soci §2):
@@ -28,6 +27,7 @@ class SocioStatoController extends Controller
         private readonly SocioActivityLogger $activityLogger,
         private readonly TesseraAutomaticaService $tessere,
         private readonly EmailBenvenutoService $emailBenvenuto,
+        private readonly PaymentService $payments,
     ) {}
 
     /**
@@ -75,9 +75,7 @@ class SocioStatoController extends Controller
         $dataPagamento = $request->validated('data_pagamento') ?: now()->toDateString();
 
         if ($request->isMetodoOnline()) {
-            $token = Str::random(64);
-
-            Quota::create([
+            $quota = Quota::create([
                 'socio_id' => $socio->id,
                 'associazione_id' => $socio->associazione_id,
                 'anno' => (int) now()->year,
@@ -87,22 +85,23 @@ class SocioStatoController extends Controller
                 'tipo' => $tipo,
                 'metodo_pagamento' => $metodo,
                 'gateway' => $metodo,
-                'payment_token' => $token,
-                'payment_token_expires' => now()->addDays(7),
             ]);
 
-            $link = Route::has('pagamento.show')
-                ? route('pagamento.show', ['token' => $token])
-                : url('/pagamento?token='.$token);
+            // Token nel formato della rotta pubblica (64 char esadecimali),
+            // valido 7 giorni
+            $this->payments->generatePaymentToken($quota, 24 * 7);
+            $link = $this->payments->paymentUrl($quota);
 
             return back()
                 ->with('success', 'Quota creata: invia al socio il link di pagamento. Il socio sarà attivato automaticamente al pagamento.')
                 ->with('payment_link', $link);
         }
 
-        DB::transaction(function () use ($socio, $importo, $metodo, $tipo, $dataPagamento): void {
+        $quota = DB::transaction(function () use ($socio, $importo, $metodo, $tipo, $dataPagamento): ?Quota {
+            $quota = null;
+
             if ($importo > 0) {
-                Quota::create([
+                $quota = Quota::create([
                     'socio_id' => $socio->id,
                     'associazione_id' => $socio->associazione_id,
                     'anno' => (int) now()->year,
@@ -128,7 +127,15 @@ class SocioStatoController extends Controller
             );
 
             $this->tessere->creaPerAnnoCorrente($socio);
+
+            return $quota;
         });
+
+        // Incasso allo sportello come ogni altro pagamento offline: conferma
+        // di pagamento, ricevuta numerata e prima nota (fuori transazione)
+        if ($quota !== null) {
+            $this->payments->completaPagamentoOffline($quota, $socio);
+        }
 
         $this->emailBenvenuto->accoda($socio);
 

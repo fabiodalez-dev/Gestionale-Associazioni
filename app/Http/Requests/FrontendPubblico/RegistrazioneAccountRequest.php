@@ -37,7 +37,7 @@ class RegistrazioneAccountRequest extends FormRequest
                 Rule::unique('accounts', 'email')
                     ->where('associazione_id', $this->associazioneCorrente()?->id),
             ],
-            'telefono' => ['nullable', 'string', 'max:30'],
+            'telefono' => ['nullable', 'string', 'max:20'],
             'password' => ['required', 'confirmed', ...PasswordPolicy::rules([$this->input('email'), $this->input('nome'), $this->input('cognome')])],
             'privacy' => ['accepted'],
         ];

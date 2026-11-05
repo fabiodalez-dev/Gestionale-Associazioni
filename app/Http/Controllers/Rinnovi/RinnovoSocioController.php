@@ -28,7 +28,7 @@ class RinnovoSocioController extends Controller
         if ($quota === null) {
             return redirect()
                 ->route('area-soci.dashboard')
-                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoCorrente().' risulta già emessa oppure il tuo profilo non è attivo.');
+                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoRinnovo($socio).' risulta già emessa oppure il tuo profilo non è attivo.');
         }
 
         return redirect()->route('pagamento.show', ['token' => $quota->payment_token]);

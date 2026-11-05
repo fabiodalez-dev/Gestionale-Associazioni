@@ -86,7 +86,7 @@ class SondaggiAccountController extends Controller
             SondaggiVotoService::ESITO_OK => ['success', 'Grazie! Il tuo voto è stato registrato.'],
             SondaggiVotoService::ESITO_GIA_VOTATO => ['warning', 'Hai già votato questo sondaggio.'],
             SondaggiVotoService::ESITO_CHIUSO => ['warning', 'Il sondaggio non è aperto al voto.'],
-            SondaggiVotoService::ESITO_NON_AMMESSO => ['warning', 'Questo sondaggio è riservato ai soci.'],
+            SondaggiVotoService::ESITO_NON_AMMESSO => ['warning', 'Questo sondaggio è riservato ai soci attivi.'],
             default => ['danger', 'Voto non valido.'],
         };
     }

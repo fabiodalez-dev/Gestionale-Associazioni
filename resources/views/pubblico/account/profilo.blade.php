@@ -34,7 +34,7 @@
                         <div class="mb-3">
                             <label for="telefono" class="form-label">Telefono <span class="text-muted small">(facoltativo)</span></label>
                             <input type="tel" class="form-control @error('telefono') is-invalid @enderror"
-                                   id="telefono" name="telefono" value="{{ old('telefono', $account->telefono) }}" maxlength="30">
+                                   id="telefono" name="telefono" value="{{ old('telefono', $account->telefono) }}" maxlength="20">
                             @error('telefono')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 

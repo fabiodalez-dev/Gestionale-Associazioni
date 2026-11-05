@@ -8,6 +8,7 @@ use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -235,6 +236,11 @@ class EventoApiController extends Controller
 
             return $this->error(500, 'db_error', 'Errore interno durante il check-in.');
         }
+
+        // Stesso allineamento del check-in con la tessera da backoffice: la
+        // prenotazione confermata dell'account collegato al socio risulta
+        // arrivata (feedback post-evento, vita sociale). Idempotente.
+        app(PresenzeSociService::class)->segnaPrenotazioneDelSocio($evento, $socio, null);
 
         $socioPayload = [
             'nome' => $socio->nome,

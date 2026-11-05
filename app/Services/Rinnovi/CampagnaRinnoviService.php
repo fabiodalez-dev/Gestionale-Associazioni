@@ -123,7 +123,7 @@ class CampagnaRinnoviService
                 continue;
             }
 
-            $quota = $this->rinnovi->quotaPerRinnovo($socio);
+            $quota = $this->rinnovi->quotaPerRinnovo($socio, $anno);
 
             if ($quota === null) {
                 $saltati++;

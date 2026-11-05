@@ -3,6 +3,7 @@
 namespace App\Services\EventiVita;
 
 use App\Models\Evento;
+use App\Services\Prenotazioni\PrenotazioneService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,8 @@ class SerieEventiService
         self::FREQUENZA_SETTIMANALE,
         self::FREQUENZA_MENSILE,
     ];
+
+    public function __construct(protected PrenotazioneService $prenotazioni) {}
 
     /** Tetto massimo di occorrenze generabili per una serie (spec f.8). */
     public const MAX_OCCORRENZE = 52;
@@ -124,6 +127,8 @@ class SerieEventiService
 
     /**
      * Annulla (soft delete) TUTTE le occorrenze della serie dell'evento.
+     * Le prenotazioni aperte delle date future vengono annullate con
+     * notifica, come per l'eliminazione del singolo evento.
      * Ritorna il numero di occorrenze eliminate.
      */
     public function eliminaSerie(Evento $evento): int
@@ -139,6 +144,7 @@ class SerieEventiService
             ->where('associazione_id', $evento->associazione_id)
             ->get()
             ->each(function (Evento $occorrenza) use (&$eliminate): void {
+                $this->prenotazioni->annullaPerEventoEliminato($occorrenza);
                 $occorrenza->delete();
                 $eliminate++;
             });

@@ -34,9 +34,12 @@ class IscrizioneRifiutataNotification extends Notification implements ShouldQueu
     {
         $associazione = $this->richiesta->associazione;
 
+        // Account: nome dell'account; ospite (invio on-demand): nome dal modulo
+        $nome = trim((string) ($notifiable->nome ?? $this->richiesta->dati_form['nome'] ?? ''));
+
         $message = (new MailMessage)
             ->subject('Richiesta di iscrizione non approvata — '.($associazione->nome ?? 'Associazione'))
-            ->greeting('Ciao '.($notifiable->nome ?? '').',')
+            ->greeting('Ciao'.($nome !== '' ? ' '.$nome : '').',')
             ->line('la tua richiesta di iscrizione a "'
                 .($associazione->nome ?? 'Associazione')
                 .'" non è stata approvata.');

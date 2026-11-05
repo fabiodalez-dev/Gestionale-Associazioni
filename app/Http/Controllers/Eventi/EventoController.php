@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Eventi\EventoRequest;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Services\Prenotazioni\PrenotazioneService;
 use App\Services\SpaziRisorse\ConflittoSpazioEvento;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -113,10 +114,14 @@ class EventoController extends Controller
     /**
      * Eliminazione evento: i partecipanti vengono rimossi (cascade),
      * le tessere emesse durante l'evento restano (riferimento storico).
+     * Le prenotazioni aperte di un evento non ancora svolto vengono
+     * annullate con notifica (il biglietto non resta valido).
      */
-    public function destroy(Evento $evento): RedirectResponse
+    public function destroy(Evento $evento, PrenotazioneService $prenotazioni): RedirectResponse
     {
         $this->authorize('delete', $evento);
+
+        $prenotazioni->annullaPerEventoEliminato($evento);
 
         $evento->delete();
 

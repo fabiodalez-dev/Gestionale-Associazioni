@@ -15,6 +15,7 @@ use Illuminate\Database\QueryException;
  * - votante polimorfico: Socio (area soci) o Account (frontend pubblico);
  * - un account COLLEGATO a un socio vota come quel Socio, così lo stesso
  *   tesserato non può votare due volte passando da aree diverse;
+ * - i sondaggi solo_soci sono riservati ai soci in stato Attivo;
  * - un solo voto per (sondaggio, votante): check applicativo + unique a DB
  *   come rete di sicurezza contro i submit concorrenti.
  */
@@ -37,8 +38,10 @@ class SondaggiVotoService
     {
         $votante = $this->risolviVotante($votante);
 
-        // I sondaggi solo-soci non sono votabili dagli account non collegati
-        if ($sondaggio->solo_soci && ! $votante instanceof Socio) {
+        // I sondaggi solo-soci li votano solo i soci in stato Attivo: non gli
+        // account non collegati, né i soci sospesi, cessati o in attesa
+        // (stessa regola degli eventi riservati ai soci)
+        if ($sondaggio->solo_soci && (! $votante instanceof Socio || ! $votante->isAttivo())) {
             return self::ESITO_NON_AMMESSO;
         }
 

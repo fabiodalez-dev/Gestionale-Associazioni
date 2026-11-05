@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\VitaAssociativa;
+namespace Tests\Feature\VitaAssociativa;
 
 use App\Mail\Struttura\InvitoAmministratoreMail;
 use App\Models\Account;
@@ -3239,9 +3239,14 @@ class VitaBurocraticaTest extends TestCase
         $dueVolte('rinnovi:promemoria');
         $this->vai('2026-12-10 10:00:00');
         $this->pagaOffline($this->tesoriere, Quota::query()->where('socio_id', $soci['Elsa']->id)->where('anno', 2027)->sole(), '2026-12-10')->assertSessionHas('success');
-        $this->come($this->segretario)->post(route('tessere.store'), [
-            'socio_id' => $soci['Elsa']->id, 'numero_tessera' => '20270001', 'anno_validita' => 2027, 'data_emissione' => '2026-12-10', 'stato' => Tessera::STATO_ATTIVA,
-        ])->assertSessionHasNoErrors();
+        // Il pagamento offline della quota 2027 emette già la tessera 2027 (come
+        // quello online): l'emissione manuale serve solo se manca
+        if (! Tessera::query()->where('socio_id', $soci['Elsa']->id)->where('anno_validita', 2027)->exists()) {
+            $this->come($this->segretario)->post(route('tessere.store'), [
+                'socio_id' => $soci['Elsa']->id, 'numero_tessera' => '20270001', 'anno_validita' => 2027, 'data_emissione' => '2026-12-10', 'stato' => Tessera::STATO_ATTIVA,
+            ])->assertSessionHasNoErrors();
+        }
+        $this->assertSame(1, Tessera::query()->where('socio_id', $soci['Elsa']->id)->where('anno_validita', 2027)->count());
         foreach (['2026-12-16', '2026-12-28'] as $giorno) {
             $this->vai($giorno.' 07:00:00');
             $dueVolte('rinnovi:promemoria');

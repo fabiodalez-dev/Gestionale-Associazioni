@@ -69,8 +69,8 @@
                                 <input type="text" class="form-control" id="cfg_nome" name="nome" required value="{{ old('nome', $associazione->nome) }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="cfg_email">Email</label>
-                                <input type="email" class="form-control" id="cfg_email" name="email" value="{{ old('email', $associazione->email) }}">
+                                <label class="form-label" for="cfg_email">Email *</label>
+                                <input type="email" class="form-control" id="cfg_email" name="email" required value="{{ old('email', $associazione->email) }}">
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label" for="cfg_piva">Partita IVA</label>

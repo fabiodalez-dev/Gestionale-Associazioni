@@ -3,8 +3,10 @@
 namespace App\Http\Requests\EventiVita;
 
 use App\Models\Evento;
+use App\Models\Prenotazione;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Aggiornamento dell'INTERA serie ricorrente (f.8): solo i campi comuni
@@ -43,5 +45,54 @@ class SerieUpdateRequest extends FormRequest
             'solo_soci' => ['required', 'boolean'],
             'immagine_url' => ['nullable', 'string', 'url:http,https', 'max:2048'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $this->validaCapienzaNonRiducibile($validator);
+        });
+    }
+
+    /**
+     * Stessa regola della modifica singola (EventoRequest): la capienza
+     * propagata non può scendere sotto i posti già occupati di nessuna
+     * occorrenza; una capienza invariata resta ammessa anche in overbooking.
+     */
+    protected function validaCapienzaNonRiducibile(Validator $validator): void
+    {
+        $evento = $this->route('evento');
+        $capienza = $this->input('capienza');
+
+        if (! $evento instanceof Evento || $evento->serie_id === null) {
+            return;
+        }
+
+        if ($capienza === null || $capienza === '' || ! ctype_digit((string) $capienza)) {
+            return; // illimitata o già segnalata dalla regola integer/min
+        }
+
+        $occorrenze = Evento::query()
+            ->dellaSerie($evento->serie_id)
+            ->where('associazione_id', $evento->associazione_id)
+            ->orderBy('data_evento')
+            ->get();
+
+        foreach ($occorrenze as $occorrenza) {
+            $occupati = Prenotazione::postiOccupati($occorrenza->id);
+            $riduzione = $occorrenza->capienza === null || (int) $capienza < (int) $occorrenza->capienza;
+
+            if ((int) $capienza < $occupati && $riduzione) {
+                $validator->errors()->add(
+                    'capienza',
+                    "La capienza non può essere ridotta a {$capienza}: l'occorrenza del "
+                    .$occorrenza->data_evento->format('d/m/Y H:i')." ha già {$occupati} posti occupati "
+                    .'da prenotazioni confermate o riservate (in attesa di pagamento). '
+                    .'Annulla prima le prenotazioni in eccesso.'
+                );
+
+                return;
+            }
+        }
     }
 }

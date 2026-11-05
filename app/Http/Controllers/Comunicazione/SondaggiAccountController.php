@@ -36,6 +36,7 @@ class SondaggiAccountController extends Controller
             ->map(fn (Sondaggio $sondaggio) => [
                 'sondaggio' => $sondaggio,
                 'risposta' => $this->voto->rispostaDi($sondaggio, $account),
+                'puoVotare' => $this->voto->puoVotare($sondaggio, $account),
                 'risultati' => $sondaggio->risultati(),
             ]);
 

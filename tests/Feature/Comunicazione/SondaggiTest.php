@@ -301,4 +301,28 @@ class SondaggiTest extends ComunicazioneTestCase
 
         $this->assertSame(1, RispostaSondaggio::allTenants()->count());
     }
+
+    public function test_account_collegato_a_un_socio_non_attivo_non_vede_il_modulo_di_voto_dei_solo_soci(): void
+    {
+        $socio = Socio::factory()->conAccessoAreaSoci()->create([
+            'associazione_id' => $this->associazione->id,
+            'stato' => Socio::STATO_SOSPESO,
+        ]);
+        $account = Account::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $socio->id,
+        ]);
+        Sondaggio::factory()->soloSoci()->create([
+            'associazione_id' => $this->associazione->id,
+            'domanda' => 'Sondaggio riservato ai soci attivi?',
+        ]);
+
+        // Il sondaggio è visibile, ma senza il modulo di voto che verrebbe rifiutato
+        $this->actingAs($account, 'account')
+            ->get($this->urlTenant('account/sondaggi'))
+            ->assertOk()
+            ->assertSee('Sondaggio riservato ai soci attivi?')
+            ->assertSee('Questo sondaggio è riservato ai soci attivi.')
+            ->assertDontSee('name="opzione"', false);
+    }
 }

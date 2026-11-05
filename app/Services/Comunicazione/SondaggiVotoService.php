@@ -38,10 +38,7 @@ class SondaggiVotoService
     {
         $votante = $this->risolviVotante($votante);
 
-        // I sondaggi solo-soci li votano solo i soci in stato Attivo: non gli
-        // account non collegati, né i soci sospesi, cessati o in attesa
-        // (stessa regola degli eventi riservati ai soci)
-        if ($sondaggio->solo_soci && (! $votante instanceof Socio || ! $votante->isAttivo())) {
+        if (! $this->puoVotare($sondaggio, $votante)) {
             return self::ESITO_NON_AMMESSO;
         }
 
@@ -71,6 +68,20 @@ class SondaggiVotoService
         }
 
         return self::ESITO_OK;
+    }
+
+    /**
+     * Il votante è ammesso al sondaggio? I sondaggi solo-soci li votano solo
+     * i soci in stato Attivo: non gli account non collegati, né i soci
+     * sospesi, cessati o in attesa (stessa regola degli eventi riservati ai
+     * soci). Usato anche dalle liste per non mostrare un modulo di voto che
+     * verrebbe comunque rifiutato.
+     */
+    public function puoVotare(Sondaggio $sondaggio, Model $votante): bool
+    {
+        $votante = $this->risolviVotante($votante);
+
+        return ! $sondaggio->solo_soci || ($votante instanceof Socio && $votante->isAttivo());
     }
 
     /**

@@ -19,6 +19,7 @@
                 @include('comunicazione._sondaggio-voto', [
                     'sondaggio' => $voce['sondaggio'],
                     'risposta' => $voce['risposta'],
+                'puoVotare' => $voce['puoVotare'],
                     'risultati' => $voce['risultati'],
                     'actionVota' => route('pubblico.account.sondaggi.vota', [$associazione->slug, $voce['sondaggio']]),
                 ])

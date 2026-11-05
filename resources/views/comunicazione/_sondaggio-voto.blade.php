@@ -1,6 +1,7 @@
 {{-- Card di voto/risultati di un sondaggio (f.11): condivisa tra area soci
      e area account. Variabili: $sondaggio, $risposta (RispostaSondaggio|null),
-     $risultati (array indice→voti), $actionVota (url POST del voto). --}}
+     $risultati (array indice→voti), $actionVota (url POST del voto),
+     $puoVotare (bool: il votante è ammesso, es. solo soci attivi). --}}
 @php
     $opzioni = array_values((array) $sondaggio->opzioni);
     $totaleVoti = array_sum($risultati);
@@ -19,7 +20,11 @@
             </p>
         @endif
 
-        @if ($risposta === null)
+        @if ($risposta === null && ! ($puoVotare ?? true))
+            <p class="text-muted small mb-0">
+                <i class="bi bi-lock me-1"></i>Questo sondaggio è riservato ai soci attivi.
+            </p>
+        @elseif ($risposta === null)
             <form method="POST" action="{{ $actionVota }}">
                 @csrf
                 @foreach ($opzioni as $indice => $opzione)

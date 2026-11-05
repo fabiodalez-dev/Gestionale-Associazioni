@@ -34,6 +34,7 @@ class SondaggiSocioController extends Controller
             ->map(fn (Sondaggio $sondaggio) => [
                 'sondaggio' => $sondaggio,
                 'risposta' => $this->voto->rispostaDi($sondaggio, $socio),
+                'puoVotare' => $this->voto->puoVotare($sondaggio, $socio),
                 'risultati' => $sondaggio->risultati(),
             ]);
 

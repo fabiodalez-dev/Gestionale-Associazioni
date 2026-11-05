@@ -198,17 +198,19 @@ class EventoApiController extends Controller
 
         try {
             $result = DB::transaction(function () use ($evento, $socio, $associazioneId) {
+                // Stesso allineamento del check-in con la tessera da backoffice,
+                // nella stessa transazione della partecipazione: la prenotazione
+                // confermata dell'account collegato risulta arrivata. Idempotente.
+                // Prima del lock sul partecipante: stesso ordine dei lock del
+                // check-in con tessera (prenotazione, poi partecipante).
+                app(PresenzeSociService::class)->segnaPrenotazioneDelSocio($evento, $socio, null);
+
                 /** @var EventoPartecipante|null $partecipazione */
                 $partecipazione = EventoPartecipante::allTenants()
                     ->where('evento_id', $evento->id)
                     ->where('socio_id', $socio->id)
                     ->lockForUpdate()
                     ->first();
-
-                // Stesso allineamento del check-in con la tessera da backoffice,
-                // nella stessa transazione della partecipazione: la prenotazione
-                // confermata dell'account collegato risulta arrivata. Idempotente.
-                app(PresenzeSociService::class)->segnaPrenotazioneDelSocio($evento, $socio, null);
 
                 if ($partecipazione && $partecipazione->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
                     return ['already_checked_in' => true];

@@ -8,6 +8,8 @@ use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CheckinTest extends TessereTestCase
 {
@@ -84,6 +86,42 @@ class CheckinTest extends TessereTestCase
         $response->assertOk();
         $response->assertJson(['success' => true, 'already_checked_in' => true]);
         $this->assertSame(1, EventoPartecipante::allTenants()->where('evento_id', $evento->id)->count());
+    }
+
+    public function test_checkin_con_partecipante_creato_in_parallelo_lo_conferma_invece_di_fallire(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $socio = Socio::factory()->create(['associazione_id' => $assoc->id]);
+        $tessera = Tessera::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $assoc->id,
+        ]);
+        $evento = Evento::factory()->create(['associazione_id' => $assoc->id]);
+
+        // Un'operazione parallela inserisce la riga (unique evento+socio)
+        // dopo la lettura iniziale del check-in e prima del suo create()
+        EventoPartecipante::creating(function (EventoPartecipante $nuovo) use ($assoc, $evento, $socio): void {
+            if ($nuovo->socio_id === $socio->id && ! EventoPartecipante::allTenants()->where('evento_id', $evento->id)->exists()) {
+                DB::table('eventi_partecipanti')->insert([
+                    'id' => (string) Str::uuid(),
+                    'associazione_id' => $assoc->id,
+                    'evento_id' => $evento->id,
+                    'socio_id' => $socio->id,
+                    'stato_partecipazione' => EventoPartecipante::STATO_NON_PARTECIPA,
+                    'created_at' => now(),
+                ]);
+            }
+        });
+
+        $this->actingAs($admin)->postJson('/tessere/checkin', [
+            'evento_id' => $evento->id,
+            'tessera_id' => $tessera->id,
+        ])->assertOk()->assertJson(['success' => true, 'already_checked_in' => false]);
+
+        $partecipanti = EventoPartecipante::allTenants()->where('evento_id', $evento->id)->get();
+        $this->assertCount(1, $partecipanti);
+        $this->assertSame(EventoPartecipante::STATO_CONFERMATO, $partecipanti->first()->stato_partecipazione);
     }
 
     public function test_checkin_tramite_numero_tessera(): void

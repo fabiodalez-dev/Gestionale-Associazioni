@@ -9,6 +9,7 @@ use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Services\EventiVita\PresenzeSociService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -137,13 +138,37 @@ class CheckinController extends Controller
                     'data_conferma' => now(),
                 ]);
             } else {
-                EventoPartecipante::create([
-                    'associazione_id' => $associazioneId,
-                    'evento_id' => $evento->id,
-                    'socio_id' => $socio->id,
-                    'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
-                    'data_conferma' => now(),
-                ]);
+                try {
+                    EventoPartecipante::create([
+                        'associazione_id' => $associazioneId,
+                        'evento_id' => $evento->id,
+                        'socio_id' => $socio->id,
+                        'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                        'data_conferma' => now(),
+                    ]);
+                } catch (UniqueConstraintViolationException $e) {
+                    // Riga creata in parallelo (altra scansione o operazione
+                    // admin, unique evento+socio): riletta con lock, perché la
+                    // lettura iniziale della transazione può non vederla
+                    $partecipante = EventoPartecipante::query()
+                        ->where('evento_id', $evento->id)
+                        ->where('socio_id', $socio->id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($partecipante === null) {
+                        throw $e;
+                    }
+
+                    if ($partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+                        return true;
+                    }
+
+                    $partecipante->update([
+                        'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                        'data_conferma' => now(),
+                    ]);
+                }
             }
 
             return false;

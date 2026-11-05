@@ -206,7 +206,7 @@ class DuplicatiTest extends TestCase
         $this->post('/soci-duplicati/unisci', [])->assertRedirect();
     }
 
-    public function test_merge_non_sposta_le_tessere_dello_stesso_anno_del_principale(): void
+    public function test_merge_sposta_come_annullate_le_tessere_dello_stesso_anno_del_principale(): void
     {
         $principale = $this->socio(['email' => 'p@example.com']);
         $duplicato = $this->socio(['email' => 'd@example.com']);
@@ -226,9 +226,15 @@ class DuplicatiTest extends TestCase
         ])
             ->assertRedirect(route('soci-duplicati.index'))
             ->assertSessionHas('success')
-            ->assertSessionHas('warning', fn (string $avviso): bool => str_contains($avviso, '1 tessere non spostate'));
+            ->assertSessionHas('warning', fn (string $avviso): bool => str_contains($avviso, '1 tessere spostate come annullate'));
 
-        $this->assertSame($duplicato->id, $inConflitto->refresh()->socio_id);
+        // Il doppione resta conservato sul principale, annullato e fuori dal
+        // vincolo: lo svuotamento del cestino non lo cancella con il duplicato
+        $inConflitto->refresh();
+        $this->assertSame($principale->id, $inConflitto->socio_id);
+        $this->assertSame(Tessera::STATO_ANNULLATA, $inConflitto->stato);
+        $this->assertNull($inConflitto->getAttribute('anno_non_annullata'));
+        $this->assertSame(0, Tessera::allTenants()->where('socio_id', $duplicato->id)->count());
         $this->assertSame($principale->id, $altroAnno->refresh()->socio_id);
         $this->assertSame($principale->id, $annullata->refresh()->socio_id);
         $this->assertSoftDeleted('soci', ['id' => $duplicato->id]);

@@ -7,6 +7,7 @@ use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\Utente;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Propaganistas\LaravelPhone\Rules\Phone;
@@ -190,7 +191,20 @@ class ModificaDatiService
 
             $this->verificaUnicita($socio);
 
-            $socio->save();
+            // Due approvazioni concorrenti possono superare entrambe il
+            // controllo: il vincolo unique respinge la seconda, che diventa
+            // lo stesso errore di dominio (solo per email e codice fiscale)
+            try {
+                $socio->save();
+            } catch (UniqueConstraintViolationException $e) {
+                $campo = $this->campoDelVincolo($e);
+
+                if ($campo === null) {
+                    throw $e;
+                }
+
+                throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo]));
+            }
 
             StoricoAttivitaSocio::create([
                 'associazione_id' => $richiesta->associazione_id,
@@ -235,6 +249,26 @@ class ModificaDatiService
                 throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo]));
             }
         }
+    }
+
+    /**
+     * Campo (email o codice_fiscale) del vincolo unique violato sui soci,
+     * riconosciuto dal nome dell'indice (MySQL/MariaDB) o dalle colonne
+     * (SQLite); null per ogni altro vincolo.
+     */
+    private function campoDelVincolo(UniqueConstraintViolationException $e): ?string
+    {
+        $messaggio = $e->getMessage();
+
+        if (str_contains($messaggio, 'soci_associazione_id_email_unique') || str_contains($messaggio, 'soci.email')) {
+            return 'email';
+        }
+
+        if (str_contains($messaggio, 'uniq_assoc_cf') || str_contains($messaggio, 'soci.codice_fiscale')) {
+            return 'codice_fiscale';
+        }
+
+        return null;
     }
 
     /**

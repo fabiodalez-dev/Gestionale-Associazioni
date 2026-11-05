@@ -307,4 +307,32 @@ class RichiesteModificaDatiTest extends TestCase
             $richiesta->fresh()->stato
         );
     }
+
+    public function test_approvazione_concorrente_con_email_presa_nel_frattempo_mostra_l_errore_invece_di_un_500(): void
+    {
+        $socio = $this->creaSocio(['email' => 'vecchia@example.com']);
+        $richiesta = RichiestaModificaDati::factory()->create([
+            'socio_id' => $socio->id,
+            'proposte' => ['email' => 'nuova@example.com'],
+        ]);
+
+        // Un'altra approvazione assegna la stessa email dopo il controllo di
+        // unicità e prima del salvataggio: lo simula un listener su saving
+        Socio::saving(function (Socio $salvato) use ($socio): void {
+            if ($salvato->is($socio) && $salvato->isDirty('email')) {
+                Socio::withoutEvents(fn () => Socio::factory()->create([
+                    'associazione_id' => $this->associazione->id,
+                    'email' => 'nuova@example.com',
+                ]));
+            }
+        });
+
+        $this->actingAs($this->admin)
+            ->post("/richieste-modifica-dati/{$richiesta->id}/approva")
+            ->assertRedirect('/richieste-modifica-dati')
+            ->assertSessionHas('error', fn (string $errore): bool => str_contains($errore, 'email'));
+
+        $this->assertSame('vecchia@example.com', $socio->refresh()->email);
+        $this->assertSame(RichiestaModificaDati::STATO_IN_ATTESA, $richiesta->refresh()->stato);
+    }
 }

@@ -12,6 +12,7 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
 use App\Services\EventiVita\FeedbackEventiService;
+use App\Services\EventiVita\PresenzeSociService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -236,6 +237,32 @@ class CheckinPerPostoSincronizzatoTest extends TestCase
         $this->assertSame(3, $prenotazione->posti_entrati);
         $this->assertSame(Prenotazione::CHECKIN_ORIGINE_PRESENZE_BLOCCO, $prenotazione->checkin_origine);
         $this->assertTrue($primoIngresso->equalTo($prenotazione->checkin_at));
+    }
+
+    public function test_presenze_in_blocco_e_tessera_concorrente_fanno_entrare_tutti_i_posti(): void
+    {
+        $prenotazione = $this->prenotazioneDelSocio(3);
+
+        // Simula il check-in con la tessera di un'altra richiesta subito
+        // dopo la prima UPDATE delle presenze in blocco: con due UPDATE
+        // separate la prenotazione selezionata restava entrata solo in parte
+        $iniettato = false;
+        DB::listen(function ($query) use (&$iniettato): void {
+            if ($iniettato || ! str_contains($query->sql, 'update "prenotazioni"')) {
+                return;
+            }
+            $iniettato = true;
+            app(PresenzeSociService::class)->segnaPrenotazioneDelSocio($this->evento, $this->socio, $this->admin->id);
+        });
+
+        $this->actingAs($this->admin)
+            ->post(route('eventi.presenze.store', $this->evento), ['prenotazioni' => [$prenotazione->id]])
+            ->assertSessionHas('success', 'Presenze registrate: 1.');
+
+        $this->assertTrue($iniettato);
+        $prenotazione->refresh();
+        $this->assertSame(3, $prenotazione->posti_entrati);
+        $this->assertSame(Prenotazione::CHECKIN_ORIGINE_PRESENZE_BLOCCO, $prenotazione->checkin_origine);
     }
 
     // ------------------------------------------------------------------

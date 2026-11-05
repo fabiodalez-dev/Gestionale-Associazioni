@@ -105,12 +105,19 @@ class SerieEventiService
      * Propaga i campi comuni (CAMPI_SERIE) a TUTTE le occorrenze della
      * serie dell'evento. Ritorna il numero di occorrenze aggiornate.
      *
-     * Tutto in una transazione: le occorrenze vengono bloccate col mutex
-     * per-evento di PrenotazioneService, in ordine di id (ordine stabile
-     * fra modifiche di serie concorrenti, niente deadlock), poi la capienza
-     * viene ricontrollata sui posti occupati correnti di ogni occorrenza.
-     * Se anche una sola scenderebbe sotto → ValidationException su
-     * capienza e nessuna occorrenza viene modificata.
+     * Gli id delle occorrenze vengono letti PRIMA della transazione (lettura
+     * semplice, in autocommit); nella transazione ogni occorrenza viene
+     * bloccata per chiave primaria col mutex per-evento di
+     * PrenotazioneService, in ordine di id: ordine stabile fra modifiche di
+     * serie concorrenti, niente deadlock. Poi la capienza viene ricontrollata
+     * sui posti occupati correnti di ogni occorrenza. Se anche una sola
+     * scenderebbe sotto → ValidationException su capienza e nessuna
+     * occorrenza viene modificata.
+     *
+     * Da chiamare fuori da transazioni aperte (come fa il controller): in
+     * InnoDB (REPEATABLE READ) una lettura semplice dentro una transazione
+     * già aperta fisserebbe lo snapshot prima dei lock e la SUM dei posti
+     * occupati non vedrebbe le prenotazioni confermate nel frattempo.
      *
      * @param  array<string, mixed>  $dati
      *
@@ -128,18 +135,17 @@ class SerieEventiService
             return 0;
         }
 
-        return DB::transaction(function () use ($evento, $dati): int {
-            // Lettura bloccante anche per gli id: in InnoDB (REPEATABLE READ)
-            // una SELECT semplice come prima istruzione fisserebbe lo snapshot
-            // PRIMA dei lock, e la SUM dei posti occupati non vedrebbe le
-            // prenotazioni confermate nel frattempo
-            $ids = Evento::query()
-                ->dellaSerie($evento->serie_id)
-                ->where('associazione_id', $evento->associazione_id)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->pluck('id');
+        // Fuori dalla transazione: una SELECT ... FOR UPDATE sull'indice
+        // serie_id bloccherebbe le righe nell'ordine della scansione, non
+        // necessariamente per id, e una SELECT semplice come prima istruzione
+        // della transazione ne fisserebbe lo snapshot prima dei lock
+        $ids = Evento::query()
+            ->dellaSerie($evento->serie_id)
+            ->where('associazione_id', $evento->associazione_id)
+            ->orderBy('id')
+            ->pluck('id');
 
+        return DB::transaction(function () use ($ids, $dati): int {
             $occorrenze = $ids
                 ->map(fn (string $id): Evento => $this->prenotazioni->lockEvento($id))
                 // eliminata nel frattempo (lockEvento ignora i global scope)

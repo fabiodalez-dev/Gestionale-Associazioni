@@ -68,7 +68,12 @@ class Tessera extends Model
      * derivata: anno_validita per le tessere non annullate, NULL per le
      * annullate (i NULL non collidono nell'indice unique, su SQLite come su
      * MariaDB). Così una tessera persa si annulla e se ne emette un'altra
-     * per lo stesso anno. Tenuta allineata qui a ogni salvataggio Eloquent:
+     * per lo stesso anno. Solo 'Annullata' esce dal vincolo: una tessera con
+     * stato 'Scaduta' memorizzato (valore legacy, non più selezionabile dal
+     * backoffice) resta una tessera reale di quell'anno e blocca una nuova
+     * emissione per lo stesso anno finché non viene annullata (scelta
+     * esplicita, come nella migration e nelle regole delle FormRequest).
+     * Tenuta allineata qui a ogni salvataggio Eloquent:
      * nessun flusso dell'applicazione scrive le tessere fuori dal modello.
      * Si ricalcola solo alla creazione o quando cambiano socio, anno o
      * stato: i doppioni legacy lasciati fuori dal vincolo dall'import

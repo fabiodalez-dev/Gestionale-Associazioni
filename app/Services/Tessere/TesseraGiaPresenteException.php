@@ -6,8 +6,11 @@ use RuntimeException;
 
 /**
  * Il socio ha già una tessera non annullata per l'anno richiesto (vincolo
- * unique socio + anno_non_annullata, issue #21). Il messaggio è in italiano e pensato
- * per essere mostrato all'utente come errore di validazione.
+ * unique socio + anno_non_annullata, issue #21). Anche una tessera con stato
+ * 'Scaduta' memorizzato (valore legacy) conta: è una tessera reale di
+ * quell'anno e va annullata prima di emetterne un'altra. Il messaggio è in
+ * italiano e pensato per essere mostrato all'utente come errore di
+ * validazione.
  */
 class TesseraGiaPresenteException extends RuntimeException
 {
@@ -16,6 +19,6 @@ class TesseraGiaPresenteException extends RuntimeException
      */
     public function __construct(int $anno)
     {
-        parent::__construct("Il socio ha già una tessera non annullata per l'anno {$anno}.");
+        parent::__construct("Il socio ha già una tessera non annullata per l'anno {$anno} (anche se scaduta: va annullata prima di emetterne un'altra).");
     }
 }

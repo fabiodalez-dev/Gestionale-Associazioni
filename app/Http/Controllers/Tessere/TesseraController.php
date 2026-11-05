@@ -233,8 +233,12 @@ class TesseraController extends Controller
         } catch (UniqueConstraintViolationException) {
             // Vincoli unique occupati da un'emissione concorrente dopo la
             // validazione: tessera non annullata del socio per l'anno o
-            // numero tessera
+            // numero tessera. Senza global scope (tenant esplicito): la
+            // tessera in conflitto può essere fuori dal perimetro di sede
+            // dell'operatore e va comunque riconosciuta come doppione
             $doppione = $dati['stato'] !== Tessera::STATO_ANNULLATA && Tessera::query()
+                ->withoutGlobalScopes()
+                ->where('associazione_id', $tessera->associazione_id)
                 ->whereKeyNot($tessera->id)
                 ->where('socio_id', $dati['socio_id'])
                 ->where('anno_validita', (int) $dati['anno_validita'])
@@ -242,7 +246,7 @@ class TesseraController extends Controller
                 ->exists();
 
             throw ValidationException::withMessages($doppione
-                ? ['anno_validita' => "Il socio ha già una tessera non annullata per l'anno {$dati['anno_validita']}."]
+                ? ['anno_validita' => (new TesseraGiaPresenteException((int) $dati['anno_validita']))->getMessage()]
                 : ['numero_tessera' => 'Numero tessera già esistente per questa associazione.']);
         }
 

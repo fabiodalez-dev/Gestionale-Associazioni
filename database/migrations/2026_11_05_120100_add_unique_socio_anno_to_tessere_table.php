@@ -19,6 +19,13 @@ use Illuminate\Support\Facades\Schema;
  * allineata dal modello Tessera. I NULL non collidono nell'indice unique, su
  * SQLite come su MariaDB.
  *
+ * Tessere 'Scaduta'. Esce dal vincolo solo lo stato 'Annullata': una tessera
+ * con stato 'Scaduta' memorizzato (valore legacy, il backoffice non lo
+ * accetta più) è comunque una tessera emessa per quell'anno e conta. Per
+ * emetterne un'altra dello stesso anno va prima annullata (il messaggio di
+ * errore lo indica). Le tessere annuali scadono dopo il loro anno, quindi il
+ * caso è raro.
+ *
  * Doppioni già presenti. Le tessere non hanno soft delete: due tessere non
  * annullate dello stesso socio e anno sono dati reali (numero stampato, QR
  * consegnato) e la migration NON le cancella né le modifica. La colonna viene

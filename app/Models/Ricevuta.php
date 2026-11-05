@@ -65,13 +65,20 @@ class Ricevuta extends Model
     }
 
     /**
-     * Vero se la ricevuta ha l'istantanea dell'intestatario salvata
-     * all'emissione; le ricevute storiche (emesse prima della colonna)
-     * non ce l'hanno e il PDF ricade sui dati correnti di socio e quota.
+     * Vero se la ricevuta ha l'istantanea salvata all'emissione. Basta uno
+     * qualsiasi dei campi copiati: se il socio non era disponibile restano
+     * comunque quelli della quota. Le ricevute storiche (emesse prima delle
+     * colonne) non ne hanno nessuno e il PDF ricade sui dati correnti.
      */
     public function haIstantanea(): bool
     {
-        return $this->intestatario_cognome !== null || $this->intestatario_nome !== null;
+        foreach (['intestatario_nome', 'intestatario_cognome', 'tipo_quota', 'metodo_pagamento', 'data_pagamento', 'riferimento_transazione'] as $campo) {
+            if ($this->getAttribute($campo) !== null) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -83,10 +90,18 @@ class Ricevuta extends Model
     public function datiStampa(?Quota $quota, ?Socio $socio): array
     {
         if ($this->haIstantanea()) {
+            // Senza intestatario salvato (socio non disponibile all'emissione)
+            // l'unico nome stampabile resta quello del socio corrente
+            $conIntestatario = $this->intestatario_nome !== null || $this->intestatario_cognome !== null;
+
             return [
-                'intestatario' => trim($this->intestatario_nome.' '.$this->intestatario_cognome),
-                'codice_fiscale' => $this->intestatario_codice_fiscale,
-                'numero_socio' => $this->numero_socio,
+                'intestatario' => $conIntestatario
+                    ? trim($this->intestatario_nome.' '.$this->intestatario_cognome)
+                    : ($socio !== null ? trim($socio->nome.' '.$socio->cognome) : null),
+                'codice_fiscale' => $conIntestatario ? $this->intestatario_codice_fiscale : $socio?->codice_fiscale,
+                'numero_socio' => $conIntestatario
+                    ? $this->numero_socio
+                    : ($socio?->numero_socio !== null ? (string) $socio->numero_socio : null),
                 'tipo_quota' => $this->tipo_quota,
                 'metodo_pagamento' => $this->metodo_pagamento,
                 'data_pagamento' => $this->data_pagamento,

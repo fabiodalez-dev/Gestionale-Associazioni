@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\VitaAssociativa;
 
+use App\Console\Commands\TurniPromemoria;
 use App\Mail\Struttura\InvitoAmministratoreMail;
 use App\Models\Account;
 use App\Models\Adempimento;
@@ -11,56 +12,85 @@ use App\Models\Associazione;
 use App\Models\AttivitaAdmin;
 use App\Models\Carica;
 use App\Models\CategoriaMovimento;
+use App\Models\CategoriaSocio;
 use App\Models\Cessazione;
 use App\Models\Documento;
 use App\Models\Donazione;
 use App\Models\EmailLog;
 use App\Models\EmailQueue;
+use App\Models\EmailTemplate;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
+use App\Models\GruppoDinamico;
+use App\Models\Mansione;
 use App\Models\Movimento;
 use App\Models\NewsletterInviata;
 use App\Models\PaymentGatewaySetting;
+use App\Models\Prenotazione;
+use App\Models\PrenotazioneSpazio;
 use App\Models\PromemoriaInviato;
 use App\Models\Quota;
 use App\Models\Ricevuta;
 use App\Models\RichiestaIscrizione;
+use App\Models\RichiestaModificaDati;
 use App\Models\RispostaSondaggio;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Scadenza;
+use App\Models\Sede;
 use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Models\Sondaggio;
+use App\Models\Spazio;
+use App\Models\SpesaEvento;
+use App\Models\Tag;
 use App\Models\Tessera;
 use App\Models\TipoSocio;
+use App\Models\Turno;
+use App\Models\TurnoAssegnazione;
 use App\Models\Utente;
 use App\Models\Verbale;
 use App\Models\VerbaleFirmatario;
 use App\Models\VotazioneRiunione;
+use App\Notifications\Comunicazione\AuguriCompleannoNotification;
 use App\Notifications\Comunicazione\ConvocazioneAssembleaNotification;
+use App\Notifications\Economia\RicevutaDonazioneNotification;
 use App\Notifications\Economia\SollecitoQuotaNotification;
 use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
 use App\Notifications\Iscrizioni\IscrizioneRifiutataNotification;
 use App\Notifications\Iscrizioni\RichiestaIscrizioneRicevutaNotification;
 use App\Notifications\Operativita\PromemoriaAttivitaNotification;
+use App\Notifications\Prenotazioni\ConfermataNotification;
+use App\Notifications\Prenotazioni\DaApprovareNotification;
+use App\Notifications\Prenotazioni\EventoEsauritoNotification;
+use App\Notifications\Prenotazioni\InApprovazioneNotification;
+use App\Notifications\Prenotazioni\PromemoriaEventoNotification;
+use App\Notifications\Prenotazioni\RifiutataNotification;
 use App\Notifications\PromemoriaScadenzaNotification;
 use App\Notifications\Rinnovi\PromemoriaRinnovoNotification;
 use App\Notifications\Struttura\ConvocazioneRiunioneNotification;
 use App\Notifications\Struttura\PromemoriaAdempimentoNotification;
+use App\Notifications\VolontariTurni\CandidaturaTurnoNotification;
+use App\Notifications\VolontariTurni\PromemoriaTurnoNotification;
+use App\Notifications\VolontariTurni\RinunciaTurnoNotification;
 use App\Services\Economia\PrimaNotaService;
 use App\Services\Economia\SollecitoQuoteService;
+use App\Services\Email\TenantMailer;
+use App\Services\Iscrizioni\FormIscrizioneService;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
+use App\Services\Pagamenti\PaymentService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Maatwebsite\Excel\Facades\Excel;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Honeypot\ProtectAgainstSpam;
 use Tests\TestCase;
 
@@ -449,7 +479,7 @@ class VitaBurocraticaTest extends TestCase
      */
     private function mailerFinto(array &$invii): void
     {
-        $this->mock(\App\Services\Email\TenantMailer::class, function ($mock) use (&$invii) {
+        $this->mock(TenantMailer::class, function ($mock) use (&$invii) {
             $mock->shouldReceive('send')->andReturnUsing(function (SmtpSetting $settings, string $to) use (&$invii) {
                 $invii[] = $to;
 
@@ -1514,7 +1544,7 @@ class VitaBurocraticaTest extends TestCase
             'scadenza_tessera' => ['Tessera {NUMERO_TESSERA} in scadenza', '<p>Ciao {NOME}, la tua tessera {ANNO_VALIDITA} scade il {DATA_SCADENZA}. Rinnova: {LINK_RINNOVO}</p>'],
             'scadenza_quota' => ['Quota {ANNO} da versare', '<p>Ciao {NOME}, la quota {ANNO} di {IMPORTO} euro scade il {DATA_SCADENZA}.</p>'],
         ] as $codice => [$oggetto, $corpo]) {
-            \App\Models\EmailTemplate::create([
+            EmailTemplate::create([
                 'associazione_id' => $this->associazione->id, 'codice' => $codice, 'nome' => $codice,
                 'oggetto' => $oggetto, 'corpo_html' => $corpo, 'attivo' => true,
             ]);
@@ -1631,7 +1661,7 @@ class VitaBurocraticaTest extends TestCase
             ])->assertSessionHas('success');
             $soci[] = Socio::query()->findOrFail($richiesta->fresh()->socio_id);
         }
-        $this->assertCount(10, $soci, "soci");
+        $this->assertCount(10, $soci, 'soci');
 
         // Quote 2025 tutte pagate, tessere 2025 emesse
         $this->vai('2025-07-01 10:00:00');
@@ -1680,7 +1710,7 @@ class VitaBurocraticaTest extends TestCase
             ->assertRedirect(route('tessere.index', ['anno' => 2026]))->assertSessionHas('success');
         $nuove = Tessera::query()->where('anno_validita', 2026)->whereNotIn('numero_tessera', $giaEmesse)->orderBy('numero_tessera')->get();
         // La generazione massiva emette la tessera a tutti i soci attivi, non solo a chi ha pagato
-        $this->assertCount(10 - count($giaEmesse), $nuove, "nuove");
+        $this->assertCount(10 - count($giaEmesse), $nuove, 'nuove');
         $this->assertSame(10, Tessera::query()->where('anno_validita', 2026)->count());
         $numeri = Tessera::query()->where('anno_validita', 2026)->pluck('numero_tessera');
         $this->assertSame($numeri->count(), $numeri->unique()->count(), 'Numeri tessera senza collisioni');
@@ -1754,7 +1784,7 @@ class VitaBurocraticaTest extends TestCase
         $this->come($this->segretario)->post(route('config-gruppi.store'), [
             'nome_gruppo' => 'Soci di Milano', 'descrizione' => 'Gruppo territoriale', 'filtri' => ['citta' => 'Milano'],
         ])->assertSessionHasNoErrors();
-        $gruppo = \App\Models\GruppoDinamico::query()->sole();
+        $gruppo = GruppoDinamico::query()->sole();
         $this->assertSame(['citta' => 'Milano'], is_array($gruppo->filtri_json) ? $gruppo->filtri_json : json_decode($gruppo->filtri_json, true));
 
         $invii = [];
@@ -1875,14 +1905,14 @@ class VitaBurocraticaTest extends TestCase
                 ->post(route('pubblico.eventi.prenota', ['associazione' => $this->associazione->slug, 'evento' => $evento->id]), ['posti' => 1])
                 ->assertSessionHasNoErrors();
         }
-        $pren = collect($persone)->map(fn (Account $a) => \App\Models\Prenotazione::query()->where('account_id', $a->id)->sole());
+        $pren = collect($persone)->map(fn (Account $a) => Prenotazione::query()->where('account_id', $a->id)->sole());
         $this->assertSame(
             ['Rosa' => 'in_approvazione', 'Sauro' => 'in_approvazione', 'Tina' => 'in_approvazione', 'Ugo' => 'lista_attesa', 'Vera' => 'lista_attesa'],
             $pren->map(fn ($p) => $p->stato)->all()
         );
-        Notification::assertSentToTimes($this->presidente, \App\Notifications\Prenotazioni\DaApprovareNotification::class, 3);
+        Notification::assertSentToTimes($this->presidente, DaApprovareNotification::class, 3);
         foreach (['Rosa', 'Sauro', 'Tina'] as $nome) {
-            Notification::assertSentTo($persone[$nome], \App\Notifications\Prenotazioni\InApprovazioneNotification::class);
+            Notification::assertSentTo($persone[$nome], InApprovazioneNotification::class);
         }
 
         // La segreteria decide: Rosa e Sauro sì, Tina no (posto liberato → Ugo promosso)
@@ -1891,21 +1921,21 @@ class VitaBurocraticaTest extends TestCase
         $this->riuscito($this->come($this->segretario)->post($url('approva', $pren['Rosa'])));
         $this->riuscito($this->post($url('approva', $pren['Sauro'])));
         $this->riuscito($this->post($url('rifiuta', $pren['Tina']), ['motivo' => 'Precedenza ai soci con turni di volontariato.']));
-        Notification::assertSentTo($persone['Tina'], \App\Notifications\Prenotazioni\RifiutataNotification::class);
-        $this->assertSame(\App\Models\Prenotazione::STATO_IN_APPROVAZIONE, $pren['Ugo']->fresh()->stato, 'Ugo promosso dalla lista, da approvare');
+        Notification::assertSentTo($persone['Tina'], RifiutataNotification::class);
+        $this->assertSame(Prenotazione::STATO_IN_APPROVAZIONE, $pren['Ugo']->fresh()->stato, 'Ugo promosso dalla lista, da approvare');
         $this->riuscito($this->post($url('approva', $pren['Ugo']->fresh())));
 
         // Evento a pagamento: dopo l'approvazione si attende il pagamento, registrato in sede
         foreach (['Rosa', 'Sauro', 'Ugo'] as $nome) {
-            $this->assertSame(\App\Models\Prenotazione::STATO_IN_ATTESA_PAGAMENTO, $pren[$nome]->fresh()->stato);
+            $this->assertSame(Prenotazione::STATO_IN_ATTESA_PAGAMENTO, $pren[$nome]->fresh()->stato);
             $this->riuscito($this->post($url('conferma-pagamento', $pren[$nome])));
-            $this->assertSame(\App\Models\Prenotazione::STATO_CONFERMATA, $pren[$nome]->fresh()->stato);
-            Notification::assertSentTo($persone[$nome], \App\Notifications\Prenotazioni\ConfermataNotification::class);
+            $this->assertSame(Prenotazione::STATO_CONFERMATA, $pren[$nome]->fresh()->stato);
+            Notification::assertSentTo($persone[$nome], ConfermataNotification::class);
         }
-        $this->assertSame(3, \App\Models\Prenotazione::postiOccupati($evento->id));
-        Notification::assertSentTo($this->presidente, \App\Notifications\Prenotazioni\EventoEsauritoNotification::class);
-        $this->assertSame(\App\Models\Prenotazione::STATO_LISTA_ATTESA, $pren['Vera']->fresh()->stato);
-        $this->assertSame(\App\Models\Prenotazione::STATO_ANNULLATA, $pren['Tina']->fresh()->stato);
+        $this->assertSame(3, Prenotazione::postiOccupati($evento->id));
+        Notification::assertSentTo($this->presidente, EventoEsauritoNotification::class);
+        $this->assertSame(Prenotazione::STATO_LISTA_ATTESA, $pren['Vera']->fresh()->stato);
+        $this->assertSame(Prenotazione::STATO_ANNULLATA, $pren['Tina']->fresh()->stato);
 
         // Promemoria il giorno prima, una sola volta
         $this->vai('2026-09-18 08:30:00');
@@ -1914,8 +1944,8 @@ class VitaBurocraticaTest extends TestCase
         $this->artisan('prenotazioni:promemoria-eventi')->expectsOutput('Promemoria inviati: 3')->assertSuccessful();
         $this->vai('2026-09-20 08:30:00');
         $this->artisan('prenotazioni:promemoria-eventi')->expectsOutput('Promemoria inviati: 0')->assertSuccessful();
-        Notification::assertSentTimes(\App\Notifications\Prenotazioni\PromemoriaEventoNotification::class, 3);
-        Notification::assertNotSentTo([$persone['Tina'], $persone['Vera']], \App\Notifications\Prenotazioni\PromemoriaEventoNotification::class);
+        Notification::assertSentTimes(PromemoriaEventoNotification::class, 3);
+        Notification::assertNotSentTo([$persone['Tina'], $persone['Vera']], PromemoriaEventoNotification::class);
 
         // La sera della festa: presenze, foglio firme, spese
         $this->vai('2026-09-20 20:00:00');
@@ -1930,8 +1960,8 @@ class VitaBurocraticaTest extends TestCase
         $this->come($this->segretario)->post(route('eventi.economia.spese.store', $evento), ['descrizione' => 'Catering', 'importo' => '120.00', 'data' => '2026-09-20'])->assertSessionHas('success');
         $this->post(route('eventi.economia.spese.store', $evento), ['descrizione' => 'Premi volontari', 'importo' => '45.00', 'data' => '2026-09-20'])->assertSessionHas('success');
 
-        $this->assertSame(2, \App\Models\SpesaEvento::query()->where('evento_id', $evento->id)->count());
-        $incassi = Movimento::query()->where('origine_type', (new \App\Models\Prenotazione)->getMorphClass())->get();
+        $this->assertSame(2, SpesaEvento::query()->where('evento_id', $evento->id)->count());
+        $incassi = Movimento::query()->where('origine_type', (new Prenotazione)->getMorphClass())->get();
         $this->assertCount(3, $incassi);
         $this->assertEqualsWithDelta(30.0, (float) $incassi->sum('importo'), 0.001);
 
@@ -1953,10 +1983,10 @@ class VitaBurocraticaTest extends TestCase
             $this->come($this->presidente)->post(route('sedi.save'), ['nome' => $nome, 'citta' => $citta, 'provincia' => strtoupper(substr($citta, 0, 2)), 'cap' => '40100'])
                 ->assertSessionHasNoErrors();
         }
-        $sedi = \App\Models\Sede::query()->withoutGlobalScopes()->orderBy('nome')->get()->keyBy('nome');
+        $sedi = Sede::query()->withoutGlobalScopes()->orderBy('nome')->get()->keyBy('nome');
         $this->post(route('spazi.store'), ['nome' => 'Sala riunioni', 'capienza' => 20, 'attivo' => '1'])->assertSessionHasNoErrors();
         $this->post(route('spazi.store'), ['nome' => 'Salone', 'capienza' => 80, 'attivo' => '1'])->assertSessionHasNoErrors();
-        $sala = \App\Models\Spazio::query()->where('nome', 'Sala riunioni')->sole();
+        $sala = Spazio::query()->where('nome', 'Sala riunioni')->sole();
 
         $opNord = $this->creaStaff('Nadia', 'Nordini');
         $opSud = $this->creaStaff('Saverio', 'Sudati');
@@ -2009,7 +2039,7 @@ class VitaBurocraticaTest extends TestCase
         // La sede viene chiusa: i suoi soci restano, senza sede
         $sociCentro = Socio::query()->where('sede_id', $sedi['Sede Centro']->id)->pluck('id');
         $this->come($this->presidente)->delete(route('sedi.destroy', $sedi['Sede Centro']))->assertSessionHas('success', 'Sede eliminata.');
-        $this->assertNull(\App\Models\Sede::query()->withoutGlobalScopes()->find($sedi['Sede Centro']->id));
+        $this->assertNull(Sede::query()->withoutGlobalScopes()->find($sedi['Sede Centro']->id));
         $this->assertSame(3, Socio::query()->whereIn('id', $sociCentro)->whereNull('sede_id')->count());
 
         // Lo spazio della riunione (riunioni.spazio_id, f.17) è solo il luogo indicato
@@ -2022,8 +2052,8 @@ class VitaBurocraticaTest extends TestCase
         $this->from(route('spazi.prenotazioni.index'))->post(route('spazi.prenotazioni.store'), [
             'spazio_id' => $sala->id, 'titolo' => 'Corso di yoga', 'dal' => '2026-02-26T20:30', 'al' => '2026-02-26T22:30',
         ])->assertSessionHasErrors('dal');
-        $this->assertTrue(\App\Models\PrenotazioneSpazio::query()->where('titolo', 'Direttivo di febbraio')->exists());
-        $this->assertFalse(\App\Models\PrenotazioneSpazio::query()->where('titolo', 'Corso di yoga')->exists());
+        $this->assertTrue(PrenotazioneSpazio::query()->where('titolo', 'Direttivo di febbraio')->exists());
+        $this->assertFalse(PrenotazioneSpazio::query()->where('titolo', 'Corso di yoga')->exists());
     }
 
     // ==================================================================
@@ -2078,7 +2108,7 @@ class VitaBurocraticaTest extends TestCase
         $this->assertSame(Socio::STATO_ATTIVO, $mirco->stato);
         $quotaMirco = Quota::query()->where('socio_id', $mirco->id)->where('anno', 2026)->sole();
         $this->assertSame('30.00', (string) $quotaMirco->importo);
-        app(\App\Services\Pagamenti\PaymentService::class)->generatePaymentToken($quotaMirco);
+        app(PaymentService::class)->generatePaymentToken($quotaMirco);
         $this->assertTrue($quotaMirco->fresh()->hasValidPaymentToken());
         $this->stripePagaQuota($quotaMirco->fresh(), 'pi_mirco');
         $this->assertTrue($quotaMirco->fresh()->isPagata());
@@ -2152,8 +2182,8 @@ class VitaBurocraticaTest extends TestCase
         $this->getJson(route('soci.verifica-dati', ['codice_fiscale' => 'RSSMRA85T10A562S']))->assertOk()->assertJsonPath('codice_fiscale.valido', true);
 
         // Azioni in blocco: tag "Assemblea 2026" a tutti gli attivi, categoria "Fondatore" a tre
-        $tag = \App\Models\Tag::create(['associazione_id' => $this->associazione->id, 'nome_tag' => 'Assemblea 2026', 'colore' => '#0D9488']);
-        $fondatore = \App\Models\CategoriaSocio::create(['associazione_id' => $this->associazione->id, 'nome' => 'Fondatore']);
+        $tag = Tag::create(['associazione_id' => $this->associazione->id, 'nome_tag' => 'Assemblea 2026', 'colore' => '#0D9488']);
+        $fondatore = CategoriaSocio::create(['associazione_id' => $this->associazione->id, 'nome' => 'Fondatore']);
         $attivi = Socio::query()->where('stato', Socio::STATO_ATTIVO)->pluck('id')->all();
         $this->assertCount(10, $attivi);
         $this->from(route('soci.index'))->post(route('soci.azioni-blocco'), ['azione' => 'tag_assegna', 'valore' => $tag->id, 'soci_ids' => $attivi])
@@ -2161,7 +2191,7 @@ class VitaBurocraticaTest extends TestCase
         $tre = array_slice($attivi, 0, 3);
         $this->from(route('soci.index'))->post(route('soci.azioni-blocco'), ['azione' => 'categoria', 'valore' => $fondatore->id, 'soci_ids' => $tre])
             ->assertSessionHas('success');
-        $this->assertSame(10, \Illuminate\Support\Facades\DB::table('socio_tags')->where('tag_id', $tag->id)->count());
+        $this->assertSame(10, DB::table('socio_tags')->where('tag_id', $tag->id)->count());
         $this->assertEqualsCanonicalizing($tre, Socio::query()->where('categoria_socio_id', $fondatore->id)->pluck('id')->all());
         Excel::fake();
         $this->post(route('soci.azioni-blocco.export'), ['soci_ids' => $tre])->assertOk();
@@ -2279,7 +2309,7 @@ class VitaBurocraticaTest extends TestCase
         $this->assertSame(Donazione::STATO_PAGATA, $donazioni['lucia@dona.test']->fresh()->stato);
         $this->assertSame(Donazione::STATO_IN_ATTESA, $donazioni['piero@dona.test']->fresh()->stato);
         $this->assertNull(Movimento::query()->where('origine_id', $donazioni['piero@dona.test']->id)->first());
-        Notification::assertSentOnDemandTimes(\App\Notifications\Economia\RicevutaDonazioneNotification::class, 2);
+        Notification::assertSentOnDemandTimes(RicevutaDonazioneNotification::class, 2);
 
         $movimenti = Movimento::query()->get();
         $this->assertSame(2, $movimenti->where('origine_type', (new Donazione)->getMorphClass())->count());
@@ -2430,14 +2460,14 @@ class VitaBurocraticaTest extends TestCase
 
         $this->come($this->segretario)->post(route('mansioni.store'), ['nome' => 'Accoglienza', 'descrizione' => 'Banco informazioni'])->assertRedirect();
         $this->post(route('mansioni.store'), ['nome' => 'Logistica', 'descrizione' => 'Montaggio gazebo'])->assertRedirect();
-        $mansioni = \App\Models\Mansione::query()->pluck('id', 'nome');
+        $mansioni = Mansione::query()->pluck('id', 'nome');
         $turni = [];
         foreach ([['Montaggio', '08:00', '11:00', 'Logistica', false], ['Accoglienza mattina', '11:00', '14:00', 'Accoglienza', true], ['Smontaggio', '17:00', '20:00', 'Logistica', false]] as [$titolo, $dalle, $alle, $mansione, $auto]) {
             $this->post(route('turni.store'), [
                 'titolo' => $titolo, 'data' => '2026-04-18', 'ora_inizio' => $dalle, 'ora_fine' => $alle, 'posti' => 3,
-                'mansione_id' => $mansioni[$mansione], 'stato' => \App\Models\Turno::STATO_APERTO, 'auto_conferma' => $auto ? '1' : '0',
+                'mansione_id' => $mansioni[$mansione], 'stato' => Turno::STATO_APERTO, 'auto_conferma' => $auto ? '1' : '0',
             ])->assertSessionHasNoErrors()->assertRedirect();
-            $turni[$titolo] = \App\Models\Turno::query()->where('titolo', $titolo)->sole();
+            $turni[$titolo] = Turno::query()->where('titolo', $titolo)->sole();
         }
 
         $volontari = [];
@@ -2451,10 +2481,10 @@ class VitaBurocraticaTest extends TestCase
             $this->actingAs($volontari[$n], 'socio')->post(route('area-soci.volontariato.candidati', $turni[$turno]))->assertSessionHas('success');
         }
         // L'admin è avvisato solo delle candidature da confermare: le due del turno con conferma automatica no
-        Notification::assertSentToTimes($this->presidente, \App\Notifications\VolontariTurni\CandidaturaTurnoNotification::class, 4);
-        $assegnazione = fn (int $n) => \App\Models\TurnoAssegnazione::query()->where('socio_id', $volontari[$n]->id)->sole();
-        $this->assertSame(\App\Models\TurnoAssegnazione::STATO_CONFERMATO, $assegnazione(3)->stato, 'Turno con conferma automatica');
-        $this->assertSame(\App\Models\TurnoAssegnazione::STATO_PROPOSTO, $assegnazione(1)->stato);
+        Notification::assertSentToTimes($this->presidente, CandidaturaTurnoNotification::class, 4);
+        $assegnazione = fn (int $n) => TurnoAssegnazione::query()->where('socio_id', $volontari[$n]->id)->sole();
+        $this->assertSame(TurnoAssegnazione::STATO_CONFERMATO, $assegnazione(3)->stato, 'Turno con conferma automatica');
+        $this->assertSame(TurnoAssegnazione::STATO_PROPOSTO, $assegnazione(1)->stato);
 
         // L'admin conferma le candidature e assegna un settimo volontario allo smontaggio
         $this->vai('2026-04-10 10:00:00');
@@ -2468,9 +2498,9 @@ class VitaBurocraticaTest extends TestCase
         $this->vai('2026-04-15 12:00:00');
         $this->esci();
         $this->actingAs($volontari[2], 'socio')->post(route('area-soci.volontariato.rinuncia', $assegnazione(2)), ['motivo' => 'Influenza'])->assertSessionHas('success');
-        Notification::assertSentToTimes($this->presidente, \App\Notifications\VolontariTurni\RinunciaTurnoNotification::class, 1);
+        Notification::assertSentToTimes($this->presidente, RinunciaTurnoNotification::class, 1);
         $stati = collect(range(1, 7))->mapWithKeys(fn ($n) => [$n => $assegnazione($n)->stato])->countBy()->all();
-        $this->assertSame([\App\Models\TurnoAssegnazione::STATO_CONFERMATO => 6, \App\Models\TurnoAssegnazione::STATO_RINUNCIATO => 1], $stati);
+        $this->assertSame([TurnoAssegnazione::STATO_CONFERMATO => 6, TurnoAssegnazione::STATO_RINUNCIATO => 1], $stati);
 
         // Promemoria dei turni dalle 17 del giorno prima
         foreach (['2026-04-16' => 0, '2026-04-17' => 6] as $giorno => $attesi) {
@@ -2478,9 +2508,9 @@ class VitaBurocraticaTest extends TestCase
             $this->artisan('turni:promemoria')->expectsOutput("Promemoria turni inviati: {$attesi}")->assertSuccessful();
         }
         $this->artisan('turni:promemoria')->expectsOutput('Promemoria turni inviati: 0')->assertSuccessful();
-        Notification::assertSentTimes(\App\Notifications\VolontariTurni\PromemoriaTurnoNotification::class, 6);
-        Notification::assertNotSentTo($volontari[2], \App\Notifications\VolontariTurni\PromemoriaTurnoNotification::class);
-        $this->assertSame(6, PromemoriaInviato::query()->where('tipo', \App\Console\Commands\TurniPromemoria::TIPO)->count());
+        Notification::assertSentTimes(PromemoriaTurnoNotification::class, 6);
+        Notification::assertNotSentTo($volontari[2], PromemoriaTurnoNotification::class);
+        $this->assertSame(6, PromemoriaInviato::query()->where('tipo', TurniPromemoria::TIPO)->count());
 
         // 18 aprile: presenze; Volontario6 non si presenta
         $this->vai('2026-04-18 21:00:00');
@@ -2556,7 +2586,7 @@ class VitaBurocraticaTest extends TestCase
         $this->get(route('pubblico.trasparenza.download', [$this->associazione->slug, $documenti['bilancio-2025.pdf']->id]))->assertNotFound();
 
         $registro = Documento::query()->whereKey($documenti['bilancio-2025.pdf']->id)->first()->activities ?? null;
-        $log = \Spatie\Activitylog\Models\Activity::query()->where('subject_id', $documenti['bilancio-2025.pdf']->id)->get();
+        $log = Activity::query()->where('subject_id', $documenti['bilancio-2025.pdf']->id)->get();
         $this->assertGreaterThanOrEqual(2, $log->where('event', 'updated')->count(), 'Pubblicazione e ritiro tracciati nel registro modifiche');
 
         // Un documento cestinato per errore torna; quello vecchio viene eliminato dallo scheduler
@@ -2792,13 +2822,13 @@ class VitaBurocraticaTest extends TestCase
             'from_email' => 'noreply@ilfaronuovo.test', 'from_name' => 'ODV Il Faro Nuovo', 'max_per_hour' => 100, 'auto_benvenuto' => '1',
         ])->assertSessionHasNoErrors();
         $passiFatti(3);
-        $benvenuto = \App\Models\EmailTemplate::query()->withoutGlobalScopes()->where('associazione_id', $nuova->id)->where('codice', 'benvenuto')->first();
+        $benvenuto = EmailTemplate::query()->withoutGlobalScopes()->where('associazione_id', $nuova->id)->where('codice', 'benvenuto')->first();
         $this->assertNotNull($benvenuto, 'Al salvataggio dell\'SMTP nascono i template predefiniti');
         $benvenuto->forceFill(['attivo' => true])->save();
 
         $this->post(route('configurazioni.modulo-iscrizione.salva'), [
             'iscrizioni_socio_aperte' => '1', 'modalita_iscrizione' => Associazione::MODALITA_PREISCRIZIONE,
-            'campi_standard' => collect(\App\Services\Iscrizioni\FormIscrizioneService::CAMPI_STANDARD)->values()
+            'campi_standard' => collect(FormIscrizioneService::CAMPI_STANDARD)->values()
                 ->mapWithKeys(fn ($c, $i) => [$c => ['visibile' => '1', 'obbligatorio' => in_array($c, ['telefono', 'data_nascita'], true) ? '1' : '0', 'ordine' => $i + 1]])->all(),
         ])->assertSessionHasNoErrors();
         $passiFatti(4);
@@ -2884,8 +2914,8 @@ class VitaBurocraticaTest extends TestCase
         $this->assertTrue((bool) $this->associazione->fresh()->auguri_automatici);
         $this->assertFalse((bool) $b->fresh()->auguri_automatici);
         $this->artisan('compleanni:auguri')->assertSuccessful();
-        Notification::assertSentTo($sociA['Mario'], \App\Notifications\Comunicazione\AuguriCompleannoNotification::class);
-        Notification::assertNotSentTo($sociB['Mario'], \App\Notifications\Comunicazione\AuguriCompleannoNotification::class);
+        Notification::assertSentTo($sociA['Mario'], AuguriCompleannoNotification::class);
+        Notification::assertNotSentTo($sociB['Mario'], AuguriCompleannoNotification::class);
 
         // Checklist e scadenze in entrambe
         $this->come($this->presidente)->post(route('adempimenti.seed'))->assertSessionHas('success');
@@ -3000,7 +3030,7 @@ class VitaBurocraticaTest extends TestCase
                 'stato' => Socio::STATO_ATTIVO, 'telefono' => '3389990000', 'citta' => 'Carpi',
             ])->assertSessionHasNoErrors()->assertRedirect(route('soci.show', $socio));
         }
-        $richiesta = \App\Models\RichiestaModificaDati::factory()->create(['socio_id' => $soci['Corrado']->id, 'proposte' => ['telefono' => '3471112233']]);
+        $richiesta = RichiestaModificaDati::factory()->create(['socio_id' => $soci['Corrado']->id, 'proposte' => ['telefono' => '3471112233']]);
         $this->post(route('richieste-modifica-dati.approva', $richiesta))->assertSessionHas('success');
         $this->assertSame('3471112233', $soci['Corrado']->fresh()->telefono);
 
@@ -3193,7 +3223,7 @@ class VitaBurocraticaTest extends TestCase
             $this->esci();
             $this->actingAs($account, 'account')->post(route('pubblico.eventi.prenota', ['associazione' => $this->associazione->slug, 'evento' => $festa->id]), ['posti' => 1])
                 ->assertSessionHasNoErrors();
-            $prenotazione = \App\Models\Prenotazione::query()->where('account_id', $account->id)->sole();
+            $prenotazione = Prenotazione::query()->where('account_id', $account->id)->sole();
             $this->come($this->segretario)->post(route('eventi.prenotazioni.conferma-pagamento', ['evento' => $festa->id, 'prenotazione' => $prenotazione->id]))->assertSessionHas('success');
         }
         $this->vai('2026-06-28 10:00:00');
@@ -3287,7 +3317,7 @@ class VitaBurocraticaTest extends TestCase
 
         $movimenti = Movimento::query()->get();
         $this->assertSame(13, $movimenti->where('origine_type', (new Quota)->getMorphClass())->count());
-        $this->assertSame(2, $movimenti->where('origine_type', (new \App\Models\Prenotazione)->getMorphClass())->count());
+        $this->assertSame(2, $movimenti->where('origine_type', (new Prenotazione)->getMorphClass())->count());
         $this->assertSame(2, $movimenti->whereNull('origine_type')->count());
 
         $stat = $this->get(route('statistiche-annuali.index', ['anno' => 2026]))->assertOk()->viewData('dati')['corrente'];

@@ -2,14 +2,18 @@
 
 namespace Tests\Feature\Tessere;
 
+use App\Http\Requests\Tessere\UpdateTesseraRequest;
 use App\Models\Associazione;
+use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\TesseraCounter;
+use App\Models\Utente;
 use App\Services\Soci\TesseraAutomaticaService;
 use App\Services\Tessere\TesseraGiaPresenteException;
 use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraQrService;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +32,10 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
     use RefreshDatabase;
 
     private const MIGRATION = '2026_11_05_120100_add_unique_socio_anno_to_tessere_table.php';
+
+    private const ANCHE_SCADUTA = " (anche se scaduta: va annullata prima di emetterne un'altra).";
+
+    private const GIA_PRESENTE_FORM = 'Il socio ha già una tessera non annullata per questo anno'.self::ANCHE_SCADUTA;
 
     private function issuer(): TesseraIssuer
     {
@@ -285,7 +293,7 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
             'anno_validita' => 2026,
             'data_emissione' => '2026-06-11',
             'stato' => 'Attiva',
-        ])->assertRedirect('/tessere')->assertSessionHasErrors(['anno_validita' => 'Il socio ha già una tessera non annullata per questo anno.']);
+        ])->assertRedirect('/tessere')->assertSessionHasErrors(['anno_validita' => self::GIA_PRESENTE_FORM]);
 
         // Anno diverso: ammessa
         $this->actingAs($admin)->post('/tessere', [
@@ -315,7 +323,7 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
             'anno_validita' => 2026,
             'data_emissione' => '2026-06-11',
             'stato' => 'Attiva',
-        ])->assertRedirect('/tessere')->assertSessionHasErrors(['anno_validita' => "Il socio ha già una tessera non annullata per l'anno 2026."]);
+        ])->assertRedirect('/tessere')->assertSessionHasErrors(['anno_validita' => "Il socio ha già una tessera non annullata per l'anno 2026".self::ANCHE_SCADUTA]);
     }
 
     public function test_modifica_che_sposta_la_tessera_su_un_anno_gia_occupato_e_un_errore_di_validazione(): void
@@ -335,7 +343,7 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
 
         $this->actingAs($admin)->from('/tessere')->put('/tessere/'.$vecchia->id, $dati + ['anno_validita' => 2026])
             ->assertRedirect('/tessere')
-            ->assertSessionHasErrors(['anno_validita' => 'Il socio ha già una tessera non annullata per questo anno.']);
+            ->assertSessionHasErrors(['anno_validita' => self::GIA_PRESENTE_FORM]);
         $this->assertSame(2025, $vecchia->fresh()->anno_validita);
 
         // Spostata sul 2026 ma annullata: fuori dal vincolo, ammessa
@@ -382,5 +390,92 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
         // Il servizio applica la stessa regola anche fuori dal form
         $this->expectException(TesseraGiaPresenteException::class);
         $this->issuer()->emetti($socio, ['anno_validita' => 2026, 'stato' => Tessera::STATO_SOSPESA]);
+    }
+
+    /**
+     * Esce dal vincolo solo 'Annullata': una tessera con stato 'Scaduta'
+     * memorizzato (valore legacy) è una tessera reale di quell'anno, blocca
+     * una nuova emissione per lo stesso anno e il messaggio dice di
+     * annullarla prima.
+     */
+    public function test_tessera_scaduta_memorizzata_conta_nel_vincolo_finche_non_viene_annullata(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $socio = Socio::factory()->create(['associazione_id' => $assoc->id]);
+        $this->inserisciTesseraGrezza($socio, 2026, 'L-2026', Tessera::STATO_SCADUTA);
+
+        $nuova = [
+            'socio_id' => $socio->id,
+            'numero_tessera' => '20260077',
+            'anno_validita' => 2026,
+            'data_emissione' => '2026-06-11',
+            'stato' => 'Attiva',
+        ];
+
+        $this->actingAs($admin)->from('/tessere')->post('/tessere', $nuova)
+            ->assertRedirect('/tessere')
+            ->assertSessionHasErrors(['anno_validita' => self::GIA_PRESENTE_FORM]);
+
+        try {
+            $this->issuer()->emetti($socio, ['anno_validita' => 2026]);
+            $this->fail('La tessera Scaduta dell\'anno deve bloccare l\'emissione');
+        } catch (TesseraGiaPresenteException $e) {
+            $this->assertSame("Il socio ha già una tessera non annullata per l'anno 2026".self::ANCHE_SCADUTA, $e->getMessage());
+        }
+
+        // Annullata la tessera scaduta, la nuova emissione è ammessa
+        Tessera::allTenants()->where('numero_tessera', 'L-2026')->sole()->update(['stato' => Tessera::STATO_ANNULLATA]);
+
+        $this->actingAs($admin)->post('/tessere', $nuova)->assertSessionHasNoErrors();
+        $this->assertSame(2, Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2026)->count());
+    }
+
+    /**
+     * Modifica in gara con un'emissione concorrente per un socio fuori dal
+     * perimetro di sede dell'operatore: il doppione va riconosciuto anche se
+     * l'operatore non vede quella tessera (errore su anno_validita, non sul
+     * numero tessera).
+     */
+    public function test_modifica_in_gara_con_doppione_fuori_dal_perimetro_di_sede_segnala_l_anno(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $assoc = Associazione::factory()->create();
+        $padova = Sede::create(['associazione_id' => $assoc->id, 'nome' => 'Padova']);
+        $vicenza = Sede::create(['associazione_id' => $assoc->id, 'nome' => 'Vicenza']);
+
+        $responsabile = Utente::factory()->operatore()->create(['associazione_id' => $assoc->id]);
+        $responsabile->syncRoles(['responsabile_sede']);
+        $responsabile->assegnaSedi([$padova->id]);
+
+        $socioPadova = Socio::factory()->create(['associazione_id' => $assoc->id, 'sede_id' => $padova->id]);
+        $socioVicenza = Socio::factory()->create(['associazione_id' => $assoc->id, 'sede_id' => $vicenza->id]);
+        $tessera = Tessera::factory()->create([
+            'associazione_id' => $assoc->id,
+            'socio_id' => $socioPadova->id,
+            'anno_validita' => 2025,
+            'numero_tessera' => '20250001',
+        ]);
+
+        // Validazione superata: subito dopo un altro flusso emette la
+        // tessera 2026 del socio di Vicenza
+        $this->app->afterResolving(UpdateTesseraRequest::class, function () use ($socioVicenza): void {
+            $this->inserisciTesseraGrezza($socioVicenza, 2026, 'V-2026');
+        });
+
+        $this->actingAs($responsabile)->withSession(['associazione_id' => $assoc->id])
+            ->from('/tessere')
+            ->put('/tessere/'.$tessera->id, [
+                'socio_id' => $socioVicenza->id,
+                'numero_tessera' => '20250001',
+                'anno_validita' => 2026,
+                'data_emissione' => '2026-01-10',
+                'stato' => 'Attiva',
+            ])
+            ->assertRedirect('/tessere')
+            ->assertSessionHasErrors(['anno_validita' => "Il socio ha già una tessera non annullata per l'anno 2026".self::ANCHE_SCADUTA])
+            ->assertSessionDoesntHaveErrors('numero_tessera');
+
+        $this->assertSame($socioPadova->id, $tessera->fresh()->socio_id);
     }
 }

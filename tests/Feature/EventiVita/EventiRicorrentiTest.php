@@ -291,6 +291,45 @@ class EventiRicorrentiTest extends TestCase
         }
     }
 
+    /**
+     * Issue #22: gli id delle occorrenze si leggono fuori dalla transazione.
+     * Una SELECT ... FOR UPDATE filtrata per serie_id bloccherebbe le righe
+     * nell'ordine della scansione dell'indice (non per id) e due modifiche
+     * concorrenti della stessa serie potrebbero andare in deadlock: dentro
+     * la transazione restano solo i lock per chiave primaria, in ordine di id.
+     */
+    public function test_update_serie_non_blocca_le_occorrenze_tramite_l_indice_della_serie(): void
+    {
+        $occorrenze = $this->creaSerie(3);
+        $livelloTest = DB::transactionLevel();
+
+        $dentroTransazione = [];
+        DB::listen(function ($query) use ($livelloTest, &$dentroTransazione): void {
+            if (DB::transactionLevel() > $livelloTest && str_contains($query->sql, '"serie_id"')) {
+                $dentroTransazione[] = $query->sql;
+            }
+        });
+
+        $this->actingAs($this->admin)
+            ->put("/eventi/{$occorrenze->first()->id}/serie", [
+                'titolo' => 'Corso di ballo AVANZATO',
+                'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+                'capienza' => 20,
+                'prezzo' => '0',
+                'iscrizioni_aperte' => '1',
+                'richiede_approvazione' => '0',
+                'solo_soci' => '0',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(3, Evento::query()->where('titolo', 'Corso di ballo AVANZATO')->count());
+        $this->assertSame([], array_values(array_filter(
+            $dentroTransazione,
+            // gli UPDATE delle occorrenze scrivono serie_id solo se cambia
+            fn (string $sql): bool => str_starts_with(strtolower($sql), 'select'),
+        )));
+    }
+
     public function test_modifica_della_singola_occorrenza_non_tocca_la_serie(): void
     {
         $occorrenze = $this->creaSerie(3);

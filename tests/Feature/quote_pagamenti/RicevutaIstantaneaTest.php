@@ -138,4 +138,36 @@ class RicevutaIstantaneaTest extends TestCase
         $this->assertStringContainsString('Quota Ordinaria', $html);
         $this->assertStringContainsString('Bonifico', $html);
     }
+
+    public function test_istantanea_senza_intestatario_conserva_comunque_i_dati_della_quota(): void
+    {
+        $socio = $this->socioDiProva();
+        $quota = $this->quotaPagata($socio);
+
+        // Socio non disponibile all'emissione: salvati solo i dati della quota
+        $ricevuta = Ricevuta::allTenants()->create([
+            'associazione_id' => $this->associazione->id,
+            'quota_id' => $quota->id,
+            'numero' => 1,
+            'anno' => 2026,
+            'importo' => 30,
+            'emessa_at' => now(),
+            'tipo_quota' => 'Quota Ordinaria',
+            'metodo_pagamento' => 'bonifico',
+            'data_pagamento' => '2026-03-10',
+            'riferimento_transazione' => 'TRN-001',
+        ]);
+        $this->assertTrue($ricevuta->haIstantanea());
+
+        $quota->update(['tipo' => 'Quota Sostenitore', 'metodo_pagamento' => 'contanti', 'gateway_transaction_id' => null]);
+
+        $html = $this->htmlRicevuta($ricevuta);
+
+        $this->assertStringContainsString('Quota Ordinaria', $html);
+        $this->assertStringContainsString('Bonifico', $html);
+        $this->assertStringContainsString('TRN-001', $html);
+        $this->assertStringNotContainsString('Quota Sostenitore', $html);
+        // L'intestatario ricade sul socio corrente
+        $this->assertStringContainsString('Maria Rossi', $html);
+    }
 }

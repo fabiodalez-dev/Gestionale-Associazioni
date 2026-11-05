@@ -5,19 +5,23 @@ namespace Tests\Feature\Flussi;
 use App\Models\Account;
 use App\Models\Adempimento;
 use App\Models\Annuncio;
+use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Attrezzatura;
 use App\Models\CampoPersonalizzato;
 use App\Models\Carica;
 use App\Models\CategoriaSocio;
 use App\Models\Cessazione;
+use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Consenso;
 use App\Models\ContattoEsterno;
 use App\Models\Documento;
 use App\Models\EmailLog;
+use App\Models\EmailQueue;
 use App\Models\EmailTemplate;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
+use App\Models\Mansione;
 use App\Models\MilestoneProgetto;
 use App\Models\Movimento;
 use App\Models\NotaSocio;
@@ -32,7 +36,9 @@ use App\Models\Quota;
 use App\Models\Ricevuta;
 use App\Models\RichiestaIscrizione;
 use App\Models\RichiestaModificaDati;
+use App\Models\RichiestaRegistrazione;
 use App\Models\Riunione;
+use App\Models\RiunionePartecipante;
 use App\Models\Scadenza;
 use App\Models\Sede;
 use App\Models\SmtpSetting;
@@ -59,6 +65,7 @@ use Database\Seeders\RolesSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +74,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PDO;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -1486,7 +1494,7 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
 
     public function test_round_trip_turno_assegnazione_attrezzatura_prestito_progetto_milestone(): void
     {
-        $mansione = \App\Models\Mansione::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Cucina']);
+        $mansione = Mansione::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Cucina']);
         $evento = Evento::factory()->create(['associazione_id' => $this->associazione->id]);
         $spazio = Spazio::factory()->create(['associazione_id' => $this->associazione->id]);
         $volontario = $this->creaSocio(['nome' => 'Vito', 'cognome' => 'Volontario']);
@@ -1936,9 +1944,9 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
         // Dichiaratamente globali: la riga può esistere senza tenant (o lo
         // sceglie il super admin) e non hanno il global scope
         $globali = [
-            'utenti' => \App\Models\Utente::class,
-            'api_keys' => \App\Models\ApiKey::class,
-            'richieste_registrazione' => \App\Models\RichiestaRegistrazione::class,
+            'utenti' => Utente::class,
+            'api_keys' => ApiKey::class,
+            'richieste_registrazione' => RichiestaRegistrazione::class,
         ];
         // Tabelle tecniche senza modello Eloquent dedicato
         $senzaModello = ['settings'];
@@ -1951,7 +1959,7 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
                 if (! in_array($tabella, $senzaModello, true)) {
                     $problemi[] = "{$tabella}: nessun modello in app/Models";
                 }
-            } elseif (! isset($globali[$tabella]) && ! in_array(\App\Models\Concerns\BelongsToAssociazione::class, class_uses_recursive($classe), true)) {
+            } elseif (! isset($globali[$tabella]) && ! in_array(BelongsToAssociazione::class, class_uses_recursive($classe), true)) {
                 $problemi[] = "{$classe} ({$tabella}): manca il trait BelongsToAssociazione (nessun isolamento tenant)";
             }
 
@@ -2005,11 +2013,11 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
         $account = Account::factory()->create(['associazione_id' => $a, 'socio_id' => $socio->id, 'email' => 'ettore@radici.test']);
         $richiestaIscrizione = RichiestaIscrizione::factory()->create(['associazione_id' => $a, 'account_id' => $account->id, 'socio_id' => $socio->id, 'stato' => RichiestaIscrizione::STATO_APPROVATA]);
         $emailLog = EmailLog::create(['associazione_id' => $a, 'socio_id' => $socio->id, 'to_email' => 'ettore@radici.test', 'subject' => 'Benvenuto', 'status' => 'sent']);
-        $emailCoda = \App\Models\EmailQueue::create(['associazione_id' => $a, 'batch_id' => (string) \Illuminate\Support\Str::uuid(), 'socio_id' => $socio->id, 'to_email' => 'ettore@radici.test', 'subject' => 'Notiziario', 'body_html' => '<p>Ciao</p>']);
+        $emailCoda = EmailQueue::create(['associazione_id' => $a, 'batch_id' => (string) Str::uuid(), 'socio_id' => $socio->id, 'to_email' => 'ettore@radici.test', 'subject' => 'Notiziario', 'body_html' => '<p>Ciao</p>']);
         $verbale = Verbale::create(['associazione_id' => $a, 'titolo' => 'Assemblea', 'numero' => 1, 'anno' => 2026, 'data_riunione' => '2026-02-01', 'tipo_riunione' => 'Assemblea Ordinaria']);
         $firmatario = VerbaleFirmatario::create(['associazione_id' => $a, 'verbale_id' => $verbale->id, 'socio_id' => $socio->id, 'nome' => 'Ettore Eliminato', 'ruolo' => 'Segretario']);
         $opportunita = OpportunitaCrm::create(['associazione_id' => $a, 'pipeline' => 'adesioni', 'fase' => 'contatto', 'posizione' => 1, 'titolo' => 'Rinnovo Ettore', 'socio_id' => $socio->id]);
-        $partecipanteRiunione = \App\Models\RiunionePartecipante::factory()->create(['associazione_id' => $a, 'riunione_id' => Riunione::factory()->create(['associazione_id' => $a])->id, 'socio_id' => $socio->id]);
+        $partecipanteRiunione = RiunionePartecipante::factory()->create(['associazione_id' => $a, 'riunione_id' => Riunione::factory()->create(['associazione_id' => $a])->id, 'socio_id' => $socio->id]);
         Tessera::factory()->create(['associazione_id' => $a, 'socio_id' => $testimone->id, 'numero_tessera' => '20269002', 'anno_validita' => 2026]);
 
         // Prima nel cestino, poi eliminazione definitiva dal cestino
@@ -2293,8 +2301,8 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
         $this->assertSame('+39 340 5556677', $dopoAnna['telefono']);
         $this->assertSame('Livorno', $dopoAnna['citta']);
         $diff = array_keys(array_diff_assoc(
-            \Illuminate\Support\Arr::except($dopoAnna, ['updated_at']),
-            \Illuminate\Support\Arr::except($primaAnna, ['updated_at'])
+            Arr::except($dopoAnna, ['updated_at']),
+            Arr::except($primaAnna, ['updated_at'])
         ));
         sort($diff);
         $this->assertSame(['citta', 'telefono'], $diff, 'Nessun altro campo di Anna modificato');

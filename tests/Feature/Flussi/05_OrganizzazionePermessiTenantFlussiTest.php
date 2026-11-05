@@ -48,6 +48,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\PersonalAccessToken;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -1478,7 +1479,7 @@ class Flussi05_OrganizzazionePermessiTenantFlussiTest extends TestCase
 
         // Il proprietario promosso a operatore usa lo stesso token
         $volontario->syncRoles(['operatore']);
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $this->api('PUT', '/api/v1/soci/'.$socioX->id, $tokenVolontario, ['nome' => 'Carlotta'])->assertOk();
         $this->assertSame('Carlotta', $socioX->fresh()->nome);
     }

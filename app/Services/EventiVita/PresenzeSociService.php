@@ -117,33 +117,25 @@ class PresenzeSociService
             return 0;
         }
 
-        $daCompletare = fn () => Prenotazione::query()
+        // Un solo UPDATE (atomico per riga): checkin_at resta l'orario del
+        // primo ingresso se già valorizzato, altrimenti diventa adesso. Con
+        // due UPDATE separati (già iniziate / nuove) un check-in con tessera
+        // concorrente fra l'uno e l'altro lasciava una prenotazione
+        // selezionata entrata solo in parte
+        $adesso = DB::escape(now()->format(DB::getQueryGrammar()->getDateFormat()));
+
+        return Prenotazione::query()
             ->withoutGlobalScope('associazione')
             ->where('evento_id', $evento->id)
             ->whereIn('id', $prenotazioneIds)
             ->where('stato', Prenotazione::STATO_CONFERMATA)
-            ->whereColumn('posti_entrati', '<', 'posti');
-
-        // Due UPDATE su insiemi disgiunti: ingresso già iniziato (checkin_at
-        // conservato) e prima registrazione
-        $completate = $daCompletare()
-            ->whereNotNull('checkin_at')
+            ->whereColumn('posti_entrati', '<', 'posti')
             ->update([
+                'checkin_at' => DB::raw("COALESCE(checkin_at, {$adesso})"),
                 'posti_entrati' => DB::raw('posti'),
                 'checkin_origine' => $origine,
                 'checkin_utente_id' => $utenteId,
             ]);
-
-        $nuove = $daCompletare()
-            ->whereNull('checkin_at')
-            ->update([
-                'checkin_at' => now(),
-                'posti_entrati' => DB::raw('posti'),
-                'checkin_origine' => $origine,
-                'checkin_utente_id' => $utenteId,
-            ]);
-
-        return $completate + $nuove;
     }
 
     /**

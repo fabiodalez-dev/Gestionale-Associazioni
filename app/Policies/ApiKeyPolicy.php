@@ -9,9 +9,12 @@ use App\Policies\Concerns\AuthorizesModulePermissions;
 /**
  * Regole pagina "Chiavi API":
  * - accesso con permesso spatie api.view (operatore escluso dal RolesSeeder);
- * - creazione: super_admin (anche globale) o utente con associazione;
- * - toggle/delete: super_admin su qualunque chiave; gli altri solo sulle
- *   chiavi della propria associazione (mai globali né di altri tenant).
+ * - creazione: super_admin (anche globale) o utente con associazione e
+ *   permesso api.create (l'operatore, escluso dalla pagina, non si crea
+ *   chiavi con più poteri dei propri);
+ * - toggle/delete: super_admin su qualunque chiave; gli altri, con permesso
+ *   api.update/api.delete, solo sulle chiavi della propria associazione
+ *   (mai globali né di altri tenant).
  */
 class ApiKeyPolicy
 {
@@ -24,19 +27,24 @@ class ApiKeyPolicy
 
     public function create(Utente $utente): bool
     {
-        return $utente->isSuperAdmin()
-            || ! empty($utente->associazione_id)
-            || session('associazione_id') !== null;
+        if ($utente->isSuperAdmin()) {
+            return true;
+        }
+
+        return (! empty($utente->associazione_id) || session('associazione_id') !== null)
+            && $this->allowed($utente, 'api.create', ['admin_associazione']);
     }
 
     public function update(Utente $utente, ApiKey $apiKey): bool
     {
-        return $this->gestibile($utente, $apiKey);
+        return $this->gestibile($utente, $apiKey)
+            && ($utente->isSuperAdmin() || $this->allowed($utente, 'api.update', ['admin_associazione']));
     }
 
     public function delete(Utente $utente, ApiKey $apiKey): bool
     {
-        return $this->gestibile($utente, $apiKey);
+        return $this->gestibile($utente, $apiKey)
+            && ($utente->isSuperAdmin() || $this->allowed($utente, 'api.delete', ['admin_associazione']));
     }
 
     private function gestibile(Utente $utente, ApiKey $apiKey): bool

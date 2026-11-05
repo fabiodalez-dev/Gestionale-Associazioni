@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Quote;
 
+use App\Models\Socio;
+use App\Support\PerimetroSedi;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,6 +31,13 @@ class StoreQuotaRequest extends FormRequest
                 Rule::exists('soci', 'id')
                     ->where('associazione_id', $tenantId)
                     ->whereNull('deleted_at'),
+                // Rule::exists ignora anche lo scope per sede: un utente limitato
+                // (PerimetroSedi) non crea quote per soci fuori dalle sue sedi
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (PerimetroSedi::limitato() && ! Socio::query()->whereKey($value)->exists()) {
+                        $fail('Il socio selezionato non esiste in questa associazione.');
+                    }
+                },
             ],
             'anno' => ['required', 'integer', 'between:2000,2100'],
             'importo' => ['required', 'numeric', 'gt:0', 'max:99999999.99'],

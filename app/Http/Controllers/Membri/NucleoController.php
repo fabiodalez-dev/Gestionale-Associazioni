@@ -152,6 +152,8 @@ class NucleoController extends Controller
 
     /**
      * Socio del tenant corrente (o del tenant indicato), NULL se assente.
+     * Restano attivi gli scope di cestino e perimetro di sede: un socio
+     * eliminato o fuori dalle sedi dell'utente non entra in un nucleo.
      */
     private function socioDelTenant(?string $socioId, ?string $associazioneId = null): ?Socio
     {
@@ -160,7 +162,7 @@ class NucleoController extends Controller
         }
 
         return Socio::query()
-            ->when($associazioneId !== null, fn ($q) => $q->withoutGlobalScopes()->where('associazione_id', $associazioneId))
+            ->when($associazioneId !== null, fn ($q) => $q->withoutGlobalScope('associazione')->where('associazione_id', $associazioneId))
             ->find($socioId);
     }
 }

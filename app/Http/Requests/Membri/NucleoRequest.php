@@ -27,7 +27,7 @@ class NucleoRequest extends FormRequest
             'nome' => ['required', 'string', 'max:150'],
             'capofamiglia_id' => [
                 'nullable',
-                Rule::exists('soci', 'id')->where('associazione_id', $this->associazioneId()),
+                Rule::exists('soci', 'id')->where('associazione_id', $this->associazioneId())->whereNull('deleted_at'),
             ],
         ];
     }

@@ -57,6 +57,9 @@ class DecisioneController extends Controller
             ->approvate()
             ->with(['riunione' => fn ($q) => $q->with('verbale')])
             ->get()
+            // Collection base: con zero risultati la map resterebbe una
+            // Eloquent\Collection e il merge con righe-array andrebbe in errore.
+            ->toBase()
             ->filter(fn (VotazioneRiunione $v) => $v->riunione !== null)
             ->when($anno !== null, fn ($c) => $c->filter(
                 fn (VotazioneRiunione $v) => (int) $v->riunione->data_ora->year === $anno

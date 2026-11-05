@@ -77,7 +77,9 @@ class Verbale extends Model implements HasMedia
      */
     public static function prossimoNumero(int $anno): int
     {
-        return (int) static::query()->where('anno', $anno)->max('numero') + 1;
+        // withTrashed: i verbali nel cestino conservano il loro numero e restano
+        // nell'unique associazione+anno+numero, quindi vanno contati.
+        return (int) static::withTrashed()->where('anno', $anno)->max('numero') + 1;
     }
 
     /**

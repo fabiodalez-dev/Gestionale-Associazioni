@@ -76,6 +76,9 @@ class CandidaturaService
     {
         $admins = Utente::query()
             ->where('associazione_id', $assegnazione->associazione_id)
+            // Solo gli amministratori: operatori e cariche (es. volontario in
+            // sola lettura) non gestiscono le candidature
+            ->whereIn('ruolo', [Utente::RUOLO_ADMIN_ASSOCIAZIONE, Utente::RUOLO_SUPER_ADMIN])
             ->where('attivo', true)
             ->whereNotNull('email')
             ->get()

@@ -151,6 +151,14 @@ class AuthenticateApiV1
             return $this->error(403, 'permission_denied', "Permesso '{$permesso}' non concesso a questo token.");
         }
 
+        // Le abilities del token non possono superare i permessi del proprietario
+        // (ruoli spatie): un volontario non modifica i soci via API solo perché
+        // si è creato un token con soci:write, e chi perde un ruolo perde anche
+        // l'accesso API corrispondente.
+        if ($permesso !== null && ! $this->proprietarioHaPermesso($utente, $permesso)) {
+            return $this->error(403, 'permission_denied', "Il proprietario del token non ha il permesso '{$permesso}'.");
+        }
+
         try {
             $accessToken->forceFill(['last_used_at' => now()])->saveQuietly();
         } catch (\Throwable $e) {
@@ -162,6 +170,27 @@ class AuthenticateApiV1
         $request->attributes->set('api_utente', $utente);
 
         return $next($request);
+    }
+
+    /**
+     * Permesso API (modulo:read|write) tradotto nel permesso del gestionale
+     * (modulo.view|update) e verificato sui ruoli del proprietario del token.
+     */
+    private function proprietarioHaPermesso(Utente $utente, string $permesso): bool
+    {
+        if ($utente->isSuperAdmin() || $utente->isAdminAssociazione()) {
+            return true;
+        }
+
+        [$modulo, $azione] = array_pad(explode(':', $permesso, 2), 2, 'read');
+        $permessoGestionale = $modulo.'.'.($azione === 'read' ? 'view' : 'update');
+
+        try {
+            return $utente->hasPermissionTo($permessoGestionale);
+        } catch (\Throwable) {
+            // Permessi non seedati (ambienti legacy): nessun vincolo aggiuntivo
+            return true;
+        }
     }
 
     private function error(int $status, string $code, string $message): JsonResponse

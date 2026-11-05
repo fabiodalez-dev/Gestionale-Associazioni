@@ -12,6 +12,9 @@ use Illuminate\Validation\Rule;
  */
 class StoreSocioRequest extends SocioRequest
 {
+    /**
+     * Regole del socio più il numero socio unico nel tenant.
+     */
     public function rules(): array
     {
         return parent::rules() + [

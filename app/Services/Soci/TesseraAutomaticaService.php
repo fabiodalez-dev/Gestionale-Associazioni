@@ -16,6 +16,9 @@ use App\Services\Tessere\TesseraIssuer;
  */
 class TesseraAutomaticaService
 {
+    /**
+     * Emissione sotto lock (TesseraIssuer) e storico attività del socio.
+     */
     public function __construct(
         private readonly TesseraIssuer $issuer,
         private readonly SocioActivityLogger $activityLogger,
@@ -28,18 +31,15 @@ class TesseraAutomaticaService
     {
         $anno = (int) now()->year;
 
-        $esiste = Tessera::allTenants()
-            ->where('associazione_id', $socio->associazione_id)
-            ->where('socio_id', $socio->id)
-            ->where('anno_validita', $anno)
-            ->exists();
+        // Numerazione unificata {anno}{NNNN}, etichetta template e QR firmato.
+        // Controllo di esistenza sotto lock del socio in TesseraIssuer: una
+        // tessera già presente (anche emessa da un flusso concorrente) non è
+        // un errore, semplicemente non se ne crea un'altra (issue #21)
+        $tessera = $this->issuer->emettiSeNonPresente($socio, ['anno_validita' => $anno]);
 
-        if ($esiste) {
+        if ($tessera === null) {
             return null;
         }
-
-        // Numerazione unificata {anno}{NNNN}, etichetta template e QR firmato
-        $tessera = $this->issuer->emetti($socio, ['anno_validita' => $anno]);
 
         $this->activityLogger->log(
             $socio,

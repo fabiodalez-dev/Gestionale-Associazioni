@@ -3,11 +3,13 @@
 namespace App\Services\EventiVita;
 
 use App\Models\Evento;
+use App\Services\Prenotazioni\CapienzaEventoService;
 use App\Services\Prenotazioni\PrenotazioneService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Eventi ricorrenti (f.8 del piano Vita sociale): genera le occorrenze
@@ -28,7 +30,14 @@ class SerieEventiService
         self::FREQUENZA_MENSILE,
     ];
 
-    public function __construct(protected PrenotazioneService $prenotazioni) {}
+    /**
+     * Prenotazioni per il mutex per-evento, capienza per il ricontrollo
+     * sotto lock della modifica di serie.
+     */
+    public function __construct(
+        protected PrenotazioneService $prenotazioni,
+        protected CapienzaEventoService $capienza,
+    ) {}
 
     /** Tetto massimo di occorrenze generabili per una serie (spec f.8). */
     public const MAX_OCCORRENZE = 52;
@@ -96,7 +105,16 @@ class SerieEventiService
      * Propaga i campi comuni (CAMPI_SERIE) a TUTTE le occorrenze della
      * serie dell'evento. Ritorna il numero di occorrenze aggiornate.
      *
+     * Tutto in una transazione: le occorrenze vengono bloccate col mutex
+     * per-evento di PrenotazioneService, in ordine di id (ordine stabile
+     * fra modifiche di serie concorrenti, niente deadlock), poi la capienza
+     * viene ricontrollata sui posti occupati correnti di ogni occorrenza.
+     * Se anche una sola scenderebbe sotto → ValidationException su
+     * capienza e nessuna occorrenza viene modificata.
+     *
      * @param  array<string, mixed>  $dati
+     *
+     * @throws ValidationException
      */
     public function aggiornaSerie(Evento $evento, array $dati): int
     {
@@ -110,19 +128,35 @@ class SerieEventiService
             return 0;
         }
 
-        $aggiornate = 0;
+        return DB::transaction(function () use ($evento, $dati): int {
+            // Lettura bloccante anche per gli id: in InnoDB (REPEATABLE READ)
+            // una SELECT semplice come prima istruzione fisserebbe lo snapshot
+            // PRIMA dei lock, e la SUM dei posti occupati non vedrebbe le
+            // prenotazioni confermate nel frattempo
+            $ids = Evento::query()
+                ->dellaSerie($evento->serie_id)
+                ->where('associazione_id', $evento->associazione_id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id');
 
-        // update() per modello: passa dai cast Eloquent e dall'activity log
-        Evento::query()
-            ->dellaSerie($evento->serie_id)
-            ->where('associazione_id', $evento->associazione_id)
-            ->get()
-            ->each(function (Evento $occorrenza) use ($dati, &$aggiornate): void {
-                $occorrenza->update($dati);
-                $aggiornate++;
-            });
+            $occorrenze = $ids
+                ->map(fn (string $id): Evento => $this->prenotazioni->lockEvento($id))
+                // eliminata nel frattempo (lockEvento ignora i global scope)
+                ->reject(fn (Evento $occorrenza): bool => $occorrenza->trashed())
+                ->sortBy('data_evento')
+                ->values();
 
-        return $aggiornate;
+            // Ricontrollo sotto lock, in ordine cronologico (primo errore)
+            foreach ($occorrenze as $occorrenza) {
+                $this->capienza->verificaSottoLock($occorrenza, $dati, occorrenza: true);
+            }
+
+            // update() per modello: passa dai cast Eloquent e dall'activity log
+            $occorrenze->each(fn (Evento $occorrenza) => $occorrenza->update($dati));
+
+            return $occorrenze->count();
+        });
     }
 
     /**

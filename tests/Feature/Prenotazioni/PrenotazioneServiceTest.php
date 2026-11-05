@@ -350,7 +350,7 @@ class PrenotazioneServiceTest extends TestCase
         ]);
         $account = $this->creaAccount($evento);
         $prenotazione = $this->service->crea($account, $evento, 1);
-        $prenotazione->forceFill(['checkin_at' => now()])->save();
+        $prenotazione->forceFill(['checkin_at' => now(), 'posti_entrati' => 1])->save();
 
         $this->expectException(PrenotazioneException::class);
 

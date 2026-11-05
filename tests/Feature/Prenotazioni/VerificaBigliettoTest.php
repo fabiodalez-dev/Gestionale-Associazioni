@@ -101,6 +101,8 @@ class VerificaBigliettoTest extends TestCase
         $prenotazione = $this->creaPrenotazione([
             'checkin_at' => now()->setDate(2026, 6, 10)->setTime(14, 30),
         ]);
+        // Tutti i posti entrati (scansione del biglietto)
+        $prenotazione->forceFill(['posti_entrati' => $prenotazione->posti])->save();
 
         $response = $this->get(app(BigliettoService::class)->signedUrl($prenotazione));
 

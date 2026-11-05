@@ -18,6 +18,10 @@ class RinnovoSocioController extends Controller
 {
     public function __construct(private readonly RinnovoService $rinnovi) {}
 
+    /**
+     * Rinnovo dall'area soci: avvia il pagamento della quota dell'anno o
+     * emette la tessera mancante se la quota è già pagata.
+     */
     public function store(Request $request): RedirectResponse
     {
         /** @var Socio $socio */

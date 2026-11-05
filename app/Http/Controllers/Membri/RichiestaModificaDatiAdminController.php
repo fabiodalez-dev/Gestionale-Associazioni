@@ -51,6 +51,10 @@ class RichiestaModificaDatiAdminController extends Controller
         ]);
     }
 
+    /**
+     * Approva una richiesta di modifica dati ancora in attesa; un valore non
+     * più unico viene segnalato come errore invece di sovrascrivere un altro socio.
+     */
     public function approva(Request $request, RichiestaModificaDati $richiesta): RedirectResponse
     {
         $this->authorize('gestisci', $richiesta);

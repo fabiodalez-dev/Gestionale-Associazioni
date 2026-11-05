@@ -38,6 +38,10 @@ abstract class PrenotazioneNotification extends Notification implements ShouldQu
         return ['database', 'mail'];
     }
 
+    /**
+     * Evento della prenotazione anche se eliminato o fuori dal tenant
+     * corrente (le notifiche partono da code e scheduler).
+     */
     protected function evento(): ?Evento
     {
         return $this->prenotazione->evento()

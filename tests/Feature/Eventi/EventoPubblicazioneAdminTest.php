@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Eventi;
 
+use App\Http\Requests\Eventi\EventoRequest;
 use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\Prenotazione;
@@ -185,6 +186,42 @@ class EventoPubblicazioneAdminTest extends TestCase
 
         $response->assertSessionHasNoErrors();
         $this->assertSame(3, $evento->fresh()->capienza);
+    }
+
+    /**
+     * Issue #22: la FormRequest controlla la capienza fuori dal lock. Una
+     * prenotazione confermata che arriva DOPO la validazione e PRIMA del
+     * salvataggio (simulata con un listener sulla risoluzione della request,
+     * che parte solo a validazione superata) non deve portare l'evento in
+     * overbooking: il salvataggio ricontrolla sotto il mutex per-evento.
+     */
+    public function test_prenotazione_arrivata_tra_validazione_e_salvataggio_fa_rifiutare_la_riduzione(): void
+    {
+        $evento = Evento::factory()->pubblicato()->conCapienza(10)->create([
+            'associazione_id' => $this->associazione->id,
+        ]);
+        Prenotazione::factory()->confermata()->create(['evento_id' => $evento->id, 'posti' => 3]);
+
+        $arrivata = false;
+        $this->app->afterResolving(EventoRequest::class, function () use ($evento, &$arrivata): void {
+            // Validazione superata (4 >= 3 occupati): ora arriva un'altra prenotazione
+            Prenotazione::factory()->confermata()->create(['evento_id' => $evento->id, 'posti' => 2]);
+            $arrivata = true;
+        });
+
+        $this->actingAs($this->admin)
+            ->from('/eventi')
+            ->put("/eventi/{$evento->id}", $this->payloadCompleto(['capienza' => 4, 'titolo' => 'Titolo nuovo']))
+            ->assertRedirect('/eventi')
+            ->assertSessionHasErrors(['capienza']);
+
+        $this->assertTrue($arrivata, 'Il listener deve partire dopo la validazione superata');
+        $this->assertStringContainsString('5 posti occupati', session('errors')->first('capienza'));
+
+        // Nessuna modifica salvata (né la capienza né gli altri campi)
+        $this->assertSame(10, $evento->fresh()->capienza);
+        $this->assertNotSame('Titolo nuovo', $evento->fresh()->titolo);
+        $this->assertSame(5, Prenotazione::postiOccupati($evento->id));
     }
 
     public function test_lista_eventi_mostra_badge_stato_pubblicazione(): void

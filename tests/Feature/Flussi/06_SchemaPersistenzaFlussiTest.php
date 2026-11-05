@@ -579,6 +579,8 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
             'soci | soci_associazione_id_numero_socio_unique | 0 | associazione_id,numero_socio',
             'soci | uniq_assoc_cf | 0 | associazione_id,codice_fiscale',
             'tessere | tessere_associazione_id_numero_tessera_unique | 0 | associazione_id,numero_tessera',
+            // Issue #21: una sola tessera non annullata per socio e anno
+            'tessere | uq_tessere_socio_anno | 0 | socio_id,anno_non_annullata',
             'accounts | accounts_associazione_id_email_unique | 0 | associazione_id,email',
             'accounts | accounts_socio_id_unique | 0 | socio_id',
             'prenotazioni | prenotazioni_associazione_id_codice_unique | 0 | associazione_id,codice',
@@ -1169,6 +1171,7 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
         $socio = $this->creaSocio(['nome' => 'Anna', 'cognome' => 'Quotista']);
         $secondo = $this->creaSocio(['nome' => 'Bruno', 'cognome' => 'Tesserato']);
         $terzo = $this->creaSocio(['nome' => 'Carla', 'cognome' => 'Riassegnata']);
+        $quarto = $this->creaSocio(['nome' => 'Dario', 'cognome' => 'Senzatessera']);
         $tipo = TipoSocio::create(['associazione_id' => $this->associazione->id, 'nome' => 'Ordinario', 'costo_tessera' => 20]);
 
         // Quota
@@ -1214,18 +1217,28 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
         ])->assertSessionHasNoErrors();
         $this->assertSame('2026-09-30', Tessera::query()->where('numero_tessera', '20260103')->firstOrFail()->data_scadenza->toDateString());
 
+        // Riassegnazione a un socio che ha già la tessera 2026: errore di
+        // validazione, non un 500 sul vincolo unique socio + anno (issue #21)
+        $risposta = $this->comeAdmin()->put('/tessere/'.$prima->id, [
+            'socio_id' => $terzo->id, 'numero_tessera' => '20260111', 'anno_validita' => '2026',
+            'data_emissione' => '2026-04-01', 'data_scadenza' => '', 'stato' => Tessera::STATO_SOSPESA,
+        ]);
+        $this->assertNon500($risposta, 'riassegnazione a un socio con la tessera dello stesso anno');
+        $risposta->assertSessionHasErrors('anno_validita');
+        $this->assertSame($socio->id, $prima->fresh()->socio_id);
+
         // Modifica con riassegnazione del socio e scadenza ricalcolata
         $this->comeAdmin()->put('/tessere/'.$prima->id, [
-            'socio_id' => $terzo->id, 'numero_tessera' => '20260111', 'anno_validita' => '2026',
+            'socio_id' => $quarto->id, 'numero_tessera' => '20260111', 'anno_validita' => '2026',
             'data_emissione' => '2026-04-01', 'data_scadenza' => '', 'stato' => Tessera::STATO_SOSPESA,
         ])->assertRedirect()->assertSessionHasNoErrors();
         $prima->refresh();
-        $this->assertSame([$terzo->id, '20260111', '2026-04-01', '2027-04-01', Tessera::TIPO_SCADENZA_ANNUALE, Tessera::STATO_SOSPESA],
+        $this->assertSame([$quarto->id, '20260111', '2026-04-01', '2027-04-01', Tessera::TIPO_SCADENZA_ANNUALE, Tessera::STATO_SOSPESA],
             [$prima->socio_id, $prima->numero_tessera, $prima->data_emissione->toDateString(), $prima->data_scadenza->toDateString(), $prima->tipo_scadenza, $prima->stato]);
 
         // Numero di un'altra tessera dello stesso tenant: errore di validazione
         $this->comeAdmin()->put('/tessere/'.$prima->id, [
-            'socio_id' => $terzo->id, 'numero_tessera' => '20260102', 'anno_validita' => '2026',
+            'socio_id' => $quarto->id, 'numero_tessera' => '20260102', 'anno_validita' => '2026',
             'data_emissione' => '2026-04-01', 'stato' => Tessera::STATO_ATTIVA,
         ])->assertSessionHasErrors('numero_tessera');
 

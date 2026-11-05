@@ -87,6 +87,10 @@ class UpdateSocioApiRequest extends FormRequest
         ];
     }
 
+    /**
+     * Errori di validazione nel formato dell'API v1 (codice invalid_stato o
+     * invalid_field) invece del redirect web.
+     */
     protected function failedValidation(Validator $validator): void
     {
         $errori = $validator->errors();

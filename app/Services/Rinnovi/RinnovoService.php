@@ -25,6 +25,10 @@ use App\Services\Tessere\TesseraIssuer;
  */
 class RinnovoService
 {
+    /**
+     * Pagamenti per la quota di rinnovo, emissione tessere per i rinnovi già
+     * pagati.
+     */
     public function __construct(
         private readonly PaymentService $payments,
         private readonly TesseraIssuer $tessere,

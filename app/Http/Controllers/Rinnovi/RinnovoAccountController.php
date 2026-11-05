@@ -19,6 +19,10 @@ class RinnovoAccountController extends Controller
 {
     public function __construct(private readonly RinnovoService $rinnovi) {}
 
+    /**
+     * Rinnovo dal mini-sito per l'account collegato a un socio del tenant:
+     * avvia il pagamento della quota o emette la tessera se la quota è già pagata.
+     */
     public function store(Request $request, Associazione $associazione): RedirectResponse
     {
         /** @var Account $account */

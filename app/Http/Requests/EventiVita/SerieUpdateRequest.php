@@ -3,7 +3,7 @@
 namespace App\Http\Requests\EventiVita;
 
 use App\Models\Evento;
-use App\Models\Prenotazione;
+use App\Services\Prenotazioni\CapienzaEventoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -47,6 +47,10 @@ class SerieUpdateRequest extends FormRequest
         ];
     }
 
+    /**
+     * Aggiunge il primo controllo della capienza dopo le regole base
+     * (ripetuto sotto lock al salvataggio).
+     */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -58,19 +62,22 @@ class SerieUpdateRequest extends FormRequest
      * Stessa regola della modifica singola (EventoRequest): la capienza
      * propagata non può scendere sotto i posti già occupati di nessuna
      * occorrenza; una capienza invariata resta ammessa anche in overbooking.
+     *
+     * Primo controllo, fuori dal lock: SerieEventiService::aggiornaSerie
+     * lo ripete con le occorrenze bloccate.
      */
     protected function validaCapienzaNonRiducibile(Validator $validator): void
     {
         $evento = $this->route('evento');
         // Stesso parsing della regola integer (es. "+1" vale 1): con
         // ctype_digit valori come "+1" saltavano il controllo dei posti
-        $capienza = filter_var($this->input('capienza'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $capienza = CapienzaEventoService::capienzaRichiesta($this->input('capienza'));
 
         if (! $evento instanceof Evento || $evento->serie_id === null) {
             return;
         }
 
-        if ($capienza === false) {
+        if ($capienza === null) {
             return; // illimitata o già segnalata dalla regola integer/min
         }
 
@@ -81,17 +88,10 @@ class SerieUpdateRequest extends FormRequest
             ->get();
 
         foreach ($occorrenze as $occorrenza) {
-            $occupati = Prenotazione::postiOccupati($occorrenza->id);
-            $riduzione = $occorrenza->capienza === null || (int) $capienza < (int) $occorrenza->capienza;
+            $errore = CapienzaEventoService::errore($occorrenza, $capienza, occorrenza: true);
 
-            if ((int) $capienza < $occupati && $riduzione) {
-                $validator->errors()->add(
-                    'capienza',
-                    "La capienza non può essere ridotta a {$capienza}: l'occorrenza del "
-                    .$occorrenza->data_evento->format('d/m/Y H:i')." ha già {$occupati} posti occupati "
-                    .'da prenotazioni confermate o riservate (in attesa di pagamento). '
-                    .'Annulla prima le prenotazioni in eccesso.'
-                );
+            if ($errore !== null) {
+                $validator->errors()->add('capienza', $errore);
 
                 return;
             }

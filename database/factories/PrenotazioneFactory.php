@@ -102,6 +102,10 @@ class PrenotazioneFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'stato' => Prenotazione::STATO_CONFERMATA,
             'checkin_at' => now(),
+            // Biglietto scansionato: tutti i posti entrati (anche con i
+            // posti passati a create(), le closure vedono gli attributi finali)
+            'posti_entrati' => fn (array $attributes) => (int) $attributes['posti'],
+            'checkin_origine' => Prenotazione::CHECKIN_ORIGINE_BIGLIETTO,
         ]);
     }
 }

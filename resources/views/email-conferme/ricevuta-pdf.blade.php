@@ -1,7 +1,11 @@
 {{--
     Ricevuta di pagamento quota NUMERATA per anno (f.21 PIANO-VITA-SOCIALE).
-    Variabili: $ricevuta (Ricevuta), $quota (?Quota), $associazione (?Associazione), $socio (?Socio).
+    Variabili: $ricevuta (Ricevuta), $quota (?Quota), $associazione (?Associazione), $socio (?Socio),
+    $dati (Ricevuta::datiStampa: istantanea salvata all'emissione, dati correnti per le ricevute storiche).
 --}}
+@php
+    $dati ??= $ricevuta->datiStampa($quota ?? null, $socio ?? null);
+@endphp
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -37,19 +41,20 @@
     </div>
 
     <p>
-        Si attesta che <strong>{{ $socio !== null ? trim($socio->nome.' '.$socio->cognome) : '—' }}</strong>
-        @if (filled($socio?->numero_socio)) (socio n. {{ $socio->numero_socio }}) @endif
+        Si attesta che <strong>{{ filled($dati['intestatario']) ? $dati['intestatario'] : '—' }}</strong>
+        @if (filled($dati['numero_socio'])) (socio n. {{ $dati['numero_socio'] }}) @endif
+        @if (filled($dati['codice_fiscale'])) &mdash; C.F. {{ $dati['codice_fiscale'] }} @endif
         ha versato la quota di seguito dettagliata.
     </p>
 
     <table class="dettagli">
-        <tr><th>Tipo quota</th><td>{{ $quota?->tipo ?? 'Quota Associativa' }}</td></tr>
+        <tr><th>Tipo quota</th><td>{{ $dati['tipo_quota'] ?? 'Quota Associativa' }}</td></tr>
         <tr><th>Anno di riferimento</th><td>{{ $ricevuta->anno }}</td></tr>
         <tr><th>Importo</th><td class="importo">&euro; {{ number_format((float) $ricevuta->importo, 2, ',', '.') }}</td></tr>
-        <tr><th>Data pagamento</th><td>{{ $quota?->data_pagamento?->format('d/m/Y') ?? '—' }}</td></tr>
-        <tr><th>Metodo di pagamento</th><td>{{ ucfirst((string) ($quota?->metodo_pagamento ?? '—')) }}</td></tr>
-        @if (filled($quota?->gateway_transaction_id))
-            <tr><th>Riferimento transazione</th><td>{{ $quota->gateway_transaction_id }}</td></tr>
+        <tr><th>Data pagamento</th><td>{{ $dati['data_pagamento']?->format('d/m/Y') ?? '—' }}</td></tr>
+        <tr><th>Metodo di pagamento</th><td>{{ ucfirst((string) ($dati['metodo_pagamento'] ?? '—')) }}</td></tr>
+        @if (filled($dati['riferimento_transazione']))
+            <tr><th>Riferimento transazione</th><td>{{ $dati['riferimento_transazione'] }}</td></tr>
         @endif
     </table>
 

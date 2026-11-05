@@ -25,6 +25,10 @@ class SondaggiAccountController extends Controller
         private readonly SondaggiVotoService $voto,
     ) {}
 
+    /**
+     * Sondaggi visibili all'account, con risposta data, possibilità di voto
+     * e risultati di ciascuno.
+     */
     public function index(Associazione $associazione, Request $request): View
     {
         /** @var Account $account */

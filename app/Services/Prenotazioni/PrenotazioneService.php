@@ -798,8 +798,10 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
     /**
      * Mutex per-evento: SELECT ... FOR UPDATE sulla riga eventi.
      * Va chiamato come PRIMA acquisizione dentro la transazione.
+     * Pubblico perché lo condivide la modifica della capienza
+     * (CapienzaEventoService, SerieEventiService): stesso mutex.
      */
-    protected function lockEvento(string $eventoId): Evento
+    public function lockEvento(string $eventoId): Evento
     {
         return Evento::query()
             ->withoutGlobalScopes()

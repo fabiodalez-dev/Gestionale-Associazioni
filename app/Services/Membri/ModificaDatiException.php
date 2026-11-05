@@ -12,6 +12,9 @@ use RuntimeException;
  */
 class ModificaDatiException extends RuntimeException
 {
+    /**
+     * Il valore proposto è stato preso da un altro socio dopo la richiesta.
+     */
     public static function valoreNonPiuUnico(string $etichetta): self
     {
         return new self("Il valore proposto per {$etichetta} appartiene ormai a un altro socio: rifiuta la richiesta o correggi i dati.");

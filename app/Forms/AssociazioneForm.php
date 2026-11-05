@@ -35,6 +35,10 @@ class AssociazioneForm extends ModuloFormello
      */
     public const GRUPPO_ADMIN = ['admin_nome', 'admin_cognome', 'admin_email', 'admin_password'];
 
+    /**
+     * Campi del form associazione, compreso l'interruttore del mini-sito
+     * pubblico /a/{slug}.
+     */
     protected function fields(): array
     {
         $nuova = $this->isCreating();

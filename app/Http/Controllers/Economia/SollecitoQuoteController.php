@@ -24,6 +24,10 @@ class SollecitoQuoteController extends Controller
 
     public function __construct(protected SollecitoQuoteService $solleciti) {}
 
+    /**
+     * Quote non pagate sollecitabili: esclude i soci cessati e quelli nel
+     * cestino.
+     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Quota::class);

@@ -108,7 +108,8 @@ class SociApiTest extends TestCase
             'colore' => '#FF7B11',
         ]);
         $socio->tags()->attach($tag->id);
-        Tessera::factory()->count(2)->create([
+        // Anni diversi: una sola tessera per socio e anno (issue #21)
+        Tessera::factory()->count(2)->sequence(['anno_validita' => 2025], ['anno_validita' => 2026])->create([
             'associazione_id' => $this->associazione->id,
             'socio_id' => $socio->id,
         ]);

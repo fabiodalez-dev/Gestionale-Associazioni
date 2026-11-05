@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tessere\CheckinTesseraRequest;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
+use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Services\EventiVita\PresenzeSociService;
@@ -124,9 +125,15 @@ class CheckinController extends Controller
                 ->first();
 
             // La prenotazione del socio (account collegato) per l'evento risulta
-            // arrivata come dopo il check-in del biglietto: vita sociale,
-            // feedback e statistiche contano la stessa presenza
-            $presenze->segnaPrenotazioneDelSocio($evento, $socio, $request->user()?->getAuthIdentifier());
+            // arrivata per il suo posto (origine "tessera"): vita sociale,
+            // feedback e statistiche contano la stessa presenza; il check-in si
+            // annulla se il partecipante viene poi rimosso o non è più Confermato
+            $presenze->segnaPrenotazioneDelSocio(
+                $evento,
+                $socio,
+                $request->user()?->getAuthIdentifier(),
+                Prenotazione::CHECKIN_ORIGINE_TESSERA,
+            );
 
             if ($partecipante !== null && $partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
                 return true;

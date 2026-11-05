@@ -52,6 +52,9 @@ class PresenzeTest extends TestCase
         $response->assertViewIs('eventi-vita.presenze');
         $this->assertCount(1, $response->viewData('prenotazioni'));
         $this->assertSame($confermata->id, $response->viewData('prenotazioni')->first()->id);
+        // Con l'entrata per posto (issue #19) il contatore conta le
+        // prenotazioni con almeno un ingresso, non quelle complete
+        $response->assertSee('Con almeno un ingresso');
     }
 
     public function test_registrazione_presenze_in_blocco_marca_il_checkin(): void
@@ -102,6 +105,7 @@ class PresenzeTest extends TestCase
         // Arrivata e poi annullata dall'admin (ammesso anche dopo il check-in)
         $annullata = Prenotazione::factory()->annullata()->create([
             'checkin_at' => now()->subHour(),
+            'posti_entrati' => 1,
             'associazione_id' => $this->associazione->id,
             'evento_id' => $this->evento->id,
             'account_id' => $account->id,

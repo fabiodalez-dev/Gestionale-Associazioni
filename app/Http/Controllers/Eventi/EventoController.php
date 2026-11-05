@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Eventi\EventoRequest;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Services\Prenotazioni\CapienzaEventoService;
 use App\Services\Prenotazioni\PrenotazioneService;
 use App\Services\SpaziRisorse\ConflittoSpazioEvento;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -78,11 +79,18 @@ class EventoController extends Controller
         );
     }
 
-    public function update(EventoRequest $request, Evento $evento): RedirectResponse
+    /**
+     * Modifica dell'evento sotto il mutex per-evento: la capienza viene
+     * ricontrollata sui posti occupati correnti (issue #22).
+     */
+    public function update(EventoRequest $request, Evento $evento, CapienzaEventoService $capienza): RedirectResponse
     {
         $this->authorize('update', $evento);
 
-        $evento->update($request->validated());
+        // Salvataggio sotto il mutex per-evento: la capienza viene
+        // ricontrollata sui posti occupati correnti (la FormRequest è solo il
+        // primo controllo); se scende sotto → errore di validazione su capienza
+        $evento = $capienza->aggiornaEvento($evento, $request->validated());
 
         return $this->conConflittiSpazio(
             redirect()->route('eventi.index')->with('success', 'Evento aggiornato con successo.'),

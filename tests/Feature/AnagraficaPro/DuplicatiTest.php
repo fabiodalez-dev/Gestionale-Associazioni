@@ -205,4 +205,32 @@ class DuplicatiTest extends TestCase
         $this->get('/soci-duplicati')->assertRedirect();
         $this->post('/soci-duplicati/unisci', [])->assertRedirect();
     }
+
+    public function test_merge_non_sposta_le_tessere_dello_stesso_anno_del_principale(): void
+    {
+        $principale = $this->socio(['email' => 'p@example.com']);
+        $duplicato = $this->socio(['email' => 'd@example.com']);
+        $anno = (int) now()->year;
+        $base = ['associazione_id' => $this->associazione->id, 'stato' => Tessera::STATO_ATTIVA];
+
+        Tessera::factory()->create($base + ['socio_id' => $principale->id, 'anno_validita' => $anno]);
+        $inConflitto = Tessera::factory()->create($base + ['socio_id' => $duplicato->id, 'anno_validita' => $anno]);
+        $altroAnno = Tessera::factory()->create($base + ['socio_id' => $duplicato->id, 'anno_validita' => $anno - 1]);
+        $annullata = Tessera::factory()->create(['socio_id' => $duplicato->id, 'anno_validita' => $anno, 'stato' => Tessera::STATO_ANNULLATA] + $base);
+
+        // Senza il filtro il vincolo unique socio/anno (issue #21) farebbe
+        // fallire l'intera unione
+        $this->actingAs($this->admin)->post('/soci-duplicati/unisci', [
+            'principale_id' => $principale->id,
+            'duplicato_id' => $duplicato->id,
+        ])
+            ->assertRedirect(route('soci-duplicati.index'))
+            ->assertSessionHas('success')
+            ->assertSessionHas('warning', fn (string $avviso): bool => str_contains($avviso, '1 tessere non spostate'));
+
+        $this->assertSame($duplicato->id, $inConflitto->refresh()->socio_id);
+        $this->assertSame($principale->id, $altroAnno->refresh()->socio_id);
+        $this->assertSame($principale->id, $annullata->refresh()->socio_id);
+        $this->assertSoftDeleted('soci', ['id' => $duplicato->id]);
+    }
 }

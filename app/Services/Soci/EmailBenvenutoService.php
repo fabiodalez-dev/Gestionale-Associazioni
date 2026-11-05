@@ -18,6 +18,10 @@ class EmailBenvenutoService
 {
     public const TEMPLATE_CODICE = 'benvenuto';
 
+    /**
+     * Accoda l'email di benvenuto (best-effort): false se manca l'email del
+     * socio, l'SMTP o l'invio automatico è disattivato.
+     */
     public function accoda(Socio $socio): bool
     {
         try {

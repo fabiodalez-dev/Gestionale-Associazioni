@@ -809,6 +809,13 @@ class Flussi02_TesseramentoEconomiaFlussiTest extends TestCase
         $ricevuta = Ricevuta::allTenants()->where('quota_id', $quota->id)->firstOrFail();
         $this->assertSame('25.00', $ricevuta->importo);
         $this->assertSame(2026, (int) $ricevuta->anno);
+        // Issue #20: anche intestatario e tipo quota restano quelli
+        // dell'emissione (socio A), non quelli della quota corretta
+        $this->assertSame('Primo', $ricevuta->intestatario_cognome);
+        $this->assertSame('contanti', $ricevuta->metodo_pagamento);
+        $stampa = $ricevuta->datiStampa($quota, $socioB);
+        $this->assertStringContainsString('Primo', (string) $stampa['intestatario']);
+        $this->assertNotSame('Quota Sostenitore', $stampa['tipo_quota']);
         $this->assertSame('25.00', Movimento::allTenants()->where('origine_id', $quota->id)->value('importo'));
 
         // Il socio di un'altra associazione non è assegnabile

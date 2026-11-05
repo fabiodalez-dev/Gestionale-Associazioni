@@ -61,10 +61,12 @@ class CessazioneService
                 'registrata_da' => $utente->id,
             ]);
 
-            // Tessere attive → annullate (f.15)
+            // Tessere attive → annullate (f.15). UPDATE massiva, fuori
+            // dall'hook del modello: anno_non_annullata va azzerata qui, così
+            // le annullate escono dal vincolo unique socio/anno (issue #21)
             $socio->tessere()
                 ->where('stato', Tessera::STATO_ATTIVA)
-                ->update(['stato' => Tessera::STATO_ANNULLATA]);
+                ->update(['stato' => Tessera::STATO_ANNULLATA, 'anno_non_annullata' => null]);
 
             // Stato socio coerente con il tipo di cessazione
             $socio->forceFill(['stato' => $nuovoStato])->save();

@@ -41,6 +41,10 @@ class IscrizioneApprovataNotification extends Notification implements ShouldQueu
         return ['database', 'mail'];
     }
 
+    /**
+     * Email di benvenuto dopo l'approvazione, indirizzata con il nome
+     * dell'account o, per l'ospite, con quello del modulo.
+     */
     public function toMail(object $notifiable): MailMessage
     {
         $associazione = $this->richiesta->associazione;

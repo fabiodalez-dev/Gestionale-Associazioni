@@ -195,6 +195,9 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
         return $this->stato === self::STATO_ATTIVO;
     }
 
+    /**
+     * Vero se il socio è in uno stato di cessazione (STATI_CESSATI).
+     */
     public function isCessato(): bool
     {
         return in_array($this->stato, self::STATI_CESSATI, true);

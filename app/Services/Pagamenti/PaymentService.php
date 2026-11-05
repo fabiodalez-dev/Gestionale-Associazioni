@@ -564,17 +564,13 @@ class PaymentService
     {
         $anno = (int) now()->year;
 
-        $esistente = Tessera::allTenants()
-            ->where('associazione_id', $socio->associazione_id)
-            ->where('socio_id', $socio->id)
-            ->where('anno_validita', $anno)
-            ->exists();
+        // Esistenza ricontrollata sotto lock del socio; una tessera emessa
+        // nel frattempo da un altro flusso vale come "già presente" (issue #21)
+        $tessera = app(TesseraIssuer::class)->emettiSeNonPresente($socio, ['anno_validita' => $anno]);
 
-        if ($esistente) {
+        if ($tessera === null) {
             return null;
         }
-
-        $tessera = app(TesseraIssuer::class)->emetti($socio, ['anno_validita' => $anno]);
 
         $this->logSocioActivity(
             $socio,

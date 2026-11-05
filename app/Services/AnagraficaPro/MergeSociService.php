@@ -53,10 +53,32 @@ class MergeSociService
             $associazioneId = $principale->associazione_id;
             $avvisi = [];
 
+            // Tessere: unique (socio_id, anno_non_annullata), issue #21. Una
+            // tessera non annullata del duplicato per un anno in cui il
+            // principale ne ha già una resta sul duplicato (nel cestino, non
+            // cancellata) con un avviso; le altre si spostano
+            $anniPrincipale = Tessera::allTenants()
+                ->where('associazione_id', $associazioneId)
+                ->where('socio_id', $principale->id)
+                ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+                ->pluck('anno_validita');
+
             $tessere = Tessera::allTenants()
                 ->where('associazione_id', $associazioneId)
                 ->where('socio_id', $duplicato->id)
+                ->where(fn ($q) => $q
+                    ->where('stato', Tessera::STATO_ANNULLATA)
+                    ->orWhereNotIn('anno_validita', $anniPrincipale))
                 ->update(['socio_id' => $principale->id]);
+
+            $conflittiTessere = Tessera::allTenants()
+                ->where('associazione_id', $associazioneId)
+                ->where('socio_id', $duplicato->id)
+                ->count();
+
+            if ($conflittiTessere > 0) {
+                $avvisi[] = "{$conflittiTessere} tessere non spostate (il principale aveva già una tessera non annullata per lo stesso anno).";
+            }
 
             $quote = Quota::allTenants()
                 ->where('associazione_id', $associazioneId)

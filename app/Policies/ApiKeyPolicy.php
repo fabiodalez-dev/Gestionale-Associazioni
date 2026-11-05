@@ -25,6 +25,10 @@ class ApiKeyPolicy
         return $this->allowed($utente, 'api.view', ['admin_associazione']);
     }
 
+    /**
+     * Creazione di chiavi API: super admin, oppure chi ha il permesso in un
+     * tenant definito.
+     */
     public function create(Utente $utente): bool
     {
         if ($utente->isSuperAdmin()) {
@@ -35,12 +39,20 @@ class ApiKeyPolicy
             && $this->allowed($utente, 'api.create', ['admin_associazione']);
     }
 
+    /**
+     * Modifica di una chiave API: super admin, o del proprio tenant con il
+     * permesso api.update.
+     */
     public function update(Utente $utente, ApiKey $apiKey): bool
     {
         return $this->gestibile($utente, $apiKey)
             && ($utente->isSuperAdmin() || $this->allowed($utente, 'api.update', ['admin_associazione']));
     }
 
+    /**
+     * Eliminazione di una chiave API: super admin, o del proprio tenant con il
+     * permesso api.delete.
+     */
     public function delete(Utente $utente, ApiKey $apiKey): bool
     {
         return $this->gestibile($utente, $apiKey)

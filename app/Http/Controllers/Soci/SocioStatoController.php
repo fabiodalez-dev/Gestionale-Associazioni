@@ -23,6 +23,10 @@ class SocioStatoController extends Controller
 {
     use AuthorizesRequests;
 
+    /**
+     * Servizi per le transizioni di stato del socio (storico, tessera,
+     * email di benvenuto, pagamenti).
+     */
     public function __construct(
         private readonly SocioActivityLogger $activityLogger,
         private readonly TesseraAutomaticaService $tessere,

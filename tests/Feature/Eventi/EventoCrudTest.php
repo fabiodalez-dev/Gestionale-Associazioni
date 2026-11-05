@@ -66,7 +66,8 @@ class EventoCrudTest extends TestCase
     {
         $evento = Evento::factory()->create(['associazione_id' => $this->associazione->id]);
         $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id]);
-        Tessera::factory()->count(2)->create([
+        // Anni diversi: una sola tessera per socio e anno (issue #21)
+        Tessera::factory()->count(2)->sequence(['anno_validita' => 2025], ['anno_validita' => 2026])->create([
             'socio_id' => $socio->id,
             'associazione_id' => $this->associazione->id,
             'evento_creazione_id' => $evento->id,

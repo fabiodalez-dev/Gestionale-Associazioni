@@ -30,6 +30,10 @@ class IscrizioneRifiutataNotification extends Notification implements ShouldQueu
         return ['database', 'mail'];
     }
 
+    /**
+     * Email di esito negativo, indirizzata con il nome dell'account o, per
+     * l'ospite, con quello del modulo.
+     */
     public function toMail(object $notifiable): MailMessage
     {
         $associazione = $this->richiesta->associazione;

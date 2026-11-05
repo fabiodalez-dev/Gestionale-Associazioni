@@ -1760,7 +1760,7 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
             ->streamedContent();
 
         $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
-        $this->assertStringContainsString('Codice;Cognome;Nome;Email;Posti;Stato;Importo;Gateway;"Pagata il";Check-in;"Operatore check-in";"Creata il"', $csv);
+        $this->assertStringContainsString('Codice;Cognome;Nome;Email;Posti;Stato;Importo;Gateway;"Pagata il";"Posti entrati";Check-in;"Operatore check-in";"Creata il"', $csv);
         $righe = $this->righeCsv($csv);
         $this->assertCount(2, $righe);
         $this->assertStringContainsString($pConfermata->codice.';Conferma;Vera;vera.conferma@esempio.test;2;confermata;0,00', $csv);

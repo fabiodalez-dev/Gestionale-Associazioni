@@ -123,6 +123,10 @@ class AuthenticateApiV1
         return $next($request);
     }
 
+    /**
+     * Autenticazione con token Sanctum: oltre alle abilities del token
+     * verifica che il proprietario abbia davvero il permesso richiesto.
+     */
     private function autenticaSanctum(Request $request, Closure $next, string $bearer, ?string $permesso): Response
     {
         $accessToken = PersonalAccessToken::findToken($bearer);

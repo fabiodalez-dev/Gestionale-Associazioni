@@ -10,17 +10,20 @@ use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\Tessere\TesseraGiaPresenteException;
 use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraPdfRenderer;
 use App\Services\Tessere\TesseraQrService;
 use App\Settings\TesseramentoSettings;
 use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -173,14 +176,23 @@ class TesseraController extends Controller
         /** @var Socio $socio */
         $socio = Socio::query()->findOrFail($dati['socio_id']);
 
-        $this->issuer->emetti($socio, [
-            'anno_validita' => (int) $dati['anno_validita'],
-            'numero_tessera' => $dati['numero_tessera'],
-            'data_emissione' => $dati['data_emissione'],
-            'data_scadenza' => $dati['data_scadenza'] ?? null,
-            'stato' => $dati['stato'],
-            'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
-        ], accodaEmail: true);
+        try {
+            $this->issuer->emetti($socio, [
+                'anno_validita' => (int) $dati['anno_validita'],
+                'numero_tessera' => $dati['numero_tessera'],
+                'data_emissione' => $dati['data_emissione'],
+                'data_scadenza' => $dati['data_scadenza'] ?? null,
+                'stato' => $dati['stato'],
+                'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
+            ], accodaEmail: true);
+        } catch (TesseraGiaPresenteException $e) {
+            // Tessera dell'anno emessa da un flusso concorrente dopo la
+            // validazione (pagamento online, generazione massiva)
+            throw ValidationException::withMessages(['anno_validita' => $e->getMessage()]);
+        } catch (UniqueConstraintViolationException) {
+            // Numero tessera preso da un'altra emissione dopo la validazione
+            throw ValidationException::withMessages(['numero_tessera' => 'Numero tessera già esistente per questa associazione.']);
+        }
 
         return redirect()
             ->route('tessere.index', ['anno' => $dati['anno_validita']])
@@ -207,16 +219,32 @@ class TesseraController extends Controller
                 ->toDateString();
         }
 
-        $tessera->update([
-            'socio_id' => $dati['socio_id'],
-            'numero_tessera' => $dati['numero_tessera'],
-            'anno_validita' => (int) $dati['anno_validita'],
-            'data_emissione' => $dati['data_emissione'],
-            'data_scadenza' => $dataScadenza,
-            'stato' => $dati['stato'],
-            'tipo_scadenza' => $tipoScadenza,
-            'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
-        ]);
+        try {
+            $tessera->update([
+                'socio_id' => $dati['socio_id'],
+                'numero_tessera' => $dati['numero_tessera'],
+                'anno_validita' => (int) $dati['anno_validita'],
+                'data_emissione' => $dati['data_emissione'],
+                'data_scadenza' => $dataScadenza,
+                'stato' => $dati['stato'],
+                'tipo_scadenza' => $tipoScadenza,
+                'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Vincoli unique occupati da un'emissione concorrente dopo la
+            // validazione: tessera non annullata del socio per l'anno o
+            // numero tessera
+            $doppione = $dati['stato'] !== Tessera::STATO_ANNULLATA && Tessera::query()
+                ->whereKeyNot($tessera->id)
+                ->where('socio_id', $dati['socio_id'])
+                ->where('anno_validita', (int) $dati['anno_validita'])
+                ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+                ->exists();
+
+            throw ValidationException::withMessages($doppione
+                ? ['anno_validita' => "Il socio ha già una tessera non annullata per l'anno {$dati['anno_validita']}."]
+                : ['numero_tessera' => 'Numero tessera già esistente per questa associazione.']);
+        }
 
         return redirect()
             ->route('tessere.index', ['anno' => $dati['anno_validita']])
@@ -255,9 +283,11 @@ class TesseraController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
+            // Una transazione per socio: le tessere emesse prima dell'errore
+            // restano, rilanciando si completano solo le mancanti
             return redirect()
                 ->route('tessere.index', ['anno' => $anno])
-                ->with('error', 'Errore durante la generazione massiva. Riprova più tardi.');
+                ->with('error', 'Errore durante la generazione massiva: alcune tessere potrebbero essere già state generate. Riprova più tardi per completare le mancanti.');
         }
 
         return redirect()

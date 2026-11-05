@@ -178,6 +178,10 @@ class QuotaController extends Controller
         return redirect()->route('quote.index')->with('success', 'Quota aggiornata.');
     }
 
+    /**
+     * Elimina la quota riletta sotto lock (un webhook concorrente può averla
+     * appena pagata) insieme al movimento automatico di prima nota.
+     */
     public function destroy(Quota $quota): RedirectResponse
     {
         $this->authorize('delete', $quota);

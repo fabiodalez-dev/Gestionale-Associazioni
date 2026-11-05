@@ -48,9 +48,11 @@ class CheckinKioskController extends Controller
 
     /**
      * Presenze registrate: partecipanti soci confermati (check-in tessera
-     * o registrazione manuale) + posti delle prenotazioni con check-in.
-     * Un socio presente anche con la prenotazione del proprio account è
-     * contato una sola volta (nei posti della prenotazione).
+     * o registrazione manuale) + posti ENTRATI delle prenotazioni con
+     * check-in (il socio entrato con la tessera conta solo il proprio posto,
+     * non quelli dei compagni ancora fuori). Un socio presente anche con la
+     * prenotazione del proprio account è contato una sola volta (nei posti
+     * della prenotazione).
      */
     private function presenze(Evento $evento): int
     {
@@ -63,7 +65,7 @@ class CheckinKioskController extends Controller
         $postiPrenotazioni = (int) Prenotazione::query()
             ->where('evento_id', $evento->id)
             ->whereNotNull('checkin_at')
-            ->sum('posti');
+            ->sum('posti_entrati');
 
         return $partecipanti + $postiPrenotazioni;
     }

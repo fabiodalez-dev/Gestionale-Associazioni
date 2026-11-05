@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\DB;
  * Ricevute di pagamento quota (f.21 PIANO-VITA-SOCIALE): una sola
  * ricevuta per quota (unique a DB), numero progressivo per tenant e
  * anno (es. "12/2026") generato sotto lock, PDF dompdf con il layout
- * della ricevuta legacy + numerazione.
+ * della ricevuta legacy + numerazione. All'emissione si salva l'istantanea
+ * dell'intestatario e del pagamento, che il PDF stampa al posto dei dati
+ * correnti (issue #20).
  */
 class RicevutaService
 {
@@ -35,8 +37,13 @@ class RicevutaService
             return $esistente;
         }
 
+        // Istantanea dell'intestatario e del pagamento al momento
+        // dell'emissione (issue #20): una correzione successiva del socio o
+        // della quota non cambia la ricevuta già emessa
+        $socio = $this->socio($quota);
+
         try {
-            return DB::transaction(function () use ($quota): Ricevuta {
+            return DB::transaction(function () use ($quota, $socio): Ricevuta {
                 $anno = (int) $quota->anno;
 
                 // Progressivo per (associazione, anno) sotto lock:
@@ -54,6 +61,14 @@ class RicevutaService
                     'anno' => $anno,
                     'importo' => $quota->importo,
                     'emessa_at' => now(),
+                    'intestatario_nome' => $socio !== null ? (string) $socio->nome : null,
+                    'intestatario_cognome' => $socio !== null ? (string) $socio->cognome : null,
+                    'intestatario_codice_fiscale' => $socio?->codice_fiscale,
+                    'numero_socio' => $socio?->numero_socio !== null ? (string) $socio->numero_socio : null,
+                    'tipo_quota' => $quota->tipo,
+                    'metodo_pagamento' => $quota->metodo_pagamento,
+                    'data_pagamento' => $quota->data_pagamento?->toDateString(),
+                    'riferimento_transazione' => $quota->gateway_transaction_id,
                 ]);
             });
         } catch (UniqueConstraintViolationException) {
@@ -69,12 +84,15 @@ class RicevutaService
     public function pdfContent(Ricevuta $ricevuta): string
     {
         $quota = $this->quota($ricevuta);
+        $socio = $this->socio($quota);
 
         $pdf = Pdf::loadView('email-conferme.ricevuta-pdf', [
             'ricevuta' => $ricevuta,
             'quota' => $quota,
             'associazione' => $quota?->associazione,
-            'socio' => $this->socio($quota),
+            'socio' => $socio,
+            // Istantanea dell'emissione, dati correnti per le ricevute storiche
+            'dati' => $ricevuta->datiStampa($quota, $socio),
         ]);
 
         return (string) $pdf->output();

@@ -742,7 +742,11 @@ class E2eFixtureCommand extends Command
         }
 
         $prenotazione = app(PrenotazioneService::class)->crea($account, $evento, 1);
-        $prenotazione->forceFill(['checkin_at' => now()])->save();
+        $prenotazione->forceFill([
+            'checkin_at' => now(),
+            'posti_entrati' => $prenotazione->posti,
+            'checkin_origine' => Prenotazione::CHECKIN_ORIGINE_BIGLIETTO,
+        ])->save();
 
         $feedback = FeedbackEvento::create([
             'associazione_id' => $prenotazione->associazione_id,

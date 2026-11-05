@@ -54,10 +54,49 @@ class Tessera extends Model
         'evento_creazione_id',
     ];
 
+    /**
+     * Colonna tecnica del vincolo unique (socio_id, anno_non_annullata):
+     * non si assegna a mano e non si mostra.
+     */
+    protected $hidden = [
+        'anno_non_annullata',
+    ];
+
+    /**
+     * Una sola tessera NON annullata per socio e anno (issue #21). MariaDB
+     * non ha indici parziali, quindi il vincolo unique è su una colonna
+     * derivata: anno_validita per le tessere non annullate, NULL per le
+     * annullate (i NULL non collidono nell'indice unique, su SQLite come su
+     * MariaDB). Così una tessera persa si annulla e se ne emette un'altra
+     * per lo stesso anno. Tenuta allineata qui a ogni salvataggio Eloquent:
+     * nessun flusso dell'applicazione scrive le tessere fuori dal modello.
+     * Si ricalcola solo alla creazione o quando cambiano socio, anno o
+     * stato: i doppioni legacy lasciati fuori dal vincolo dall'import
+     * (anno_non_annullata NULL) non ci rientrano per un salvataggio che non
+     * li riguarda (es. il QR URL persistito alla stampa), che altrimenti
+     * violerebbe il vincolo al salvataggio del secondo doppione.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Tessera $tessera): void {
+            if ($tessera->exists && ! $tessera->isDirty(['socio_id', 'anno_validita', 'stato'])) {
+                return;
+            }
+
+            $tessera->anno_non_annullata = $tessera->stato === self::STATO_ANNULLATA
+                ? null
+                : (int) $tessera->anno_validita;
+        });
+    }
+
+    /**
+     * Cast degli anni (anche della colonna del vincolo) e delle date.
+     */
     protected function casts(): array
     {
         return [
             'anno_validita' => 'integer',
+            'anno_non_annullata' => 'integer',
             'data_emissione' => 'date',
             'data_scadenza' => 'date',
         ];

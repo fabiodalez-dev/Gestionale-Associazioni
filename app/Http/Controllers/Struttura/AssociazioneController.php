@@ -106,6 +106,10 @@ class AssociazioneController extends Controller
         ]);
     }
 
+    /**
+     * Crea l'associazione con configurazione, mini-sito e admin iniziale in
+     * un'unica transazione; gli avvisi non bloccanti tornano in sessione.
+     */
     public function store(StoreAssociazioneRequest $request): RedirectResponse
     {
         $dati = $request->validated();
@@ -181,6 +185,10 @@ class AssociazioneController extends Controller
             ->with('warning', $warnings ? implode(' ', $warnings) : null);
     }
 
+    /**
+     * Aggiorna anagrafica e configurazione; il mini-sito resta invariato se
+     * il campo non arriva dal form.
+     */
     public function update(UpdateAssociazioneRequest $request, Associazione $associazione): RedirectResponse
     {
         $dati = $request->validated();

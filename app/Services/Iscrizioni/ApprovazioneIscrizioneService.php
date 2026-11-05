@@ -302,6 +302,10 @@ class ApprovazioneIscrizioneService
             ->first();
     }
 
+    /**
+     * Email del socio collegato alla richiesta (anche nel cestino), null se
+     * assente.
+     */
     protected function emailSocio(?string $socioId): ?string
     {
         if ($socioId === null) {

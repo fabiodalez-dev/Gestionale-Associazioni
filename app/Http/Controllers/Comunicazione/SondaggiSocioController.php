@@ -22,6 +22,10 @@ class SondaggiSocioController extends Controller
         private readonly SondaggiVotoService $voto,
     ) {}
 
+    /**
+     * Sondaggi aperti per l'area soci, con risposta data, possibilità di
+     * voto (solo soci attivi) e risultati.
+     */
     public function index(Request $request): View
     {
         /** @var Socio $socio */

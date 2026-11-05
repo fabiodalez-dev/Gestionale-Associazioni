@@ -39,11 +39,13 @@ class PresenzeController extends Controller
     }
 
     /**
-     * Registrazione presenze in blocco: marca il check-in (now) sulle
-     * prenotazioni CONFERMATE selezionate non ancora arrivate. Gli id
-     * estranei (altro evento/tenant, stati diversi, già check-in)
-     * vengono ignorati dalla UPDATE scoped. I soci collegati agli account
-     * presenti vengono registrati tra i partecipanti (PresenzeSociService).
+     * Registrazione presenze in blocco: le prenotazioni CONFERMATE
+     * selezionate risultano entrate per tutti i posti rimanenti (origine
+     * "presenze_blocco"; checkin_at al primo ingresso, conservato se il socio
+     * era già entrato con la tessera). Gli id estranei (altro evento/tenant,
+     * stati diversi, già entrate per intero) vengono ignorati dalle UPDATE
+     * scoped. I soci collegati agli account presenti vengono registrati tra
+     * i partecipanti (PresenzeSociService).
      */
     public function store(PresenzeBulkRequest $request, Evento $evento, PresenzeSociService $presenze): RedirectResponse
     {
@@ -52,15 +54,12 @@ class PresenzeController extends Controller
         // Check-in e registrazione dei soci nella stessa transazione: se la
         // seconda fallisce le prenotazioni non risultano segnate a metà
         $registrate = DB::transaction(function () use ($request, $evento, $presenze): int {
-            $registrate = Prenotazione::query()
-                ->where('evento_id', $evento->id)
-                ->whereIn('id', $request->validated('prenotazioni'))
-                ->where('stato', Prenotazione::STATO_CONFERMATA)
-                ->whereNull('checkin_at')
-                ->update([
-                    'checkin_at' => now(),
-                    'checkin_utente_id' => $request->user()?->id,
-                ]);
+            $registrate = $presenze->registraPostiRimanenti(
+                $evento,
+                $request->validated('prenotazioni'),
+                Prenotazione::CHECKIN_ORIGINE_PRESENZE_BLOCCO,
+                $request->user()?->id,
+            );
 
             // I soci collegati agli account presenti risultano anche tra i
             // partecipanti confermati, come dopo il check-in con la tessera

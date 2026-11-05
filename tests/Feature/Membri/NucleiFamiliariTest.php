@@ -276,6 +276,33 @@ class NucleiFamiliariTest extends TestCase
         $this->assertNull($nucleo->fresh()->capofamiglia_id);
     }
 
+    public function test_capofamiglia_nel_cestino_non_e_riproposto_e_la_rinomina_riesce(): void
+    {
+        $padre = $this->creaSocio(['cognome' => 'Cestinato']);
+        $figlia = $this->creaSocio(['cognome' => 'Rimasta']);
+        $nucleo = Nucleo::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'nome' => 'Famiglia Cestinato',
+            'capofamiglia_id' => $padre->id,
+        ]);
+        $padre->forceFill(['nucleo_id' => $nucleo->id])->save();
+        $figlia->forceFill(['nucleo_id' => $nucleo->id])->save();
+        $padre->delete();
+
+        // Nessuna opzione di ripiego per un socio eliminato: il form invia "Nessuno"
+        $this->actingAs($this->admin)
+            ->get(route('soci.show', $figlia))
+            ->assertOk()
+            ->assertDontSee('Capofamiglia attuale (non visibile)');
+
+        $this->actingAs($this->admin)->put("/nuclei/{$nucleo->id}", [
+            'nome' => 'Famiglia Rimasta',
+            'capofamiglia_id' => '',
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        $this->assertSame('Famiglia Rimasta', $nucleo->fresh()->nome);
+    }
+
     // ------------------------------------------------------------------
     // Isolamento tenant
     // ------------------------------------------------------------------

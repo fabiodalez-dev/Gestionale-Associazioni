@@ -20,6 +20,7 @@ use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use App\Services\Tessere\TesseraIssuer;
+use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -32,6 +33,8 @@ use Illuminate\Support\Facades\Log;
  */
 class PaymentService
 {
+    use DetectsConcurrencyErrors;
+
     public const TOKEN_EXPIRY_HOURS = 72;
 
     public function __construct(
@@ -137,6 +140,14 @@ class PaymentService
         try {
             app(TesseraIssuer::class)->emettiSeAssente($socio, (int) $quota->anno);
         } catch (\Throwable $e) {
+            // Deadlock/lock timeout dentro una transazione esterna (es.
+            // onPaymentCompleted): il database ha già annullato o compromesso
+            // la transazione, quindi non va ingoiato. Si rilancia perché il
+            // pagamento fallisca in modo esplicito e il webhook venga ritentato.
+            if (DB::transactionLevel() > 0 && $this->causedByConcurrencyError($e)) {
+                throw $e;
+            }
+
             Log::warning('PaymentService: emissione tessera di rinnovo fallita', [
                 'socio_id' => $socio->id,
                 'quota_id' => $quota->id,

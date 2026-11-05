@@ -8,6 +8,17 @@
             'membri' => fn ($q) => $q->orderBy('cognome')->orderBy('nome'),
         ])->find($socio->nucleo_id)
         : null;
+    // Capofamiglia attuale fuori dalle sedi dell'utente ma ancora attivo:
+    // il form lo ripropone come opzione nascosta. Se è nel cestino non va
+    // riproposto (NucleoRequest lo rifiuterebbe e la rinomina fallirebbe).
+    $capofamigliaNascostoAttivo = $nucleoSocio !== null
+        && $nucleoSocio->capofamiglia_id !== null
+        && ! $nucleoSocio->membri->contains('id', $nucleoSocio->capofamiglia_id)
+        && \App\Models\Socio::withoutGlobalScopes()
+            ->whereKey($nucleoSocio->capofamiglia_id)
+            ->where('associazione_id', $nucleoSocio->associazione_id)
+            ->whereNull('deleted_at')
+            ->exists();
     $nucleiDisponibili = \App\Models\Nucleo::query()->orderBy('nome')->get(['id', 'nome']);
     $puoGestire = auth()->user()?->can('create', \App\Models\Nucleo::class) ?? false;
 @endphp
@@ -98,7 +109,7 @@
                             @endforeach
                             {{-- Capofamiglia attuale non tra i membri visibili (fuori dalle sedi
                                  dell'utente): resta selezionato, una rinomina non lo azzera --}}
-                            @if ($nucleoSocio->capofamiglia_id !== null && ! $nucleoSocio->membri->contains('id', $nucleoSocio->capofamiglia_id))
+                            @if ($capofamigliaNascostoAttivo)
                                 <option value="{{ $nucleoSocio->capofamiglia_id }}" selected>Capofamiglia attuale (non visibile)</option>
                             @endif
                         </select>

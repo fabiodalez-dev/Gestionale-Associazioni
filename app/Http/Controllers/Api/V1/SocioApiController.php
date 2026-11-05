@@ -160,6 +160,14 @@ class SocioApiController extends Controller
             return $this->apiError(400, 'no_valid_fields', 'Nessun campo aggiornabile presente nel body.');
         }
 
+        // I campi obbligatori fatti solo di caratteri di controllo superano
+        // 'required' ma restano vuoti dopo la pulizia: rifiutati come in validazione
+        foreach (['nome', 'cognome', 'email'] as $campo) {
+            if (($aggiornamenti[$campo] ?? null) === '') {
+                return $this->apiError(400, 'invalid_field', "Valore non valido per il campo '{$campo}': il campo non può essere vuoto.");
+            }
+        }
+
         try {
             Socio::allTenants()
                 ->whereKey($socio->id)

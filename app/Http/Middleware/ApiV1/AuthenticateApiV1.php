@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -28,6 +29,18 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AuthenticateApiV1
 {
+    /**
+     * Ruoli ammessi per modulo quando i permessi spatie non sono seedati:
+     * gli stessi delle Policy web (SocioPolicy ricade su admin/operatore,
+     * QuotaPolicy e TesseraPolicy non hanno fallback). Gli admin passano
+     * comunque prima della verifica.
+     *
+     * @var array<string, list<string>>
+     */
+    private const RUOLI_FALLBACK = [
+        'soci' => [Utente::RUOLO_OPERATORE],
+    ];
+
     public function handle(Request $request, Closure $next, ?string $permesso = null): Response
     {
         $bearer = $request->bearerToken();
@@ -187,9 +200,16 @@ class AuthenticateApiV1
 
         try {
             return $utente->hasPermissionTo($permessoGestionale);
-        } catch (\Throwable) {
-            // Permessi non seedati (ambienti legacy): nessun vincolo aggiuntivo
-            return true;
+        } catch (PermissionDoesNotExist) {
+            // Permessi non seedati (ambienti legacy): stesso fallback per ruolo
+            // delle Policy web (AuthorizesModulePermissions::allowed), non un
+            // via libera per chiunque abbia un token
+            return in_array($utente->ruolo, self::RUOLI_FALLBACK[$modulo] ?? [], true);
+        } catch (\Throwable $e) {
+            // Qualsiasi altro errore nella verifica: si nega
+            report($e);
+
+            return false;
         }
     }
 

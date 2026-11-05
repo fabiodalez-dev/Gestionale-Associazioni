@@ -156,6 +156,22 @@ class EventoPubblicazioneAdminTest extends TestCase
         $this->assertStringContainsString('3 posti occupati', $messaggio);
     }
 
+    public function test_capienza_con_segno_non_aggira_il_controllo_dei_posti_occupati(): void
+    {
+        $evento = Evento::factory()->pubblicato()->conCapienza(10)->create([
+            'associazione_id' => $this->associazione->id,
+        ]);
+        Prenotazione::factory()->confermata()->create(['evento_id' => $evento->id, 'posti' => 3]);
+
+        // "+2" passa la regola integer (vale 2) e va controllato come 2
+        $this->actingAs($this->admin)
+            ->from('/eventi')
+            ->put("/eventi/{$evento->id}", $this->payloadCompleto(['capienza' => '+2']))
+            ->assertSessionHasErrors(['capienza']);
+
+        $this->assertSame(10, $evento->fresh()->capienza);
+    }
+
     public function test_capienza_riducibile_fino_ai_posti_occupati(): void
     {
         $evento = Evento::factory()->pubblicato()->conCapienza(10)->create([

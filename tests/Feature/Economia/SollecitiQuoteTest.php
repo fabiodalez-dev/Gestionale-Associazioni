@@ -59,6 +59,27 @@ class SollecitiQuoteTest extends TestCase
         $response->assertViewHas('quote', fn ($quote) => $quote->total() === 2);
     }
 
+    public function test_lista_e_bulk_escludono_le_quote_dei_soci_cessati_anche_se_nel_cestino(): void
+    {
+        $attivo = $this->creaSocio(['email' => 'attivo@example.com', 'email_opt_out' => false]);
+        $cessato = $this->creaSocio(['stato' => Socio::STATI_CESSATI[0], 'email' => 'cessato@example.com', 'email_opt_out' => false]);
+        $cessatoNelCestino = $this->creaSocio(['stato' => Socio::STATI_CESSATI[0], 'email' => 'cestino@example.com', 'email_opt_out' => false]);
+
+        $quotaAttivo = $this->creaQuota($attivo);
+        $quotaCessato = $this->creaQuota($cessato);
+        $quotaCestino = $this->creaQuota($cessatoNelCestino);
+        $cessatoNelCestino->delete();
+
+        $this->actingAs($this->admin)->get(route('solleciti-quote.index'))
+            ->assertOk()
+            ->assertViewHas('quote', fn ($quote) => collect($quote->items())->pluck('id')->all() === [$quotaAttivo->id]);
+
+        // Nel bulk le quote dei cessati non entrano nemmeno tra le "saltate"
+        $this->actingAs($this->admin)->post(route('solleciti-quote.bulk'), [
+            'quota_ids' => [$quotaAttivo->id, $quotaCessato->id, $quotaCestino->id],
+        ])->assertSessionHas('success', 'Solleciti inviati: 1.');
+    }
+
     public function test_sollecito_singolo_invia_notifica_e_traccia(): void
     {
         $socio = $this->creaSocio(['email' => 'socio@example.com', 'email_opt_out' => false]);

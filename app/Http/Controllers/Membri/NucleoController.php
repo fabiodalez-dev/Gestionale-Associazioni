@@ -79,11 +79,19 @@ class NucleoController extends Controller
     {
         $this->authorize('update', $nucleo);
 
-        $capofamiglia = $this->socioDelTenant($request->validated('capofamiglia_id'), $nucleo->associazione_id);
+        $capofamigliaId = $request->validated('capofamiglia_id');
+        $capofamiglia = $this->socioDelTenant($capofamigliaId, $nucleo->associazione_id);
+
+        // Capofamiglia attuale non visibile all'utente (fuori dal suo perimetro
+        // di sede): il form lo ripropone tale e quale e va conservato, non
+        // azzerato. Solo la scelta esplicita "Nessuno" (valore vuoto) lo toglie.
+        $mantieniAttuale = $capofamiglia === null
+            && filled($capofamigliaId)
+            && $capofamigliaId === $nucleo->capofamiglia_id;
 
         $nucleo->update([
             'nome' => $request->validated('nome'),
-            'capofamiglia_id' => $capofamiglia?->id,
+            'capofamiglia_id' => $mantieniAttuale ? $nucleo->capofamiglia_id : $capofamiglia?->id,
         ]);
 
         if ($capofamiglia !== null && $capofamiglia->nucleo_id !== $nucleo->id) {

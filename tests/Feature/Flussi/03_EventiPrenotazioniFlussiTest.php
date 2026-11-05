@@ -954,7 +954,8 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
     {
         $evento = $this->adminCreaEvento(['titolo' => 'Torneo di burraco', 'capienza' => 4]);
 
-        $p1 = $this->prenota($this->visitatore('Paola', 'Carte'), $evento, 2);
+        $paola = $this->visitatore('Paola', 'Carte');
+        $p1 = $this->prenota($paola, $evento, 2);
         $p2 = $this->prenota($this->visitatore('Pietro', 'Mazzi'), $evento, 2);
         $p3 = $this->prenota($this->visitatore('Rita', 'Attesa'), $evento, 1);
         $this->assertSame(Prenotazione::STATO_LISTA_ATTESA, $p3->stato);
@@ -965,6 +966,13 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
                 'socio_id' => $socio->id,
                 'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
             ])->assertSessionHas('success');
+
+        // Paola è anche socia (account collegato): la sua presenza col
+        // biglietto la registra tra i partecipanti, ma il kiosk la conta una volta
+        $sociaPaola = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id, 'cognome' => 'Carte', 'stato' => Socio::STATO_ATTIVO,
+        ]);
+        $paola->forceFill(['socio_id' => $sociaPaola->id])->save();
 
         Carbon::setTestNow('2026-05-23 21:05:00');
 
@@ -979,6 +987,8 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
             $this->assertSame($this->admin->id, $p->checkin_utente_id);
         }
         $this->assertNull($p3->fresh()->checkin_at);
+        $this->assertSame(EventoPartecipante::STATO_CONFERMATO, EventoPartecipante::query()
+            ->where('evento_id', $evento->id)->where('socio_id', $sociaPaola->id)->value('stato_partecipazione'));
 
         // Ripetere non registra di nuovo
         $this->post(route('eventi.presenze.store', $evento), ['prenotazioni' => [$p1->id]])
@@ -1176,6 +1186,21 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
             ])->assertSessionHasErrors('capienza');
 
         $this->assertSame(20, $terza->fresh()->capienza, 'La capienza non deve scendere sotto i posti occupati');
+
+        // Un intero con segno ("+1", accettato dalla regola integer) non
+        // aggira il controllo dei posti occupati
+        $this->comeAdmin()
+            ->put(route('eventi.serie.update', $prima), [
+                'titolo' => 'Corso di yoga — livello base',
+                'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+                'capienza' => '+1',
+                'prezzo' => '7,50',
+                'iscrizioni_aperte' => '1',
+                'richiede_approvazione' => '0',
+                'solo_soci' => '0',
+            ])->assertSessionHasErrors('capienza');
+
+        $this->assertSame(20, $terza->fresh()->capienza);
     }
 
     // ------------------------------------------------------------------
@@ -1217,6 +1242,9 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
 
         $p->refresh();
         $this->assertNotNull($p);
+        // L'occorrenza futura eliminata annulla la prenotazione (biglietto non più valido)
+        $this->assertSame(Prenotazione::STATO_ANNULLATA, $p->stato);
+        $this->assertNotNull($p->annullata_at);
         $eventoCestinato = $p->evento()->withoutGlobalScopes()->withTrashed()->first();
         $this->assertNotNull($eventoCestinato);
         $this->assertTrue($eventoCestinato->trashed());

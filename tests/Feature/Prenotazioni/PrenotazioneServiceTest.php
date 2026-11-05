@@ -236,6 +236,26 @@ class PrenotazioneServiceTest extends TestCase
         $this->service->crea($this->creaAccount($evento), $evento, 1);
     }
 
+    public function test_evento_eliminato_mentre_si_attende_il_lock_non_prenotabile(): void
+    {
+        $evento = Evento::factory()->pubblicato()->conCapienza(10)->create([
+            'data_evento' => now()->addWeek(),
+        ]);
+        $account = $this->creaAccount($evento);
+        // La richiesta ha già caricato l'evento quando l'admin lo elimina
+        $caricato = Evento::allTenants()->findOrFail($evento->id);
+        $this->service->eliminaEvento($evento);
+
+        try {
+            $this->service->crea($account, $caricato, 1);
+            $this->fail('PrenotazioneException attesa');
+        } catch (PrenotazioneException) {
+            // atteso
+        }
+
+        $this->assertSame(0, Prenotazione::allTenants()->where('evento_id', $evento->id)->count());
+    }
+
     public function test_posti_oltre_il_massimo_per_prenotazione_rifiutati(): void
     {
         $evento = Evento::factory()->pubblicato()->conCapienza(100)->create([
@@ -617,6 +637,33 @@ class PrenotazioneServiceTest extends TestCase
         $this->assertSame(Prenotazione::STATO_ANNULLATA, $esito->stato);
         $this->assertNotNull($esito->pagata_at);
         $this->assertSame('pi_tardivo', $esito->gateway_transaction_id);
+    }
+
+    public function test_pagamento_tardivo_su_evento_eliminato_non_riconferma(): void
+    {
+        $evento = Evento::factory()->pubblicato()->conCapienza(5)->aPagamento()->create([
+            'data_evento' => now()->addWeek(),
+        ]);
+        $prenotazione = $this->service->crea($this->creaAccount($evento), $evento, 1);
+
+        // Scade, poi l'evento viene eliminato (le scadute non sono toccate)
+        $this->travel(31)->minutes();
+        $this->service->scadiPagamenti();
+        $this->service->eliminaEvento($evento);
+        $this->assertSame(Prenotazione::STATO_SCADUTA, $this->fresca($prenotazione)->stato);
+
+        // Il checkout era ancora aperto: il pagamento arriva dopo l'eliminazione
+        $esito = $this->service->onPagamentoCompletato($prenotazione->id, $evento->associazione_id, 'stripe', 'pi_dopo_eliminazione');
+
+        $this->assertSame(Prenotazione::STATO_ANNULLATA, $esito->stato);
+        $this->assertNotNull($esito->annullata_at);
+        $this->assertSame("Pagamento ricevuto dopo l'eliminazione dell'evento: rimborso da gestire manualmente", $esito->motivo_annullamento);
+        // L'incasso resta tracciato per il rimborso manuale
+        $this->assertNotNull($esito->pagata_at);
+        $this->assertSame('pi_dopo_eliminazione', $esito->gateway_transaction_id);
+        $this->assertSame(0, Prenotazione::postiOccupati($evento->id));
+        $this->assertSame([$prenotazione->id], $this->service->idPerTipo('annullata'));
+        $this->assertSame([], $this->service->idPerTipo('confermata'));
     }
 
     // ------------------------------------------------------------------

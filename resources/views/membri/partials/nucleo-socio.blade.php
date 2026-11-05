@@ -96,6 +96,11 @@
                             @foreach ($nucleoSocio->membri as $membro)
                                 <option value="{{ $membro->id }}" @selected($nucleoSocio->capofamiglia_id === $membro->id)>{{ $membro->cognome }} {{ $membro->nome }}</option>
                             @endforeach
+                            {{-- Capofamiglia attuale non tra i membri visibili (fuori dalle sedi
+                                 dell'utente): resta selezionato, una rinomina non lo azzera --}}
+                            @if ($nucleoSocio->capofamiglia_id !== null && ! $nucleoSocio->membri->contains('id', $nucleoSocio->capofamiglia_id))
+                                <option value="{{ $nucleoSocio->capofamiglia_id }}" selected>Capofamiglia attuale (non visibile)</option>
+                            @endif
                         </select>
                     </div>
                     <div class="col-md-3">

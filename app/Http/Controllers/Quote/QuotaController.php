@@ -182,16 +182,24 @@ class QuotaController extends Controller
     {
         $this->authorize('delete', $quota);
 
-        // Blocco eliminazione per quote pagate online (tracciabilità contabile, §10.5 spec)
-        if (filled($quota->gateway_transaction_id)) {
-            return redirect()->route('quote.index')
-                ->with('error', 'Impossibile eliminare una quota pagata online (tracciabilità contabile).');
-        }
-
         // Il movimento automatico di prima nota (origine polimorfica, senza FK)
         // segue la quota eliminata: altrimenti resterebbe orfano e, essendo
         // "automatico", non più eliminabile dalla prima nota.
-        DB::transaction(function () use ($quota): void {
+        $eliminata = DB::transaction(function () use ($quota): bool {
+            // Riletta sotto lock: un webhook di pagamento concorrente (che
+            // blocca la stessa riga) può averla appena segnata pagata online
+            $quota = Quota::query()->whereKey($quota->getKey())->lockForUpdate()->first();
+
+            if ($quota === null) {
+                // Già eliminata da una richiesta concorrente
+                return true;
+            }
+
+            // Blocco eliminazione per quote pagate online (tracciabilità contabile, §10.5 spec)
+            if (filled($quota->gateway_transaction_id)) {
+                return false;
+            }
+
             Movimento::query()
                 ->withoutGlobalScopes()
                 ->where('associazione_id', $quota->associazione_id)
@@ -201,7 +209,14 @@ class QuotaController extends Controller
                 ->each(fn (Movimento $movimento) => $movimento->delete());
 
             $quota->delete();
+
+            return true;
         });
+
+        if (! $eliminata) {
+            return redirect()->route('quote.index')
+                ->with('error', 'Impossibile eliminare una quota pagata online (tracciabilità contabile).');
+        }
 
         return redirect()->route('quote.index')->with('success', 'Quota eliminata con successo.');
     }

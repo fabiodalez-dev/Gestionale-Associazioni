@@ -229,6 +229,13 @@ class CheckinApiTest extends TestCase
             'associazione_id' => $this->associazione->id,
             'account_id' => $account->id,
         ]);
+        // Prenotazione dello stesso account per un altro evento: non va toccata
+        $altroEvento = Evento::factory()->create(['associazione_id' => $this->associazione->id]);
+        $prenotazioneAltroEvento = Prenotazione::factory()->confermata()->create([
+            'evento_id' => $altroEvento->id,
+            'associazione_id' => $this->associazione->id,
+            'account_id' => $account->id,
+        ]);
 
         $this->postJson(
             "/api/v1/eventi/{$this->evento->id}/checkin",
@@ -237,6 +244,7 @@ class CheckinApiTest extends TestCase
         )->assertOk()->assertJsonPath('already_checked_in', false);
 
         $this->assertNotNull($prenotazione->fresh()->checkin_at);
+        $this->assertNull($prenotazioneAltroEvento->fresh()->checkin_at);
     }
 
     public function test_checkin_con_tessera_id(): void

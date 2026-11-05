@@ -93,7 +93,9 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
             // Mutex per-evento: tutte le decisioni sui posti avvengono qui dentro
             $evento = $this->lockEvento($evento->id);
 
-            if (! $evento->isPrenotabile()) {
+            // Evento eliminato mentre la richiesta attendeva il lock (il
+            // lock non applica il filtro del cestino): non prenotabile
+            if ($evento->trashed() || ! $evento->isPrenotabile()) {
                 throw PrenotazioneException::eventoNonPrenotabile();
             }
 
@@ -375,26 +377,25 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
     }
 
     /**
-     * Evento eliminato dall'organizzazione (singolo o intera serie): le
-     * prenotazioni ancora aperte (confermate, riservate, in approvazione,
-     * in lista d'attesa) vengono annullate con notifica, così il biglietto
-     * non resta "valido" per una data che non esiste più. Nessuna
-     * promozione della lista d'attesa: anche la coda viene annullata.
+     * Elimina (soft delete) un evento dell'organizzazione (singolo o
+     * occorrenza di una serie): le prenotazioni ancora aperte (confermate,
+     * riservate, in approvazione, in lista d'attesa) vengono annullate con
+     * notifica, così il biglietto non resta "valido" per una data che non
+     * esiste più. Nessuna promozione della lista d'attesa: anche la coda
+     * viene annullata.
      *
-     * Un evento già svolto non viene toccato: le sue prenotazioni restano
-     * come storico delle presenze.
+     * Annullamento ed eliminazione avvengono nella stessa transazione sotto
+     * il mutex per-evento: una prenotazione concorrente attende il lock e
+     * trova l'evento già nel cestino (crea() la rifiuta), invece di
+     * confermarsi tra l'annullamento e il soft delete. Le notifiche partono
+     * dopo il commit.
      *
-     * Va chiamato PRIMA del soft delete dell'evento. Ritorna il numero di
+     * Un evento già svolto viene eliminato senza toccare le prenotazioni:
+     * restano come storico delle presenze. Ritorna il numero di
      * prenotazioni annullate.
      */
-    public function annullaPerEventoEliminato(Evento $evento): int
+    public function eliminaEvento(Evento $evento): int
     {
-        $fine = $evento->data_fine ?? $evento->data_evento;
-
-        if ($fine->isPast()) {
-            return 0;
-        }
-
         // Titolo e data nel motivo: restano leggibili nello storico della
         // prenotazione anche quando l'evento non è più visibile (cestino)
         $motivo = 'Evento "'.$evento->titolo.'"'
@@ -402,26 +403,34 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
             ." annullato dall'organizzazione";
 
         $annullate = DB::transaction(function () use ($evento, $motivo): int {
-            $this->lockEvento($evento->id);
+            $bloccato = $this->lockEvento($evento->id);
+            $fine = $bloccato->data_fine ?? $bloccato->data_evento;
+            $annullate = 0;
 
-            $aperte = Prenotazione::query()
-                ->withoutGlobalScope('associazione')
-                ->where('evento_id', $evento->id)
-                ->whereNotIn('stato', [Prenotazione::STATO_ANNULLATA, Prenotazione::STATO_SCADUTA])
-                ->lockForUpdate()
-                ->get();
+            if (! $fine->isPast()) {
+                $aperte = Prenotazione::query()
+                    ->withoutGlobalScope('associazione')
+                    ->where('evento_id', $evento->id)
+                    ->whereNotIn('stato', [Prenotazione::STATO_ANNULLATA, Prenotazione::STATO_SCADUTA])
+                    ->lockForUpdate()
+                    ->get();
 
-            foreach ($aperte as $prenotazione) {
-                $prenotazione->forceFill([
-                    'stato' => Prenotazione::STATO_ANNULLATA,
-                    'annullata_at' => now(),
-                    'motivo_annullamento' => $motivo,
-                ])->save();
+                foreach ($aperte as $prenotazione) {
+                    $prenotazione->forceFill([
+                        'stato' => Prenotazione::STATO_ANNULLATA,
+                        'annullata_at' => now(),
+                        'motivo_annullamento' => $motivo,
+                    ])->save();
 
-                $this->accodaNotifica('notificaAnnullata', $prenotazione);
+                    $this->accodaNotifica('notificaAnnullata', $prenotazione);
+                }
+
+                $annullate = $aperte->count();
             }
 
-            return $aperte->count();
+            $evento->delete();
+
+            return $annullate;
         });
 
         $this->inviaNotifichePendenti();
@@ -611,7 +620,9 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
      * prenotazione è già pagata il webhook viene ack-ato senza effetti
      * (replay sicuro). Pagamento arrivato su una prenotazione già SCADUTA
      * → riconferma comunque, anche in overbooking (il denaro è stato
-     * incassato; l'eccedenza è visibile in admin).
+     * incassato; l'eccedenza è visibile in admin). Se però l'evento è stato
+     * eliminato (cestino) la prenotazione non viene riconfermata: resta
+     * annullata con l'incasso registrato e il rimborso da gestire.
      *
      * Ritorna null solo se la prenotazione non esiste per quel tenant
      * (il chiamante ack-a comunque il webhook).
@@ -640,7 +651,7 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
             }
 
             // Ordine di lock unico: evento, poi prenotazione
-            $this->lockEvento($prenotazione->evento_id);
+            $evento = $this->lockEvento($prenotazione->evento_id);
 
             $prenotazione = Prenotazione::query()
                 ->withoutGlobalScope('associazione')
@@ -659,10 +670,29 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
                 'pagata_at' => now(),
             ];
 
-            if (in_array($prenotazione->stato, [
+            $confermabile = in_array($prenotazione->stato, [
                 Prenotazione::STATO_IN_ATTESA_PAGAMENTO,
                 Prenotazione::STATO_SCADUTA, // riconferma post-scadenza: overbooking accettato
-            ], true)) {
+            ], true);
+
+            if ($confermabile && $evento->trashed()) {
+                // Pagamento tardivo (checkout ancora aperto) su un evento nel
+                // cestino: nessuna riconferma per una data che non esiste più.
+                // L'incasso resta registrato, la prenotazione annullata con il
+                // motivo; il rimborso è manuale (nessun rimborso automatico)
+                $dati['stato'] = Prenotazione::STATO_ANNULLATA;
+                $dati['annullata_at'] = $prenotazione->annullata_at ?? now();
+                $dati['motivo_annullamento'] = "Pagamento ricevuto dopo l'eliminazione dell'evento: rimborso da gestire manualmente";
+                $this->accodaNotifica('notificaAnnullata', $prenotazione);
+
+                Log::warning('PrenotazioneService: pagamento su prenotazione di un evento eliminato, rimborso da gestire', [
+                    'prenotazione_id' => $prenotazione->id,
+                    'evento_id' => $evento->id,
+                    'stato' => $prenotazione->stato,
+                    'gateway' => $gateway,
+                    'transaction_id' => $transactionId,
+                ]);
+            } elseif ($confermabile) {
                 $dati['stato'] = Prenotazione::STATO_CONFERMATA;
                 $this->accodaNotifica('notificaConfermata', $prenotazione);
             } else {

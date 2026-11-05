@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\ApiV1;
 
+use Closure;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -77,7 +78,12 @@ class UpdateSocioApiRequest extends FormRequest
             'citta' => ['sometimes', 'nullable', 'string', 'max:100'],
             'provincia' => ['sometimes', 'nullable', 'string', 'max:2'],
             'cap' => ['sometimes', 'nullable', 'string', 'max:5'],
-            'note' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            // TEXT: 65535 BYTE, non caratteri (max: conta i caratteri multibyte uno)
+            'note' => ['sometimes', 'nullable', 'string', function (string $attribute, mixed $value, Closure $fail): void {
+                if (is_string($value) && strlen($value) > 65535) {
+                    $fail('Il campo note supera la dimensione massima di 65535 byte.');
+                }
+            }],
         ];
     }
 

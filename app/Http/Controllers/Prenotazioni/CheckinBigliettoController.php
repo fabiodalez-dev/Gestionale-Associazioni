@@ -7,6 +7,7 @@ use App\Http\Requests\Prenotazioni\CheckinBigliettoRequest;
 use App\Models\Prenotazione;
 use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Check-in dei biglietti (prenotazioni) dallo scanner admin.
@@ -92,13 +93,17 @@ class CheckinBigliettoController extends Controller
 
         $adesso = now();
 
-        $prenotazione->update([
-            'checkin_at' => $adesso,
-            'checkin_utente_id' => $request->user()?->getAuthIdentifier(),
-        ]);
+        // Check-in e registrazione del socio collegato all'account tra i
+        // partecipanti confermati nella stessa transazione: se la seconda
+        // fallisce il biglietto non risulta usato e la scansione si ripete
+        DB::transaction(function () use ($prenotazione, $adesso, $request, $presenze): void {
+            $prenotazione->update([
+                'checkin_at' => $adesso,
+                'checkin_utente_id' => $request->user()?->getAuthIdentifier(),
+            ]);
 
-        // Socio collegato all'account: anche tra i partecipanti confermati
-        $presenze->registraSociDellePrenotazioni($prenotazione->evento, [$prenotazione->id]);
+            $presenze->registraSociDellePrenotazioni($prenotazione->evento, [$prenotazione->id]);
+        });
 
         return response()->json([
             'success' => true,

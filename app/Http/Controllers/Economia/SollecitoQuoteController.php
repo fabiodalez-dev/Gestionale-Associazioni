@@ -28,11 +28,13 @@ class SollecitoQuoteController extends Controller
     {
         $this->authorize('viewAny', Quota::class);
 
-        // Le quote dei soci cessati non sono sollecitabili
+        // Le quote dei soci cessati non sono sollecitabili, e nemmeno quelle
+        // dei soci nel cestino: whereHas applica lo scope SoftDeletes, mentre
+        // whereDoesntHave lascerebbe passare i soci cessati già eliminati
         $query = Quota::query()
             ->with('socio')
             ->whereNull('data_pagamento')
-            ->whereDoesntHave('socio', fn ($q) => $q->whereIn('stato', Socio::STATI_CESSATI))
+            ->whereHas('socio', fn ($q) => $q->whereNotIn('stato', Socio::STATI_CESSATI))
             ->orderBy('data_scadenza')
             ->orderBy('created_at');
 
@@ -86,7 +88,7 @@ class SollecitoQuoteController extends Controller
             ->with('socio')
             ->whereIn('id', $validated['quota_ids'])
             ->whereNull('data_pagamento')
-            ->whereDoesntHave('socio', fn ($q) => $q->whereIn('stato', Socio::STATI_CESSATI))
+            ->whereHas('socio', fn ($q) => $q->whereNotIn('stato', Socio::STATI_CESSATI))
             ->get();
 
         foreach ($quote as $quota) {

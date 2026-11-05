@@ -37,12 +37,15 @@ class RinnovoAccountController extends Controller
             ->where('associazione_id', $account->associazione_id)
             ->firstOrFail();
 
-        $quota = $this->rinnovi->quotaPerRinnovo($socio);
+        // Anno calcolato una volta sola: quotaPerRinnovo può emettere la
+        // tessera e un nuovo calcolo indicherebbe nel messaggio l'anno dopo
+        $anno = $this->rinnovi->annoRinnovo($socio);
+        $quota = $this->rinnovi->quotaPerRinnovo($socio, $anno);
 
         if ($quota === null) {
             return redirect()
                 ->route('pubblico.account.tessera', $associazione)
-                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoRinnovo($socio).' risulta già emessa oppure il profilo socio non è attivo.');
+                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$anno.' risulta già emessa oppure il profilo socio non è attivo.');
         }
 
         return redirect()->route('pagamento.show', ['token' => $quota->payment_token]);

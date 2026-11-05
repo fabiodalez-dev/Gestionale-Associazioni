@@ -16,6 +16,7 @@ use App\Models\Tessera;
 use App\Models\TipoSocio;
 use App\Models\Utente;
 use App\Notifications\Accounts\VerificaEmailAccount;
+use App\Notifications\Iscrizioni\IscrizioneRifiutataNotification;
 use App\Services\Iscrizioni\FormIscrizioneService;
 use App\Services\Privacy\DatiPersonali;
 use Database\Seeders\RolesSeeder;
@@ -26,8 +27,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
+use ZipArchive;
 
 /**
  * Flussi reali — ADESIONE E ACCOUNT (batch 01).
@@ -593,6 +596,12 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         $this->assertSame(0, DB::table('valori_campi_personalizzati')->where('socio_id', $socioId)->count());
         $this->assertSame(0, DB::table('consensi')->where('socio_id', $socioId)->count());
 
+        // Iscritta da ospite (senza account): l'esito arriva all'email del modulo
+        Notification::assertSentOnDemand(
+            IscrizioneRifiutataNotification::class,
+            fn ($notifica, array $canali, $destinatario) => $destinatario->routes['mail'] === 'giulia.verdi@example.com'
+        );
+
         // Ora può ripresentare la domanda
         $this->inviaIscrizioneOspite(['custom_field' => [$professione->id => 'Medico']])
             ->assertSessionHasNoErrors()
@@ -633,6 +642,8 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         $socio = Socio::withoutGlobalScopes()->findOrFail($richiesta->socio_id);
         $this->assertSame(Socio::STATO_ATTIVO, $socio->stato);
         $this->assertSame($socio->id, $account->fresh()->socio_id);
+        // La data di iscrizione è quella della delibera di ammissione
+        $this->assertSame('2026-10-30', $socio->data_iscrizione->toDateString());
 
         $tessera = Tessera::withoutGlobalScopes()->where('socio_id', $socio->id)->sole();
         $this->assertSame(2026, (int) $tessera->anno_validita);
@@ -1036,7 +1047,7 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         $this->assertNull($account->fresh()->email_verified_at);
 
         // Link con l'id di un altro account ma la firma originale: rifiutato
-        $this->get(str_replace($account->id, (string) \Illuminate\Support\Str::uuid(), $link))->assertForbidden();
+        $this->get(str_replace($account->id, (string) Str::uuid(), $link))->assertForbidden();
         $this->assertNull($account->fresh()->email_verified_at);
 
         // Link valido: verificata
@@ -1453,6 +1464,28 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
             ->assertHeader('content-type', 'application/zip')
             ->assertDownload('dati-personali-privata-irene.zip');
         $this->assertStringStartsWith('PK', $risposta->streamedContent(), 'Il file scaricato deve essere uno ZIP.');
+
+        // Il dati.json dentro lo ZIP scaricato contiene davvero le sezioni
+        $zipLocale = tempnam(sys_get_temp_dir(), 'gdpr');
+        file_put_contents($zipLocale, $risposta->streamedContent());
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($zipLocale));
+        $datiZip = json_decode((string) $zip->getFromName('dati.json'), true, 512, JSON_THROW_ON_ERROR);
+        $documentoNelloZip = collect(range(0, $zip->numFiles - 1))
+            ->contains(fn (int $i) => str_starts_with((string) $zip->getNameIndex($i), 'documenti/'));
+        $zip->close();
+        unlink($zipLocale);
+
+        $this->assertSame('iscrizione_online', $datiZip['consensi'][0]['origine']);
+        $this->assertCount(1, $datiZip['consensi']);
+        $this->assertCount(1, $datiZip['quote']);
+        $this->assertCount(1, $datiZip['tessere']);
+        $this->assertCount(1, $datiZip['documenti']);
+        $this->assertSame(
+            ['Nota in anagrafica', 'Preferisce essere contattata la sera'],
+            array_column($datiZip['note_interne'], 'testo')
+        );
+        $this->assertTrue($documentoNelloZip, 'Il file del documento deve essere nello ZIP.');
 
         $this->assertDatabaseHas('activity_log', [
             'subject_id' => $socio->id,

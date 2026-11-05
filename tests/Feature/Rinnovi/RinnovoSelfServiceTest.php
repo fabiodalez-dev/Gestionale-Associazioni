@@ -6,6 +6,7 @@ use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 /**
  * f.1 — Rinnovo self-service dall'area soci: POST /area-soci/rinnova
@@ -93,6 +94,70 @@ class RinnovoSelfServiceTest extends RinnoviTestCase
         $response->assertRedirect(route('area-soci.dashboard'));
         $response->assertSessionHas('warning');
         $this->assertSame(0, Quota::allTenants()->where('socio_id', $socio->id)->count());
+    }
+
+    public function test_quota_dell_anno_gia_pagata_emette_la_tessera_e_l_avviso_cita_quell_anno(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-03-15 10:00:00'));
+        $this->configuraTenant();
+        $socio = $this->creaSocio(['password_hash' => 'password']);
+        Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => 2026,
+            'data_pagamento' => '2026-03-01',
+        ]);
+        // La segreteria ha già aperto la quota dell'anno dopo
+        Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => 2027,
+            'data_pagamento' => null,
+        ]);
+
+        $this->actingAs($socio, 'socio')->post('/area-soci/rinnova')
+            ->assertRedirect(route('area-soci.dashboard'))
+            ->assertSessionHas('warning', fn (string $avviso) => str_contains($avviso, 'la tessera per il 2026'));
+
+        $this->assertTrue(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2026)->exists());
+    }
+
+    public function test_quota_dell_anno_dopo_pagata_senza_tessera_permette_di_ritentare_l_emissione(): void
+    {
+        // Fuori dalla finestra dei promemoria di rinnovo anticipato
+        Carbon::setTestNow(Carbon::parse('2026-03-15 10:00:00'));
+        $this->configuraTenant();
+        $socio = $this->creaSocio(['password_hash' => 'password']);
+        Tessera::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno_validita' => 2026,
+            'data_scadenza' => '2026-12-31',
+        ]);
+        // Quota 2027 già pagata, ma l'emissione della tessera al pagamento è fallita
+        Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => 2027,
+            'data_pagamento' => '2026-03-01',
+        ]);
+
+        $this->actingAs($socio, 'socio')->get(route('area-soci.dashboard'))
+            ->assertOk()
+            ->assertSee('Rinnova per il 2027');
+
+        $this->actingAs($socio, 'socio')->post('/area-soci/rinnova')
+            ->assertRedirect(route('area-soci.dashboard'))
+            ->assertSessionHas('warning');
+
+        $this->assertTrue(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2027)->exists());
+        // Nessun secondo pagamento richiesto
+        $this->assertSame(1, Quota::allTenants()->where('socio_id', $socio->id)->where('anno', 2027)->count());
+
+        // Con la tessera emessa il pulsante sparisce
+        $this->actingAs($socio, 'socio')->get(route('area-soci.dashboard'))
+            ->assertOk()
+            ->assertDontSee('Rinnova per il 2027');
     }
 
     public function test_socio_non_attivo_non_puo_rinnovare(): void

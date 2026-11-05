@@ -121,9 +121,8 @@ class EventoController extends Controller
     {
         $this->authorize('delete', $evento);
 
-        $prenotazioni->annullaPerEventoEliminato($evento);
-
-        $evento->delete();
+        // Annullamento prenotazioni e soft delete in un'unica transazione
+        $prenotazioni->eliminaEvento($evento);
 
         return redirect()
             ->route('eventi.index')

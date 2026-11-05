@@ -12,6 +12,7 @@ use App\Models\TesseraCounter;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Servizio unico di emissione/rinnovo tessere (spec §10 "TesseraIssuer").
@@ -63,20 +64,27 @@ class TesseraIssuer
     public function prossimoNumero(string $associazioneId, int $anno): string
     {
         return DB::transaction(function () use ($associazioneId, $anno): string {
-            $counter = TesseraCounter::query()
+            $contatore = fn () => TesseraCounter::query()
                 ->withoutGlobalScope('associazione')
                 ->where('associazione_id', $associazioneId)
-                ->where('anno', $anno)
-                ->lockForUpdate()
-                ->first();
+                ->where('anno', $anno);
 
-            if ($counter === null) {
-                $counter = new TesseraCounter([
+            // Prima tessera dell'anno: la riga del contatore nasce con un
+            // upsert sul vincolo unique (associazione, anno). Con due emissioni
+            // concorrenti la seconda attende la prima invece di fallire per
+            // chiave duplicata (o deadlock sul gap lock di un SELECT FOR
+            // UPDATE a vuoto), che annullerebbe la transazione del chiamante.
+            if (! $contatore()->exists()) {
+                TesseraCounter::query()->withoutGlobalScope('associazione')->upsert([[
+                    'id' => (string) Str::uuid(),
                     'associazione_id' => $associazioneId,
                     'anno' => $anno,
                     'ultimo_numero' => $this->massimoProgressivoEsistente($associazioneId, $anno),
-                ]);
+                ]], ['associazione_id', 'anno'], ['anno']);
             }
+
+            /** @var TesseraCounter $counter */
+            $counter = $contatore()->lockForUpdate()->firstOrFail();
 
             do {
                 $counter->ultimo_numero++;
@@ -181,27 +189,34 @@ class TesseraIssuer
     {
         $anno = $anno ?? (int) now()->year;
 
-        $esistente = Tessera::allTenants()
-            ->where('socio_id', $socio->id)
-            ->where('associazione_id', $socio->associazione_id)
-            ->where('anno_validita', $anno)
-            ->orderByDesc('data_emissione')
-            ->first();
+        return DB::transaction(function () use ($socio, $anno, $eventoId): Tessera {
+            // Lock sulla riga del socio: due pagamenti concorrenti dello
+            // stesso socio non superano entrambi il controllo di esistenza
+            // (la tessera non ha un vincolo unique per socio e anno)
+            Socio::query()->withoutGlobalScopes()->whereKey($socio->id)->lockForUpdate()->first();
 
-        if ($esistente !== null) {
-            // Le tessere legacy possono non avere il QR URL persistito
-            if (empty($esistente->qr_code_url)) {
-                $esistente->qr_code_url = $this->qr->verificationUrl($esistente);
-                $esistente->save();
+            $esistente = Tessera::allTenants()
+                ->where('socio_id', $socio->id)
+                ->where('associazione_id', $socio->associazione_id)
+                ->where('anno_validita', $anno)
+                ->orderByDesc('data_emissione')
+                ->first();
+
+            if ($esistente !== null) {
+                // Le tessere legacy possono non avere il QR URL persistito
+                if (empty($esistente->qr_code_url)) {
+                    $esistente->qr_code_url = $this->qr->verificationUrl($esistente);
+                    $esistente->save();
+                }
+
+                return $esistente;
             }
 
-            return $esistente;
-        }
-
-        return $this->emetti($socio, [
-            'anno_validita' => $anno,
-            'evento_creazione_id' => $eventoId,
-        ]);
+            return $this->emetti($socio, [
+                'anno_validita' => $anno,
+                'evento_creazione_id' => $eventoId,
+            ]);
+        });
     }
 
     /**

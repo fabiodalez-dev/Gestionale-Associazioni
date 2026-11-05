@@ -203,6 +203,32 @@ class SociApiTest extends TestCase
             ->assertJsonPath('code', 'no_valid_fields');
     }
 
+    public function test_update_con_nome_di_soli_caratteri_di_controllo_restituisce_400_invalid_field(): void
+    {
+        $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Mario']);
+
+        $this->putJson('/api/v1/soci/'.$socio->id, ['nome' => "\u{0001}\u{0007}"], $this->auth())
+            ->assertStatus(400)
+            ->assertJsonPath('code', 'invalid_field');
+
+        $this->assertSame('Mario', $socio->fresh()->nome);
+    }
+
+    public function test_update_con_note_oltre_65535_byte_restituisce_400_invalid_field(): void
+    {
+        $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id, 'note' => null]);
+
+        // 40.000 caratteri ma 80.000 byte: oltre la colonna TEXT
+        $this->putJson('/api/v1/soci/'.$socio->id, ['note' => str_repeat('è', 40000)], $this->auth())
+            ->assertStatus(400)
+            ->assertJsonPath('code', 'invalid_field');
+        $this->assertNull($socio->fresh()->note);
+
+        // Al limite in byte passa
+        $this->putJson('/api/v1/soci/'.$socio->id, ['note' => str_repeat('è', 32767)], $this->auth())
+            ->assertOk();
+    }
+
     public function test_update_con_email_duplicata_restituisce_409(): void
     {
         Socio::factory()->create([

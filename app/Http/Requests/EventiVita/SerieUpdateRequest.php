@@ -62,13 +62,15 @@ class SerieUpdateRequest extends FormRequest
     protected function validaCapienzaNonRiducibile(Validator $validator): void
     {
         $evento = $this->route('evento');
-        $capienza = $this->input('capienza');
+        // Stesso parsing della regola integer (es. "+1" vale 1): con
+        // ctype_digit valori come "+1" saltavano il controllo dei posti
+        $capienza = filter_var($this->input('capienza'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         if (! $evento instanceof Evento || $evento->serie_id === null) {
             return;
         }
 
-        if ($capienza === null || $capienza === '' || ! ctype_digit((string) $capienza)) {
+        if ($capienza === false) {
             return; // illimitata o già segnalata dalla regola integer/min
         }
 

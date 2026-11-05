@@ -69,20 +69,24 @@ class CandidaturaService
     }
 
     /**
-     * Notifica agli amministratori attivi del tenant (admin_associazione +
-     * super_admin del tenant) con email valida.
+     * Notifica allo staff attivo del tenant con email valida che gestisce le
+     * candidature: amministratori (admin_associazione + super_admin del
+     * tenant) e chi può confermare il turno (permesso volontari.update, es.
+     * operatore o responsabile di sede). Le cariche in sola lettura (es.
+     * volontario) non vengono avvisate.
      */
     private function avvisaAdmin(TurnoAssegnazione $assegnazione, object $notification): void
     {
+        $turno = Turno::query()->withoutGlobalScopes()->find($assegnazione->turno_id);
+
         $admins = Utente::query()
             ->where('associazione_id', $assegnazione->associazione_id)
-            // Solo gli amministratori: operatori e cariche (es. volontario in
-            // sola lettura) non gestiscono le candidature
-            ->whereIn('ruolo', [Utente::RUOLO_ADMIN_ASSOCIAZIONE, Utente::RUOLO_SUPER_ADMIN])
             ->where('attivo', true)
             ->whereNotNull('email')
             ->get()
-            ->filter(fn (Utente $u) => filled($u->email));
+            ->filter(fn (Utente $u) => filled($u->email)
+                && (in_array($u->ruolo, [Utente::RUOLO_ADMIN_ASSOCIAZIONE, Utente::RUOLO_SUPER_ADMIN], true)
+                    || ($turno !== null && $u->can('update', $turno))));
 
         if ($admins->isNotEmpty()) {
             Notification::send($admins, $notification);

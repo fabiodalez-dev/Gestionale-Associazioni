@@ -63,8 +63,10 @@ class ApprovazioneIscrizioneService
         $tessera = null;
         /** @var Quota|null $quota */
         $quota = null;
+        /** @var string|null $emailRichiedente */
+        $emailRichiedente = null;
 
-        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $generaQuota, $deliberaNumero, $deliberaData, &$tessera, &$quota): RichiestaIscrizione {
+        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $generaQuota, $deliberaNumero, $deliberaData, &$tessera, &$quota, &$emailRichiedente): RichiestaIscrizione {
             $richiesta = $this->lockRichiesta($richiesta);
 
             if (! $richiesta->isInAttesa()) {
@@ -73,6 +75,10 @@ class ApprovazioneIscrizioneService
 
             $socio = $this->socioPreiscritto($richiesta);
             $account = $this->account($richiesta);
+
+            // Email per l'esito letta qui, come in rifiuta(): dopo il commit
+            // un errore di lettura darebbe un 500 su un'approvazione già salvata
+            $emailRichiedente = $this->emailSocio($socio->id);
 
             if ($account !== null && $account->socio_id !== null && $account->socio_id !== $socio->id) {
                 throw IscrizioneException::accountGiaCollegato();
@@ -138,7 +144,7 @@ class ApprovazioneIscrizioneService
             $tessera?->numero_tessera,
             $tessera?->id,
             $this->linkPagamentoQuota($quota)
-        ), $this->emailSocio($risultato->socio_id));
+        ), $emailRichiedente);
 
         return $risultato;
     }

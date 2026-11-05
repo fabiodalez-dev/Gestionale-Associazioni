@@ -10,6 +10,8 @@ use App\Models\Tessera;
 use App\Models\Utente;
 use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
 use App\Notifications\Iscrizioni\IscrizioneRifiutataNotification;
+use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
+use App\Services\Pagamenti\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -160,6 +162,31 @@ class RichiesteIscrizioneAdminTest extends TestCase
             IscrizioneApprovataNotification::class,
             fn (IscrizioneApprovataNotification $n) => $n->numeroTessera === $tessera->numero_tessera
         );
+    }
+
+    public function test_un_errore_nel_leggere_l_email_del_richiedente_non_lascia_un_approvazione_salvata_a_meta(): void
+    {
+        $richiesta = $this->creaRichiestaPendente();
+
+        // L'email per l'esito si legge dentro la transazione: un errore annulla
+        // tutto, invece di dare un 500 su un'approvazione già confermata
+        $servizio = new class(app(PaymentService::class)) extends ApprovazioneIscrizioneService
+        {
+            protected function emailSocio(?string $socioId): ?string
+            {
+                throw new \RuntimeException('Connessione persa');
+            }
+        };
+
+        try {
+            $servizio->approva($richiesta, $this->admin);
+            $this->fail('L\'errore deve arrivare al chiamante.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Connessione persa', $e->getMessage());
+        }
+
+        $this->assertSame(RichiestaIscrizione::STATO_IN_ATTESA, $richiesta->fresh()->stato);
+        $this->assertSame(Socio::STATO_IN_ATTESA, Socio::allTenants()->find($richiesta->socio_id)->stato);
     }
 
     public function test_approva_richiesta_gia_gestita_mostra_errore(): void

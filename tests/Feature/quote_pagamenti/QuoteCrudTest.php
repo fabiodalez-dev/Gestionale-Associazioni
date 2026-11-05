@@ -7,6 +7,7 @@ use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class QuoteCrudTest extends TestCase
@@ -188,6 +189,31 @@ class QuoteCrudTest extends TestCase
 
         $response->assertSessionHas('error');
         $this->assertDatabaseHas('quote', ['id' => $quota->id]);
+    }
+
+    public function test_destroy_ricontrolla_sotto_lock_il_pagamento_online_arrivato_nel_frattempo(): void
+    {
+        $socio = $this->creaSocio();
+        $quota = $this->creaQuota($socio);
+
+        // Il webhook registra il pagamento subito dopo il caricamento della
+        // quota dalla rotta: l'istanza in memoria non lo sa ancora
+        $primaLettura = true;
+        Quota::retrieved(function (Quota $letta) use (&$primaLettura, $quota): void {
+            if ($primaLettura && $letta->id === $quota->id) {
+                $primaLettura = false;
+                DB::table('quote')->where('id', $quota->id)->update([
+                    'data_pagamento' => now()->toDateString(),
+                    'gateway' => 'stripe',
+                    'gateway_transaction_id' => 'pi_concorrente',
+                ]);
+            }
+        });
+
+        $this->actingAs($this->admin)->delete(route('quote.destroy', $quota))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('quote', ['id' => $quota->id, 'gateway_transaction_id' => 'pi_concorrente']);
     }
 
     public function test_autocomplete_soci_scoped_sul_tenant(): void

@@ -23,12 +23,15 @@ class RinnovoSocioController extends Controller
         /** @var Socio $socio */
         $socio = $request->user('socio');
 
-        $quota = $this->rinnovi->quotaPerRinnovo($socio);
+        // Anno calcolato una volta sola: quotaPerRinnovo può emettere la
+        // tessera e un nuovo calcolo indicherebbe nel messaggio l'anno dopo
+        $anno = $this->rinnovi->annoRinnovo($socio);
+        $quota = $this->rinnovi->quotaPerRinnovo($socio, $anno);
 
         if ($quota === null) {
             return redirect()
                 ->route('area-soci.dashboard')
-                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoRinnovo($socio).' risulta già emessa oppure il tuo profilo non è attivo.');
+                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$anno.' risulta già emessa oppure il tuo profilo non è attivo.');
         }
 
         return redirect()->route('pagamento.show', ['token' => $quota->payment_token]);

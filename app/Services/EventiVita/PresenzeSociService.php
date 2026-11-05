@@ -8,6 +8,7 @@ use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
 use App\Models\Socio;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
  * Allinea i due canali delle presenze di un SOCIO a un evento:
@@ -80,6 +81,9 @@ class PresenzeSociService
                     ->withoutGlobalScope('associazione')
                     ->where('evento_id', $evento->id)
                     ->whereIn('id', $prenotazioneIds)
+                    // Solo biglietti validi: una prenotazione annullata dopo
+                    // il check-in non registra il socio tra i presenti
+                    ->where('stato', Prenotazione::STATO_CONFERMATA)
                     ->whereNotNull('checkin_at')
                     ->select('account_id'))
                 ->select('socio_id'))
@@ -104,13 +108,19 @@ class PresenzeSociService
                     'data_conferma' => now(),
                 ]);
             } else {
-                EventoPartecipante::create([
-                    'associazione_id' => $evento->associazione_id,
-                    'evento_id' => $evento->id,
-                    'socio_id' => $socioId,
-                    'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
-                    'data_conferma' => now(),
-                ]);
+                try {
+                    EventoPartecipante::create([
+                        'associazione_id' => $evento->associazione_id,
+                        'evento_id' => $evento->id,
+                        'socio_id' => $socioId,
+                        'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                        'data_conferma' => now(),
+                    ]);
+                } catch (UniqueConstraintViolationException) {
+                    // Registrato in parallelo (altro scanner o check-in con la
+                    // tessera, unique evento+socio): già tra i partecipanti
+                    continue;
+                }
             }
 
             $registrati++;

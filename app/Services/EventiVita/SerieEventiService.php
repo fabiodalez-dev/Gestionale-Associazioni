@@ -144,8 +144,9 @@ class SerieEventiService
             ->where('associazione_id', $evento->associazione_id)
             ->get()
             ->each(function (Evento $occorrenza) use (&$eliminate): void {
-                $this->prenotazioni->annullaPerEventoEliminato($occorrenza);
-                $occorrenza->delete();
+                // Annullamento prenotazioni e soft delete nella stessa
+                // transazione, una per occorrenza (mutex per-evento)
+                $this->prenotazioni->eliminaEvento($occorrenza);
                 $eliminate++;
             });
 

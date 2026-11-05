@@ -4,6 +4,7 @@ namespace Tests\Feature\Eventi;
 
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
@@ -147,6 +148,35 @@ class EventoCrudTest extends TestCase
         $response->assertRedirect(route('eventi.index'));
         $response->assertSessionHas('success', 'Evento eliminato con successo.');
         $this->assertSoftDeleted('eventi', ['id' => $evento->id]);
+    }
+
+    public function test_eliminazione_evento_fallita_non_annulla_le_prenotazioni(): void
+    {
+        $evento = Evento::factory()->pubblicato()->create([
+            'associazione_id' => $this->associazione->id,
+            'data_evento' => now()->addWeek(),
+        ]);
+        $prenotazione = Prenotazione::factory()->confermata()->create([
+            'associazione_id' => $this->associazione->id,
+            'evento_id' => $evento->id,
+        ]);
+
+        // Il soft delete fallisce: l'annullamento delle prenotazioni, nella
+        // stessa transazione, viene annullato con lui
+        Evento::deleting(fn () => throw new \RuntimeException('Soft delete fallito'));
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->admin)->delete("/eventi/{$evento->id}");
+            $this->fail('Eccezione attesa');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Soft delete fallito', $e->getMessage());
+        }
+
+        $this->assertNull($evento->fresh()->deleted_at);
+        $this->assertSame(Prenotazione::STATO_CONFERMATA, $prenotazione->fresh()->stato);
+        $this->assertNull($prenotazione->fresh()->annullata_at);
     }
 
     public function test_eliminazione_evento_di_altro_tenant_restituisce_404(): void

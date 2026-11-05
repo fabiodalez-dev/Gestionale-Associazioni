@@ -142,14 +142,20 @@ class RinnovoService
      */
     private function rinnovoAnticipatoDisponibile(Socio $socio, int $anno): bool
     {
-        $quotaAperta = Quota::allTenants()
+        $quoteAnno = Quota::allTenants()
             ->where('associazione_id', $socio->associazione_id)
             ->where('socio_id', $socio->id)
-            ->where('anno', $anno)
-            ->whereNull('data_pagamento')
-            ->exists();
+            ->where('anno', $anno);
 
-        if ($quotaAperta) {
+        if ((clone $quoteAnno)->whereNull('data_pagamento')->exists()) {
+            return true;
+        }
+
+        // Quota dell'anno già pagata ma tessera mai emessa (emissione
+        // best-effort fallita al pagamento): il rinnovo resta disponibile
+        // per ritentarla, quotaPerRinnovo la emette senza chiedere un nuovo
+        // pagamento. Con la tessera già emessa nulla cambia.
+        if ((clone $quoteAnno)->whereNotNull('data_pagamento')->exists() && ! $this->haTesseraAnno($socio, $anno)) {
             return true;
         }
 

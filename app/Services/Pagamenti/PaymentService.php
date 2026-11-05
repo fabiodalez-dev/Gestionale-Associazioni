@@ -510,7 +510,8 @@ class PaymentService
 
     /**
      * Crea la tessera per il socio attivato — idempotente per (associazione, socio, anno).
-     * Numero progressivo per associazione, zero-padded a 4 cifre, generato sotto lock.
+     * Emissione delegata a TesseraIssuer: numerazione unificata {anno}{NNNN}
+     * (contatore sotto lock), etichetta template e QR di verifica firmato.
      */
     public function createTesseraForSocio(Socio $socio): ?Tessera
     {
@@ -526,40 +527,12 @@ class PaymentService
             return null;
         }
 
-        /** @var Associazione|null $associazione */
-        $associazione = Associazione::find($socio->associazione_id);
-        $tipoScadenza = $associazione?->tesseramento()->tipo_scadenza_default ?? Tessera::TIPO_SCADENZA_SOLARE;
-
-        $dataScadenza = $tipoScadenza === Tessera::TIPO_SCADENZA_ANNUALE
-            ? now()->addYear()->toDateString()
-            : now()->endOfYear()->toDateString();
-
-        // Progressivo sotto lock per evitare la race condition del legacy
-        $maxNumero = Tessera::allTenants()
-            ->where('associazione_id', $socio->associazione_id)
-            ->lockForUpdate()
-            ->pluck('numero_tessera')
-            ->map(fn ($n) => (int) $n)
-            ->max() ?? 0;
-
-        $numeroTessera = str_pad((string) ($maxNumero + 1), 4, '0', STR_PAD_LEFT);
-
-        $tessera = new Tessera([
-            'associazione_id' => $socio->associazione_id,
-            'socio_id' => $socio->id,
-            'numero_tessera' => $numeroTessera,
-            'anno_validita' => $anno,
-            'data_emissione' => now()->toDateString(),
-            'data_scadenza' => $dataScadenza,
-            'stato' => Tessera::STATO_ATTIVA,
-            'tipo_scadenza' => $tipoScadenza,
-        ]);
-        $tessera->save();
+        $tessera = app(TesseraIssuer::class)->emetti($socio, ['anno_validita' => $anno]);
 
         $this->logSocioActivity(
             $socio,
             'Generazione Tessera',
-            "Tessera {$numeroTessera} generata dopo pagamento online."
+            "Tessera {$tessera->numero_tessera} generata dopo pagamento online."
         );
 
         return $tessera;

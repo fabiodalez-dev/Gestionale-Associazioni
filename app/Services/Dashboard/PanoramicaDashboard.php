@@ -49,12 +49,12 @@ class PanoramicaDashboard
 
         $incassi = null;
         if ($vediQuote) {
-            $incassatoAnno = (float) Quota::query()->where('stato', 'Pagata')->where('anno', $anno)->sum('importo');
-            $incassatoPrecedente = (float) Quota::query()->where('stato', 'Pagata')->where('anno', $anno - 1)->sum('importo');
+            $incassatoAnno = (float) Quota::query()->whereNotNull('data_pagamento')->where('anno', $anno)->sum('importo');
+            $incassatoPrecedente = (float) Quota::query()->whereNotNull('data_pagamento')->where('anno', $anno - 1)->sum('importo');
             $incassi = [
                 'incassato_anno' => $incassatoAnno,
                 'variazione' => $this->variazione($incassatoAnno, $incassatoPrecedente),
-                'da_incassare' => (float) Quota::query()->where('stato', '!=', 'Pagata')->where('anno', $anno)->sum('importo'),
+                'da_incassare' => (float) Quota::query()->whereNull('data_pagamento')->where('anno', $anno)->sum('importo'),
             ];
         }
 
@@ -195,7 +195,7 @@ class PanoramicaDashboard
         }
 
         if ($quote) {
-            Quota::query()->with('socio:id,nome,cognome')->where('stato', 'Pagata')->whereNotNull('data_pagamento')
+            Quota::query()->with('socio:id,nome,cognome')->whereNotNull('data_pagamento')
                 ->latest('data_pagamento')->limit(4)->get()
                 ->each(fn (Quota $q) => $voci->push([
                     'tipo' => 'info',

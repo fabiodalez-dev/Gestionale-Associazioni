@@ -513,29 +513,32 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         $indirizzo = str_pad($indirizzo, 300, 'x');
         $this->assertSame(300, mb_strlen($indirizzo));
 
-        $risposta = $this->inviaIscrizioneOspite(['indirizzo' => $indirizzo]);
-
-        $this->assertNotSame(500, $risposta->status(), 'L\'invio non deve generare un errore 500.');
-        $risposta->assertSessionHasNoErrors()->assertSessionHas('success');
-
-        $socio = Socio::withoutGlobalScopes()->where('email', 'giulia.verdi@example.com')->sole();
-
-        // Su SQLite la colonna non ha limite effettivo: il valore è intero
-        $this->assertSame($indirizzo, $socio->indirizzo);
-
-        // Ma lo schema reale (installer MariaDB, uguale alla migration
-        // string('indirizzo') = varchar(255)) non può contenerlo: in strict
-        // mode l'INSERT fallisce con "Data too long" → errore 500 per
-        // l'utente. La regola del form pubblico deve stare entro la colonna,
-        // come già fanno SocioRequest e ModificaDatiService (max:255).
+        // Lo schema reale (installer MariaDB, uguale alla migration
+        // string('indirizzo') = varchar(255)) non può contenere 300 caratteri:
+        // in strict mode l'INSERT fallirebbe con "Data too long" → errore 500.
+        // La regola del form pubblico deve quindi stare entro la colonna, come
+        // già fanno SocioRequest e ModificaDatiService (max:255): l'indirizzo
+        // troppo lungo va segnalato sul campo, senza creare il socio.
         $lunghezza = $this->lunghezzaColonnaSchemaInstaller('soci', 'indirizzo');
         $this->assertNotNull($lunghezza, 'Colonna soci.indirizzo non trovata in database/installer/schema.sql');
-        $this->assertGreaterThanOrEqual(
-            mb_strlen($indirizzo),
-            $lunghezza,
-            "Su MariaDB soci.indirizzo è varchar({$lunghezza}) ma FormIscrizioneService accetta max:500: "
-            .'un indirizzo di 300 caratteri passa la validazione e fa fallire l\'INSERT (500).'
-        );
+        $this->assertLessThan(mb_strlen($indirizzo), $lunghezza);
+
+        $this->comeOspite();
+        $risposta = $this->from($this->url('iscriviti'))
+            ->post($this->url('iscriviti'), $this->datiOspite(['indirizzo' => $indirizzo]));
+
+        $this->assertNotSame(500, $risposta->status(), 'L\'invio non deve generare un errore 500.');
+        $risposta->assertSessionHasErrors('indirizzo');
+        $this->assertSame(0, Socio::withoutGlobalScopes()->where('email', 'giulia.verdi@example.com')->count());
+
+        // Un indirizzo che sta nella colonna viene salvato per intero
+        $entro = mb_substr($indirizzo, 0, $lunghezza);
+        $this->inviaIscrizioneOspite(['indirizzo' => $entro])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $socio = Socio::withoutGlobalScopes()->where('email', 'giulia.verdi@example.com')->sole();
+        $this->assertSame($entro, $socio->indirizzo);
     }
 
     // ------------------------------------------------------------------

@@ -148,6 +148,20 @@ class AccountAdminController extends Controller
                 ->with('error', 'Questo account è già collegato a un socio.');
         }
 
+        // soci(associazione_id, email) è unique (anche per i soci nel
+        // cestino): l'anagrafica esiste già, va collegata, non duplicata.
+        $emailGiaUsata = Socio::withoutGlobalScopes()
+            ->withTrashed()
+            ->where('associazione_id', $account->associazione_id)
+            ->where('email', $account->email)
+            ->exists();
+
+        if ($emailGiaUsata) {
+            return redirect()
+                ->route('accounts.show', $account)
+                ->with('error', 'Esiste già un socio con questa email: usa "Collega a socio" per collegarlo all\'account.');
+        }
+
         $socio = $this->soci->crea([
             'associazione_id' => $account->associazione_id,
             'nome' => $account->nome,

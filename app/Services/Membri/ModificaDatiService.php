@@ -166,6 +166,8 @@ class ModificaDatiService
     /**
      * Approva: applica al socio i soli campi in whitelist e scrive lo
      * storico con il diff applicato.
+     *
+     * @throws ModificaDatiException se email/codice fiscale sono ormai di un altro socio
      */
     public function approva(RichiestaModificaDati $richiesta, Utente $admin): void
     {
@@ -186,6 +188,8 @@ class ModificaDatiService
                 );
             }
 
+            $this->verificaUnicita($socio);
+
             $socio->save();
 
             StoricoAttivitaSocio::create([
@@ -204,6 +208,33 @@ class ModificaDatiService
                 'gestita_at' => now(),
             ]);
         });
+    }
+
+    /**
+     * Rivalida all'approvazione l'unicità di email e codice fiscale: tra la
+     * proposta e l'approvazione il valore può essere stato assegnato a un
+     * altro socio del tenant (il vincolo unique conta anche il cestino).
+     *
+     * @throws ModificaDatiException
+     */
+    private function verificaUnicita(Socio $socio): void
+    {
+        foreach (['email', 'codice_fiscale'] as $campo) {
+            if (! $socio->isDirty($campo) || blank($socio->{$campo})) {
+                continue;
+            }
+
+            $occupato = Socio::withoutGlobalScopes()
+                ->withTrashed()
+                ->where('associazione_id', $socio->associazione_id)
+                ->where($campo, $socio->{$campo})
+                ->whereKeyNot($socio->getKey())
+                ->exists();
+
+            if ($occupato) {
+                throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo] ?? $campo));
+            }
+        }
     }
 
     /**

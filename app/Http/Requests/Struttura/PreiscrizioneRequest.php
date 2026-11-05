@@ -39,7 +39,7 @@ class PreiscrizioneRequest extends FormRequest
             'data_nascita' => [$required('data_nascita'), 'date_format:Y-m-d'],
             'telefono' => [$required('telefono'), 'string', 'max:20'],
             'codice_fiscale' => [$required('codice_fiscale'), 'string', 'max:16'],
-            'indirizzo' => [$required('indirizzo'), 'string', 'max:500'],
+            'indirizzo' => [$required('indirizzo'), 'string', 'max:255'],
             'citta' => [$required('citta'), 'string', 'max:100'],
             'provincia' => [$required('provincia'), 'string', 'size:2', 'alpha'],
             'cap' => [$required('cap'), 'digits:5'],

@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -433,5 +434,35 @@ class CheckinPerPostoSincronizzatoTest extends TestCase
         $this->assertSame(3, (int) $righe[$arrivata->id]->posti_entrati);
         $this->assertNull($righe[$arrivata->id]->checkin_origine);
         $this->assertSame(0, (int) $righe[$nonArrivata->id]->posti_entrati);
+    }
+
+    public function test_presenze_dalle_prenotazioni_confermano_il_partecipante_creato_in_parallelo_con_un_altro_stato(): void
+    {
+        $prenotazione = $this->prenotazioneDelSocio(1);
+        $prenotazione->forceFill(['checkin_at' => now(), 'posti_entrati' => 1])->save();
+
+        // Fra la lettura iniziale e il create() un inserimento parallelo crea
+        // la riga del socio come "Non Partecipa" (unique evento+socio)
+        EventoPartecipante::creating(function (EventoPartecipante $nuovo): void {
+            if ($nuovo->socio_id === $this->socio->id
+                && ! EventoPartecipante::allTenants()->where('evento_id', $this->evento->id)->exists()) {
+                DB::table('eventi_partecipanti')->insert([
+                    'id' => (string) Str::uuid(),
+                    'associazione_id' => $this->associazione->id,
+                    'evento_id' => $this->evento->id,
+                    'socio_id' => $this->socio->id,
+                    'stato_partecipazione' => EventoPartecipante::STATO_NON_PARTECIPA,
+                    'created_at' => now(),
+                ]);
+            }
+        });
+
+        $registrati = app(PresenzeSociService::class)
+            ->registraSociDellePrenotazioni($this->evento, [$prenotazione->id]);
+
+        $this->assertSame(1, $registrati);
+        $partecipanti = EventoPartecipante::allTenants()->where('evento_id', $this->evento->id)->get();
+        $this->assertCount(1, $partecipanti);
+        $this->assertSame(EventoPartecipante::STATO_CONFERMATO, $partecipanti->first()->stato_partecipazione);
     }
 }

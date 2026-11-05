@@ -201,10 +201,29 @@ class PresenzeSociService
                         'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
                         'data_conferma' => now(),
                     ]);
-                } catch (UniqueConstraintViolationException) {
-                    // Registrato in parallelo (altro scanner o check-in con la
-                    // tessera, unique evento+socio): già tra i partecipanti
-                    continue;
+                } catch (UniqueConstraintViolationException $e) {
+                    // Riga creata in parallelo (unique evento+socio): può essere
+                    // un altro check-in (già confermata) o un inserimento admin
+                    // con un altro stato, da confermare dopo la lettura corrente
+                    $partecipante = EventoPartecipante::query()
+                        ->withoutGlobalScopes()
+                        ->where('evento_id', $evento->id)
+                        ->where('socio_id', $socioId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($partecipante === null) {
+                        throw $e;
+                    }
+
+                    if ($partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+                        continue;
+                    }
+
+                    $partecipante->update([
+                        'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                        'data_conferma' => now(),
+                    ]);
                 }
             }
 

@@ -96,7 +96,7 @@ class RinnovoSelfServiceTest extends RinnoviTestCase
         $this->assertSame(0, Quota::allTenants()->where('socio_id', $socio->id)->count());
     }
 
-    public function test_quota_dell_anno_gia_pagata_emette_la_tessera_e_l_avviso_cita_quell_anno(): void
+    public function test_quota_dell_anno_gia_pagata_emette_la_tessera_e_l_esito_cita_quell_anno(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-03-15 10:00:00'));
         $this->configuraTenant();
@@ -117,7 +117,8 @@ class RinnovoSelfServiceTest extends RinnoviTestCase
 
         $this->actingAs($socio, 'socio')->post('/area-soci/rinnova')
             ->assertRedirect(route('area-soci.dashboard'))
-            ->assertSessionHas('warning', fn (string $avviso) => str_contains($avviso, 'la tessera per il 2026'));
+            ->assertSessionMissing('warning')
+            ->assertSessionHas('success', fn (string $esito) => str_contains($esito, 'la tessera per il 2026 è stata emessa'));
 
         $this->assertTrue(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2026)->exists());
     }
@@ -142,13 +143,16 @@ class RinnovoSelfServiceTest extends RinnoviTestCase
             'data_pagamento' => '2026-03-01',
         ]);
 
+        // Il pulsante non promette un pagamento: la quota è già pagata
         $this->actingAs($socio, 'socio')->get(route('area-soci.dashboard'))
             ->assertOk()
-            ->assertSee('Rinnova per il 2027');
+            ->assertSee('Emetti la tessera 2027')
+            ->assertDontSee('Paghi online la quota 2027');
 
         $this->actingAs($socio, 'socio')->post('/area-soci/rinnova')
             ->assertRedirect(route('area-soci.dashboard'))
-            ->assertSessionHas('warning');
+            ->assertSessionMissing('warning')
+            ->assertSessionHas('success', fn (string $esito) => str_contains($esito, 'la tessera per il 2027 è stata emessa'));
 
         $this->assertTrue(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', 2027)->exists());
         // Nessun secondo pagamento richiesto
@@ -157,7 +161,8 @@ class RinnovoSelfServiceTest extends RinnoviTestCase
         // Con la tessera emessa il pulsante sparisce
         $this->actingAs($socio, 'socio')->get(route('area-soci.dashboard'))
             ->assertOk()
-            ->assertDontSee('Rinnova per il 2027');
+            ->assertDontSee('Rinnova per il 2027')
+            ->assertDontSee('Emetti la tessera 2027');
     }
 
     public function test_socio_non_attivo_non_puo_rinnovare(): void

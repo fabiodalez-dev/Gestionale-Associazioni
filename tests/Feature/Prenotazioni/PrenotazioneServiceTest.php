@@ -666,6 +666,29 @@ class PrenotazioneServiceTest extends TestCase
         $this->assertSame([], $this->service->idPerTipo('confermata'));
     }
 
+    public function test_pagamento_tardivo_di_una_prenotazione_annullata_dall_eliminazione_segnala_il_rimborso(): void
+    {
+        $evento = Evento::factory()->pubblicato()->conCapienza(5)->aPagamento()->create([
+            'data_evento' => now()->addWeek(),
+        ]);
+        $prenotazione = $this->service->crea($this->creaAccount($evento), $evento, 1);
+
+        // Ancora in attesa di pagamento: l'eliminazione dell'evento la annulla
+        $this->service->eliminaEvento($evento);
+        $this->assertSame(Prenotazione::STATO_ANNULLATA, $this->fresca($prenotazione)->stato);
+
+        // Il checkout era ancora aperto e incassa dopo l'eliminazione
+        $esito = $this->service->onPagamentoCompletato($prenotazione->id, $evento->associazione_id, 'stripe', 'pi_dopo_annullo');
+
+        $this->assertSame(Prenotazione::STATO_ANNULLATA, $esito->stato);
+        $this->assertSame("Pagamento ricevuto dopo l'eliminazione dell'evento: rimborso da gestire manualmente", $esito->motivo_annullamento);
+        $this->assertNotNull($esito->pagata_at);
+        $this->assertSame('pi_dopo_annullo', $esito->gateway_transaction_id);
+        $this->assertSame([], $this->service->idPerTipo('confermata'));
+        // Due avvisi di annullamento: all'eliminazione e dopo l'incasso (con il rimborso)
+        $this->assertSame([$prenotazione->id, $prenotazione->id], $this->service->idPerTipo('annullata'));
+    }
+
     // ------------------------------------------------------------------
     // Notifiche: sempre fuori dalla transazione
     // ------------------------------------------------------------------

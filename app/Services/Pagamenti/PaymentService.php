@@ -433,6 +433,15 @@ class PaymentService
                 return true;
             }
 
+            // Lock sulla riga del socio prima di ogni altra lettura o scrittura
+            // (ordine quota → socio → contatore tessere): due pagamenti dello
+            // stesso socio si serializzano qui. Preso più avanti, il secondo
+            // vedrebbe uno snapshot senza la tessera appena emessa dal primo,
+            // oppure andrebbe in deadlock con i lock condivisi delle foreign
+            // key presi dal log attività
+            /** @var Socio|null $socio */
+            $socio = Socio::allTenants()->withTrashed()->lockForUpdate()->find($quota->socio_id);
+
             $quota->forceFill([
                 'stato' => Quota::STATO_PAGATA,
                 'data_pagamento' => now()->toDateString(),
@@ -440,9 +449,6 @@ class PaymentService
                 'gateway_transaction_id' => $transactionId,
                 'metodo_pagamento' => $gateway,
             ])->save();
-
-            /** @var Socio|null $socio */
-            $socio = Socio::allTenants()->withTrashed()->find($quota->socio_id);
 
             if ($socio === null) {
                 return true;

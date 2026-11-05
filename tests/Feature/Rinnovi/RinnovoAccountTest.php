@@ -88,6 +88,35 @@ class RinnovoAccountTest extends RinnoviTestCase
         $this->assertSame(0, Quota::allTenants()->where('socio_id', $socio->id)->count());
     }
 
+    public function test_account_con_quota_anno_gia_pagata_emette_la_tessera_con_esito_di_successo(): void
+    {
+        $this->configuraFrontend();
+        $socio = $this->creaSocio();
+        // Quota pagata, ma l'emissione della tessera al pagamento è fallita
+        Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => (int) now()->year,
+            'data_pagamento' => now()->toDateString(),
+        ]);
+        $account = $this->creaAccountCollegato($socio);
+
+        $this->actingAs($account, 'account')
+            ->get(route('pubblico.account.tessera', $this->associazione))
+            ->assertOk()
+            ->assertSee('Emetti la tessera '.now()->year)
+            ->assertDontSee('Paghi online la quota '.now()->year);
+
+        $this->actingAs($account, 'account')
+            ->post(route('pubblico.account.rinnova', $this->associazione))
+            ->assertRedirect(route('pubblico.account.tessera', $this->associazione))
+            ->assertSessionMissing('warning')
+            ->assertSessionHas('success', fn (string $esito) => str_contains($esito, 'la tessera per il '.now()->year.' è stata emessa'));
+
+        $this->assertTrue(Tessera::allTenants()->where('socio_id', $socio->id)->where('anno_validita', (int) now()->year)->exists());
+        $this->assertSame(1, Quota::allTenants()->where('socio_id', $socio->id)->count());
+    }
+
     public function test_isolamento_tenant_account_non_rinnova_su_altro_mini_sito(): void
     {
         $this->configuraFrontend();

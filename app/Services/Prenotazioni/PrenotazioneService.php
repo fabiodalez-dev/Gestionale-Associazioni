@@ -695,6 +695,21 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
             } elseif ($confermabile) {
                 $dati['stato'] = Prenotazione::STATO_CONFERMATA;
                 $this->accodaNotifica('notificaConfermata', $prenotazione);
+            } elseif ($prenotazione->stato === Prenotazione::STATO_ANNULLATA && $evento->trashed()) {
+                // Prenotazione in attesa annullata dall'eliminazione dell'evento
+                // e poi pagata dal checkout ancora aperto: stesso esito del
+                // ramo sopra (motivo esplicito e nuovo avviso, che ora cita il
+                // rimborso perché la prenotazione risulta pagata)
+                $dati['motivo_annullamento'] = "Pagamento ricevuto dopo l'eliminazione dell'evento: rimborso da gestire manualmente";
+                $this->accodaNotifica('notificaAnnullata', $prenotazione);
+
+                Log::warning('PrenotazioneService: pagamento su prenotazione di un evento eliminato, rimborso da gestire', [
+                    'prenotazione_id' => $prenotazione->id,
+                    'evento_id' => $evento->id,
+                    'stato' => $prenotazione->stato,
+                    'gateway' => $gateway,
+                    'transaction_id' => $transactionId,
+                ]);
             } else {
                 // Stato inatteso (es. annullata): registra l'incasso senza
                 // cambiare stato, il follow-up (rimborso manuale) è in admin

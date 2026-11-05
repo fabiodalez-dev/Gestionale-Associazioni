@@ -40,7 +40,16 @@ class RinnovoAccountController extends Controller
         // Anno calcolato una volta sola: quotaPerRinnovo può emettere la
         // tessera e un nuovo calcolo indicherebbe nel messaggio l'anno dopo
         $anno = $this->rinnovi->annoRinnovo($socio);
+        $avevaTessera = $this->rinnovi->haTesseraAnno($socio, $anno);
         $quota = $this->rinnovi->quotaPerRinnovo($socio, $anno);
+
+        // Quota dell'anno già pagata: nessun pagamento, la tessera mancante
+        // è stata emessa adesso e l'esito è un successo, non un avviso
+        if ($quota === null && ! $avevaTessera && $this->rinnovi->haTesseraAnno($socio, $anno)) {
+            return redirect()
+                ->route('pubblico.account.tessera', $associazione)
+                ->with('success', 'La quota '.$anno.' risulta già pagata: la tessera per il '.$anno.' è stata emessa.');
+        }
 
         if ($quota === null) {
             return redirect()

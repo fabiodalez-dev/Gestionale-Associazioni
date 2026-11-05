@@ -224,6 +224,11 @@ class TesseraIssuer
      * dell'associazione senza tessera per l'anno indicato (qualunque stato).
      * In transazione; nessuna email nel flusso massivo.
      *
+     * Il lock del contatore resta preso fino al commit: un pagamento online
+     * concorrente di un socio del lotto (ordine socio → contatore) può
+     * andare in deadlock con questo flusso. InnoDB lo rileva e annulla una
+     * delle due transazioni senza effetti parziali (il webhook viene ritentato).
+     *
      * @return int numero di tessere generate
      */
     public function generaMassivo(Associazione $associazione, int $anno, ?string $eventoId = null): int

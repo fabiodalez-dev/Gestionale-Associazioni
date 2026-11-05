@@ -70,6 +70,20 @@ class RinnovoService
     }
 
     /**
+     * Esiste già una quota pagata del socio per l'anno? In quel caso il
+     * rinnovo non chiede un nuovo pagamento ma emette solo la tessera.
+     */
+    public function quotaAnnoPagata(Socio $socio, int $anno): bool
+    {
+        return Quota::allTenants()
+            ->where('associazione_id', $socio->associazione_id)
+            ->where('socio_id', $socio->id)
+            ->where('anno', $anno)
+            ->whereNotNull('data_pagamento')
+            ->exists();
+    }
+
+    /**
      * Quota per il rinnovo dell'anno indicato (default: annoRinnovo): riusa
      * una quota non pagata esistente, altrimenti la crea con l'importo del
      * tipo socio (fallback costo tessera associazione). Garantisce un
@@ -88,12 +102,7 @@ class RinnovoService
             return null;
         }
 
-        $quoteAnno = Quota::allTenants()
-            ->where('associazione_id', $socio->associazione_id)
-            ->where('socio_id', $socio->id)
-            ->where('anno', $anno);
-
-        if ((clone $quoteAnno)->whereNotNull('data_pagamento')->exists()) {
+        if ($this->quotaAnnoPagata($socio, $anno)) {
             try {
                 $this->tessere->emettiSeAssente($socio, $anno);
             } catch (\Throwable $e) {
@@ -105,7 +114,10 @@ class RinnovoService
         }
 
         /** @var Quota|null $quota */
-        $quota = $quoteAnno
+        $quota = Quota::allTenants()
+            ->where('associazione_id', $socio->associazione_id)
+            ->where('socio_id', $socio->id)
+            ->where('anno', $anno)
             ->whereNull('data_pagamento')
             ->orderBy('data_scadenza')
             ->first();
@@ -142,12 +154,14 @@ class RinnovoService
      */
     private function rinnovoAnticipatoDisponibile(Socio $socio, int $anno): bool
     {
-        $quoteAnno = Quota::allTenants()
+        $quotaAperta = Quota::allTenants()
             ->where('associazione_id', $socio->associazione_id)
             ->where('socio_id', $socio->id)
-            ->where('anno', $anno);
+            ->where('anno', $anno)
+            ->whereNull('data_pagamento')
+            ->exists();
 
-        if ((clone $quoteAnno)->whereNull('data_pagamento')->exists()) {
+        if ($quotaAperta) {
             return true;
         }
 
@@ -155,7 +169,7 @@ class RinnovoService
         // best-effort fallita al pagamento): il rinnovo resta disponibile
         // per ritentarla, quotaPerRinnovo la emette senza chiedere un nuovo
         // pagamento. Con la tessera già emessa nulla cambia.
-        if ((clone $quoteAnno)->whereNotNull('data_pagamento')->exists() && ! $this->haTesseraAnno($socio, $anno)) {
+        if ($this->quotaAnnoPagata($socio, $anno) && ! $this->haTesseraAnno($socio, $anno)) {
             return true;
         }
 

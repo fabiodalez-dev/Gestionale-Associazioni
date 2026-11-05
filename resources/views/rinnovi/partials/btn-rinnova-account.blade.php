@@ -13,9 +13,17 @@
 @if ($rinnovoService->puoRinnovare($socio, $annoRinnovo))
     <form method="POST" action="{{ route('pubblico.account.rinnova', $associazione) }}" class="mt-3 mb-0">
         @csrf
-        <button type="submit" class="btn btn-primary">
-            <i class="bi bi-arrow-repeat me-1"></i>Rinnova per il {{ $annoRinnovo }}
-        </button>
-        <div class="form-text">Paghi online la quota {{ $annoRinnovo }} e la tessera viene emessa automaticamente.</div>
+        @if ($rinnovoService->quotaAnnoPagata($socio, $annoRinnovo))
+            {{-- Quota già pagata ma tessera mancante: si emette solo la tessera --}}
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-person-badge me-1"></i>Emetti la tessera {{ $annoRinnovo }}
+            </button>
+            <div class="form-text">La quota {{ $annoRinnovo }} risulta già pagata: la tessera viene emessa subito, senza nuovi pagamenti.</div>
+        @else
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-arrow-repeat me-1"></i>Rinnova per il {{ $annoRinnovo }}
+            </button>
+            <div class="form-text">Paghi online la quota {{ $annoRinnovo }} e la tessera viene emessa automaticamente.</div>
+        @endif
     </form>
 @endif

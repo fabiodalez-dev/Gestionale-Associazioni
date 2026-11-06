@@ -4,9 +4,13 @@ name: Release
 # inclusi) con bin/build-release.sh e lo pubblica come asset della GitHub
 # Release, insieme al suo SHA256. L'aggiornatore in-app (/aggiornamenti)
 # scarica esattamente questo asset: <repo>-<tag>.zip e <repo>-<tag>.zip.sha256.
+# Avviato a mano (Actions > Release > Run workflow) dalla branch main pubblica
+# la versione del file VERSION: il tag v<VERSION> viene creato insieme alla
+# release, sul commit costruito. Utile quando non si può pushare il tag.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions: {}
 
@@ -43,20 +47,40 @@ jobs:
           package-manager-cache: false
 
       - name: Il tag deve coincidere con il file VERSION
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME#v}"
           versione="$(tr -d '[:space:]' < VERSION)"
-          if [ "$tag" != "$versione" ]; then
-            echo "Tag v$tag ma VERSION contiene $versione: allinea il file VERSION prima di taggare." >&2
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            # Avvio manuale: solo da main, e solo per una versione non ancora
+            # taggata (un tag esistente si ripubblica rilanciando il suo push)
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "L'avvio manuale pubblica solo dalla branch main (ora: $GITHUB_REF)." >&2
+              exit 1
+            fi
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$versione" >/dev/null 2>&1; then
+              echo "Il tag v$versione esiste già: aggiorna il file VERSION prima di pubblicare." >&2
+              exit 1
+            fi
+            tag="v$versione"
+          else
+            tag="$GITHUB_REF_NAME"
+            if [ "${tag#v}" != "$versione" ]; then
+              echo "Tag $tag ma VERSION contiene $versione: allinea il file VERSION prima di taggare." >&2
+              exit 1
+            fi
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Costruisci il pacchetto
         run: bash bin/build-release.sh
 
       - name: Verifica il pacchetto
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          zip="releases/gestionale-associazioni-${GITHUB_REF_NAME}.zip"
+          zip="releases/gestionale-associazioni-${TAG}.zip"
           test -f "$zip"
           (cd releases && shasum -a 256 -c "$(basename "$zip").sha256")
           unzip -l "$zip" | grep -q "gestionale-associazioni/vendor/autoload.php"
@@ -67,14 +91,17 @@ jobs:
       - name: Pubblica la release con il pacchetto
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           # Un tag con trattino (v1.2.3-rc.1) è una prerelease: non deve
           # diventare "Latest", altrimenti il canale stabile dell'updater
           # (/releases/latest) la proporrebbe a tutte le installazioni
           extra=""
-          case "$GITHUB_REF_NAME" in *-*) extra="--prerelease" ;; esac
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --clobber
+          case "$TAG" in *-*) extra="--prerelease" ;; esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" releases/*.zip releases/*.sha256 --clobber
           else
-            gh release create "$GITHUB_REF_NAME" releases/*.zip releases/*.sha256 --title "$GITHUB_REF_NAME" --generate-notes $extra
+            # --target crea il tag sul commit costruito se non esiste ancora
+            # (avvio manuale); con il push del tag è già quello
+            gh release create "$TAG" releases/*.zip releases/*.sha256 --title "$TAG" --target "$GITHUB_SHA" --generate-notes $extra
           fi

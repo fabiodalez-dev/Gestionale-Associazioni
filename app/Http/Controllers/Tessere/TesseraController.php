@@ -391,10 +391,11 @@ class TesseraController extends Controller
     /**
      * Tessere doppie (stesso socio e anno, non annullate) rimaste da prima
      * del vincolo socio/anno: tenta prima di applicarlo, poi elenca quelle
-     * dei soci visibili all'utente (associazione e perimetro sedi), più il
-     * numero di quelle fuori vista che lo bloccano comunque.
+     * dei soci visibili all'utente (associazione e perimetro sedi), il
+     * numero di quelle dei soci nel cestino (da ripristinare per correggerle)
+     * e quello delle altre fuori vista, che lo bloccano comunque.
      *
-     * @return array{visibili: Collection<int, object>, altri: int}|null
+     * @return array{visibili: Collection<int, \stdClass>, cestino: int, altri: int}|null
      */
     private function doppioniDaSistemare(?Associazione $associazione): ?array
     {
@@ -404,14 +405,25 @@ class TesseraController extends Controller
         }
 
         $tutti = $vincolo->doppioni();
+        $idSoci = $tutti->pluck('socio_id')->unique()->values();
         $sociVisibili = Socio::query()
-            ->whereIn('id', $tutti->pluck('socio_id')->unique()->values())
+            ->whereIn('id', $idSoci)
             ->when($associazione !== null, fn ($q) => $q->where('associazione_id', $associazione->id))
             ->pluck('id')
             ->flip();
-        $visibili = $tutti->filter(fn (object $riga): bool => $sociVisibili->has($riga->socio_id))->values();
+        $sociNelCestino = Socio::onlyTrashed()
+            ->whereIn('id', $idSoci)
+            ->when($associazione !== null, fn ($q) => $q->where('associazione_id', $associazione->id))
+            ->pluck('id')
+            ->flip();
+        $visibili = $tutti->filter(fn (\stdClass $riga): bool => $sociVisibili->has($riga->socio_id))->values();
+        $cestino = $tutti->filter(fn (\stdClass $riga): bool => $sociNelCestino->has($riga->socio_id))->count();
 
-        return ['visibili' => $visibili, 'altri' => $tutti->count() - $visibili->count()];
+        return [
+            'visibili' => $visibili,
+            'cestino' => $cestino,
+            'altri' => $tutti->count() - $visibili->count() - $cestino,
+        ];
     }
 
     private function associazioneCorrente(): ?Associazione

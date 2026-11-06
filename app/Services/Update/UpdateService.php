@@ -855,22 +855,48 @@ class UpdateService
     protected function manutenzione(bool $attiva): void
     {
         $marker = $this->root.'/'.self::MAINTENANCE_MARKER;
-        if ($this->rootReale()) {
-            Artisan::call($attiva ? 'down' : 'up', $attiva ? ['--render' => 'errors::503', '--retry' => 60] : []);
-        }
-        if ($attiva) {
-            // Solo se artisan down non l'ha scritto (radice dei test, comando
-            // fallito): stesso formato JSON che Laravel si aspetta
-            if (! is_file($marker)) {
-                File::ensureDirectoryExists(dirname($marker));
-                File::put($marker, (string) json_encode(['except' => [], 'redirect' => null, 'retry' => 60, 'refresh' => null, 'secret' => null, 'status' => 503, 'template' => null]));
-            } else {
-                // Resto di un update interrotto: la data conta da adesso
-                @touch($marker);
+        if (! $attiva) {
+            if ($this->rootReale()) {
+                Artisan::call('up');
             }
-        } else {
             @unlink($marker);
+
+            return;
         }
+
+        $esito = $this->rootReale()
+            ? Artisan::call('down', ['--render' => 'errors::503', '--retry' => 60])
+            : 0;
+
+        if ($this->markerLeggibile($marker)) {
+            // Anche un resto valido di un update interrotto: conta da adesso
+            @touch($marker);
+
+            return;
+        }
+
+        // artisan down non l'ha scritto (radice dei test, comando fallito) o
+        // non l'ha riscritto perché il sito risultava già giù con il numero
+        // lasciato dal vecchio updater: stesso JSON che Laravel si aspetta
+        File::ensureDirectoryExists(dirname($marker));
+        File::put($marker, (string) json_encode(['except' => [], 'redirect' => null, 'retry' => 60, 'refresh' => null, 'secret' => null, 'status' => 503, 'template' => null]));
+        if (! $this->markerLeggibile($marker)) {
+            throw new RuntimeException('Impossibile attivare la modalità manutenzione: '.$marker.' non è scrivibile.');
+        }
+        if ($esito !== 0) {
+            Log::warning('UpdateService: artisan down fallito, manutenzione attivata con il solo marcatore', ['output' => Artisan::output()]);
+        }
+    }
+
+    /**
+     * Il file di manutenzione esiste ed è il JSON che Laravel legge a ogni
+     * richiesta. Legge il disco a ogni chiamata.
+     *
+     * @phpstan-impure
+     */
+    private function markerLeggibile(string $marker): bool
+    {
+        return is_file($marker) && is_array(json_decode((string) @file_get_contents($marker), true));
     }
 
     private function rootReale(): bool

@@ -2,9 +2,11 @@
 
 namespace App\Services\Tessere;
 
+use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -18,21 +20,32 @@ use Illuminate\Support\Facades\Schema;
  * aggiunge più tardi, senza terminale, appena i doppioni sono stati sistemati
  * dal backoffice: dopo il salvataggio o l'eliminazione di una tessera, ogni
  * notte (tessere:applica-vincolo-anno) e dalla pagina Tessere, che intanto
- * elenca i doppioni da sistemare.
+ * elenca i doppioni da sistemare. Dopo un ALTER TABLE fallito (doppione
+ * nato nel frattempo, lock sulla tabella) aspetta qualche minuto prima di
+ * riprovare, così una pagina molto aperta non ripete il DDL a ogni visita.
  */
+#[Singleton]
 class VincoloTessereAnnoService
 {
     public const INDICE = 'uq_tessere_socio_anno';
 
-    /** Indice già visto in questo processo: evita di ricontrollarlo a ogni salvataggio. */
-    private static bool $attivoInCache = false;
+    /** Dopo un ALTER TABLE fallito non si riprova a ogni pagina: pausa breve. */
+    private const CHIAVE_PAUSA = 'tessere:vincolo-socio-anno:pausa';
+
+    private const MINUTI_PAUSA = 10;
+
+    /**
+     * Indice già visto in questo processo (servizio singleton): evita di
+     * ricontrollarlo a ogni salvataggio di una tessera.
+     */
+    private bool $attivoInCache = false;
 
     /**
      * Vero se l'indice unique esiste.
      */
     public function attivo(): bool
     {
-        if (self::$attivoInCache) {
+        if ($this->attivoInCache) {
             return true;
         }
 
@@ -40,14 +53,17 @@ class VincoloTessereAnnoService
             return false;
         }
 
-        return self::$attivoInCache = Schema::hasIndex('tessere', self::INDICE);
+        return $this->attivoInCache = Schema::hasIndex('tessere', self::INDICE);
     }
 
     /**
      * Coppie socio/anno con più tessere non annullate, con i numeri tessera
      * e il nominativo del socio; facoltativamente di una sola associazione.
      *
-     * @return Collection<int, object{socio_id: string, associazione_id: string, anno: int, totale: int, numeri: string, nominativo: string}>
+     * Ogni riga ha socio_id, associazione_id, anno, totale, numeri (numeri
+     * tessera separati da virgola) e nominativo.
+     *
+     * @return Collection<int, \stdClass>
      */
     public function doppioni(?string $associazioneId = null): Collection
     {
@@ -101,6 +117,12 @@ class VincoloTessereAnnoService
             return false;
         }
 
+        // Pausa solo dopo un errore del DDL: con i doppioni appena sistemati
+        // (nessun errore prima) il vincolo si applica subito
+        if (Cache::has(self::CHIAVE_PAUSA)) {
+            return $this->attivoSenzaCache();
+        }
+
         try {
             if ($this->doppioni()->isNotEmpty()) {
                 return false;
@@ -116,27 +138,20 @@ class VincoloTessereAnnoService
             // Un doppione creato nel frattempo, o un altro processo che ha
             // appena aggiunto l'indice: si riprova alla prossima occasione
             Log::warning('Vincolo tessere socio/anno non applicato', ['error' => $e->getMessage()]);
+            Cache::put(self::CHIAVE_PAUSA, true, now()->addMinutes(self::MINUTI_PAUSA));
 
             return $this->attivoSenzaCache();
         }
 
         Log::info('Vincolo tessere socio/anno applicato: nessuna tessera doppia rimasta.');
-        self::$attivoInCache = true;
+        $this->attivoInCache = true;
 
         return true;
     }
 
-    /**
-     * Dimentica l'indice visto in questo processo (test, schema cambiato).
-     */
-    public static function dimenticaStato(): void
-    {
-        self::$attivoInCache = false;
-    }
-
     private function attivoSenzaCache(): bool
     {
-        self::$attivoInCache = false;
+        $this->attivoInCache = false;
 
         return $this->attivo();
     }

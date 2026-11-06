@@ -10,7 +10,10 @@ use App\Services\Tessere\VincoloTessereAnnoService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /**
  * Installazione aggiornata con tessere doppie già presenti: la migration
@@ -36,7 +39,7 @@ class VincoloTessereAnnoTest extends TessereTestCase
 
         // Come dopo la migration con doppioni: colonna presente, indice no
         Schema::table('tessere', fn (Blueprint $table) => $table->dropUnique(VincoloTessereAnnoService::INDICE));
-        VincoloTessereAnnoService::dimenticaStato();
+        app()->forgetInstance(VincoloTessereAnnoService::class);
 
         $this->associazione = Associazione::factory()->create();
         $this->socio = Socio::factory()->create([
@@ -51,7 +54,7 @@ class VincoloTessereAnnoTest extends TessereTestCase
 
     protected function tearDown(): void
     {
-        VincoloTessereAnnoService::dimenticaStato();
+        app()->forgetInstance(VincoloTessereAnnoService::class);
 
         parent::tearDown();
     }
@@ -174,5 +177,72 @@ class VincoloTessereAnnoTest extends TessereTestCase
 
         // La colonna del vincolo è riallineata anche per l'update fuori dal modello
         $this->assertNull(Tessera::allTenants()->find($this->doppione->id)->getAttribute('anno_non_annullata'));
+    }
+
+    public function test_dopo_un_ddl_fallito_si_riprova_solo_dopo_una_pausa(): void
+    {
+        Cache::forget('tessere:vincolo-socio-anno:pausa');
+        $this->doppione->update(['stato' => Tessera::STATO_ANNULLATA]);
+        $this->assertTrue($this->indicePresente());
+        Schema::table('tessere', fn (Blueprint $table) => $table->dropUnique(VincoloTessereAnnoService::INDICE));
+        app()->forgetInstance(VincoloTessereAnnoService::class);
+
+        // Un doppione nasce fra il controllo e l'ALTER TABLE: l'indice fallisce
+        $inserito = false;
+        DB::listen(function ($query) use (&$inserito): void {
+            if (! $inserito && str_starts_with(strtolower($query->sql), 'update "tessere" set "anno_non_annullata" = anno_validita')) {
+                $inserito = true;
+                DB::table('tessere')->insert([
+                    'id' => (string) Str::uuid(),
+                    'associazione_id' => $this->associazione->id,
+                    'socio_id' => $this->socio->id,
+                    'numero_tessera' => '20260001-C',
+                    'anno_validita' => 2026,
+                    'anno_non_annullata' => 2026,
+                    'data_emissione' => '2026-01-10',
+                    'data_scadenza' => '2026-12-31',
+                    'tipo_scadenza' => Tessera::TIPO_SCADENZA_SOLARE,
+                    'stato' => Tessera::STATO_ATTIVA,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        $this->assertFalse($this->vincolo()->applicaSePossibile());
+        $this->assertTrue($inserito);
+        $this->assertTrue(Cache::has('tessere:vincolo-socio-anno:pausa'));
+
+        // Doppione sistemato subito: durante la pausa nessun nuovo ALTER TABLE
+        DB::table('tessere')->where('numero_tessera', '20260001-C')->delete();
+        $ddl = 0;
+        DB::listen(function ($query) use (&$ddl): void {
+            if (str_starts_with(strtolower($query->sql), 'create unique index')) {
+                $ddl++;
+            }
+        });
+        $this->assertFalse($this->vincolo()->applicaSePossibile());
+        $this->assertSame(0, $ddl);
+
+        // Finita la pausa si applica
+        Cache::forget('tessere:vincolo-socio-anno:pausa');
+        $this->assertTrue($this->vincolo()->applicaSePossibile());
+        $this->assertSame(1, $ddl);
+        $this->assertTrue($this->indicePresente());
+    }
+
+    public function test_i_doppioni_dei_soci_nel_cestino_sono_indicati_a_parte(): void
+    {
+        $admin = $this->creaAdmin($this->associazione);
+        $this->socio->delete();
+
+        $this->actingAs($admin)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->get(route('tessere.index'))
+            ->assertOk()
+            ->assertSee('Tessere doppie da sistemare')
+            ->assertSee('1 caso riguarda un socio nel cestino', false)
+            ->assertDontSee('che non vedi da qui');
+        $this->assertFalse($this->indicePresente());
     }
 }

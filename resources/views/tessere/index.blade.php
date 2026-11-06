@@ -48,6 +48,12 @@
             @endforeach
         </ul>
     @endif
+    @if ($doppioniTessere['cestino'] > 0)
+        <p class="mb-0 mt-1 small">
+            {{ $doppioniTessere['cestino'] }} {{ $doppioniTessere['cestino'] === 1 ? 'caso riguarda un socio' : 'casi riguardano soci' }} nel cestino:
+            ripristina il socio dal cestino e correggi le sue tessere, altrimenti il controllo resta spento.
+        </p>
+    @endif
     @if ($doppioniTessere['altri'] > 0)
         <p class="mb-0 mt-1 small text-muted">
             Altri {{ $doppioniTessere['altri'] }} casi riguardano soci che non vedi da qui (altre associazioni o sedi).

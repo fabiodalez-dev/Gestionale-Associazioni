@@ -241,6 +241,22 @@ class UpdateServiceFlussoTest extends TestCase
         $this->assertFileDoesNotExist($this->root.'/storage/framework/down');
     }
 
+    public function test_il_marcatore_illeggibile_di_un_vecchio_update_interrotto_viene_riscritto(): void
+    {
+        // Il vecchio updater scriveva time() nel file: artisan down, trovando
+        // il sito già giù, non lo riscrive e Laravel risponderebbe 500
+        $marker = $this->root.'/storage/framework/down';
+        File::ensureDirectoryExists(dirname($marker));
+        File::put($marker, '1762380000');
+        $updater = new UpdateServiceDiProva($this->root);
+
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto);
+
+        $this->assertTrue($esito['success'], (string) $esito['error']);
+        $this->assertIsArray(json_decode((string) $updater->manutenzioneDuranteIlPost, true));
+        $this->assertFileDoesNotExist($marker);
+    }
+
     public function test_manutenzione_scaduta_viene_riconosciuta_e_sbloccata(): void
     {
         $updater = new UpdateServiceDiProva($this->root);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\EventiVita;
 
+use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
@@ -51,6 +52,9 @@ class PresenzeTest extends TestCase
         $response->assertViewIs('eventi-vita.presenze');
         $this->assertCount(1, $response->viewData('prenotazioni'));
         $this->assertSame($confermata->id, $response->viewData('prenotazioni')->first()->id);
+        // Con l'entrata per posto (issue #19) il contatore conta le
+        // prenotazioni con almeno un ingresso, non quelle complete
+        $response->assertSee('Con almeno un ingresso');
     }
 
     public function test_registrazione_presenze_in_blocco_marca_il_checkin(): void
@@ -92,6 +96,29 @@ class PresenzeTest extends TestCase
             $checkinOriginale->format('Y-m-d H:i:s'),
             $giaArrivata->fresh()->checkin_at->format('Y-m-d H:i:s')
         );
+    }
+
+    public function test_prenotazione_annullata_dopo_il_checkin_non_registra_il_socio(): void
+    {
+        $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id, 'stato' => Socio::STATO_ATTIVO]);
+        $account = Account::factory()->create(['associazione_id' => $this->associazione->id, 'socio_id' => $socio->id]);
+        // Arrivata e poi annullata dall'admin (ammesso anche dopo il check-in)
+        $annullata = Prenotazione::factory()->annullata()->create([
+            'checkin_at' => now()->subHour(),
+            'posti_entrati' => 1,
+            'associazione_id' => $this->associazione->id,
+            'evento_id' => $this->evento->id,
+            'account_id' => $account->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/eventi/{$this->evento->id}/presenze", ['prenotazioni' => [$annullata->id]])
+            ->assertSessionHas('success', 'Presenze registrate: 0.');
+
+        $this->assertFalse(EventoPartecipante::withoutGlobalScopes()
+            ->where('evento_id', $this->evento->id)
+            ->where('socio_id', $socio->id)
+            ->exists());
     }
 
     public function test_prenotazioni_di_un_altro_evento_vengono_ignorate(): void

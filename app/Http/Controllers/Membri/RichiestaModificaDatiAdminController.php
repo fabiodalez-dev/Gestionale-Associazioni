@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Membri\RifiutaRichiestaModificaRequest;
 use App\Models\RichiestaModificaDati;
 use App\Models\Utente;
+use App\Services\Membri\ModificaDatiException;
 use App\Services\Membri\ModificaDatiService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -50,6 +51,10 @@ class RichiestaModificaDatiAdminController extends Controller
         ]);
     }
 
+    /**
+     * Approva una richiesta di modifica dati ancora in attesa; un valore non
+     * più unico viene segnalato come errore invece di sovrascrivere un altro socio.
+     */
     public function approva(Request $request, RichiestaModificaDati $richiesta): RedirectResponse
     {
         $this->authorize('gestisci', $richiesta);
@@ -63,7 +68,13 @@ class RichiestaModificaDatiAdminController extends Controller
         /** @var Utente $utente */
         $utente = $request->user();
 
-        $this->modifiche->approva($richiesta, $utente);
+        try {
+            $this->modifiche->approva($richiesta, $utente);
+        } catch (ModificaDatiException $e) {
+            return redirect()
+                ->route('richieste-modifica-dati.index')
+                ->with('error', $e->getMessage());
+        }
 
         return redirect()
             ->route('richieste-modifica-dati.index')

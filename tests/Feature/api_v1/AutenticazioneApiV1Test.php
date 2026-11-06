@@ -139,6 +139,24 @@ class AutenticazioneApiV1Test extends TestCase
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token])->assertOk();
     }
 
+    public function test_token_di_operatore_senza_permessi_seedati_segue_il_fallback_per_ruolo_delle_policy(): void
+    {
+        // Nessun RolesSeeder: hasPermissionTo lancia PermissionDoesNotExist.
+        // Come sul web, l'operatore ricade sui soci (SocioPolicy) ma non sulle
+        // quote e sulle tessere (QuotaPolicy/TesseraPolicy senza fallback).
+        $operatore = Utente::factory()->operatore()->create(['associazione_id' => $this->associazione->id]);
+        $token = $operatore->createToken('test', ['soci:read', 'quote:read', 'tessere:read'])->plainTextToken;
+        $header = ['Authorization' => 'Bearer '.$token];
+
+        $this->getJson('/api/v1/soci', $header)->assertOk();
+        $this->getJson('/api/v1/quote', $header)
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'permission_denied');
+        $this->getJson('/api/v1/tessere', $header)
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'permission_denied');
+    }
+
     public function test_token_sanctum_invalido_restituisce_401(): void
     {
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer 123|tokeninventato'])

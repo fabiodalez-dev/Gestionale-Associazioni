@@ -19,6 +19,10 @@ class RinnovoAccountController extends Controller
 {
     public function __construct(private readonly RinnovoService $rinnovi) {}
 
+    /**
+     * Rinnovo dal mini-sito per l'account collegato a un socio del tenant:
+     * avvia il pagamento della quota o emette la tessera se la quota è già pagata.
+     */
     public function store(Request $request, Associazione $associazione): RedirectResponse
     {
         /** @var Account $account */
@@ -37,12 +41,33 @@ class RinnovoAccountController extends Controller
             ->where('associazione_id', $account->associazione_id)
             ->firstOrFail();
 
-        $quota = $this->rinnovi->quotaPerRinnovo($socio);
+        // Anno calcolato una volta sola: quotaPerRinnovo può emettere la
+        // tessera e un nuovo calcolo indicherebbe nel messaggio l'anno dopo
+        $anno = $this->rinnovi->annoRinnovo($socio);
+        $avevaTessera = $this->rinnovi->haTesseraAnno($socio, $anno);
+        $quota = $this->rinnovi->quotaPerRinnovo($socio, $anno);
+
+        // Quota dell'anno già pagata: nessun pagamento, la tessera mancante
+        // è stata emessa adesso e l'esito è un successo, non un avviso
+        if ($quota === null && ! $avevaTessera && $this->rinnovi->haTesseraAnno($socio, $anno)) {
+            return redirect()
+                ->route('pubblico.account.tessera', $associazione)
+                ->with('success', 'La quota '.$anno.' risulta già pagata: la tessera per il '.$anno.' è stata emessa.');
+        }
+
+        // Quota già pagata ma emissione della tessera non riuscita: la tessera
+        // manca ancora, non è il caso "già emessa" dell'avviso generico
+        if ($quota === null && ! $this->rinnovi->haTesseraAnno($socio, $anno)
+            && $this->rinnovi->puoRinnovare($socio, $anno) && $this->rinnovi->quotaAnnoPagata($socio, $anno)) {
+            return redirect()
+                ->route('pubblico.account.tessera', $associazione)
+                ->with('warning', 'La quota '.$anno.' risulta già pagata, ma la tessera non è stata emessa. Riprova più tardi o contatta la segreteria.');
+        }
 
         if ($quota === null) {
             return redirect()
                 ->route('pubblico.account.tessera', $associazione)
-                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$this->rinnovi->annoCorrente().' risulta già emessa oppure il profilo socio non è attivo.');
+                ->with('warning', 'Il rinnovo non è disponibile: la tessera per il '.$anno.' risulta già emessa oppure il profilo socio non è attivo.');
         }
 
         return redirect()->route('pagamento.show', ['token' => $quota->payment_token]);

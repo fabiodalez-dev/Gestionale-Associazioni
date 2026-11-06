@@ -3,8 +3,10 @@
 namespace App\Http\Requests\EventiVita;
 
 use App\Models\Evento;
+use App\Services\Prenotazioni\CapienzaEventoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Aggiornamento dell'INTERA serie ricorrente (f.8): solo i campi comuni
@@ -43,5 +45,56 @@ class SerieUpdateRequest extends FormRequest
             'solo_soci' => ['required', 'boolean'],
             'immagine_url' => ['nullable', 'string', 'url:http,https', 'max:2048'],
         ];
+    }
+
+    /**
+     * Aggiunge il primo controllo della capienza dopo le regole base
+     * (ripetuto sotto lock al salvataggio).
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $this->validaCapienzaNonRiducibile($validator);
+        });
+    }
+
+    /**
+     * Stessa regola della modifica singola (EventoRequest): la capienza
+     * propagata non può scendere sotto i posti già occupati di nessuna
+     * occorrenza; una capienza invariata resta ammessa anche in overbooking.
+     *
+     * Primo controllo, fuori dal lock: SerieEventiService::aggiornaSerie
+     * lo ripete con le occorrenze bloccate.
+     */
+    protected function validaCapienzaNonRiducibile(Validator $validator): void
+    {
+        $evento = $this->route('evento');
+        // Stesso parsing della regola integer (es. "+1" vale 1): con
+        // ctype_digit valori come "+1" saltavano il controllo dei posti
+        $capienza = CapienzaEventoService::capienzaRichiesta($this->input('capienza'));
+
+        if (! $evento instanceof Evento || $evento->serie_id === null) {
+            return;
+        }
+
+        if ($capienza === null) {
+            return; // illimitata o già segnalata dalla regola integer/min
+        }
+
+        $occorrenze = Evento::query()
+            ->dellaSerie($evento->serie_id)
+            ->where('associazione_id', $evento->associazione_id)
+            ->orderBy('data_evento')
+            ->get();
+
+        foreach ($occorrenze as $occorrenza) {
+            $errore = CapienzaEventoService::errore($occorrenza, $capienza, occorrenza: true);
+
+            if ($errore !== null) {
+                $validator->errors()->add('capienza', $errore);
+
+                return;
+            }
+        }
     }
 }

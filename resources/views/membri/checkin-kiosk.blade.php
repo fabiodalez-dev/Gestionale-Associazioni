@@ -182,8 +182,12 @@
             var posti = b && b.posti ? (b.posti === 1 ? '1 posto' : b.posti + ' posti') : '';
 
             if (data.success && !data.already_checked_in) {
-                bumpCounter(b && b.posti ? b.posti : 1);
-                showResult('ok', 'bi-ticket-perforated-fill', nome || 'Biglietto valido', (posti ? posti + ' · ' : '') + 'Check-in registrato.');
+                // Solo i posti entrati con questa scansione (il socio già
+                // entrato con la tessera è già nel contatore)
+                var entrati = data.posti_registrati || (b && b.posti ? b.posti : 1);
+                bumpCounter(entrati);
+                var daEntrare = entrati === 1 ? 'Fai entrare 1 persona' : 'Fai entrare ' + entrati + ' persone';
+                showResult('ok', 'bi-ticket-perforated-fill', nome || 'Biglietto valido', (posti ? posti + ' · ' : '') + daEntrare + '. Check-in registrato.');
             } else if (data.success && data.already_checked_in) {
                 showResult('dup', 'bi-exclamation-circle-fill', nome || 'Biglietto', 'Biglietto già utilizzato.');
             } else {

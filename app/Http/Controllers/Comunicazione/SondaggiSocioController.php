@@ -22,6 +22,10 @@ class SondaggiSocioController extends Controller
         private readonly SondaggiVotoService $voto,
     ) {}
 
+    /**
+     * Sondaggi aperti per l'area soci, con risposta data, possibilità di
+     * voto (solo soci attivi) e risultati.
+     */
     public function index(Request $request): View
     {
         /** @var Socio $socio */
@@ -34,6 +38,7 @@ class SondaggiSocioController extends Controller
             ->map(fn (Sondaggio $sondaggio) => [
                 'sondaggio' => $sondaggio,
                 'risposta' => $this->voto->rispostaDi($sondaggio, $socio),
+                'puoVotare' => $this->voto->puoVotare($sondaggio, $socio),
                 'risultati' => $sondaggio->risultati(),
             ]);
 
@@ -64,6 +69,7 @@ class SondaggiSocioController extends Controller
             SondaggiVotoService::ESITO_OK => ['success', 'Grazie! Il tuo voto è stato registrato.'],
             SondaggiVotoService::ESITO_GIA_VOTATO => ['warning', 'Hai già votato questo sondaggio.'],
             SondaggiVotoService::ESITO_CHIUSO => ['warning', 'Il sondaggio non è aperto al voto.'],
+            SondaggiVotoService::ESITO_NON_AMMESSO => ['warning', 'Questo sondaggio è riservato ai soci attivi.'],
             default => ['danger', 'Voto non valido.'],
         };
     }

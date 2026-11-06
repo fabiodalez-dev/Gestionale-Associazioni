@@ -5,6 +5,7 @@ namespace App\Services\Soci;
 use App\Models\EmailQueue;
 use App\Models\EmailTemplate;
 use App\Models\Socio;
+use App\Services\Email\EmailPlaceholders;
 use Illuminate\Support\Str;
 
 /**
@@ -17,6 +18,10 @@ class EmailBenvenutoService
 {
     public const TEMPLATE_CODICE = 'benvenuto';
 
+    /**
+     * Accoda l'email di benvenuto (best-effort): false se manca l'email del
+     * socio, l'SMTP o l'invio automatico è disattivato.
+     */
     public function accoda(Socio $socio): bool
     {
         try {
@@ -42,6 +47,7 @@ class EmailBenvenutoService
                 return false;
             }
 
+            // Placeholder legacy {{nome}} (compatibilità con template storici)
             $placeholders = [
                 '{{nome}}' => (string) $socio->nome,
                 '{{cognome}}' => (string) $socio->cognome,
@@ -51,14 +57,25 @@ class EmailBenvenutoService
                 '{{email}}' => (string) $socio->email,
             ];
 
+            // Placeholder dell'editor template ({NOME}, {NOME_ASSOCIAZIONE}, ...):
+            // stessa sintassi di EmailPlaceholders usata da comunicazioni e coda.
+            // L'oggetto è testo semplice: niente escape HTML.
+            $valori = EmailPlaceholders::buildValues($associazione, $socio);
+            $oggetto = html_entity_decode(
+                EmailPlaceholders::render(strtr((string) $template->oggetto, $placeholders), $valori),
+                ENT_QUOTES | ENT_HTML5,
+                'UTF-8'
+            );
+            $corpo = EmailPlaceholders::render(strtr((string) $template->corpo_html, $placeholders), $valori);
+
             EmailQueue::create([
                 'associazione_id' => $associazione->id,
                 'batch_id' => (string) Str::uuid(),
                 'socio_id' => $socio->id,
                 'to_email' => $socio->email,
                 'to_name' => $socio->nome_completo,
-                'subject' => strtr((string) $template->oggetto, $placeholders) ?: 'Benvenuto',
-                'body_html' => strtr((string) $template->corpo_html, $placeholders),
+                'subject' => $oggetto !== '' ? $oggetto : 'Benvenuto',
+                'body_html' => $corpo,
                 'template_codice' => self::TEMPLATE_CODICE,
                 'status' => 'pending',
             ]);

@@ -9,6 +9,7 @@ use App\Models\TurnoAssegnazione;
 use App\Models\Utente;
 use App\Notifications\VolontariTurni\CandidaturaTurnoNotification;
 use App\Notifications\VolontariTurni\RinunciaTurnoNotification;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -74,6 +75,41 @@ class AutoCandidaturaTest extends TestCase
 
         Notification::assertSentTo(
             Utente::where('associazione_id', $this->associazione->id)->get(),
+            CandidaturaTurnoNotification::class
+        );
+    }
+
+    public function test_candidatura_avvisa_chi_gestisce_i_turni_per_permesso(): void
+    {
+        $this->seed(RolesSeeder::class);
+
+        $staff = function (string $ruolo): Utente {
+            $utente = Utente::factory()->operatore()->create(['associazione_id' => $this->associazione->id]);
+            $utente->syncRoles([$ruolo]);
+
+            return $utente;
+        };
+        // Operatore e responsabile di sede confermano i turni (volontari.update)
+        $operatore = $staff('operatore');
+        $responsabile = $staff('responsabile_sede');
+        // Volontario e tesoriere no: nessun avviso
+        $volontario = $staff('volontario');
+        $tesoriere = $staff('tesoriere');
+
+        $turno = Turno::factory()->create([
+            'associazione_id' => $this->associazione->id, 'posti' => 2,
+            'data' => now()->addDays(2)->toDateString(),
+        ]);
+
+        $this->actingAs($this->socio, 'socio')
+            ->post(route('area-soci.volontariato.candidati', $turno))
+            ->assertRedirect(route('area-soci.volontariato'));
+
+        Notification::assertSentTo([$operatore, $responsabile], CandidaturaTurnoNotification::class);
+        Notification::assertNotSentTo([$volontario, $tesoriere], CandidaturaTurnoNotification::class);
+        // L'amministratore resta avvisato anche senza ruolo spatie assegnato
+        Notification::assertSentTo(
+            Utente::where('associazione_id', $this->associazione->id)->where('ruolo', Utente::RUOLO_ADMIN_ASSOCIAZIONE)->get(),
             CandidaturaTurnoNotification::class
         );
     }

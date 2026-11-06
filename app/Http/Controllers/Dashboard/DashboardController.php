@@ -40,7 +40,7 @@ class DashboardController extends Controller
                 ->whereBetween('data_evento', [now()->startOfMonth(), now()->endOfMonth()])
                 ->count(),
             'quote_pagate' => Quota::query()
-                ->where('stato', 'Pagata')
+                ->whereNotNull('data_pagamento')
                 ->where('anno', now()->year)
                 ->count(),
             'scadenze_imminenti' => Tessera::query()

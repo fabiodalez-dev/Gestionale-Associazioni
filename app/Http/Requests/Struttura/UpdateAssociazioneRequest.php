@@ -30,8 +30,8 @@ class UpdateAssociazioneRequest extends FormRequest
             // Slug mini-sito editabile (f.22): kebab-case, unique; vuoto = slug corrente invariato
             'slug' => ['nullable', 'string', 'max:100', 'regex:/^[a-z0-9]+(-[a-z0-9]+)*$/', Rule::unique('associazioni', 'slug')->ignore($associazione->id)],
             'email' => ['required', 'email', 'max:255', Rule::unique('associazioni', 'email')->ignore($associazione->id)],
-            'partita_iva' => ['nullable', 'string', 'max:20'],
-            'codice_fiscale' => ['nullable', 'string', 'max:16'],
+            'partita_iva' => ['nullable', 'string', 'max:20', Rule::unique('associazioni', 'partita_iva')->ignore($associazione->id)],
+            'codice_fiscale' => ['nullable', 'string', 'max:16', Rule::unique('associazioni', 'codice_fiscale')->ignore($associazione->id)],
             'telefono' => ['nullable', 'string', 'max:20'],
             'indirizzo' => ['nullable', 'string', 'max:500'],
             'citta' => ['nullable', 'string', 'max:100'],
@@ -41,6 +41,7 @@ class UpdateAssociazioneRequest extends FormRequest
             'giorni_notifica_scadenza' => ['nullable', 'integer', 'min:1', 'max:365'],
             'costo_tessera' => ['nullable', 'numeric', 'min:0'],
             'attiva' => ['nullable', 'boolean'],
+            'frontend_pubblico_attivo' => ['nullable', 'boolean'],
             'logo_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:2048'],
 
             'link_admin_user_id' => ['nullable', 'uuid'],

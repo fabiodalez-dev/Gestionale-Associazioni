@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -28,6 +29,18 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AuthenticateApiV1
 {
+    /**
+     * Ruoli ammessi per modulo quando i permessi spatie non sono seedati:
+     * gli stessi delle Policy web (SocioPolicy ricade su admin/operatore,
+     * QuotaPolicy e TesseraPolicy non hanno fallback). Gli admin passano
+     * comunque prima della verifica.
+     *
+     * @var array<string, list<string>>
+     */
+    private const RUOLI_FALLBACK = [
+        'soci' => [Utente::RUOLO_OPERATORE],
+    ];
+
     public function handle(Request $request, Closure $next, ?string $permesso = null): Response
     {
         $bearer = $request->bearerToken();
@@ -110,6 +123,10 @@ class AuthenticateApiV1
         return $next($request);
     }
 
+    /**
+     * Autenticazione con token Sanctum: oltre alle abilities del token
+     * verifica che il proprietario abbia davvero il permesso richiesto.
+     */
     private function autenticaSanctum(Request $request, Closure $next, string $bearer, ?string $permesso): Response
     {
         $accessToken = PersonalAccessToken::findToken($bearer);
@@ -151,6 +168,14 @@ class AuthenticateApiV1
             return $this->error(403, 'permission_denied', "Permesso '{$permesso}' non concesso a questo token.");
         }
 
+        // Le abilities del token non possono superare i permessi del proprietario
+        // (ruoli spatie): un volontario non modifica i soci via API solo perché
+        // si è creato un token con soci:write, e chi perde un ruolo perde anche
+        // l'accesso API corrispondente.
+        if ($permesso !== null && ! $this->proprietarioHaPermesso($utente, $permesso)) {
+            return $this->error(403, 'permission_denied', "Il proprietario del token non ha il permesso '{$permesso}'.");
+        }
+
         try {
             $accessToken->forceFill(['last_used_at' => now()])->saveQuietly();
         } catch (\Throwable $e) {
@@ -162,6 +187,34 @@ class AuthenticateApiV1
         $request->attributes->set('api_utente', $utente);
 
         return $next($request);
+    }
+
+    /**
+     * Permesso API (modulo:read|write) tradotto nel permesso del gestionale
+     * (modulo.view|update) e verificato sui ruoli del proprietario del token.
+     */
+    private function proprietarioHaPermesso(Utente $utente, string $permesso): bool
+    {
+        if ($utente->isSuperAdmin() || $utente->isAdminAssociazione()) {
+            return true;
+        }
+
+        [$modulo, $azione] = array_pad(explode(':', $permesso, 2), 2, 'read');
+        $permessoGestionale = $modulo.'.'.($azione === 'read' ? 'view' : 'update');
+
+        try {
+            return $utente->hasPermissionTo($permessoGestionale);
+        } catch (PermissionDoesNotExist) {
+            // Permessi non seedati (ambienti legacy): stesso fallback per ruolo
+            // delle Policy web (AuthorizesModulePermissions::allowed), non un
+            // via libera per chiunque abbia un token
+            return in_array($utente->ruolo, self::RUOLI_FALLBACK[$modulo] ?? [], true);
+        } catch (\Throwable $e) {
+            // Qualsiasi altro errore nella verifica: si nega
+            report($e);
+
+            return false;
+        }
     }
 
     private function error(int $status, string $code, string $message): JsonResponse

@@ -27,8 +27,8 @@ class SollecitoQuoteService
      * Invia il sollecito per una quota non pagata.
      *
      * @return bool true se il sollecito è stato inviato, false se la
-     *              quota non è sollecitabile (pagata, socio senza email
-     *              o con opt-out).
+     *              quota non è sollecitabile (pagata, socio cessato,
+     *              senza email o con opt-out).
      */
     public function invia(Quota $quota): bool
     {
@@ -39,7 +39,9 @@ class SollecitoQuoteService
         /** @var Socio|null $socio */
         $socio = $quota->socio()->first();
 
-        if ($socio === null || blank($socio->email) || $socio->email_opt_out) {
+        // Ai soci cessati (radiati, deceduti, trasferiti) nessun sollecito:
+        // la quota resta da pagare ma il rapporto associativo è chiuso
+        if ($socio === null || $socio->isCessato() || blank($socio->email) || $socio->email_opt_out) {
             return false;
         }
 

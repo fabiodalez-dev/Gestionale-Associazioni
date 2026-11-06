@@ -15,7 +15,9 @@ use Illuminate\View\View;
  * trattato come non valido. La pagina è pubblica e NON espone dati
  * personali completi (solo nome e iniziale del cognome).
  *
- * Stati: valida | gia_usato (con orario) | non_valida (con motivo).
+ * Stati: valida (con i posti ancora da far entrare se l'ingresso è già
+ * iniziato) | gia_usato (tutti i posti entrati, con orario) | non_valida
+ * (con motivo).
  */
 class VerificaBigliettoController extends Controller
 {
@@ -64,11 +66,19 @@ class VerificaBigliettoController extends Controller
             return ['non_valida', null, 'Biglietto non trovato.'];
         }
 
+        // Evento eliminato (nel cestino, la relazione non lo carica): la
+        // data non esiste più, il biglietto non vale qualunque sia lo stato
+        if ($prenotazione->evento === null) {
+            return ['non_valida', $prenotazione, 'Evento annullato: il biglietto non è più valido.'];
+        }
+
         if ($prenotazione->stato !== Prenotazione::STATO_CONFERMATA) {
             return ['non_valida', $prenotazione, $this->motivoStato($prenotazione->stato)];
         }
 
-        if ($prenotazione->checkin_at !== null) {
+        // Già usato solo quando tutti i posti sono entrati: dopo il check-in
+        // con la tessera del socio il biglietto vale ancora per i compagni
+        if ($prenotazione->isEntrataCompleta()) {
             return ['gia_usato', $prenotazione, null];
         }
 

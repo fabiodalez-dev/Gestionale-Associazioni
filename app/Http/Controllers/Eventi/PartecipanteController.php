@@ -9,11 +9,13 @@ use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\EventiVita\PresenzeSociService;
 use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -85,24 +87,35 @@ class PartecipanteController extends Controller
     /**
      * Aggiunta di un singolo socio. Upsert: se il socio è già iscritto
      * (doppio submit / race) aggiorna stato e note invece di fallire
-     * (parità con l'ON DUPLICATE KEY UPDATE legacy).
+     * (parità con l'ON DUPLICATE KEY UPDATE legacy). Uno stato diverso da
+     * Confermato annulla il check-in che la tessera aveva riportato sulla
+     * prenotazione del socio (PresenzeSociService).
      */
-    public function store(PartecipanteStoreRequest $request, Evento $evento): RedirectResponse
+    public function store(PartecipanteStoreRequest $request, Evento $evento, PresenzeSociService $presenze): RedirectResponse
     {
         $this->authorize('update', $evento);
 
-        EventoPartecipante::query()->updateOrCreate(
-            [
-                'evento_id' => $evento->id,
-                'socio_id' => $request->validated('socio_id'),
-            ],
-            [
-                'associazione_id' => $evento->associazione_id,
-                'stato_partecipazione' => $request->validated('stato_partecipazione'),
-                'note' => $request->validated('note'),
-                'data_conferma' => now(),
-            ]
-        );
+        DB::transaction(function () use ($request, $evento, $presenze): void {
+            $this->allineaCheckinPrenotazione(
+                $presenze,
+                $evento,
+                (string) $request->validated('socio_id'),
+                (string) $request->validated('stato_partecipazione'),
+            );
+
+            EventoPartecipante::query()->updateOrCreate(
+                [
+                    'evento_id' => $evento->id,
+                    'socio_id' => $request->validated('socio_id'),
+                ],
+                [
+                    'associazione_id' => $evento->associazione_id,
+                    'stato_partecipazione' => $request->validated('stato_partecipazione'),
+                    'note' => $request->validated('note'),
+                    'data_conferma' => now(),
+                ]
+            );
+        });
 
         return redirect()
             ->route('eventi.partecipanti.index', $evento)
@@ -141,20 +154,31 @@ class PartecipanteController extends Controller
 
     /**
      * Aggiornamento stato/note. data_conferma viene SEMPRE riscritta a now()
-     * a ogni modifica (è il timestamp "ultima transizione di stato").
+     * a ogni modifica (è il timestamp "ultima transizione di stato"). Uno
+     * stato diverso da Confermato annulla il check-in sincronizzato della
+     * prenotazione del socio.
      */
-    public function update(PartecipanteUpdateRequest $request, Evento $evento, string $partecipante): RedirectResponse
+    public function update(PartecipanteUpdateRequest $request, Evento $evento, string $partecipante, PresenzeSociService $presenze): RedirectResponse
     {
         $this->authorize('update', $evento);
 
         /** @var EventoPartecipante $record */
         $record = $evento->partecipanti()->findOrFail($partecipante);
 
-        $record->update([
-            'stato_partecipazione' => $request->validated('stato_partecipazione'),
-            'note' => $request->validated('note'),
-            'data_conferma' => now(),
-        ]);
+        DB::transaction(function () use ($request, $evento, $record, $presenze): void {
+            $this->allineaCheckinPrenotazione(
+                $presenze,
+                $evento,
+                (string) $record->socio_id,
+                (string) $request->validated('stato_partecipazione'),
+            );
+
+            $record->update([
+                'stato_partecipazione' => $request->validated('stato_partecipazione'),
+                'note' => $request->validated('note'),
+                'data_conferma' => now(),
+            ]);
+        });
 
         return redirect()
             ->route('eventi.partecipanti.index', $evento)
@@ -163,13 +187,22 @@ class PartecipanteController extends Controller
 
     /**
      * Rimozione partecipante (idempotente: nessun errore se inesistente,
-     * parità legacy).
+     * parità legacy). Il socio rimosso non risulta più arrivato neanche con
+     * la prenotazione, se il check-in era stato riportato dalla tessera.
      */
-    public function destroy(Request $request, Evento $evento, string $partecipante): RedirectResponse
+    public function destroy(Request $request, Evento $evento, string $partecipante, PresenzeSociService $presenze): RedirectResponse
     {
         $this->authorize('update', $evento);
 
-        $evento->partecipanti()->whereKey($partecipante)->delete();
+        $socioId = $evento->partecipanti()->whereKey($partecipante)->value('socio_id');
+
+        if ($socioId !== null) {
+            DB::transaction(function () use ($evento, $partecipante, $socioId, $presenze): void {
+                $presenze->annullaCheckinSincronizzato($evento, (string) $socioId);
+
+                $evento->partecipanti()->whereKey($partecipante)->delete();
+            });
+        }
 
         return redirect()
             ->route('eventi.partecipanti.index', $evento)
@@ -240,5 +273,19 @@ class PartecipanteController extends Controller
             ->orderBy('cognome')
             ->orderBy('nome')
             ->get(['id', 'nome', 'cognome', 'numero_socio']);
+    }
+
+    /**
+     * Partecipazione che non è (più) Confermato: il check-in riportato dalla
+     * tessera/API sulla prenotazione dell'account del socio viene annullato.
+     * Da chiamare PRIMA di scrivere la partecipazione, nella stessa
+     * transazione: stesso ordine dei lock del check-in con la tessera
+     * (prenotazione, poi partecipante).
+     */
+    private function allineaCheckinPrenotazione(PresenzeSociService $presenze, Evento $evento, string $socioId, string $stato): void
+    {
+        if ($stato !== EventoPartecipante::STATO_CONFERMATO) {
+            $presenze->annullaCheckinSincronizzato($evento, $socioId);
+        }
     }
 }

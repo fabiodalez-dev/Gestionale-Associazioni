@@ -22,7 +22,7 @@ class AggiornaProfiloRequest extends FormRequest
         return [
             'nome' => ['required', 'string', 'max:100'],
             'cognome' => ['required', 'string', 'max:100'],
-            'telefono' => ['nullable', 'string', 'max:30'],
+            'telefono' => ['nullable', 'string', 'max:20'],
         ];
     }
 

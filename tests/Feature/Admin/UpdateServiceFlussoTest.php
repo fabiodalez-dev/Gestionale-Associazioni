@@ -224,6 +224,39 @@ class UpdateServiceFlussoTest extends TestCase
         $this->assertSame(0, UpdateLog::query()->count());
     }
 
+    public function test_durante_l_aggiornamento_il_file_di_manutenzione_e_leggibile_da_laravel(): void
+    {
+        $updater = new UpdateServiceDiProva($this->root);
+
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto);
+
+        $this->assertTrue($esito['success'], (string) $esito['error']);
+        // FileBasedMaintenanceMode::data() fa json_decode(..., true) con tipo
+        // di ritorno array: un numero (il vecchio marcatore time()) dava 500
+        // a ogni richiesta invece della pagina di manutenzione
+        $dati = json_decode((string) $updater->manutenzioneDuranteIlPost, true);
+        $this->assertIsArray($dati);
+        $this->assertSame(503, $dati['status']);
+        $this->assertSame(60, $dati['retry']);
+        $this->assertFileDoesNotExist($this->root.'/storage/framework/down');
+    }
+
+    public function test_il_marcatore_illeggibile_di_un_vecchio_update_interrotto_viene_riscritto(): void
+    {
+        // Il vecchio updater scriveva time() nel file: artisan down, trovando
+        // il sito già giù, non lo riscrive e Laravel risponderebbe 500
+        $marker = $this->root.'/storage/framework/down';
+        File::ensureDirectoryExists(dirname($marker));
+        File::put($marker, '1762380000');
+        $updater = new UpdateServiceDiProva($this->root);
+
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto);
+
+        $this->assertTrue($esito['success'], (string) $esito['error']);
+        $this->assertIsArray(json_decode((string) $updater->manutenzioneDuranteIlPost, true));
+        $this->assertFileDoesNotExist($marker);
+    }
+
     public function test_manutenzione_scaduta_viene_riconosciuta_e_sbloccata(): void
     {
         $updater = new UpdateServiceDiProva($this->root);
@@ -318,6 +351,9 @@ class UpdateServiceDiProva extends UpdateService
 
     public int $postInstallazioneEseguita = 0;
 
+    /** Contenuto del file di manutenzione mentre girano migration e comandi. */
+    public ?string $manutenzioneDuranteIlPost = null;
+
     protected function backupDatabase(): string
     {
         return 'finto';
@@ -329,6 +365,12 @@ class UpdateServiceDiProva extends UpdateService
             throw new \RuntimeException('migrate fallita');
         }
         $this->postInstallazioneEseguita++;
+        $this->manutenzioneDuranteIlPost = @file_get_contents($this->rootDiProva().'/storage/framework/down') ?: null;
+    }
+
+    private function rootDiProva(): string
+    {
+        return \Closure::bind(fn (): string => $this->root, $this, UpdateService::class)();
     }
 
     protected function ripristinaFile(string $backupDir): void

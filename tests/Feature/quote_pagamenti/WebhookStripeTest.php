@@ -181,7 +181,8 @@ class WebhookStripeTest extends TestCase
 
         $tessera = Tessera::allTenants()->where('socio_id', $socio->id)->first();
         $this->assertNotNull($tessera);
-        $this->assertSame('0001', $tessera->numero_tessera);
+        // Numerazione unificata di TesseraIssuer: {anno}{progressivo 4 cifre}
+        $this->assertSame(now()->year.'0001', $tessera->numero_tessera);
         $this->assertSame(Tessera::STATO_ATTIVA, $tessera->stato);
         $this->assertSame((int) now()->year, $tessera->anno_validita);
 

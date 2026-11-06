@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Quota;
 use App\Services\Pagamenti\PaymentService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\Pagamenti\RicevutaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -87,8 +87,10 @@ class PaginaPagamentoController extends Controller
 
     /**
      * Ricevuta PDF pubblica (disponibile solo a pagamento avvenuto).
+     * È la stessa ricevuta NUMERATA dell'area soci e dell'area
+     * amministrativa (f.21): emessa on demand se manca, idempotente.
      */
-    public function ricevuta(string $token): Response|RedirectResponse
+    public function ricevuta(string $token, RicevutaService $ricevute): Response|RedirectResponse
     {
         $quota = $this->resolveQuota($token);
 
@@ -96,11 +98,16 @@ class PaginaPagamentoController extends Controller
             return redirect()->route('pagamento.show', ['token' => $token]);
         }
 
-        $quota->loadMissing(['associazione', 'socio' => fn ($q) => $q->withTrashed()]);
+        $ricevuta = $ricevute->emettiPerQuota($quota);
 
-        $pdf = Pdf::loadView('quote.ricevuta-pdf', ['quota' => $quota]);
+        if ($ricevuta === null) {
+            return redirect()->route('pagamento.show', ['token' => $token]);
+        }
 
-        return $pdf->download("ricevuta-quota-{$quota->anno}.pdf");
+        return response($ricevute->pdfContent($ricevuta), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$ricevute->nomeFile($ricevuta).'"',
+        ]);
     }
 
     /**

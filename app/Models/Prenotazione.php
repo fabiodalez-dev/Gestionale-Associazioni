@@ -26,6 +26,16 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
  * - confermata → annullata (utente entro la finestra, admin sempre).
  * Il check-in NON è uno stato: è checkin_at su una confermata.
  *
+ * Check-in per posto: posti_entrati conta i posti già entrati (0..posti) e
+ * checkin_at è l'orario del primo ingresso (valorizzato <=> posti_entrati
+ * > 0). Biglietto e presenze in blocco registrano tutti i posti rimanenti;
+ * il check-in con la tessera del socio collegato all'account (backoffice,
+ * kiosk, API v1) ne registra uno solo, con origine "sincronizzata"
+ * (tessera|api): se il partecipante socio viene poi rimosso o non è più
+ * Confermato quel check-in si annulla (PresenzeSociService). Una
+ * registrazione manuale successiva (biglietto, presenze in blocco) completa i
+ * posti e diventa l'origine: il check-in non è più sincronizzato.
+ *
  * I posti occupati di un evento sono SEMPRE SUM(posti) sulle prenotazioni
  * attive (nessun contatore denormalizzato); le scritture concorrenti vanno
  * serializzate con lockForUpdate() sulla riga eventi (PrenotazioneService).
@@ -72,6 +82,23 @@ class Prenotazione extends Model implements Pagabile
         self::STATO_IN_APPROVAZIONE,
     ];
 
+    public const CHECKIN_ORIGINE_BIGLIETTO = 'biglietto';
+
+    public const CHECKIN_ORIGINE_PRESENZE_BLOCCO = 'presenze_blocco';
+
+    public const CHECKIN_ORIGINE_TESSERA = 'tessera';
+
+    public const CHECKIN_ORIGINE_API = 'api';
+
+    /**
+     * Origini del check-in riportate dalla partecipazione del socio: le sole
+     * annullate quando il partecipante viene rimosso o non è più Confermato.
+     */
+    public const CHECKIN_ORIGINI_SINCRONIZZATE = [
+        self::CHECKIN_ORIGINE_TESSERA,
+        self::CHECKIN_ORIGINE_API,
+    ];
+
     /** Alfabeto base32 non ambiguo (niente 0/1/I/L/O/U) per i codici prenotazione. */
     public const ALFABETO_CODICE = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -98,14 +125,20 @@ class Prenotazione extends Model implements Pagabile
         'annullata_at',
         'motivo_annullamento',
         'checkin_at',
+        'posti_entrati',
+        'checkin_origine',
         'checkin_utente_id',
         'note',
     ];
 
+    /**
+     * Cast dei posti (anche quelli entrati), degli importi e degli orari.
+     */
     protected function casts(): array
     {
         return [
             'posti' => 'integer',
+            'posti_entrati' => 'integer',
             'prezzo_unitario' => 'decimal:2',
             'importo_totale' => 'decimal:2',
             'pagata_at' => 'datetime',
@@ -210,6 +243,22 @@ class Prenotazione extends Model implements Pagabile
     public function isAttiva(): bool
     {
         return in_array($this->stato, self::STATI_ATTIVI, true);
+    }
+
+    /**
+     * Posti della prenotazione non ancora entrati.
+     */
+    public function postiDaEntrare(): int
+    {
+        return max(0, (int) $this->posti - (int) $this->posti_entrati);
+    }
+
+    /**
+     * Tutti i posti risultano entrati (biglietto completamente utilizzato).
+     */
+    public function isEntrataCompleta(): bool
+    {
+        return $this->checkin_at !== null && $this->postiDaEntrare() === 0;
     }
 
     /**

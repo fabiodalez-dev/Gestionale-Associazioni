@@ -7,6 +7,7 @@ use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\Utente;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Propaganistas\LaravelPhone\Rules\Phone;
@@ -166,6 +167,8 @@ class ModificaDatiService
     /**
      * Approva: applica al socio i soli campi in whitelist e scrive lo
      * storico con il diff applicato.
+     *
+     * @throws ModificaDatiException se email/codice fiscale sono ormai di un altro socio
      */
     public function approva(RichiestaModificaDati $richiesta, Utente $admin): void
     {
@@ -186,7 +189,22 @@ class ModificaDatiService
                 );
             }
 
-            $socio->save();
+            $this->verificaUnicita($socio);
+
+            // Due approvazioni concorrenti possono superare entrambe il
+            // controllo: il vincolo unique respinge la seconda, che diventa
+            // lo stesso errore di dominio (solo per email e codice fiscale)
+            try {
+                $socio->save();
+            } catch (UniqueConstraintViolationException $e) {
+                $campo = $this->campoDelVincolo($e);
+
+                if ($campo === null) {
+                    throw $e;
+                }
+
+                throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo]));
+            }
 
             StoricoAttivitaSocio::create([
                 'associazione_id' => $richiesta->associazione_id,
@@ -204,6 +222,53 @@ class ModificaDatiService
                 'gestita_at' => now(),
             ]);
         });
+    }
+
+    /**
+     * Rivalida all'approvazione l'unicità di email e codice fiscale: tra la
+     * proposta e l'approvazione il valore può essere stato assegnato a un
+     * altro socio del tenant (il vincolo unique conta anche il cestino).
+     *
+     * @throws ModificaDatiException
+     */
+    private function verificaUnicita(Socio $socio): void
+    {
+        foreach (['email', 'codice_fiscale'] as $campo) {
+            if (! $socio->isDirty($campo) || blank($socio->{$campo})) {
+                continue;
+            }
+
+            $occupato = Socio::withoutGlobalScopes()
+                ->withTrashed()
+                ->where('associazione_id', $socio->associazione_id)
+                ->where($campo, $socio->{$campo})
+                ->whereKeyNot($socio->getKey())
+                ->exists();
+
+            if ($occupato) {
+                throw ModificaDatiException::valoreNonPiuUnico(mb_strtolower(self::LABELS[$campo]));
+            }
+        }
+    }
+
+    /**
+     * Campo (email o codice_fiscale) del vincolo unique violato sui soci,
+     * riconosciuto dal nome dell'indice (MySQL/MariaDB) o dalle colonne
+     * (SQLite); null per ogni altro vincolo.
+     */
+    private function campoDelVincolo(UniqueConstraintViolationException $e): ?string
+    {
+        $messaggio = $e->getMessage();
+
+        if (str_contains($messaggio, 'soci_associazione_id_email_unique') || str_contains($messaggio, 'soci.email')) {
+            return 'email';
+        }
+
+        if (str_contains($messaggio, 'uniq_assoc_cf') || str_contains($messaggio, 'soci.codice_fiscale')) {
+            return 'codice_fiscale';
+        }
+
+        return null;
     }
 
     /**

@@ -7,11 +7,13 @@ use App\Http\Requests\EventiVita\PresenzeBulkRequest;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
+use App\Services\EventiVita\PresenzeSociService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -37,24 +39,34 @@ class PresenzeController extends Controller
     }
 
     /**
-     * Registrazione presenze in blocco: marca il check-in (now) sulle
-     * prenotazioni CONFERMATE selezionate non ancora arrivate. Gli id
-     * estranei (altro evento/tenant, stati diversi, già check-in)
-     * vengono ignorati dalla UPDATE scoped.
+     * Registrazione presenze in blocco: le prenotazioni CONFERMATE
+     * selezionate risultano entrate per tutti i posti rimanenti (origine
+     * "presenze_blocco"; checkin_at al primo ingresso, conservato se il socio
+     * era già entrato con la tessera). Gli id estranei (altro evento/tenant,
+     * stati diversi, già entrate per intero) vengono ignorati dalle UPDATE
+     * scoped. I soci collegati agli account presenti vengono registrati tra
+     * i partecipanti (PresenzeSociService).
      */
-    public function store(PresenzeBulkRequest $request, Evento $evento): RedirectResponse
+    public function store(PresenzeBulkRequest $request, Evento $evento, PresenzeSociService $presenze): RedirectResponse
     {
         $this->authorize('update', $evento);
 
-        $registrate = Prenotazione::query()
-            ->where('evento_id', $evento->id)
-            ->whereIn('id', $request->validated('prenotazioni'))
-            ->where('stato', Prenotazione::STATO_CONFERMATA)
-            ->whereNull('checkin_at')
-            ->update([
-                'checkin_at' => now(),
-                'checkin_utente_id' => $request->user()?->id,
-            ]);
+        // Check-in e registrazione dei soci nella stessa transazione: se la
+        // seconda fallisce le prenotazioni non risultano segnate a metà
+        $registrate = DB::transaction(function () use ($request, $evento, $presenze): int {
+            $registrate = $presenze->registraPostiRimanenti(
+                $evento,
+                $request->validated('prenotazioni'),
+                Prenotazione::CHECKIN_ORIGINE_PRESENZE_BLOCCO,
+                $request->user()?->id,
+            );
+
+            // I soci collegati agli account presenti risultano anche tra i
+            // partecipanti confermati, come dopo il check-in con la tessera
+            $presenze->registraSociDellePrenotazioni($evento, $request->validated('prenotazioni'));
+
+            return $registrate;
+        });
 
         return redirect()
             ->route('eventi.presenze.index', $evento)

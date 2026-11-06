@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Economia;
 
 use App\Http\Controllers\Controller;
 use App\Models\Quota;
+use App\Models\Socio;
 use App\Services\Economia\SollecitoQuoteService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -23,13 +24,21 @@ class SollecitoQuoteController extends Controller
 
     public function __construct(protected SollecitoQuoteService $solleciti) {}
 
+    /**
+     * Quote non pagate sollecitabili: esclude i soci cessati e quelli nel
+     * cestino.
+     */
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Quota::class);
 
+        // Le quote dei soci cessati non sono sollecitabili, e nemmeno quelle
+        // dei soci nel cestino: whereHas applica lo scope SoftDeletes, mentre
+        // whereDoesntHave lascerebbe passare i soci cessati già eliminati
         $query = Quota::query()
             ->with('socio')
             ->whereNull('data_pagamento')
+            ->whereHas('socio', fn ($q) => $q->whereNotIn('stato', Socio::STATI_CESSATI))
             ->orderBy('data_scadenza')
             ->orderBy('created_at');
 
@@ -83,6 +92,7 @@ class SollecitoQuoteController extends Controller
             ->with('socio')
             ->whereIn('id', $validated['quota_ids'])
             ->whereNull('data_pagamento')
+            ->whereHas('socio', fn ($q) => $q->whereNotIn('stato', Socio::STATI_CESSATI))
             ->get();
 
         foreach ($quote as $quota) {

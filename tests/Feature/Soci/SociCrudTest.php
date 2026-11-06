@@ -69,10 +69,11 @@ class SociCrudTest extends TestCase
         $this->assertSame('001', $socio->numero_socio);
         $this->assertSame($this->associazione->id, $socio->associazione_id);
 
-        // Tessera automatica per l'anno corrente (spec §1.6), numero a 4 cifre
+        // Tessera automatica per l'anno corrente (spec §1.6), numerazione
+        // unificata di TesseraIssuer: {anno}{progressivo 4 cifre}
         $tessera = $socio->tessere()->first();
         $this->assertNotNull($tessera);
-        $this->assertSame('0001', $tessera->numero_tessera);
+        $this->assertSame(now()->year.'0001', $tessera->numero_tessera);
         $this->assertSame((int) now()->year, $tessera->anno_validita);
         $this->assertSame(Tessera::STATO_ATTIVA, $tessera->stato);
         $this->assertNotEmpty($tessera->qr_code_url);

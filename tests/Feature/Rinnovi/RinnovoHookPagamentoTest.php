@@ -6,6 +6,8 @@ use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Services\Pagamenti\PaymentService;
+use App\Services\Tessere\TesseraIssuer;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 
@@ -108,5 +110,53 @@ class RinnovoHookPagamentoTest extends RinnoviTestCase
         $quota->refresh();
         $this->assertNotNull($quota->data_pagamento);
         $this->assertSame(0, Tessera::allTenants()->where('socio_id', $socio->id)->count());
+    }
+
+    public function test_errore_generico_di_emissione_non_invalida_il_pagamento(): void
+    {
+        Notification::fake();
+        $this->configuraTenant();
+        $socio = $this->creaSocio();
+        $quota = Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => (int) now()->year,
+        ]);
+        $this->mock(TesseraIssuer::class)
+            ->shouldReceive('emettiSeAssente')
+            ->andThrow(new \RuntimeException('template tessera mancante'));
+
+        $this->pagaQuota($quota);
+
+        // Best-effort: l'errore viene loggato, il pagamento resta registrato
+        $this->assertNotNull($quota->fresh()->data_pagamento);
+    }
+
+    public function test_deadlock_in_emissione_fa_fallire_il_pagamento_per_il_retry_del_webhook(): void
+    {
+        Notification::fake();
+        $this->configuraTenant();
+        $socio = $this->creaSocio();
+        $quota = Quota::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno' => (int) now()->year,
+        ]);
+        $this->mock(TesseraIssuer::class)
+            ->shouldReceive('emettiSeAssente')
+            ->andThrow(new QueryException('mysql', 'select 1', [], new \PDOException(
+                'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction'
+            )));
+
+        // Il deadlock ha già annullato la transazione sul server: non va
+        // ingoiato, il webhook risponde errore e viene ritentato. (Qui il
+        // deadlock è simulato, quindi il rollback lato server non avviene:
+        // si verifica solo che l'errore si propaghi.)
+        try {
+            $this->pagaQuota($quota);
+            $this->fail('Il deadlock deve propagarsi fuori da onPaymentCompleted.');
+        } catch (\PDOException $e) {
+            $this->assertStringContainsString('Deadlock found', $e->getMessage());
+        }
     }
 }

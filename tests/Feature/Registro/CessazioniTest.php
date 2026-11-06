@@ -8,6 +8,7 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
 use App\Services\Registro\CessazioneService;
+use App\Services\Tessere\TesseraIssuer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -210,5 +211,33 @@ class CessazioniTest extends TestCase
 
         $this->assertSame(Socio::STATO_RADIATO, $socio->refresh()->stato);
         $this->assertSame(1, Cessazione::query()->count());
+    }
+
+    public function test_le_tessere_annullate_dalla_cessazione_escono_dal_vincolo_socio_anno(): void
+    {
+        $socio = $this->creaSocioAttivo();
+        $anno = (int) now()->year;
+        $tessera = Tessera::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+            'anno_validita' => $anno,
+            'stato' => Tessera::STATO_ATTIVA,
+        ]);
+
+        $this->actingAs($this->admin)->post(route('cessazioni.store'), [
+            'socio_id' => $socio->id,
+            'tipo' => Cessazione::TIPO_DIMISSIONI,
+            'data' => now()->toDateString(),
+        ])->assertRedirect(route('cessazioni.index'));
+
+        // L'UPDATE massiva azzera anche la colonna del vincolo unique (issue #21)
+        $this->assertDatabaseHas('tessere', ['id' => $tessera->id, 'stato' => Tessera::STATO_ANNULLATA, 'anno_non_annullata' => null]);
+
+        // Socio riammesso: una nuova tessera dello stesso anno si emette
+        $socio->forceFill(['stato' => Socio::STATO_ATTIVO])->save();
+        $nuova = app(TesseraIssuer::class)->emetti($socio->refresh(), ['anno_validita' => $anno]);
+
+        $this->assertSame(Tessera::STATO_ATTIVA, $nuova->stato);
+        $this->assertSame(2, Tessera::query()->where('socio_id', $socio->id)->where('anno_validita', $anno)->count());
     }
 }

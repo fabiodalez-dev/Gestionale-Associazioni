@@ -3,10 +3,10 @@
 namespace App\Http\Requests\Eventi;
 
 use App\Models\Evento;
-use App\Models\Prenotazione;
 use App\Models\Progetto;
 use App\Models\Spazio;
 use App\Rules\SedeNelPerimetro;
+use App\Services\Prenotazioni\CapienzaEventoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -144,6 +144,11 @@ class EventoRequest extends FormRequest
     /**
      * In modifica la capienza non può scendere sotto i posti già occupati
      * da prenotazioni confermate o in attesa di pagamento (posti riservati).
+     * Una capienza invariata (o aumentata) resta ammessa anche se i posti
+     * occupati la superano già.
+     *
+     * Primo controllo, fuori dal lock: il salvataggio lo ripete sotto il
+     * mutex per-evento (CapienzaEventoService::aggiornaEvento).
      */
     protected function validaCapienzaNonRiducibile(Validator $validator): void
     {
@@ -153,21 +158,18 @@ class EventoRequest extends FormRequest
             return; // creazione: nessuna prenotazione esistente
         }
 
-        $capienza = $this->input('capienza');
+        // Stesso parsing della regola integer (es. "+1" vale 1): con
+        // ctype_digit valori come "+1" saltavano il controllo dei posti
+        $capienza = CapienzaEventoService::capienzaRichiesta($this->input('capienza'));
 
-        if ($capienza === null || $capienza === '' || ! ctype_digit((string) $capienza)) {
+        if ($capienza === null) {
             return; // illimitata o già segnalata dalla regola integer/min
         }
 
-        $occupati = Prenotazione::postiOccupati($evento->id);
+        $errore = CapienzaEventoService::errore($evento, $capienza);
 
-        if ((int) $capienza < $occupati) {
-            $validator->errors()->add(
-                'capienza',
-                "La capienza non può essere ridotta a {$capienza}: ci sono già {$occupati} posti occupati "
-                .'da prenotazioni confermate o riservate (in attesa di pagamento). '
-                .'Annulla prima le prenotazioni in eccesso.'
-            );
+        if ($errore !== null) {
+            $validator->errors()->add('capienza', $errore);
         }
     }
 

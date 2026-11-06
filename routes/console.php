@@ -251,3 +251,17 @@ Schedule::command('conflitti:promemoria-dichiarazioni')
 Schedule::command('personal-data-export:clean')
     ->dailyAt('03:30')
     ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Tessere — vincolo una tessera non annullata per socio e anno (issue #21)
+|--------------------------------------------------------------------------
+|
+| Se la migration l'ha rinviato per tessere doppie già presenti, viene
+| aggiunto appena i doppioni sono stati sistemati: anche qui ogni notte, oltre
+| che al salvataggio delle tessere e all'apertura della pagina Tessere.
+|
+*/
+Schedule::command('tessere:applica-vincolo-anno')
+    ->dailyAt('04:15')
+    ->withoutOverlapping();

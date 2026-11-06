@@ -7,6 +7,7 @@ use App\Http\Requests\Struttura\StoreAssociazioneRequest;
 use App\Http\Requests\Struttura\UpdateAssociazioneRequest;
 use App\Models\Accesso;
 use App\Models\Associazione;
+use App\Models\Prenotazione;
 use App\Models\Quota;
 use App\Models\RichiestaRegistrazione;
 use App\Models\Sede;
@@ -105,6 +106,10 @@ class AssociazioneController extends Controller
         ]);
     }
 
+    /**
+     * Crea l'associazione con configurazione, mini-sito e admin iniziale in
+     * un'unica transazione; gli avvisi non bloccanti tornano in sessione.
+     */
     public function store(StoreAssociazioneRequest $request): RedirectResponse
     {
         $dati = $request->validated();
@@ -128,6 +133,7 @@ class AssociazioneController extends Controller
                     'giorni_notifica_scadenza' => $dati['giorni_notifica_scadenza'] ?? 30,
                     'costo_tessera' => $dati['costo_tessera'] ?? null,
                     'attiva' => $request->boolean('attiva'),
+                    'frontend_pubblico_attivo' => $request->boolean('frontend_pubblico_attivo'),
                 ]);
 
                 // Logo (soft: un errore non annulla l'operazione principale)
@@ -179,6 +185,10 @@ class AssociazioneController extends Controller
             ->with('warning', $warnings ? implode(' ', $warnings) : null);
     }
 
+    /**
+     * Aggiorna anagrafica e configurazione; il mini-sito resta invariato se
+     * il campo non arriva dal form.
+     */
     public function update(UpdateAssociazioneRequest $request, Associazione $associazione): RedirectResponse
     {
         $dati = $request->validated();
@@ -200,6 +210,10 @@ class AssociazioneController extends Controller
                     'cap' => $dati['cap'] ?? null,
                     'costo_tessera' => $dati['costo_tessera'] ?? null,
                     'attiva' => $request->boolean('attiva'),
+                    // Mini-sito: invariato se il campo non arriva (il form invia sempre 0/1)
+                    'frontend_pubblico_attivo' => $request->has('frontend_pubblico_attivo')
+                        ? $request->boolean('frontend_pubblico_attivo')
+                        : $associazione->frontend_pubblico_attivo,
                 ]);
 
                 $associazione->tesseramento()->aggiorna([
@@ -265,6 +279,9 @@ class AssociazioneController extends Controller
     /**
      * Eliminazione con conferma forte (digitare il nome — spec §9.16):
      * i dati figli vengono rimossi per cascade FK, gli utenti restano scollegati.
+     * Le prenotazioni si eliminano prima: prenotazioni.account_id è RESTRICT
+     * (voluto per la cancellazione GDPR del singolo account) e su InnoDB
+     * bloccherebbe la cascade associazione → accounts.
      */
     public function destroy(Request $request, Associazione $associazione): RedirectResponse
     {
@@ -275,11 +292,17 @@ class AssociazioneController extends Controller
             ['conferma_nome.in' => 'Il nome digitato non corrisponde: eliminazione annullata.']
         );
 
-        // Gli utenti collegati vengono scollegati (il cascade DB li eliminerebbe)
-        Utente::query()->where('associazione_id', $associazione->id)->update(['associazione_id' => null]);
-
         $nome = $associazione->nome;
-        $associazione->delete();
+
+        DB::transaction(function () use ($associazione): void {
+            // Gli utenti collegati vengono scollegati (il cascade DB li eliminerebbe)
+            Utente::query()->where('associazione_id', $associazione->id)->update(['associazione_id' => null]);
+
+            // Dipendenze delle prenotazioni (feedback, ...) già in cascade
+            Prenotazione::allTenants()->where('associazione_id', $associazione->id)->delete();
+
+            $associazione->delete();
+        });
 
         return redirect()
             ->route('associazioni.index')

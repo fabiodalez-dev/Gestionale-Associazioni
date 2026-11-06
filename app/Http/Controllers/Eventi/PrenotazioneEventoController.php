@@ -295,7 +295,7 @@ class PrenotazioneEventoController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, CellaSicura::riga([
                 'Codice', 'Cognome', 'Nome', 'Email', 'Posti', 'Stato',
-                'Importo', 'Gateway', 'Pagata il', 'Check-in', 'Operatore check-in', 'Creata il',
+                'Importo', 'Gateway', 'Pagata il', 'Posti entrati', 'Check-in', 'Operatore check-in', 'Creata il',
             ]), ';');
 
             foreach ($prenotazioni as $p) {
@@ -309,6 +309,9 @@ class PrenotazioneEventoController extends Controller
                     number_format((float) $p->importo_totale, 2, ',', ''),
                     $p->gateway,
                     $p->pagata_at?->format('d/m/Y H:i'),
+                    // Ingressi registrati (issue #19): con più posti
+                    // l'entrata può essere parziale
+                    (int) $p->posti_entrati,
                     $p->checkin_at?->format('d/m/Y H:i'),
                     $p->checkinUtente?->nome_completo,
                     $p->created_at?->format('d/m/Y H:i'),

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Tessera;
 use App\Models\Utente;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,10 @@ class ImportLegacy extends Command
         'api_keys',
     ];
 
+    /**
+     * Copia le tabelle legacy nell'ordine delle foreign key, senza audit;
+     * dopo le tessere allinea la colonna del vincolo unique socio/anno.
+     */
     public function handle(): int
     {
         try {
@@ -96,6 +101,10 @@ class ImportLegacy extends Command
                     continue;
                 }
                 $imported += $count;
+
+                if ($table === 'tessere' && ! $dryRun) {
+                    $this->allineaVincoloTessere();
+                }
             }
 
             if (! $dryRun) {
@@ -207,6 +216,69 @@ class ImportLegacy extends Command
         $this->info(sprintf('[%s] importate %d/%d righe.', $table, $copied, $total));
 
         return $copied;
+    }
+
+    /**
+     * Le tessere copiate con insertOrIgnore non passano dall'hook del modello:
+     * valorizza anno_non_annullata (colonna del vincolo unique socio/anno,
+     * issue #21) sulle tessere non annullate, così anche i dati importati
+     * entrano nel vincolo. I doppioni legacy (più tessere non annullate dello
+     * stesso socio e anno) restano fuori dal vincolo e vengono segnalati:
+     * nessuna riga viene scartata o modificata nello stato.
+     */
+    private function allineaVincoloTessere(): void
+    {
+        $doppioni = DB::table('tessere')
+            ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+            ->select('socio_id', 'anno_validita')
+            ->groupBy('socio_id', 'anno_validita')
+            ->havingRaw('COUNT(*) > 1')
+            ->orderBy('socio_id')
+            ->orderBy('anno_validita')
+            ->get()
+            ->map(fn ($r): string => $r->socio_id.'|'.$r->anno_validita)
+            ->flip();
+
+        DB::table('tessere')
+            ->whereNull('anno_non_annullata')
+            ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+            ->select('id', 'socio_id', 'anno_validita')
+            ->chunkById(500, function ($righe) use ($doppioni): void {
+                $ids = $righe
+                    ->reject(fn ($r): bool => $doppioni->has($r->socio_id.'|'.$r->anno_validita))
+                    ->pluck('id');
+
+                if ($ids->isNotEmpty()) {
+                    DB::table('tessere')->whereIn('id', $ids)->update(['anno_non_annullata' => DB::raw('anno_validita')]);
+                }
+            });
+
+        if ($doppioni->isNotEmpty()) {
+            $this->warn(sprintf(
+                '[tessere] %d coppie socio/anno con più tessere non annullate: restano fuori dal vincolo unique finché non vengono sistemate dal backoffice.',
+                $doppioni->count(),
+            ));
+
+            // Elenco delle coppie con i numeri tessera, per guidare la
+            // sistemazione (annullare o eliminare le tessere in più)
+            DB::table('tessere')
+                ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+                ->whereNull('anno_non_annullata')
+                ->orderBy('socio_id')
+                ->orderBy('anno_validita')
+                ->orderBy('numero_tessera')
+                ->get(['socio_id', 'anno_validita', 'numero_tessera'])
+                ->groupBy(fn ($r): string => $r->socio_id.'|'.$r->anno_validita)
+                ->filter(fn ($righe, string $chiave): bool => $doppioni->has($chiave))
+                ->each(function ($righe): void {
+                    $this->warn(sprintf(
+                        '  socio %s, anno %d: tessere %s',
+                        $righe->first()->socio_id,
+                        (int) $righe->first()->anno_validita,
+                        $righe->pluck('numero_tessera')->implode(', '),
+                    ));
+                });
+        }
     }
 
     /**

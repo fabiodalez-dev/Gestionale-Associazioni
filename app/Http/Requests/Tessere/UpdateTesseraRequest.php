@@ -42,7 +42,22 @@ class UpdateTesseraRequest extends FormRequest
                     ->where('associazione_id', $associazioneId)
                     ->ignore($tessera->id),
             ],
-            'anno_validita' => ['required', 'integer', 'between:2000,2100'],
+            'anno_validita' => [
+                'required',
+                'integer',
+                'between:2000,2100',
+                // Una sola tessera non annullata per socio e anno (vincolo
+                // unique, issue #21): una tessera annullata non blocca il
+                // duplicato e una tessera salvata come annullata non conta.
+                // Una tessera con stato 'Scaduta' memorizzato (legacy) conta
+                // come nel vincolo: va annullata prima di emetterne un'altra
+                Rule::when($this->input('stato') !== Tessera::STATO_ANNULLATA, [
+                    Rule::unique('tessere', 'anno_validita')
+                        ->where('socio_id', is_string($this->input('socio_id')) ? $this->input('socio_id') : '')
+                        ->where(fn ($q) => $q->where('stato', '<>', Tessera::STATO_ANNULLATA))
+                        ->ignore($tessera->id),
+                ]),
+            ],
             'data_emissione' => ['required', 'date'],
             'data_scadenza' => ['nullable', 'date', 'after_or_equal:data_emissione'],
             'stato' => ['required', Rule::in([Tessera::STATO_ATTIVA, Tessera::STATO_SOSPESA, Tessera::STATO_ANNULLATA])],
@@ -64,6 +79,7 @@ class UpdateTesseraRequest extends FormRequest
         return [
             'socio_id.exists' => 'Socio non valido per questa associazione.',
             'numero_tessera.unique' => 'Numero tessera già esistente per questa associazione.',
+            'anno_validita.unique' => 'Il socio ha già una tessera non annullata per questo anno (anche se scaduta: va annullata prima di emetterne un\'altra).',
             'evento_creazione_id.exists' => 'Evento non valido per questa associazione.',
             'stato.in' => 'Stato non valido: "Scaduta" è derivato dalla data di scadenza.',
         ];

@@ -175,6 +175,9 @@
                                 <td>
                                     @if ($prenotazione->checkin_at)
                                         <span class="text-success"><i class="bi bi-qr-code-scan me-1"></i>{{ $prenotazione->checkin_at->format('d/m/Y H:i') }}</span>
+                                        @if ($prenotazione->postiDaEntrare() > 0)
+                                            <div class="text-warning small">{{ $prenotazione->posti_entrati }}/{{ $prenotazione->posti }} posti entrati</div>
+                                        @endif
                                         @if ($prenotazione->checkinUtente)
                                             <div class="text-muted small">{{ $prenotazione->checkinUtente->nome_completo }}</div>
                                         @endif

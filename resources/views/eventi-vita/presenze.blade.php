@@ -4,8 +4,12 @@
 
 @section('content')
     @php
+        // Prenotazioni con almeno un ingresso: con quelle entrate in parte
+        // si sovrappone al contatore successivo (la somma può superare il totale)
         $arrivati = $prenotazioni->filter(fn ($p) => $p->checkin_at !== null);
-        $daRegistrare = $prenotazioni->filter(fn ($p) => $p->checkin_at === null);
+        // Anche le prenotazioni entrate in parte (il socio con la tessera,
+        // i compagni ancora fuori): la registrazione completa i posti
+        $daRegistrare = $prenotazioni->filter(fn ($p) => $p->postiDaEntrare() > 0);
     @endphp
 
     <div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom">
@@ -33,19 +37,19 @@
         <div class="col-6 col-md-3">
             <div class="card text-center"><div class="card-body py-3">
                 <div class="h4 mb-0 text-success">{{ $arrivati->count() }}</div>
-                <div class="small text-muted">Check-in effettuati</div>
+                <div class="small text-muted">Con almeno un ingresso</div>
             </div></div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card text-center"><div class="card-body py-3">
                 <div class="h4 mb-0">{{ $daRegistrare->count() }}</div>
-                <div class="small text-muted">In attesa di arrivo</div>
+                <div class="small text-muted">Con posti da far entrare</div>
             </div></div>
         </div>
         <div class="col-6 col-md-3">
             <div class="card text-center"><div class="card-body py-3">
-                <div class="h4 mb-0">{{ $prenotazioni->sum('posti') }}</div>
-                <div class="small text-muted">Posti totali</div>
+                <div class="h4 mb-0">{{ $prenotazioni->sum('posti_entrati') }} / {{ $prenotazioni->sum('posti') }}</div>
+                <div class="small text-muted">Posti entrati / totali</div>
             </div></div>
         </div>
     </div>
@@ -81,7 +85,7 @@
                             <tr>
                                 <td>
                                     <input type="checkbox" class="form-check-input" name="prenotazioni[]"
-                                           value="{{ $prenotazione->id }}" {{ $prenotazione->checkin_at !== null ? 'disabled' : '' }}>
+                                           value="{{ $prenotazione->id }}" {{ $prenotazione->isEntrataCompleta() ? 'disabled' : '' }}>
                                 </td>
                                 <td>
                                     <span class="fw-semibold">{{ $prenotazione->account?->nome_completo ?: 'Account rimosso' }}</span>
@@ -92,9 +96,13 @@
                                 <td><code>{{ $prenotazione->codice }}</code></td>
                                 <td class="text-center">{{ $prenotazione->posti }}</td>
                                 <td class="text-center">
-                                    @if ($prenotazione->checkin_at !== null)
+                                    @if ($prenotazione->isEntrataCompleta())
                                         <span class="badge bg-success">
                                             <i class="bi bi-check-lg me-1"></i>{{ $prenotazione->checkin_at->format('d/m/Y H:i') }}
+                                        </span>
+                                    @elseif ($prenotazione->checkin_at !== null)
+                                        <span class="badge bg-warning text-dark">
+                                            {{ $prenotazione->posti_entrati }}/{{ $prenotazione->posti }} entrati · {{ $prenotazione->checkin_at->format('d/m/Y H:i') }}
                                         </span>
                                     @else
                                         <span class="badge bg-secondary">Non registrata</span>

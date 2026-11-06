@@ -298,10 +298,14 @@
         var posti = b && b.posti ? (b.posti === 1 ? '1 posto' : b.posti + ' posti') : '';
 
         if (data.success && !data.already_checked_in) {
+            // Posti da far entrare con questa scansione: meno dei posti del
+            // biglietto se il socio è già entrato con la tessera
+            var entrati = data.posti_registrati || (b && b.posti ? b.posti : 1);
+            var daEntrare = entrati === 1 ? 'Fai entrare 1 persona' : 'Fai entrare ' + entrati + ' persone';
             checkinCount++;
             checkinCounter.textContent = String(checkinCount);
-            addRecent('bi-ticket-perforated-fill text-success', nome + (posti ? ' · ' + posti : ''));
-            showOverlay('result-ok', 'bi-ticket-perforated-fill', nome, (posti ? posti + ' · ' : '') + (data.message || 'Check-in registrato.'));
+            addRecent('bi-ticket-perforated-fill text-success', nome + ' · ' + daEntrare.toLowerCase());
+            showOverlay('result-ok', 'bi-ticket-perforated-fill', nome, (posti ? posti + ' · ' : '') + daEntrare + '. ' + (data.message || 'Check-in registrato.'));
         } else if (data.success && data.already_checked_in) {
             addRecent('bi-exclamation-circle text-warning', nome + ' (già utilizzato)');
             showOverlay('result-dup', 'bi-exclamation-circle-fill', nome, data.message || 'Biglietto già utilizzato.');

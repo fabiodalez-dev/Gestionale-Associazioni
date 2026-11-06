@@ -41,37 +41,62 @@ class IscrizioneApprovataNotification extends Notification implements ShouldQueu
         return ['database', 'mail'];
     }
 
+    /**
+     * Email di benvenuto dopo l'approvazione, indirizzata con il nome
+     * dell'account o, per l'ospite, con quello del modulo.
+     */
     public function toMail(object $notifiable): MailMessage
     {
         $associazione = $this->richiesta->associazione;
 
+        // Account: nome dell'account; ospite (invio on-demand): nome dal modulo
+        $nome = trim((string) ($notifiable->nome ?? $this->richiesta->dati_form['nome'] ?? ''));
+
         $message = (new MailMessage)
             ->subject('Benvenuto tra i soci — '.($associazione->nome ?? 'Associazione'))
-            ->greeting('Ciao '.($notifiable->nome ?? '').',')
+            ->greeting('Ciao'.($nome !== '' ? ' '.$nome : '').',')
             ->line('la tua richiesta di iscrizione a "'
                 .($associazione->nome ?? 'Associazione')
                 .'" è stata approvata: da oggi sei socio!');
 
+        // Iscrizione da ospite (richiesta senza account): non ha un'area
+        // riservata a cui accedere, quindi niente rimandi né pulsante verso di essa
+        $ospite = $this->richiesta->account_id === null;
+
         if (filled($this->numeroTessera)) {
             $message->line('Ti è stata assegnata la tessera numero '
-                .$this->numeroTessera.', disponibile nella tua area riservata.');
+                .$this->numeroTessera
+                .($ospite ? '.' : ', disponibile nella tua area riservata.'));
         }
 
+        $areaRiservata = ! $ospite && $associazione !== null && filled($associazione->slug) && Route::has('pubblico.account.tessera')
+            ? route('pubblico.account.tessera', ['associazione' => $associazione->slug])
+            : null;
+
+        // MailMessage ha un solo pulsante (una seconda action() sovrascrive la
+        // prima): per l'account il pulsante porta all'area riservata (dove c'è
+        // "Paga ora") e il link di pagamento diretto resta nel testo; per
+        // l'ospite il pulsante è il link di pagamento.
         if (filled($this->linkPagamentoQuota)) {
-            $message->line('Per completare il tesseramento ti chiediamo di versare la quota associativa dell\'anno: puoi pagarla online in un minuto.')
-                ->action('Paga la quota associativa', $this->linkPagamentoQuota);
+            $message->line('Per completare il tesseramento ti chiediamo di versare la quota associativa dell\'anno: puoi pagarla online in un minuto.');
+
+            if ($areaRiservata !== null) {
+                $message->line('Paga la quota associativa: '.$this->linkPagamentoQuota);
+            } else {
+                $message->action('Paga la quota associativa', $this->linkPagamentoQuota);
+            }
         }
 
-        if ($associazione !== null && filled($associazione->slug) && Route::has('pubblico.account.tessera')) {
-            $message->action(
-                'Vai alla tua area riservata',
-                route('pubblico.account.tessera', ['associazione' => $associazione->slug])
-            );
+        if ($areaRiservata !== null) {
+            $message->action('Vai alla tua area riservata', $areaRiservata);
         }
 
         // Prossimi passi (f.19)
-        $message->line('Prossimi passi: nella tua area riservata trovi tessera, quote ed eventuali pagamenti da completare.')
-            ->line('Per qualsiasi dubbio rispondi a questa email o contatta l\'associazione.');
+        if (! $ospite) {
+            $message->line('Prossimi passi: nella tua area riservata trovi tessera, quote ed eventuali pagamenti da completare.');
+        }
+
+        $message->line('Per qualsiasi dubbio rispondi a questa email o contatta l\'associazione.');
 
         $this->allegaTesseraPdf($message);
 

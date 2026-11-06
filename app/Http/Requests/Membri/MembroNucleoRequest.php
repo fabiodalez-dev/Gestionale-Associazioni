@@ -28,7 +28,7 @@ class MembroNucleoRequest extends FormRequest
         return [
             'socio_id' => [
                 'required',
-                Rule::exists('soci', 'id')->where('associazione_id', $associazioneId),
+                Rule::exists('soci', 'id')->where('associazione_id', $associazioneId)->whereNull('deleted_at'),
             ],
         ];
     }

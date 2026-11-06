@@ -4,6 +4,7 @@ namespace Tests\Feature\Membri;
 
 use App\Models\Associazione;
 use App\Models\Nucleo;
+use App\Models\Sede;
 use App\Models\Socio;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -229,6 +230,77 @@ class NucleiFamiliariTest extends TestCase
             ->assertOk()
             ->assertSee('Nucleo familiare')
             ->assertSee('Famiglia Bianchi');
+    }
+
+    public function test_rinomina_da_utente_di_sede_conserva_il_capofamiglia_fuori_perimetro(): void
+    {
+        $padova = Sede::create(['associazione_id' => $this->associazione->id, 'nome' => 'Padova']);
+        $vicenza = Sede::create(['associazione_id' => $this->associazione->id, 'nome' => 'Vicenza']);
+        $responsabile = Utente::factory()->operatore()->create(['associazione_id' => $this->associazione->id]);
+        $responsabile->assegnaSedi([$padova->id]);
+
+        $padre = $this->creaSocio(['sede_id' => $vicenza->id, 'cognome' => 'Vicentini']);
+        $figlia = $this->creaSocio(['sede_id' => $padova->id, 'cognome' => 'Padovani']);
+        $nucleo = Nucleo::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'nome' => 'Famiglia Vicentini',
+            'capofamiglia_id' => $padre->id,
+        ]);
+        $padre->forceFill(['nucleo_id' => $nucleo->id])->save();
+        $figlia->forceFill(['nucleo_id' => $nucleo->id])->save();
+
+        $comeResponsabile = fn () => $this->actingAs($responsabile)
+            ->withSession(['associazione_id' => $this->associazione->id]);
+
+        // Il capofamiglia non è tra i membri visibili ma resta selezionato nel form
+        $comeResponsabile()->get(route('soci.show', $figlia))
+            ->assertOk()
+            ->assertSee('<option value="'.$padre->id.'" selected>Capofamiglia attuale (non visibile)</option>', false);
+
+        // La rinomina rimanda il capofamiglia attuale: viene conservato
+        $comeResponsabile()->put("/nuclei/{$nucleo->id}", [
+            'nome' => 'Famiglia Vicentini-Padovani',
+            'capofamiglia_id' => $padre->id,
+        ])->assertSessionHas('success');
+
+        $nucleo->refresh();
+        $this->assertSame('Famiglia Vicentini-Padovani', $nucleo->nome);
+        $this->assertSame($padre->id, $nucleo->capofamiglia_id);
+
+        // "Nessuno" esplicito: il capofamiglia viene tolto
+        $comeResponsabile()->put("/nuclei/{$nucleo->id}", [
+            'nome' => 'Famiglia Vicentini-Padovani',
+            'capofamiglia_id' => '',
+        ])->assertSessionHas('success');
+
+        $this->assertNull($nucleo->fresh()->capofamiglia_id);
+    }
+
+    public function test_capofamiglia_nel_cestino_non_e_riproposto_e_la_rinomina_riesce(): void
+    {
+        $padre = $this->creaSocio(['cognome' => 'Cestinato']);
+        $figlia = $this->creaSocio(['cognome' => 'Rimasta']);
+        $nucleo = Nucleo::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'nome' => 'Famiglia Cestinato',
+            'capofamiglia_id' => $padre->id,
+        ]);
+        $padre->forceFill(['nucleo_id' => $nucleo->id])->save();
+        $figlia->forceFill(['nucleo_id' => $nucleo->id])->save();
+        $padre->delete();
+
+        // Nessuna opzione di ripiego per un socio eliminato: il form invia "Nessuno"
+        $this->actingAs($this->admin)
+            ->get(route('soci.show', $figlia))
+            ->assertOk()
+            ->assertDontSee('Capofamiglia attuale (non visibile)');
+
+        $this->actingAs($this->admin)->put("/nuclei/{$nucleo->id}", [
+            'nome' => 'Famiglia Rimasta',
+            'capofamiglia_id' => '',
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+
+        $this->assertSame('Famiglia Rimasta', $nucleo->fresh()->nome);
     }
 
     // ------------------------------------------------------------------

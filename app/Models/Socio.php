@@ -65,6 +65,17 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
         self::STATO_IN_ATTESA_DI_PAGAMENTO,
     ];
 
+    /**
+     * Stati di chi non fa più parte dell'associazione (cessazione per
+     * dimissioni/decadenza/espulsione → Radiato, decesso, trasferimento):
+     * nessuna automazione verso il socio (solleciti, promemoria).
+     */
+    public const STATI_CESSATI = [
+        self::STATO_RADIATO,
+        self::STATO_DECEDUTO,
+        self::STATO_TRASFERITO,
+    ];
+
     protected $table = 'soci';
 
     protected $fillable = [
@@ -182,6 +193,14 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
     public function isAttivo(): bool
     {
         return $this->stato === self::STATO_ATTIVO;
+    }
+
+    /**
+     * Vero se il socio è in uno stato di cessazione (STATI_CESSATI).
+     */
+    public function isCessato(): bool
+    {
+        return in_array($this->stato, self::STATI_CESSATI, true);
     }
 
     /**

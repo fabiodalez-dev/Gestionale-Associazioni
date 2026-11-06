@@ -45,7 +45,7 @@
                     <td>{{ $prenotazione->account?->nome_completo ?: '—' }}</td>
                     <td>{{ $prenotazione->codice }}</td>
                     <td class="center">{{ $prenotazione->posti }}</td>
-                    <td class="center">{{ $prenotazione->checkin_at?->format('H:i') ?? '' }}</td>
+                    <td class="center">{{ $prenotazione->checkin_at?->format('H:i') ?? '' }}@if ($prenotazione->checkin_at !== null && $prenotazione->postiDaEntrare() > 0) ({{ $prenotazione->posti_entrati }}/{{ $prenotazione->posti }})@endif</td>
                     <td class="firma"></td>
                 </tr>
             @empty

@@ -5,10 +5,15 @@ namespace Tests\Feature\Prenotazioni;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
+use App\Models\Socio;
 use App\Models\Utente;
+use App\Services\EventiVita\PresenzeSociService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -100,6 +105,63 @@ class CheckinBigliettoTest extends TestCase
 
         // Il primo check-in non viene sovrascritto
         $this->assertTrue($primoCheckin->equalTo($prenotazione->refresh()->checkin_at));
+    }
+
+    public function test_checkin_annullato_se_la_registrazione_del_socio_fallisce(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $prenotazione = $this->creaPrenotazione($assoc);
+
+        $this->mock(PresenzeSociService::class)
+            ->shouldReceive('registraSociDellePrenotazioni')
+            ->andThrow(new \RuntimeException('Registrazione fallita'));
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($admin)->postJson('/biglietti/checkin', ['qr_token' => $prenotazione->qr_token]);
+            $this->fail('Eccezione attesa');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Registrazione fallita', $e->getMessage());
+        }
+
+        // Stessa transazione: il biglietto non risulta usato, la scansione si ripete
+        $this->assertNull($prenotazione->refresh()->checkin_at);
+    }
+
+    public function test_socio_registrato_in_parallelo_non_fa_fallire_il_checkin(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $socio = Socio::factory()->create(['associazione_id' => $assoc->id, 'stato' => Socio::STATO_ATTIVO]);
+        $prenotazione = $this->creaPrenotazione($assoc);
+        $prenotazione->account->forceFill(['socio_id' => $socio->id])->save();
+
+        // Un'altra richiesta (es. check-in con la tessera) registra lo stesso
+        // socio tra la lettura e l'inserimento: unique evento+socio violato
+        EventoPartecipante::creating(function (EventoPartecipante $partecipante): void {
+            DB::table('eventi_partecipanti')->insertOrIgnore([
+                'id' => (string) Str::uuid(),
+                'associazione_id' => $partecipante->associazione_id,
+                'evento_id' => $partecipante->evento_id,
+                'socio_id' => $partecipante->socio_id,
+                'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                'data_conferma' => now(),
+                'created_at' => now(),
+            ]);
+        });
+
+        $this->actingAs($admin)->postJson('/biglietti/checkin', ['qr_token' => $prenotazione->qr_token])
+            ->assertOk()
+            ->assertJson(['success' => true, 'already_checked_in' => false]);
+
+        $this->assertNotNull($prenotazione->refresh()->checkin_at);
+        $this->assertSame(1, EventoPartecipante::withoutGlobalScopes()
+            ->where('evento_id', $prenotazione->evento_id)
+            ->where('socio_id', $socio->id)
+            ->where('stato_partecipazione', EventoPartecipante::STATO_CONFERMATO)
+            ->count());
     }
 
     public function test_checkin_manuale_tramite_codice_prenotazione(): void

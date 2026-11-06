@@ -99,7 +99,12 @@ class EmailsSendReminders extends Command
                 'rinnovo_token_expires' => now()->addDays(30),
             ])->saveQuietly();
 
-            $linkRinnovo = url('/preiscrizione').'?assoc='.$associazione->id.'&token='.$socio->rinnovo_token;
+            // Pagina di rinnovo: /preiscrizione/{associazione}?token=… (il
+            // vecchio formato legacy ?assoc=… non ha una rotta e dava 404)
+            $linkRinnovo = route('preiscrizione.show', [
+                'associazione' => $associazione->id,
+                'token' => $socio->rinnovo_token,
+            ]);
 
             $values = EmailPlaceholders::buildValues($associazione, $socio, [
                 'NUMERO_TESSERA' => (string) $tessera->numero_tessera,

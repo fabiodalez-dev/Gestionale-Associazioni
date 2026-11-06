@@ -21,7 +21,8 @@ use Illuminate\Notifications\Notification;
  *
  * Le relazioni (evento, associazione) vengono lette senza global scope
  * tenant: la notifica può essere smaltita da un worker fuori dal contesto
- * del frontend pubblico.
+ * del frontend pubblico. L'evento è letto anche se nel cestino: l'annullo
+ * per evento eliminato viene smaltito dopo il soft delete.
  */
 abstract class PrenotazioneNotification extends Notification implements ShouldQueue
 {
@@ -37,10 +38,15 @@ abstract class PrenotazioneNotification extends Notification implements ShouldQu
         return ['database', 'mail'];
     }
 
+    /**
+     * Evento della prenotazione anche se eliminato o fuori dal tenant
+     * corrente (le notifiche partono da code e scheduler).
+     */
     protected function evento(): ?Evento
     {
         return $this->prenotazione->evento()
             ->withoutGlobalScope('associazione')
+            ->withTrashed()
             ->first();
     }
 

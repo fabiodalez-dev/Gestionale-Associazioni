@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
+use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -197,6 +199,20 @@ class EventoApiController extends Controller
 
         try {
             $result = DB::transaction(function () use ($evento, $socio, $associazioneId) {
+                // Stesso allineamento del check-in con la tessera da backoffice,
+                // nella stessa transazione della partecipazione: la prenotazione
+                // confermata dell'account collegato risulta arrivata per il posto
+                // del socio (origine "api", annullata se il partecipante viene
+                // rimosso o non è più Confermato). Idempotente.
+                // Prima del lock sul partecipante: stesso ordine dei lock del
+                // check-in con tessera (prenotazione, poi partecipante).
+                app(PresenzeSociService::class)->segnaPrenotazioneDelSocio(
+                    $evento,
+                    $socio,
+                    null,
+                    Prenotazione::CHECKIN_ORIGINE_API,
+                );
+
                 /** @var EventoPartecipante|null $partecipazione */
                 $partecipazione = EventoPartecipante::allTenants()
                     ->where('evento_id', $evento->id)

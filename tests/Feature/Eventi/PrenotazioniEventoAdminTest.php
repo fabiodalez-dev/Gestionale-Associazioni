@@ -297,7 +297,9 @@ class PrenotazioniEventoAdminTest extends TestCase
     {
         $prenotazione = Prenotazione::factory()->confermata()->create([
             'evento_id' => $this->evento->id,
-            'posti' => 2,
+            'posti' => 3,
+            'posti_entrati' => 1,
+            'checkin_at' => '2030-05-01 20:15:00',
         ]);
         $account = Account::withoutGlobalScopes()->findOrFail($prenotazione->account_id);
 
@@ -310,6 +312,9 @@ class PrenotazioniEventoAdminTest extends TestCase
         $this->assertStringContainsString('Codice;Cognome;Nome', $csv);
         $this->assertStringContainsString($prenotazione->codice, $csv);
         $this->assertStringContainsString($account->cognome, $csv);
+        // Posti entrati (issue #19): entrata parziale, 1 posto su 3
+        $this->assertStringContainsString(';"Posti entrati";Check-in;', $csv);
+        $this->assertMatchesRegularExpression('/;3;confermata;.*;1;"01\/05\/2030 20:15";/', $csv);
     }
 
     public function test_export_csv_rispetta_il_filtro_stato(): void

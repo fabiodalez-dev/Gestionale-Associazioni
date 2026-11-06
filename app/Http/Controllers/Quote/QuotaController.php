@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Quote\StoreQuotaRequest;
 use App\Http\Requests\Quote\UpdateQuotaRequest;
 use App\Models\Associazione;
+use App\Models\Movimento;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Quota;
 use App\Models\Socio;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -176,17 +178,49 @@ class QuotaController extends Controller
         return redirect()->route('quote.index')->with('success', 'Quota aggiornata.');
     }
 
+    /**
+     * Elimina la quota riletta sotto lock (un webhook concorrente può averla
+     * appena pagata) insieme al movimento automatico di prima nota.
+     */
     public function destroy(Quota $quota): RedirectResponse
     {
         $this->authorize('delete', $quota);
 
-        // Blocco eliminazione per quote pagate online (tracciabilità contabile, §10.5 spec)
-        if (filled($quota->gateway_transaction_id)) {
+        // Il movimento automatico di prima nota (origine polimorfica, senza FK)
+        // segue la quota eliminata: altrimenti resterebbe orfano e, essendo
+        // "automatico", non più eliminabile dalla prima nota.
+        $eliminata = DB::transaction(function () use ($quota): bool {
+            // Riletta sotto lock: un webhook di pagamento concorrente (che
+            // blocca la stessa riga) può averla appena segnata pagata online
+            $quota = Quota::query()->whereKey($quota->getKey())->lockForUpdate()->first();
+
+            if ($quota === null) {
+                // Già eliminata da una richiesta concorrente
+                return true;
+            }
+
+            // Blocco eliminazione per quote pagate online (tracciabilità contabile, §10.5 spec)
+            if (filled($quota->gateway_transaction_id)) {
+                return false;
+            }
+
+            Movimento::query()
+                ->withoutGlobalScopes()
+                ->where('associazione_id', $quota->associazione_id)
+                ->where('origine_type', $quota->getMorphClass())
+                ->where('origine_id', $quota->getKey())
+                ->get()
+                ->each(fn (Movimento $movimento) => $movimento->delete());
+
+            $quota->delete();
+
+            return true;
+        });
+
+        if (! $eliminata) {
             return redirect()->route('quote.index')
                 ->with('error', 'Impossibile eliminare una quota pagata online (tracciabilità contabile).');
         }
-
-        $quota->delete();
 
         return redirect()->route('quote.index')->with('success', 'Quota eliminata con successo.');
     }

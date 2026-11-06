@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Tessere\CheckinTesseraRequest;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
+use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\EventiVita\PresenzeSociService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -34,10 +38,11 @@ class CheckinController extends Controller
     }
 
     /**
-     * Registra il check-in (stato_partecipazione 'Confermato').
+     * Registra il check-in (stato_partecipazione 'Confermato') e segna
+     * l'eventuale prenotazione confermata del socio per lo stesso evento.
      * Identificazione socio: tessera_id (dal QR) → numero_tessera → numero_socio.
      */
-    public function store(CheckinTesseraRequest $request): JsonResponse
+    public function store(CheckinTesseraRequest $request, PresenzeSociService $presenze): JsonResponse
     {
         $dati = $request->validated();
         $associazioneId = (string) session('associazione_id');
@@ -111,12 +116,72 @@ class CheckinController extends Controller
             ], 400);
         }
 
-        $partecipante = EventoPartecipante::query()
-            ->where('evento_id', $evento->id)
-            ->where('socio_id', $socio->id)
-            ->first();
+        // Prenotazione e partecipazione nella stessa transazione: un errore
+        // sulla seconda scrittura annulla anche la prima
+        $giaRegistrato = DB::transaction(function () use ($evento, $socio, $presenze, $request, $associazioneId): bool {
+            $partecipante = EventoPartecipante::query()
+                ->where('evento_id', $evento->id)
+                ->where('socio_id', $socio->id)
+                ->first();
 
-        if ($partecipante !== null && $partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+            // La prenotazione del socio (account collegato) per l'evento risulta
+            // arrivata per il suo posto (origine "tessera"): vita sociale,
+            // feedback e statistiche contano la stessa presenza; il check-in si
+            // annulla se il partecipante viene poi rimosso o non è più Confermato
+            $presenze->segnaPrenotazioneDelSocio(
+                $evento,
+                $socio,
+                $request->user()?->getAuthIdentifier(),
+                Prenotazione::CHECKIN_ORIGINE_TESSERA,
+            );
+
+            if ($partecipante !== null && $partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+                return true;
+            }
+
+            if ($partecipante !== null) {
+                $partecipante->update([
+                    'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                    'data_conferma' => now(),
+                ]);
+            } else {
+                try {
+                    EventoPartecipante::create([
+                        'associazione_id' => $associazioneId,
+                        'evento_id' => $evento->id,
+                        'socio_id' => $socio->id,
+                        'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                        'data_conferma' => now(),
+                    ]);
+                } catch (UniqueConstraintViolationException $e) {
+                    // Riga creata in parallelo (altra scansione o operazione
+                    // admin, unique evento+socio): riletta con lock, perché la
+                    // lettura iniziale della transazione può non vederla
+                    $partecipante = EventoPartecipante::query()
+                        ->where('evento_id', $evento->id)
+                        ->where('socio_id', $socio->id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($partecipante === null) {
+                        throw $e;
+                    }
+
+                    if ($partecipante->stato_partecipazione === EventoPartecipante::STATO_CONFERMATO) {
+                        return true;
+                    }
+
+                    $partecipante->update([
+                        'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
+                        'data_conferma' => now(),
+                    ]);
+                }
+            }
+
+            return false;
+        });
+
+        if ($giaRegistrato) {
             return response()->json([
                 'success' => true,
                 'already_checked_in' => true,
@@ -126,21 +191,6 @@ class CheckinController extends Controller
                     'cognome' => $socio->cognome,
                     'numero_socio' => $socio->numero_socio,
                 ],
-            ]);
-        }
-
-        if ($partecipante !== null) {
-            $partecipante->update([
-                'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
-                'data_conferma' => now(),
-            ]);
-        } else {
-            EventoPartecipante::create([
-                'associazione_id' => $associazioneId,
-                'evento_id' => $evento->id,
-                'socio_id' => $socio->id,
-                'stato_partecipazione' => EventoPartecipante::STATO_CONFERMATO,
-                'data_conferma' => now(),
             ]);
         }
 

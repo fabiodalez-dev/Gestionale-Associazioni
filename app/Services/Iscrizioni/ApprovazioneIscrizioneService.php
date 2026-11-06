@@ -16,6 +16,7 @@ use Illuminate\Notifications\Notification as NotificationMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Gestione admin delle richieste di iscrizione socio (PIANO-ISCRIZIONI
@@ -62,8 +63,10 @@ class ApprovazioneIscrizioneService
         $tessera = null;
         /** @var Quota|null $quota */
         $quota = null;
+        /** @var string|null $emailRichiedente */
+        $emailRichiedente = null;
 
-        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $generaQuota, $deliberaNumero, $deliberaData, &$tessera, &$quota): RichiestaIscrizione {
+        $risultato = DB::transaction(function () use ($richiesta, $utente, $generaTessera, $generaQuota, $deliberaNumero, $deliberaData, &$tessera, &$quota, &$emailRichiedente): RichiestaIscrizione {
             $richiesta = $this->lockRichiesta($richiesta);
 
             if (! $richiesta->isInAttesa()) {
@@ -73,12 +76,24 @@ class ApprovazioneIscrizioneService
             $socio = $this->socioPreiscritto($richiesta);
             $account = $this->account($richiesta);
 
+            // Email per l'esito letta qui, come in rifiuta(): dopo il commit
+            // un errore di lettura darebbe un 500 su un'approvazione già salvata
+            $emailRichiedente = $this->emailSocio($socio->id);
+
             if ($account !== null && $account->socio_id !== null && $account->socio_id !== $socio->id) {
                 throw IscrizioneException::accountGiaCollegato();
             }
 
-            // Socio "In Attesa" → "Attivo"
-            $socio->forceFill(['stato' => Socio::STATO_ATTIVO])->save();
+            // Socio "In Attesa" → "Attivo". La data di iscrizione diventa la
+            // data di ammissione (delibera, se indicata, altrimenti oggi), come
+            // alla conferma in segreteria e all'attivazione via webhook: il
+            // libro soci ordina e numera per data_iscrizione.
+            $socio->forceFill([
+                'stato' => Socio::STATO_ATTIVO,
+                'data_iscrizione' => filled($deliberaData)
+                    ? Carbon::parse($deliberaData)->toDateString()
+                    : now()->toDateString(),
+            ])->save();
 
             StoricoAttivitaSocio::create([
                 'associazione_id' => $richiesta->associazione_id,
@@ -124,12 +139,12 @@ class ApprovazioneIscrizioneService
             return $richiesta;
         });
 
-        $this->notificaAccount($risultato, new IscrizioneApprovataNotification(
+        $this->notificaRichiedente($risultato, new IscrizioneApprovataNotification(
             $risultato,
             $tessera?->numero_tessera,
             $tessera?->id,
             $this->linkPagamentoQuota($quota)
-        ));
+        ), $emailRichiedente);
 
         return $risultato;
     }
@@ -202,7 +217,10 @@ class ApprovazioneIscrizioneService
      */
     public function rifiuta(RichiestaIscrizione $richiesta, Utente $utente, string $motivo): RichiestaIscrizione
     {
-        $risultato = DB::transaction(function () use ($richiesta, $utente, $motivo): RichiestaIscrizione {
+        /** @var string|null $emailRichiedente */
+        $emailRichiedente = null;
+
+        $risultato = DB::transaction(function () use ($richiesta, $utente, $motivo, &$emailRichiedente): RichiestaIscrizione {
             $richiesta = $this->lockRichiesta($richiesta);
 
             if (! $richiesta->isInAttesa()) {
@@ -210,6 +228,10 @@ class ApprovazioneIscrizioneService
             }
 
             $socioId = $richiesta->socio_id;
+
+            // Email del preiscritto letta prima dell'eliminazione: serve per
+            // comunicare l'esito a chi si è iscritto da ospite (senza account)
+            $emailRichiedente = $this->emailSocio($socioId);
 
             // La richiesta va aggiornata PRIMA del forceDelete del socio
             // (la FK nullOnDelete azzererebbe socio_id solo sulla riga DB)
@@ -235,7 +257,7 @@ class ApprovazioneIscrizioneService
             return $richiesta;
         });
 
-        $this->notificaAccount($risultato, new IscrizioneRifiutataNotification($risultato));
+        $this->notificaRichiedente($risultato, new IscrizioneRifiutataNotification($risultato), $emailRichiedente);
 
         return $risultato;
     }
@@ -281,17 +303,43 @@ class ApprovazioneIscrizioneService
     }
 
     /**
-     * Invio best-effort all'account della richiesta, SEMPRE dopo il commit:
-     * un errore SMTP non fa mai rollback dell'approvazione/rifiuto.
+     * Email del socio collegato alla richiesta (anche nel cestino), null se
+     * assente.
      */
-    protected function notificaAccount(RichiestaIscrizione $richiesta, NotificationMessage $notifica): void
+    protected function emailSocio(?string $socioId): ?string
+    {
+        if ($socioId === null) {
+            return null;
+        }
+
+        $email = Socio::allTenants()->withTrashed()->whereKey($socioId)->value('email');
+
+        return filled($email) ? (string) $email : null;
+    }
+
+    /**
+     * Invio best-effort dell'esito al richiedente, SEMPRE dopo il commit:
+     * un errore SMTP non fa mai rollback dell'approvazione/rifiuto.
+     * Destinatario: l'account della richiesta; chi si è iscritto da ospite
+     * (richiesta senza account) lo riceve all'email indicata nel modulo,
+     * come la conferma di ricezione (IscrizioneController).
+     */
+    protected function notificaRichiedente(RichiestaIscrizione $richiesta, NotificationMessage $notifica, ?string $emailOspite): void
     {
         try {
             $account = $richiesta->account()
                 ->withoutGlobalScope('associazione')
                 ->first();
 
-            if ($account === null || ! $account->attivo) {
+            if ($account === null) {
+                if ($richiesta->account_id === null && filled($emailOspite)) {
+                    Notification::route('mail', $emailOspite)->notify($notifica);
+                }
+
+                return;
+            }
+
+            if (! $account->attivo) {
                 return;
             }
 

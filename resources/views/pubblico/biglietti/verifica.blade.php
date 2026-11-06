@@ -34,6 +34,12 @@
                             @endif
                             <p><strong>Intestatario:</strong> {{ $nominativo }}</p>
                             <p><strong>Posti:</strong> {{ $prenotazione->posti }}</p>
+                            @if ($prenotazione->checkin_at !== null)
+                                {{-- Ingresso già iniziato (es. il socio con la tessera): restano gli altri posti --}}
+                                <p><strong>Posti ancora da far entrare:</strong> {{ $prenotazione->postiDaEntrare() }}
+                                    <span class="text-muted small">({{ $prenotazione->posti_entrati }} già {{ $prenotazione->posti_entrati === 1 ? 'entrato' : 'entrati' }} alle {{ $prenotazione->checkin_at->format('H:i') }})</span>
+                                </p>
+                            @endif
                             <p><strong>Codice:</strong> {{ $prenotazione->codice }}</p>
                         </div>
 

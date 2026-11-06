@@ -20,6 +20,7 @@ use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use App\Services\Tessere\TesseraIssuer;
+use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -32,6 +33,8 @@ use Illuminate\Support\Facades\Log;
  */
 class PaymentService
 {
+    use DetectsConcurrencyErrors;
+
     public const TOKEN_EXPIRY_HOURS = 72;
 
     public function __construct(
@@ -76,7 +79,8 @@ class PaymentService
     /**
      * Registra un pagamento offline (contanti, bonifico, carta, altro).
      * Parità legacy: aggiorna solo data_pagamento + metodo_pagamento,
-     * logga l'attività socio e notifica best-effort.
+     * logga l'attività socio e notifica best-effort. Come per il pagamento
+     * online, il socio già attivo ottiene la tessera dell'anno della quota.
      */
     public function registerOfflinePayment(Quota $quota, string $metodo, string $dataPagamento, ?Utente $utente = null): void
     {
@@ -95,6 +99,21 @@ class PaymentService
                 $utente
             );
 
+            $this->emettiTesseraRinnovoBestEffort($socio, $quota);
+        }
+
+        $this->completaPagamentoOffline($quota, $socio);
+    }
+
+    /**
+     * Effetti di un incasso offline già registrato sulla quota: notifica di
+     * pagamento, ricevuta numerata (f.21) e movimento di prima nota (f.13).
+     * Condiviso da registerOfflinePayment e dalla conferma del pagamento
+     * della pre-iscrizione allo sportello. Tutto best-effort e idempotente.
+     */
+    public function completaPagamentoOffline(Quota $quota, ?Socio $socio): void
+    {
+        if ($socio !== null) {
             $this->notifyBestEffort($socio, new PagamentoQuotaNotification($quota->fresh() ?? $quota));
         }
 
@@ -104,6 +123,37 @@ class PaymentService
         // Prima nota (f.13 piano "Gestione 2"): movimento automatico
         // di entrata, idempotente e best-effort
         app(PrimaNotaService::class)->registraIncassoQuotaBestEffort($quota->id);
+    }
+
+    /**
+     * Rinnovo (f.1 piano Vita sociale): un socio GIÀ attivo che paga la quota
+     * di un anno ottiene la tessera di quell'anno emessa se assente
+     * (idempotente, best-effort: un errore di emissione non invalida il
+     * pagamento registrato).
+     */
+    protected function emettiTesseraRinnovoBestEffort(Socio $socio, Quota $quota): void
+    {
+        if (! $socio->isAttivo() || $socio->trashed()) {
+            return;
+        }
+
+        try {
+            app(TesseraIssuer::class)->emettiSeAssente($socio, (int) $quota->anno);
+        } catch (\Throwable $e) {
+            // Deadlock/lock timeout dentro una transazione esterna (es.
+            // onPaymentCompleted): il database ha già annullato o compromesso
+            // la transazione, quindi non va ingoiato. Si rilancia perché il
+            // pagamento fallisca in modo esplicito e il webhook venga ritentato.
+            if (DB::transactionLevel() > 0 && $this->causedByConcurrencyError($e)) {
+                throw $e;
+            }
+
+            Log::warning('PaymentService: emissione tessera di rinnovo fallita', [
+                'socio_id' => $socio->id,
+                'quota_id' => $quota->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -383,6 +433,15 @@ class PaymentService
                 return true;
             }
 
+            // Lock sulla riga del socio prima di ogni altra lettura o scrittura
+            // (ordine quota → socio → contatore tessere): due pagamenti dello
+            // stesso socio si serializzano qui. Preso più avanti, il secondo
+            // vedrebbe uno snapshot senza la tessera appena emessa dal primo,
+            // oppure andrebbe in deadlock con i lock condivisi delle foreign
+            // key presi dal log attività
+            /** @var Socio|null $socio */
+            $socio = Socio::allTenants()->withTrashed()->lockForUpdate()->find($quota->socio_id);
+
             $quota->forceFill([
                 'stato' => Quota::STATO_PAGATA,
                 'data_pagamento' => now()->toDateString(),
@@ -390,9 +449,6 @@ class PaymentService
                 'gateway_transaction_id' => $transactionId,
                 'metodo_pagamento' => $gateway,
             ])->save();
-
-            /** @var Socio|null $socio */
-            $socio = Socio::allTenants()->withTrashed()->find($quota->socio_id);
 
             if ($socio === null) {
                 return true;
@@ -434,18 +490,9 @@ class PaymentService
 
             // Rinnovo self-service (f.1 piano Vita sociale): un socio GIÀ attivo
             // che paga la quota dell'anno ottiene la tessera dell'anno
-            // emessa/rinnovata se assente (idempotente, best-effort:
-            // un errore di emissione non invalida il pagamento registrato).
-            if ($eraGiaAttivo && ! $socio->trashed()) {
-                try {
-                    app(TesseraIssuer::class)->emettiSeAssente($socio, (int) $quota->anno);
-                } catch (\Throwable $e) {
-                    Log::warning('PaymentService: emissione tessera di rinnovo fallita', [
-                        'socio_id' => $socio->id,
-                        'quota_id' => $quota->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
+            // emessa/rinnovata se assente
+            if ($eraGiaAttivo) {
+                $this->emettiTesseraRinnovoBestEffort($socio, $quota);
             }
 
             $notifiche[] = [$socio, new PagamentoQuotaNotification($quota->fresh() ?? $quota)];
@@ -510,56 +557,25 @@ class PaymentService
 
     /**
      * Crea la tessera per il socio attivato — idempotente per (associazione, socio, anno).
-     * Numero progressivo per associazione, zero-padded a 4 cifre, generato sotto lock.
+     * Emissione delegata a TesseraIssuer: numerazione unificata {anno}{NNNN}
+     * (contatore sotto lock), etichetta template e QR di verifica firmato.
      */
     public function createTesseraForSocio(Socio $socio): ?Tessera
     {
         $anno = (int) now()->year;
 
-        $esistente = Tessera::allTenants()
-            ->where('associazione_id', $socio->associazione_id)
-            ->where('socio_id', $socio->id)
-            ->where('anno_validita', $anno)
-            ->exists();
+        // Esistenza ricontrollata sotto lock del socio; una tessera emessa
+        // nel frattempo da un altro flusso vale come "già presente" (issue #21)
+        $tessera = app(TesseraIssuer::class)->emettiSeNonPresente($socio, ['anno_validita' => $anno]);
 
-        if ($esistente) {
+        if ($tessera === null) {
             return null;
         }
-
-        /** @var Associazione|null $associazione */
-        $associazione = Associazione::find($socio->associazione_id);
-        $tipoScadenza = $associazione?->tesseramento()->tipo_scadenza_default ?? Tessera::TIPO_SCADENZA_SOLARE;
-
-        $dataScadenza = $tipoScadenza === Tessera::TIPO_SCADENZA_ANNUALE
-            ? now()->addYear()->toDateString()
-            : now()->endOfYear()->toDateString();
-
-        // Progressivo sotto lock per evitare la race condition del legacy
-        $maxNumero = Tessera::allTenants()
-            ->where('associazione_id', $socio->associazione_id)
-            ->lockForUpdate()
-            ->pluck('numero_tessera')
-            ->map(fn ($n) => (int) $n)
-            ->max() ?? 0;
-
-        $numeroTessera = str_pad((string) ($maxNumero + 1), 4, '0', STR_PAD_LEFT);
-
-        $tessera = new Tessera([
-            'associazione_id' => $socio->associazione_id,
-            'socio_id' => $socio->id,
-            'numero_tessera' => $numeroTessera,
-            'anno_validita' => $anno,
-            'data_emissione' => now()->toDateString(),
-            'data_scadenza' => $dataScadenza,
-            'stato' => Tessera::STATO_ATTIVA,
-            'tipo_scadenza' => $tipoScadenza,
-        ]);
-        $tessera->save();
 
         $this->logSocioActivity(
             $socio,
             'Generazione Tessera',
-            "Tessera {$numeroTessera} generata dopo pagamento online."
+            "Tessera {$tessera->numero_tessera} generata dopo pagamento online."
         );
 
         return $tessera;
@@ -570,26 +586,30 @@ class PaymentService
     // ------------------------------------------------------------------
 
     /**
-     * Crea una quota per l'anno corrente (helper usato da altri flussi).
-     * Scadenza: 31/12 anno corrente se 'solare', oggi+1 anno se 'annuale'.
+     * Crea una quota per l'anno corrente o per l'anno indicato (helper usato
+     * da altri flussi, es. rinnovo anticipato per l'anno successivo).
+     * Scadenza: 31/12 dell'anno della quota se 'solare', oggi+1 anno se 'annuale'.
      */
     public static function createQuotaForSocio(
         Socio $socio,
         float $importo,
         ?string $dataPagamento = null,
-        string $tipo = 'Quota Associativa'
+        string $tipo = 'Quota Associativa',
+        ?int $anno = null,
     ): Quota {
         /** @var Associazione|null $associazione */
         $associazione = Associazione::find($socio->associazione_id);
 
+        $anno = $anno ?? (int) now()->year;
+
         $dataScadenza = $associazione?->tesseramento()->scadenzaAnnuale()
             ? now()->addYear()->toDateString()
-            : now()->endOfYear()->toDateString();
+            : now()->setDate($anno, 12, 31)->toDateString();
 
         $quota = new Quota([
             'socio_id' => $socio->id,
             'associazione_id' => $socio->associazione_id,
-            'anno' => (int) now()->year,
+            'anno' => $anno,
             'importo' => $importo,
             'data_scadenza' => $dataScadenza,
             'data_pagamento' => $dataPagamento,

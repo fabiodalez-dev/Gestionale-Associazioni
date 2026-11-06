@@ -29,6 +29,42 @@
     </div>
 </div>
 
+{{-- Tessere doppie da prima del vincolo socio/anno (issue #21) --}}
+@if ($doppioniTessere !== null)
+<div class="alert alert-warning" role="alert" id="avvisoTessereDoppie">
+    <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Tessere doppie da sistemare</div>
+    <p class="mb-2 small">
+        Questi soci hanno più tessere valide nello stesso anno, emesse prima dell'aggiornamento o importate dal vecchio
+        gestionale. Annulla, elimina o correggi l'anno delle tessere in più: appena non ne resta nessuna, il controllo
+        "una sola tessera valida per socio e anno" vale anche per loro, da solo.
+    </p>
+    @if ($doppioniTessere['visibili']->isNotEmpty())
+        <ul class="mb-0 small">
+            @foreach ($doppioniTessere['visibili'] as $doppione)
+                <li>
+                    <a href="{{ route('tessere.index', ['anno' => $doppione->anno, 'search' => trim((string) strtok($doppione->numeri, ','))]) }}">{{ $doppione->nominativo }}</a>,
+                    anno {{ $doppione->anno }}: tessere {{ $doppione->numeri }}
+                    @if (($doppione->altre_associazioni ?? 0) > 0)
+                        (più {{ $doppione->altre_associazioni }} registrata sotto un'altra associazione: va sistemata da lì)
+                    @endif
+                </li>
+            @endforeach
+        </ul>
+    @endif
+    @if ($doppioniTessere['cestino'] > 0)
+        <p class="mb-0 mt-1 small">
+            {{ $doppioniTessere['cestino'] }} {{ $doppioniTessere['cestino'] === 1 ? 'caso riguarda un socio' : 'casi riguardano soci' }} nel cestino:
+            ripristina il socio dal cestino e correggi le sue tessere, altrimenti il controllo resta spento.
+        </p>
+    @endif
+    @if ($doppioniTessere['altri'] > 0)
+        <p class="mb-0 mt-1 small text-muted">
+            Altri {{ $doppioniTessere['altri'] }} casi riguardano soci che non vedi da qui (altre associazioni o sedi).
+        </p>
+    @endif
+</div>
+@endif
+
 {{-- Filtri --}}
 <form method="GET" action="{{ route('tessere.index') }}" id="filtriForm" class="card mb-3">
     <div class="card-body row g-2 align-items-end">

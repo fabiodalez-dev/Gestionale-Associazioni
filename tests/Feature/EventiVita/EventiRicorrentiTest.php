@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\EventiVita;
 
+use App\Http\Requests\EventiVita\SerieUpdateRequest;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Models\Prenotazione;
 use App\Models\Utente;
+use App\Services\Prenotazioni\PrenotazioneService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -195,6 +199,135 @@ class EventiRicorrentiTest extends TestCase
             // Le date NON vengono toccate
             $this->assertSame($dateOriginali[$i], $occorrenza->data_evento->format('Y-m-d H:i'));
         }
+    }
+
+    /**
+     * Issue #22: come per l'evento singolo, una prenotazione confermata su
+     * un'occorrenza arrivata tra la validazione della request e il
+     * salvataggio della serie fa rifiutare la riduzione (ricontrollo con le
+     * occorrenze bloccate) e nessuna occorrenza viene modificata.
+     */
+    public function test_update_serie_rifiuta_la_capienza_se_una_prenotazione_arriva_dopo_la_validazione(): void
+    {
+        $occorrenze = $this->creaSerie(3);
+        $terza = $occorrenze[2];
+        $occorrenze->each->update(['capienza' => 10]);
+        Prenotazione::factory()->confermata()->create(['evento_id' => $terza->id, 'posti' => 2]);
+
+        $arrivata = false;
+        $this->app->afterResolving(SerieUpdateRequest::class, function () use ($terza, &$arrivata): void {
+            // Validazione superata (3 >= 2 occupati): ora arrivano altri 2 posti
+            Prenotazione::factory()->confermata()->create(['evento_id' => $terza->id, 'posti' => 2]);
+            $arrivata = true;
+        });
+
+        $this->actingAs($this->admin)
+            ->from("/eventi/{$occorrenze->first()->id}/serie")
+            ->put("/eventi/{$occorrenze->first()->id}/serie", [
+                'titolo' => 'Corso di ballo AVANZATO',
+                'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+                'capienza' => 3,
+                'prezzo' => '0',
+                'iscrizioni_aperte' => '1',
+                'richiede_approvazione' => '0',
+                'solo_soci' => '0',
+            ])
+            ->assertRedirect("/eventi/{$occorrenze->first()->id}/serie")
+            ->assertSessionHasErrors(['capienza']);
+
+        $this->assertTrue($arrivata, 'Il listener deve partire dopo la validazione superata');
+        $this->assertStringContainsString(
+            "l'occorrenza del ".$terza->data_evento->format('d/m/Y H:i').' ha già 4 posti occupati',
+            session('errors')->first('capienza')
+        );
+
+        // Tutto o niente: nessuna occorrenza modificata
+        foreach (Evento::query()->orderBy('data_evento')->get() as $occorrenza) {
+            $this->assertSame(10, $occorrenza->capienza);
+            $this->assertSame('Corso di ballo', $occorrenza->titolo);
+        }
+    }
+
+    /**
+     * Issue #22: l'aggiornamento della serie prende il mutex per-evento di
+     * PrenotazioneService su ogni occorrenza, in ordine di id e dentro una
+     * transazione (ordine stabile: niente deadlock fra modifiche concorrenti).
+     */
+    public function test_update_serie_blocca_le_occorrenze_in_ordine_di_id_con_il_mutex_delle_prenotazioni(): void
+    {
+        $occorrenze = $this->creaSerie(3);
+
+        $spia = new class extends PrenotazioneService
+        {
+            /** @var list<array{0: string, 1: int}> [evento_id, livello transazione] */
+            public array $lock = [];
+
+            public function lockEvento(string $eventoId): Evento
+            {
+                $this->lock[] = [$eventoId, DB::transactionLevel()];
+
+                return parent::lockEvento($eventoId);
+            }
+        };
+        $this->app->instance(PrenotazioneService::class, $spia);
+
+        $livelloTest = DB::transactionLevel();
+
+        $this->actingAs($this->admin)
+            ->put("/eventi/{$occorrenze->first()->id}/serie", [
+                'titolo' => 'Corso di ballo AVANZATO',
+                'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+                'capienza' => 20,
+                'prezzo' => '0',
+                'iscrizioni_aperte' => '1',
+                'richiede_approvazione' => '0',
+                'solo_soci' => '0',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame($occorrenze->pluck('id')->sort()->values()->all(), array_column($spia->lock, 0));
+        foreach (array_column($spia->lock, 1) as $livello) {
+            $this->assertGreaterThan($livelloTest, $livello, 'Il lock va preso dentro la transazione');
+        }
+    }
+
+    /**
+     * Issue #22: gli id delle occorrenze si leggono fuori dalla transazione.
+     * Una SELECT ... FOR UPDATE filtrata per serie_id bloccherebbe le righe
+     * nell'ordine della scansione dell'indice (non per id) e due modifiche
+     * concorrenti della stessa serie potrebbero andare in deadlock: dentro
+     * la transazione restano solo i lock per chiave primaria, in ordine di id.
+     */
+    public function test_update_serie_non_blocca_le_occorrenze_tramite_l_indice_della_serie(): void
+    {
+        $occorrenze = $this->creaSerie(3);
+        $livelloTest = DB::transactionLevel();
+
+        $dentroTransazione = [];
+        DB::listen(function ($query) use ($livelloTest, &$dentroTransazione): void {
+            if (DB::transactionLevel() > $livelloTest && str_contains($query->sql, '"serie_id"')) {
+                $dentroTransazione[] = $query->sql;
+            }
+        });
+
+        $this->actingAs($this->admin)
+            ->put("/eventi/{$occorrenze->first()->id}/serie", [
+                'titolo' => 'Corso di ballo AVANZATO',
+                'stato_pubblicazione' => Evento::STATO_PUBBLICATO,
+                'capienza' => 20,
+                'prezzo' => '0',
+                'iscrizioni_aperte' => '1',
+                'richiede_approvazione' => '0',
+                'solo_soci' => '0',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(3, Evento::query()->where('titolo', 'Corso di ballo AVANZATO')->count());
+        $this->assertSame([], array_values(array_filter(
+            $dentroTransazione,
+            // gli UPDATE delle occorrenze scrivono serie_id solo se cambia
+            fn (string $sql): bool => str_starts_with(strtolower($sql), 'select'),
+        )));
     }
 
     public function test_modifica_della_singola_occorrenza_non_tocca_la_serie(): void

@@ -375,7 +375,7 @@ class FormIscrizioneService
             'telefono' => ['string', 'max:20', 'phone:INTERNATIONAL,IT'],
             'codice_fiscale' => ['string', 'max:16', 'codice_fiscale'],
             'data_nascita' => ['date', 'before:today'],
-            'indirizzo' => ['string', 'max:500'],
+            'indirizzo' => ['string', 'max:255'],
             'citta' => ['string', 'max:100'],
             'provincia' => ['string', 'size:2', 'alpha'],
             'cap' => ['digits:5'],

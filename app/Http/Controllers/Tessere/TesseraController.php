@@ -10,17 +10,22 @@ use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\Tessere\TesseraGiaPresenteException;
 use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraPdfRenderer;
 use App\Services\Tessere\TesseraQrService;
+use App\Services\Tessere\VincoloTessereAnnoService;
 use App\Settings\TesseramentoSettings;
 use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -148,6 +153,7 @@ class TesseraController extends Controller
             ->get(['id', 'titolo', 'data_evento']);
 
         return view('tessere.index', [
+            'doppioniTessere' => $this->doppioniDaSistemare($associazione),
             'tessere' => $tessere,
             'anni' => $anni,
             'anno' => $anno,
@@ -173,14 +179,23 @@ class TesseraController extends Controller
         /** @var Socio $socio */
         $socio = Socio::query()->findOrFail($dati['socio_id']);
 
-        $this->issuer->emetti($socio, [
-            'anno_validita' => (int) $dati['anno_validita'],
-            'numero_tessera' => $dati['numero_tessera'],
-            'data_emissione' => $dati['data_emissione'],
-            'data_scadenza' => $dati['data_scadenza'] ?? null,
-            'stato' => $dati['stato'],
-            'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
-        ], accodaEmail: true);
+        try {
+            $this->issuer->emetti($socio, [
+                'anno_validita' => (int) $dati['anno_validita'],
+                'numero_tessera' => $dati['numero_tessera'],
+                'data_emissione' => $dati['data_emissione'],
+                'data_scadenza' => $dati['data_scadenza'] ?? null,
+                'stato' => $dati['stato'],
+                'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
+            ], accodaEmail: true);
+        } catch (TesseraGiaPresenteException $e) {
+            // Tessera dell'anno emessa da un flusso concorrente dopo la
+            // validazione (pagamento online, generazione massiva)
+            throw ValidationException::withMessages(['anno_validita' => $e->getMessage()]);
+        } catch (UniqueConstraintViolationException) {
+            // Numero tessera preso da un'altra emissione dopo la validazione
+            throw ValidationException::withMessages(['numero_tessera' => 'Numero tessera già esistente per questa associazione.']);
+        }
 
         return redirect()
             ->route('tessere.index', ['anno' => $dati['anno_validita']])
@@ -207,16 +222,36 @@ class TesseraController extends Controller
                 ->toDateString();
         }
 
-        $tessera->update([
-            'socio_id' => $dati['socio_id'],
-            'numero_tessera' => $dati['numero_tessera'],
-            'anno_validita' => (int) $dati['anno_validita'],
-            'data_emissione' => $dati['data_emissione'],
-            'data_scadenza' => $dataScadenza,
-            'stato' => $dati['stato'],
-            'tipo_scadenza' => $tipoScadenza,
-            'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
-        ]);
+        try {
+            $tessera->update([
+                'socio_id' => $dati['socio_id'],
+                'numero_tessera' => $dati['numero_tessera'],
+                'anno_validita' => (int) $dati['anno_validita'],
+                'data_emissione' => $dati['data_emissione'],
+                'data_scadenza' => $dataScadenza,
+                'stato' => $dati['stato'],
+                'tipo_scadenza' => $tipoScadenza,
+                'evento_creazione_id' => $dati['evento_creazione_id'] ?? null,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Vincoli unique occupati da un'emissione concorrente dopo la
+            // validazione: tessera non annullata del socio per l'anno o
+            // numero tessera. Senza global scope (tenant esplicito): la
+            // tessera in conflitto può essere fuori dal perimetro di sede
+            // dell'operatore e va comunque riconosciuta come doppione
+            $doppione = $dati['stato'] !== Tessera::STATO_ANNULLATA && Tessera::query()
+                ->withoutGlobalScopes()
+                ->where('associazione_id', $tessera->associazione_id)
+                ->whereKeyNot($tessera->id)
+                ->where('socio_id', $dati['socio_id'])
+                ->where('anno_validita', (int) $dati['anno_validita'])
+                ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+                ->exists();
+
+            throw ValidationException::withMessages($doppione
+                ? ['anno_validita' => (new TesseraGiaPresenteException((int) $dati['anno_validita']))->getMessage()]
+                : ['numero_tessera' => 'Numero tessera già esistente per questa associazione.']);
+        }
 
         return redirect()
             ->route('tessere.index', ['anno' => $dati['anno_validita']])
@@ -255,9 +290,11 @@ class TesseraController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
+            // Una transazione per socio: le tessere emesse prima dell'errore
+            // restano, rilanciando si completano solo le mancanti
             return redirect()
                 ->route('tessere.index', ['anno' => $anno])
-                ->with('error', 'Errore durante la generazione massiva. Riprova più tardi.');
+                ->with('error', 'Errore durante la generazione massiva: alcune tessere potrebbero essere già state generate. Riprova più tardi per completare le mancanti.');
         }
 
         return redirect()
@@ -349,6 +386,66 @@ class TesseraController extends Controller
         };
 
         return $query;
+    }
+
+    /**
+     * Tessere doppie (stesso socio e anno, non annullate) rimaste fuori dal
+     * vincolo socio/anno (da prima del vincolo o dall'import legacy): prima
+     * applica il vincolo o vi riporta le tessere sistemate, poi elenca quelle
+     * dei soci visibili all'utente (associazione e perimetro sedi), il
+     * numero di quelle dei soci nel cestino (da ripristinare per correggerle)
+     * e quello delle altre fuori vista, che lo bloccano comunque.
+     *
+     * @return array{visibili: Collection<int, \stdClass>, cestino: int, altri: int}|null
+     */
+    private function doppioniDaSistemare(?Associazione $associazione): ?array
+    {
+        // Anche con il vincolo attivo possono esserci doppioni rimasti fuori
+        // (import legacy): l'elenco si basa sulle tessere, non sull'indice
+        $vincolo = app(VincoloTessereAnnoService::class);
+        $vincolo->sistema();
+        $tutti = $vincolo->doppioni();
+        if ($tutti->isEmpty()) {
+            return null;
+        }
+
+        $idSoci = $tutti->pluck('socio_id')->unique()->values();
+        $sociVisibili = Socio::query()
+            ->whereIn('id', $idSoci)
+            ->when($associazione !== null, fn ($q) => $q->where('associazione_id', $associazione->id))
+            ->pluck('id')
+            ->flip();
+        $sociNelCestino = Socio::onlyTrashed()
+            ->whereIn('id', $idSoci)
+            ->when($associazione !== null, fn ($q) => $q->where('associazione_id', $associazione->id))
+            ->pluck('id')
+            ->flip();
+        $visibili = $tutti->filter(fn (\stdClass $riga): bool => $sociVisibili->has($riga->socio_id))->values();
+        $cestino = $tutti->filter(fn (\stdClass $riga): bool => $sociNelCestino->has($riga->socio_id))->count();
+
+        // Numeri tessera solo dell'associazione corrente: una riga legacy di
+        // un'altra associazione (stesso socio e anno) conta per il vincolo ma
+        // qui compare solo come numero di tessere non mostrate
+        if ($associazione !== null && $visibili->isNotEmpty()) {
+            $numeri = Tessera::allTenants()
+                ->where('associazione_id', $associazione->id)
+                ->whereIn('socio_id', $visibili->pluck('socio_id')->unique()->values())
+                ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+                ->orderBy('numero_tessera')
+                ->get(['socio_id', 'anno_validita', 'numero_tessera'])
+                ->groupBy(fn (Tessera $t): string => $t->socio_id.'|'.$t->anno_validita);
+            foreach ($visibili as $riga) {
+                $proprie = $numeri->get($riga->socio_id.'|'.$riga->anno, collect())->pluck('numero_tessera');
+                $riga->numeri = $proprie->implode(', ');
+                $riga->altre_associazioni = $riga->totale - $proprie->count();
+            }
+        }
+
+        return [
+            'visibili' => $visibili,
+            'cestino' => $cestino,
+            'altri' => $tutti->count() - $visibili->count() - $cestino,
+        ];
     }
 
     private function associazioneCorrente(): ?Associazione

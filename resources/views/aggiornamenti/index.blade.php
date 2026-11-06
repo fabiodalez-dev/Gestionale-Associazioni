@@ -27,6 +27,14 @@
         </div>
     @endif
 
+    @if ($tessereDoppie > 0)
+        <div class="alert alert-warning" id="avvisoTessereDoppie">
+            <i class="bi bi-exclamation-triangle me-1"></i>{{ $tessereDoppie }} {{ $tessereDoppie === 1 ? 'socio ha' : 'soci hanno' }} più tessere valide nello stesso anno, emesse prima di questa versione.
+            Il controllo "una sola tessera valida per socio e anno" resta spento finché non le sistemi; poi si attiva da solo.
+            <a href="{{ route('tessere.index') }}" class="alert-link">Vai alle Tessere</a>, dove trovi l'elenco.
+        </div>
+    @endif
+
     @if ($inCorso)
         <div class="alert alert-info"><i class="bi bi-hourglass-split me-1"></i>Un aggiornamento è in corso in un altro processo: la pagina si aggiorna da sola al termine.</div>
     @endif

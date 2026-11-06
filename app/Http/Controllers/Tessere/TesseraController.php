@@ -14,6 +14,7 @@ use App\Services\Tessere\TesseraGiaPresenteException;
 use App\Services\Tessere\TesseraIssuer;
 use App\Services\Tessere\TesseraPdfRenderer;
 use App\Services\Tessere\TesseraQrService;
+use App\Services\Tessere\VincoloTessereAnnoService;
 use App\Settings\TesseramentoSettings;
 use App\Support\CellaSicura;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
@@ -151,6 +153,7 @@ class TesseraController extends Controller
             ->get(['id', 'titolo', 'data_evento']);
 
         return view('tessere.index', [
+            'doppioniTessere' => $this->doppioniDaSistemare($associazione),
             'tessere' => $tessere,
             'anni' => $anni,
             'anno' => $anno,
@@ -383,6 +386,32 @@ class TesseraController extends Controller
         };
 
         return $query;
+    }
+
+    /**
+     * Tessere doppie (stesso socio e anno, non annullate) rimaste da prima
+     * del vincolo socio/anno: tenta prima di applicarlo, poi elenca quelle
+     * dei soci visibili all'utente (associazione e perimetro sedi), più il
+     * numero di quelle fuori vista che lo bloccano comunque.
+     *
+     * @return array{visibili: Collection<int, object>, altri: int}|null
+     */
+    private function doppioniDaSistemare(?Associazione $associazione): ?array
+    {
+        $vincolo = app(VincoloTessereAnnoService::class);
+        if ($vincolo->applicaSePossibile()) {
+            return null;
+        }
+
+        $tutti = $vincolo->doppioni();
+        $sociVisibili = Socio::query()
+            ->whereIn('id', $tutti->pluck('socio_id')->unique()->values())
+            ->when($associazione !== null, fn ($q) => $q->where('associazione_id', $associazione->id))
+            ->pluck('id')
+            ->flip();
+        $visibili = $tutti->filter(fn (object $riga): bool => $sociVisibili->has($riga->socio_id))->values();
+
+        return ['visibili' => $visibili, 'altri' => $tutti->count() - $visibili->count()];
     }
 
     private function associazioneCorrente(): ?Associazione

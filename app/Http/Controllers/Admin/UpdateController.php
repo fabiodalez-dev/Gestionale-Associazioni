@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\PerformUpdateRequest;
 use App\Models\UpdateLog;
 use App\Models\Utente;
 use App\Services\Sistema\EnvEditor;
+use App\Services\Tessere\VincoloTessereAnnoService;
 use App\Services\Update\UpdateService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -29,11 +30,14 @@ class UpdateController extends Controller
     {
         $this->soloSuperAdmin($request);
 
+        $inCorso = $this->updater->inCorso();
+
         return view('aggiornamenti.index', [
+            'tessereDoppie' => $inCorso ? 0 : $this->tessereDoppie(),
             'stato' => $this->updater->controllaAggiornamenti(),
             'selfUpdate' => $this->updater->selfUpdateAbilitato(),
             'requisiti' => $this->updater->requisiti(),
-            'inCorso' => $this->updater->inCorso(),
+            'inCorso' => $inCorso,
             'manutenzioneScaduta' => $this->updater->manutenzioneScaduta(),
             'backup' => array_slice($this->updater->elencoBackup(), 0, 10),
             'tokenPresente' => filled(config('update.github.token')),
@@ -172,6 +176,18 @@ class UpdateController extends Controller
         return $ok
             ? redirect()->route('aggiornamenti.index')->with('success', $messaggio)
             : redirect()->route('aggiornamenti.index')->withErrors(['update' => $messaggio]);
+    }
+
+    /**
+     * Soci con più tessere valide nello stesso anno che tengono ancora
+     * spento il vincolo socio/anno arrivato con l'aggiornamento (0 se il
+     * vincolo è attivo o lo si è appena potuto applicare).
+     */
+    private function tessereDoppie(): int
+    {
+        $vincolo = app(VincoloTessereAnnoService::class);
+
+        return $vincolo->applicaSePossibile() ? 0 : $vincolo->doppioni()->count();
     }
 
     private function soloSuperAdmin(Request $request): void

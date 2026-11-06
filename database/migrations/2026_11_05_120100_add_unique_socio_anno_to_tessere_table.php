@@ -33,10 +33,12 @@ use Illuminate\Support\Facades\Schema;
  * aggiunto e la migration lo segnala nel log con l'elenco delle coppie
  * (socio, anno) da sistemare. L'applicazione resta corretta anche senza
  * vincolo, perché ogni emissione ricontrolla la tessera dell'anno sotto lock
- * della riga del socio (TesseraIssuer). Sistemati i doppioni dal backoffice
- * (annullando, eliminando o cambiando anno alle tessere in più), il vincolo
- * si aggiunge rieseguendo questa migration:
- *   php artisan migrate:refresh --path=database/migrations/2026_11_05_120100_add_unique_socio_anno_to_tessere_table.php
+ * della riga del socio (TesseraIssuer). La pagina Tessere (e la pagina
+ * Aggiornamenti) elencano i doppioni; sistemati dal backoffice (annullando,
+ * eliminando o cambiando anno alle tessere in più) il vincolo si aggiunge da
+ * solo, senza terminale: VincoloTessereAnnoService al salvataggio delle
+ * tessere, all'apertura della pagina Tessere e ogni notte
+ * (tessere:applica-vincolo-anno).
  */
 return new class extends Migration
 {
@@ -70,7 +72,7 @@ return new class extends Migration
         if ($doppioni->isNotEmpty()) {
             $messaggio = 'Vincolo unique tessere(socio_id, anno_non_annullata) NON aggiunto: '
                 .$doppioni->count().' coppie socio/anno hanno più tessere non annullate. Nessuna tessera è stata modificata: '
-                .'sistemare i doppioni e rieseguire la migration 2026_11_05_120100_add_unique_socio_anno_to_tessere_table.';
+                .'la pagina Tessere elenca i doppioni e il vincolo si aggiunge da solo appena sono sistemati.';
 
             Log::warning($messaggio, [
                 'doppioni' => $doppioni->map(fn ($r) => [

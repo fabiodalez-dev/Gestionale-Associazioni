@@ -29,6 +29,33 @@
     </div>
 </div>
 
+{{-- Tessere doppie da prima del vincolo socio/anno (issue #21) --}}
+@if ($doppioniTessere !== null)
+<div class="alert alert-warning" role="alert" id="avvisoTessereDoppie">
+    <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Tessere doppie da sistemare</div>
+    <p class="mb-2 small">
+        Questi soci hanno più tessere valide nello stesso anno, emesse prima dell'aggiornamento. Annulla, elimina o correggi
+        l'anno delle tessere in più: appena non ne resta nessuna, il controllo "una sola tessera valida per socio e anno"
+        si attiva da solo.
+    </p>
+    @if ($doppioniTessere['visibili']->isNotEmpty())
+        <ul class="mb-0 small">
+            @foreach ($doppioniTessere['visibili'] as $doppione)
+                <li>
+                    <a href="{{ route('tessere.index', ['anno' => $doppione->anno, 'search' => trim((string) strtok($doppione->numeri, ','))]) }}">{{ $doppione->nominativo }}</a>,
+                    anno {{ $doppione->anno }}: tessere {{ $doppione->numeri }}
+                </li>
+            @endforeach
+        </ul>
+    @endif
+    @if ($doppioniTessere['altri'] > 0)
+        <p class="mb-0 mt-1 small text-muted">
+            Altri {{ $doppioniTessere['altri'] }} casi riguardano soci che non vedi da qui (altre associazioni o sedi).
+        </p>
+    @endif
+</div>
+@endif
+
 {{-- Filtri --}}
 <form method="GET" action="{{ route('tessere.index') }}" id="filtriForm" class="card mb-3">
     <div class="card-body row g-2 align-items-end">

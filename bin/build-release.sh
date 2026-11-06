@@ -38,6 +38,10 @@ rsync -a --exclude-from="$ROOT/bin/release-exclude.txt" "$ROOT/" "$STAGING/"
 
 echo "==> Dipendenze PHP di produzione"
 (cd "$STAGING" && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress --quiet)
+# Se composer ripiega sui sorgenti (dist non scaricabile, rate limit GitHub)
+# ogni pacchetto porta la sua cartella .git: centinaia di MB inutili che
+# rendono il pacchetto troppo grande per l'aggiornamento in-app
+find "$STAGING/vendor" -name .git -prune -exec rm -rf {} +
 
 if [ "$SKIP_NPM" = 0 ]; then
     echo "==> Asset frontend (npm ci + vite build)"

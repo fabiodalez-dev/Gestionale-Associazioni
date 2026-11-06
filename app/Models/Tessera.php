@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
 use App\Models\Concerns\NelPerimetroSedeTramite;
+use App\Services\Tessere\VincoloTessereAnnoService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class Tessera extends Model
 {
@@ -91,6 +93,24 @@ class Tessera extends Model
             $tessera->anno_non_annullata = $tessera->stato === self::STATO_ANNULLATA
                 ? null
                 : (int) $tessera->anno_validita;
+        });
+
+        // Se il vincolo socio/anno manca perché la migration ha trovato
+        // doppioni, annullare, spostare o eliminare l'ultimo doppione dal
+        // backoffice lo aggiunge subito, dopo il commit (DDL fuori transazione)
+        $applicaDopoIlCommit = fn () => DB::afterCommit(
+            fn () => app(VincoloTessereAnnoService::class)->applicaSePossibile()
+        );
+        static::saved(function (Tessera $tessera) use ($applicaDopoIlCommit): void {
+            if ($tessera->wasChanged(['socio_id', 'anno_validita', 'stato'])
+                && ! app(VincoloTessereAnnoService::class)->attivo()) {
+                $applicaDopoIlCommit();
+            }
+        });
+        static::deleted(function () use ($applicaDopoIlCommit): void {
+            if (! app(VincoloTessereAnnoService::class)->attivo()) {
+                $applicaDopoIlCommit();
+            }
         });
     }
 

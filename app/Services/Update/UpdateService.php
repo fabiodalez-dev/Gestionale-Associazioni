@@ -845,20 +845,29 @@ class UpdateService
     /**
      * Manutenzione: artisan down/up sull'installazione reale; nei test (radice
      * finta) solo un marcatore, così lo si può verificare.
+     *
+     * Sull'installazione reale il marcatore È il file storage/framework/down
+     * scritto da artisan down (JSON letto da Laravel a ogni richiesta, la sua
+     * data serve a manutenzioneScaduta): non va sovrascritto, altrimenti
+     * durante l'aggiornamento ogni richiesta risponde 500 invece della pagina
+     * di manutenzione.
      */
     protected function manutenzione(bool $attiva): void
     {
         $marker = $this->root.'/'.self::MAINTENANCE_MARKER;
         if ($this->rootReale()) {
-            if ($attiva) {
-                Artisan::call('down', ['--render' => 'errors::503', '--retry' => 60]);
-            } else {
-                Artisan::call('up');
-            }
+            Artisan::call($attiva ? 'down' : 'up', $attiva ? ['--render' => 'errors::503', '--retry' => 60] : []);
         }
         if ($attiva) {
-            File::ensureDirectoryExists(dirname($marker));
-            File::put($marker, (string) time());
+            // Solo se artisan down non l'ha scritto (radice dei test, comando
+            // fallito): stesso formato JSON che Laravel si aspetta
+            if (! is_file($marker)) {
+                File::ensureDirectoryExists(dirname($marker));
+                File::put($marker, (string) json_encode(['except' => [], 'redirect' => null, 'retry' => 60, 'refresh' => null, 'secret' => null, 'status' => 503, 'template' => null]));
+            } else {
+                // Resto di un update interrotto: la data conta da adesso
+                @touch($marker);
+            }
         } else {
             @unlink($marker);
         }

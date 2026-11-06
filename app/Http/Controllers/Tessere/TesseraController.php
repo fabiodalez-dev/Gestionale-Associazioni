@@ -423,6 +423,24 @@ class TesseraController extends Controller
         $visibili = $tutti->filter(fn (\stdClass $riga): bool => $sociVisibili->has($riga->socio_id))->values();
         $cestino = $tutti->filter(fn (\stdClass $riga): bool => $sociNelCestino->has($riga->socio_id))->count();
 
+        // Numeri tessera solo dell'associazione corrente: una riga legacy di
+        // un'altra associazione (stesso socio e anno) conta per il vincolo ma
+        // qui compare solo come numero di tessere non mostrate
+        if ($associazione !== null && $visibili->isNotEmpty()) {
+            $numeri = Tessera::allTenants()
+                ->where('associazione_id', $associazione->id)
+                ->whereIn('socio_id', $visibili->pluck('socio_id')->unique()->values())
+                ->where('stato', '<>', Tessera::STATO_ANNULLATA)
+                ->orderBy('numero_tessera')
+                ->get(['socio_id', 'anno_validita', 'numero_tessera'])
+                ->groupBy(fn (Tessera $t): string => $t->socio_id.'|'.$t->anno_validita);
+            foreach ($visibili as $riga) {
+                $proprie = $numeri->get($riga->socio_id.'|'.$riga->anno, collect())->pluck('numero_tessera');
+                $riga->numeri = $proprie->implode(', ');
+                $riga->altre_associazioni = $riga->totale - $proprie->count();
+            }
+        }
+
         return [
             'visibili' => $visibili,
             'cestino' => $cestino,

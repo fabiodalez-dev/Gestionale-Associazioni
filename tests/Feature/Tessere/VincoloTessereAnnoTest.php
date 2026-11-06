@@ -319,4 +319,24 @@ class VincoloTessereAnnoTest extends TessereTestCase
         $this->assertFalse($this->vincolo()->applicaSePossibile());
         $this->assertFalse($this->indicePresente());
     }
+
+    public function test_la_pagina_non_mostra_i_numeri_delle_tessere_di_un_altra_associazione(): void
+    {
+        // Riga legacy incoerente: tessera del socio di A registrata sotto B
+        $altra = Associazione::factory()->create();
+        DB::table('tessere')->where('id', $this->doppione->id)->update([
+            'associazione_id' => $altra->id,
+            'numero_tessera' => 'B-SEGRETA',
+        ]);
+        $admin = $this->creaAdmin($this->associazione);
+
+        $this->actingAs($admin)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->get(route('tessere.index'))
+            ->assertOk()
+            ->assertSee('Bianchi Anna')
+            ->assertSee('20260001')
+            ->assertDontSee('B-SEGRETA')
+            ->assertSee("più 1 registrata sotto un'altra associazione", false);
+    }
 }

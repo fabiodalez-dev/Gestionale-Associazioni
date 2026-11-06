@@ -44,6 +44,9 @@
                 <li>
                     <a href="{{ route('tessere.index', ['anno' => $doppione->anno, 'search' => trim((string) strtok($doppione->numeri, ','))]) }}">{{ $doppione->nominativo }}</a>,
                     anno {{ $doppione->anno }}: tessere {{ $doppione->numeri }}
+                    @if (($doppione->altre_associazioni ?? 0) > 0)
+                        (più {{ $doppione->altre_associazioni }} registrata sotto un'altra associazione: va sistemata da lì)
+                    @endif
                 </li>
             @endforeach
         </ul>

@@ -26,6 +26,7 @@
 <ul>
     <li>Gestione della richiesta di iscrizione e del rapporto associativo (tesseramento, quote, convocazioni, attività): esecuzione del rapporto associativo, art. 6.1.b GDPR.</li>
     <li>Adempimenti previsti dalla legge, dallo statuto e dalla normativa fiscale e contabile (libro soci, ricevute, rendiconti): obbligo legale, art. 6.1.c GDPR.</li>
+    <li>Rubrica interna dei soci, solo per chi sceglie di comparirvi e con i soli dati scelti dal socio: consenso, art. 6.1.a GDPR, facoltativo e revocabile in ogni momento dall'area riservata.</li>
     @foreach ($consensiFacoltativi as $consenso)
         <li>{{ $consenso['testo'] }}: consenso, art. 6.1.a GDPR{{ $consenso['obbligatorio'] ? '' : ', facoltativo e revocabile in ogni momento' }}.</li>
     @endforeach

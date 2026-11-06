@@ -1,0 +1,27 @@
+# Configurazione di gitleaks (workflow "Sicurezza e supply chain"): regole
+# predefinite più poche eccezioni mirate. Le eccezioni sono globali e non
+# legate a una regola (targetRules) perché gitleaks 8.28 ignora in silenzio
+# le targetRules quando la configurazione estende quella predefinita.
+
+[extend]
+useDefault = true
+
+# Password di prova dei test, tutte nella forma Parola-Parola(-Parola)-NN
+# (es. 'Lanterna-Velluto-Fiume-42'): la regola generica le scambia per chiavi
+# API. Servono entrambe le condizioni, percorso e forma del valore.
+[[allowlists]]
+description = "Password fittizie dei test"
+condition = "AND"
+paths = ['''^tests/''']
+regexes = ['''^[A-Z][a-z]+(-[A-Z][a-z]+){1,3}-\d{2}$''']
+
+# Librerie di terze parti minificate copiate in public/assets/vendor.
+[[allowlists]]
+description = "Librerie vendor minificate"
+paths = ['''^public/assets/vendor/.*\.min\.js$''']
+
+# Esempio cURL della documentazione API con il segnaposto LA_TUA_API_KEY.
+[[allowlists]]
+description = "Segnaposto della documentazione API"
+regexTarget = "line"
+regexes = ['''Bearer LA_TUA_API_KEY''']

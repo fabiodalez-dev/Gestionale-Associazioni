@@ -1,0 +1,16 @@
+name: "Gestione Associazioni CodeQL config"
+
+# Fuori dall'analisi il JavaScript che non è nostro o non viene distribuito:
+#   - tests/**                  spec Playwright E2E (mai nel pacchetto)
+#   - public/assets/vendor/**   librerie di terze parti copiate (Bootstrap,
+#                               Chart.js, GrapesJS, SortableJS, zxcvbn, ...)
+#   - public/build/**           output di Vite (generato, non versionato)
+#   - vendor/**, node_modules/**
+# Il JavaScript scritto a mano (public/assets/js, resources/js, il service
+# worker) resta analizzato.
+paths-ignore:
+  - 'tests/**'
+  - 'public/assets/vendor/**'
+  - 'public/build/**'
+  - 'vendor/**'
+  - 'node_modules/**'

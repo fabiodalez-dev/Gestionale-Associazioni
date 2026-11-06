@@ -50,7 +50,12 @@
                 <tr>
                     <td>{{ $mesi[$adempimento->mese_scadenza] ?? $adempimento->mese_scadenza }}</td>
                     <td class="fw-semibold">{{ $adempimento->titolo }}</td>
-                    <td class="text-muted">{{ $adempimento->descrizione }}</td>
+                    <td class="text-muted">
+                        {{ $adempimento->descrizione }}
+                        @if ($adempimento->paginaManuale)
+                            <div class="small"><a href="{{ route('manuale.show', $adempimento->paginaManuale) }}"><i class="bi bi-book me-1"></i>{{ $adempimento->paginaManuale->titolo }}</a></div>
+                        @endif
+                    </td>
                     <td>
                         @if ($adempimento->attivo)
                             <span class="badge bg-success">Attivo</span>
@@ -104,6 +109,17 @@
                         <label class="form-label">Descrizione</label>
                         <textarea name="descrizione" class="form-control" rows="2" maxlength="2000">{{ old('descrizione', $edit?->descrizione) }}</textarea>
                     </div>
+                    @if ($pagineManuale->isNotEmpty())
+                    <div class="mb-3">
+                        <label class="form-label" for="adempManuale">Procedura del manuale</label>
+                        <select name="manuale_pagina_id" id="adempManuale" class="form-select">
+                            <option value="">— Nessuna —</option>
+                            @foreach ($pagineManuale as $paginaManuale)
+                                <option value="{{ $paginaManuale->id }}" @selected(old('manuale_pagina_id', $edit?->manuale_pagina_id) === $paginaManuale->id)>{{ $paginaManuale->sezione }} — {{ $paginaManuale->titolo }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
                     <div class="form-check">
                         <input type="checkbox" name="attivo" value="1" class="form-check-input" id="adempAttivo"
                                @checked(old('attivo', $edit?->attivo ?? true))>

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Struttura;
 
 use App\Models\Adempimento;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Creazione/modifica di un adempimento ricorrente (f.20): titolo, mese
@@ -34,6 +35,7 @@ class SalvaAdempimentoRequest extends FormRequest
         return [
             'titolo' => ['required', 'string', 'max:200'],
             'descrizione' => ['nullable', 'string', 'max:2000'],
+            'manuale_pagina_id' => ['nullable', 'uuid', Rule::exists('manuale_pagine', 'id')->where('associazione_id', session('associazione_id'))],
             'mese_scadenza' => ['required', 'integer', 'min:1', 'max:12'],
             'attivo' => ['required', 'boolean'],
         ];

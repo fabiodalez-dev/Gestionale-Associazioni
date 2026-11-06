@@ -2,9 +2,6 @@ includes:
     - vendor/larastan/larastan/extension.neon
     # Codice morto (classi, metodi, costanti mai usati): shipmonk/dead-code-detector
     - vendor/shipmonk/dead-code-detector/rules.neon
-    # Solo falsi positivi Larastan: il tipo accessorio non-empty-array<string, mixed>
-    # viene rifiutato da array<model property, mixed> anche quando le chiavi sono valide.
-    - phpstan-baseline.neon
 
 parameters:
     level: 5
@@ -33,6 +30,14 @@ parameters:
     # categoria ed è limitata a identificatore + percorso (+ nome del membro
     # dove serve). Il codice realmente morto non rientra in nessuna di queste.
     ignoreErrors:
+        # Falso positivo Larastan: l'array validato (array<string, mixed>)
+        # passato a create()/update() viene rifiutato da array<model property,
+        # mixed> anche quando le chiavi sono colonne valide del model.
+        -
+            identifier: argument.type
+            message: '#expects array<model property of App\\Models\\\w+, mixed>, array(<string, mixed>)? given\.$#'
+            path: app/*
+
         # Servizi risolti dal container (app(), iniezione nei controller e nei
         # job): il costruttore non compare mai come `new` nel codice analizzato.
         -

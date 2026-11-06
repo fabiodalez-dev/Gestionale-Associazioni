@@ -43,6 +43,9 @@ class PromemoriaInviato extends Model
     /** Promemoria mensile di un adempimento ricorrente (f.20). */
     public const TIPO_ADEMPIMENTO = 'adempimento';
 
+    /** Promemoria mensile della dichiarazione sui conflitti di interesse (issue #11), step = AAAAMM. */
+    public const TIPO_DICHIARAZIONE_INTERESSI = 'dichiarazione_interessi';
+
     protected $table = 'promemoria_inviati';
 
     protected $fillable = [

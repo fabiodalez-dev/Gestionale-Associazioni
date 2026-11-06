@@ -8,6 +8,7 @@ use App\Models\Socio;
 use App\Notifications\Comunicazione\AuguriCompleannoNotification;
 use App\Services\Comunicazione\CompleanniService;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 /**
  * f.9 — Compleanni: widget "Compleanni del mese" in dashboard, toggle
@@ -55,7 +56,7 @@ class CompleanniTest extends ComunicazioneTestCase
             ->getContent();
 
         // Solo il widget: la dashboard elenca altrove anche i soci appena creati
-        $widget = \Illuminate\Support\Str::between((string) $html, '<!-- widget:compleanni -->', '<!-- /widget:compleanni -->');
+        $widget = Str::between((string) $html, '<!-- widget:compleanni -->', '<!-- /widget:compleanni -->');
         $this->assertStringContainsString('DelMese', $widget);
         $this->assertStringNotContainsString('MeseDiverso', $widget);
         $this->assertStringNotContainsString('Escluso', $widget);

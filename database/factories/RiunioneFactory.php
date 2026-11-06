@@ -39,6 +39,17 @@ class RiunioneFactory extends Factory
         ]);
     }
 
+    /**
+     * Assemblea dei soci (issue #6), ordinaria o straordinaria.
+     */
+    public function assemblea(string $organo = Riunione::ORGANO_ASSEMBLEA_ORDINARIA): static
+    {
+        return $this->state([
+            'titolo' => 'Assemblea dei soci',
+            'organo' => $organo,
+        ]);
+    }
+
     public function annullata(): static
     {
         return $this->state(['stato' => Riunione::STATO_ANNULLATA]);

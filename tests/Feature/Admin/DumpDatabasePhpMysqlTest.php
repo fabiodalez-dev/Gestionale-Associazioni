@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use PDO;
 use RuntimeException;
+use Spatie\Backup\Config\Config;
+use Spatie\Backup\Tasks\Backup\BackupJobFactory;
 use Tests\TestCase;
+use ZipArchive;
 
 /**
  * Dump in PHP puro del database (fallback dell'updater quando mysqldump non
@@ -52,6 +55,53 @@ class DumpDatabasePhpMysqlTest extends TestCase
             $this->server->exec("DROP DATABASE IF EXISTS `{$this->cfg['database']}`");
         }
         parent::tearDown();
+    }
+
+    public function test_il_backup_spatie_con_la_password_vuota_del_wizard_riesce_e_non_e_cifrato(): void
+    {
+        app(InstallerService::class)->installaSchema($this->cfg);
+
+        // Il .env del wizard (come .env.example) contiene BACKUP_ARCHIVE_PASSWORD=
+        // vuoto: prima diventava una password vuota e ogni backup falliva
+        // con ZipArchive::close(): Invalid argument
+        $precedente = getenv('BACKUP_ARCHIVE_PASSWORD');
+        putenv('BACKUP_ARCHIVE_PASSWORD=');
+        $_ENV['BACKUP_ARCHIVE_PASSWORD'] = $_SERVER['BACKUP_ARCHIVE_PASSWORD'] = '';
+        try {
+            $password = (require config_path('backup.php'))['backup']['password'];
+        } finally {
+            $precedente === false ? putenv('BACKUP_ARCHIVE_PASSWORD') : putenv('BACKUP_ARCHIVE_PASSWORD='.$precedente);
+            unset($_ENV['BACKUP_ARCHIVE_PASSWORD'], $_SERVER['BACKUP_ARCHIVE_PASSWORD']);
+        }
+        $this->assertNull($password);
+
+        $nome = 'backup-test-'.uniqid();
+        $cartella = storage_path('app/private/'.$nome);
+        config([
+            'backup.backup.name' => $nome,
+            'backup.backup.password' => $password,
+            'backup.backup.source.databases' => ['mysql'],
+            'backup.backup.destination.disks' => ['local'],
+        ]);
+        try {
+            // Stesso job di backup:run --only-db, con la configurazione di
+            // questo test (il comando ha già letto quella dell'avvio)
+            BackupJobFactory::createFromConfig(Config::fromArray(config('backup')))
+                ->dontBackupFilesystem()
+                ->disableSignals()
+                ->run();
+            $zip = File::files($cartella);
+            $this->assertCount(1, $zip);
+
+            $archivio = new ZipArchive;
+            $this->assertTrue($archivio->open($zip[0]->getPathname()));
+            $this->assertGreaterThan(0, $archivio->numFiles);
+            // Non cifrato: il dump si legge senza password
+            $this->assertNotFalse($archivio->getFromIndex(0));
+            $archivio->close();
+        } finally {
+            File::deleteDirectory($cartella);
+        }
     }
 
     public function test_il_dump_contiene_struttura_e_dati_ed_e_reimportabile(): void

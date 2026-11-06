@@ -186,8 +186,12 @@ return [
         /*
          * The password to be used for archive encryption.
          * Set to `null` to disable encryption.
+         *
+         * Vuota (come nel .env del wizard e di .env.example) = archivi non
+         * cifrati: una stringa vuota passata a spatie fa fallire ogni backup
+         * (ZipArchive::close(): Invalid argument), notturni e dell'updater.
          */
-        'password' => env('BACKUP_ARCHIVE_PASSWORD'),
+        'password' => env('BACKUP_ARCHIVE_PASSWORD') ?: null,
 
         /*
          * The encryption algorithm to be used for archive encryption.

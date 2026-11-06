@@ -42,8 +42,9 @@ class RicevutaService
                 // Quota riletta e bloccata: una riassegnazione o correzione
                 // arrivata dopo il caricamento non lascia nella ricevuta un
                 // intestatario o dei dati diversi da quelli della quota
-                $quota = Quota::allTenants()->whereKey($quota->getKey())->lockForUpdate()->first() ?? $quota;
-                if (! $quota->isPagata()) {
+                // Eliminata nel frattempo o non più pagata: nessuna ricevuta
+                $quota = Quota::allTenants()->whereKey($quota->getKey())->lockForUpdate()->first();
+                if ($quota === null || ! $quota->isPagata()) {
                     return null;
                 }
 

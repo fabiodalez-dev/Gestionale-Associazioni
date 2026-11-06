@@ -190,4 +190,15 @@ class RicevutaIstantaneaTest extends TestCase
         $this->assertSame('77', $ricevuta->numero_socio);
         $this->assertSame('Quota Sostenitore', $ricevuta->tipo_quota);
     }
+
+    public function test_una_quota_eliminata_dopo_il_caricamento_non_genera_la_ricevuta_ne_un_errore(): void
+    {
+        $quota = $this->quotaPagata($this->socioDiProva());
+
+        // Eliminata da un altro processo dopo il caricamento
+        DB::table('quote')->where('id', $quota->id)->delete();
+
+        $this->assertNull(app(RicevutaService::class)->emettiPerQuota($quota));
+        $this->assertSame(0, Ricevuta::allTenants()->where('quota_id', $quota->id)->count());
+    }
 }

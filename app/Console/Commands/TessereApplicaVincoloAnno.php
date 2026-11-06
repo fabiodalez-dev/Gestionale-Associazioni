@@ -19,20 +19,16 @@ class TessereApplicaVincoloAnno extends Command
 
     public function handle(VincoloTessereAnnoService $vincolo): int
     {
-        if ($vincolo->attivo()) {
-            $this->info('Vincolo già attivo.');
-
-            return self::SUCCESS;
-        }
-
-        if ($vincolo->applicaSePossibile()) {
-            $this->info('Vincolo applicato: nessuna tessera doppia rimasta.');
-
-            return self::SUCCESS;
-        }
-
+        $attivo = $vincolo->sistema();
         $doppioni = $vincolo->doppioni();
-        $this->warn("Vincolo non ancora applicato: {$doppioni->count()} soci hanno più tessere non annullate nello stesso anno. Sistemale dalla pagina Tessere.");
+
+        if ($doppioni->isEmpty()) {
+            $this->info($attivo ? 'Vincolo attivo: nessuna tessera doppia.' : 'Vincolo non applicato: riprova più tardi (vedi il log).');
+
+            return self::SUCCESS;
+        }
+
+        $this->warn("{$doppioni->count()} soci hanno più tessere non annullate nello stesso anno, fuori dal vincolo. Sistemale dalla pagina Tessere.");
         foreach ($doppioni as $riga) {
             $this->line("  {$riga->nominativo} ({$riga->anno}): tessere {$riga->numeri}");
         }

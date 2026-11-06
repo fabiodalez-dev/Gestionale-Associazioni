@@ -95,22 +95,20 @@ class Tessera extends Model
                 : (int) $tessera->anno_validita;
         });
 
-        // Se il vincolo socio/anno manca perché la migration ha trovato
-        // doppioni, annullare, spostare o eliminare l'ultimo doppione dal
-        // backoffice lo aggiunge subito, dopo il commit (DDL fuori transazione)
-        $applicaDopoIlCommit = fn () => DB::afterCommit(
-            fn () => app(VincoloTessereAnnoService::class)->applicaSePossibile()
+        // Doppioni rimasti fuori dal vincolo socio/anno (migration con
+        // doppioni, import legacy): annullare, spostare o eliminare l'ultimo
+        // doppione dal backoffice aggiunge l'indice o riporta dentro la tessera
+        // rimasta, dopo il commit (DDL fuori transazione)
+        $sistemaDopoIlCommit = fn () => DB::afterCommit(
+            fn () => app(VincoloTessereAnnoService::class)->sistema()
         );
-        static::saved(function (Tessera $tessera) use ($applicaDopoIlCommit): void {
-            if ($tessera->wasChanged(['socio_id', 'anno_validita', 'stato'])
-                && ! app(VincoloTessereAnnoService::class)->attivo()) {
-                $applicaDopoIlCommit();
+        static::saved(function (Tessera $tessera) use ($sistemaDopoIlCommit): void {
+            if ($tessera->wasChanged(['socio_id', 'anno_validita', 'stato'])) {
+                $sistemaDopoIlCommit();
             }
         });
-        static::deleted(function () use ($applicaDopoIlCommit): void {
-            if (! app(VincoloTessereAnnoService::class)->attivo()) {
-                $applicaDopoIlCommit();
-            }
+        static::deleted(function () use ($sistemaDopoIlCommit): void {
+            $sistemaDopoIlCommit();
         });
     }
 

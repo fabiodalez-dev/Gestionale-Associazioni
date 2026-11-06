@@ -179,15 +179,15 @@ class UpdateController extends Controller
     }
 
     /**
-     * Soci con più tessere valide nello stesso anno che tengono ancora
-     * spento il vincolo socio/anno arrivato con l'aggiornamento (0 se il
-     * vincolo è attivo o lo si è appena potuto applicare).
+     * Soci con più tessere valide nello stesso anno rimaste fuori dal
+     * vincolo socio/anno (0 se non ce ne sono: il vincolo è attivo per tutte).
      */
     private function tessereDoppie(): int
     {
         $vincolo = app(VincoloTessereAnnoService::class);
+        $vincolo->sistema();
 
-        return $vincolo->applicaSePossibile() ? 0 : $vincolo->doppioni()->count();
+        return $vincolo->doppioni()->count();
     }
 
     private function soloSuperAdmin(Request $request): void

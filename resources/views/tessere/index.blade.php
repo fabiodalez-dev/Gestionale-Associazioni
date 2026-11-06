@@ -34,9 +34,9 @@
 <div class="alert alert-warning" role="alert" id="avvisoTessereDoppie">
     <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Tessere doppie da sistemare</div>
     <p class="mb-2 small">
-        Questi soci hanno più tessere valide nello stesso anno, emesse prima dell'aggiornamento. Annulla, elimina o correggi
-        l'anno delle tessere in più: appena non ne resta nessuna, il controllo "una sola tessera valida per socio e anno"
-        si attiva da solo.
+        Questi soci hanno più tessere valide nello stesso anno, emesse prima dell'aggiornamento o importate dal vecchio
+        gestionale. Annulla, elimina o correggi l'anno delle tessere in più: appena non ne resta nessuna, il controllo
+        "una sola tessera valida per socio e anno" vale anche per loro, da solo.
     </p>
     @if ($doppioniTessere['visibili']->isNotEmpty())
         <ul class="mb-0 small">

@@ -389,8 +389,9 @@ class TesseraController extends Controller
     }
 
     /**
-     * Tessere doppie (stesso socio e anno, non annullate) rimaste da prima
-     * del vincolo socio/anno: tenta prima di applicarlo, poi elenca quelle
+     * Tessere doppie (stesso socio e anno, non annullate) rimaste fuori dal
+     * vincolo socio/anno (da prima del vincolo o dall'import legacy): prima
+     * applica il vincolo o vi riporta le tessere sistemate, poi elenca quelle
      * dei soci visibili all'utente (associazione e perimetro sedi), il
      * numero di quelle dei soci nel cestino (da ripristinare per correggerle)
      * e quello delle altre fuori vista, che lo bloccano comunque.
@@ -399,12 +400,15 @@ class TesseraController extends Controller
      */
     private function doppioniDaSistemare(?Associazione $associazione): ?array
     {
+        // Anche con il vincolo attivo possono esserci doppioni rimasti fuori
+        // (import legacy): l'elenco si basa sulle tessere, non sull'indice
         $vincolo = app(VincoloTessereAnnoService::class);
-        if ($vincolo->applicaSePossibile()) {
+        $vincolo->sistema();
+        $tutti = $vincolo->doppioni();
+        if ($tutti->isEmpty()) {
             return null;
         }
 
-        $tutti = $vincolo->doppioni();
         $idSoci = $tutti->pluck('socio_id')->unique()->values();
         $sociVisibili = Socio::query()
             ->whereIn('id', $idSoci)

@@ -188,7 +188,7 @@ class VincoloTessereAnnoTest extends TessereTestCase
         // Un doppione nasce fra il controllo e l'ALTER TABLE: l'indice fallisce
         $inserito = false;
         DB::listen(function ($query) use (&$inserito): void {
-            if (! $inserito && str_starts_with(strtolower($query->sql), 'update "tessere" set "anno_non_annullata" = anno_validita')) {
+            if (! $inserito && str_starts_with(self::sqlNormalizzato($query->sql), 'update tessere set anno_non_annullata = anno_validita')) {
                 $inserito = true;
                 $this->inserisciTesseraGrezza('20260001-C');
             }
@@ -214,12 +214,12 @@ class VincoloTessereAnnoTest extends TessereTestCase
         $ddl = 0;
         $fallisci = true;
         DB::listen(function ($query) use (&$ddl): void {
-            if (str_starts_with(strtolower($query->sql), 'create unique index')) {
+            if (self::eCreazioneIndice($query->sql)) {
                 $ddl++;
             }
         });
         DB::connection()->beforeExecuting(function (string $sql) use (&$fallisci): void {
-            if ($fallisci && str_starts_with(strtolower($sql), 'create unique index')) {
+            if ($fallisci && self::eCreazioneIndice($sql)) {
                 throw new QueryException('sqlite', $sql, [], new \RuntimeException('database table is locked'));
             }
         });
@@ -237,6 +237,21 @@ class VincoloTessereAnnoTest extends TessereTestCase
         $this->assertTrue($this->vincolo()->applicaSePossibile());
         $this->assertSame(1, $ddl);
         $this->assertTrue($this->indicePresente());
+    }
+
+    /** SQL in minuscolo senza virgolette né apici inversi: uguale su SQLite e MariaDB. */
+    private static function sqlNormalizzato(string $sql): string
+    {
+        return strtolower(str_replace(['"', '`'], '', $sql));
+    }
+
+    /** Creazione dell'indice unique: CREATE UNIQUE INDEX (SQLite) o ALTER TABLE ... ADD UNIQUE (MariaDB). */
+    private static function eCreazioneIndice(string $sql): bool
+    {
+        $sql = self::sqlNormalizzato($sql);
+
+        return str_starts_with($sql, 'create unique index')
+            || (str_starts_with($sql, 'alter table tessere') && str_contains($sql, 'add unique'));
     }
 
     /** Toglie il doppione del setUp senza passare dal modello (niente vincolo automatico). */
@@ -359,7 +374,7 @@ class VincoloTessereAnnoTest extends TessereTestCase
 
         $sql = [];
         DB::listen(function ($query) use (&$sql): void {
-            $sql[] = strtolower($query->sql);
+            $sql[] = self::sqlNormalizzato($query->sql);
         });
         $this->prima->update(['stato' => Tessera::STATO_SOSPESA]);
 
@@ -367,10 +382,10 @@ class VincoloTessereAnnoTest extends TessereTestCase
         // ricerca delle tessere fuori vincolo è filtrata sul socio
         $this->assertSame(2026, Tessera::allTenants()->find($this->prima->id)->getAttribute('anno_non_annullata'));
         $this->assertNull(Tessera::allTenants()->find($fuori->id)->getAttribute('anno_non_annullata'));
-        $ricerche = array_filter($sql, fn (string $q): bool => str_starts_with($q, 'select') && str_contains($q, '"anno_non_annullata" is null'));
+        $ricerche = array_filter($sql, fn (string $q): bool => str_starts_with($q, 'select') && str_contains($q, 'anno_non_annullata is null'));
         $this->assertNotEmpty($ricerche);
         foreach ($ricerche as $ricerca) {
-            $this->assertStringContainsString('"socio_id" in', $ricerca);
+            $this->assertStringContainsString('socio_id in', $ricerca);
         }
 
         // La pagina Tessere (scansione completa) riporta dentro anche l'altra

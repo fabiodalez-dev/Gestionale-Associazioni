@@ -5,6 +5,7 @@ namespace App\Services\Tessere;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,9 +21,10 @@ use Illuminate\Support\Facades\Schema;
  * aggiunge più tardi, senza terminale, appena i doppioni sono stati sistemati
  * dal backoffice: dopo il salvataggio o l'eliminazione di una tessera, ogni
  * notte (tessere:applica-vincolo-anno) e dalla pagina Tessere, che intanto
- * elenca i doppioni da sistemare. Dopo un ALTER TABLE fallito (doppione
- * nato nel frattempo, lock sulla tabella) aspetta qualche minuto prima di
- * riprovare, così una pagina molto aperta non ripete il DDL a ogni visita.
+ * elenca i doppioni da sistemare. Dopo un ALTER TABLE fallito per un motivo
+ * diverso da un doppione (permessi, lock sulla tabella) aspetta qualche
+ * minuto prima di riprovare, così una pagina molto aperta non ripete il DDL
+ * a ogni visita.
  */
 #[Singleton]
 class VincoloTessereAnnoService
@@ -134,9 +136,14 @@ class VincoloTessereAnnoService
             Schema::table('tessere', function (Blueprint $table) {
                 $table->unique(['socio_id', 'anno_non_annullata'], self::INDICE);
             });
+        } catch (UniqueConstraintViolationException) {
+            // Un doppione nato fra il controllo e l'ALTER TABLE: nessuna
+            // pausa, la prossima occasione lo trova già con la sola lettura
+            // dei doppioni e applica il vincolo appena viene sistemato
+            return $this->attivoSenzaCache();
         } catch (QueryException $e) {
-            // Un doppione creato nel frattempo, o un altro processo che ha
-            // appena aggiunto l'indice: si riprova alla prossima occasione
+            // Errore del DDL (permessi, lock sulla tabella, indice aggiunto da
+            // un altro processo): pausa prima di riprovare
             Log::warning('Vincolo tessere socio/anno non applicato', ['error' => $e->getMessage()]);
             Cache::put(self::CHIAVE_PAUSA, true, now()->addMinutes(self::MINUTI_PAUSA));
 

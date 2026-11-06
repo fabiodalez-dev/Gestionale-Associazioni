@@ -8,6 +8,7 @@ use App\Models\Tessera;
 use App\Models\Utente;
 use App\Services\Tessere\VincoloTessereAnnoService;
 use Database\Seeders\RolesSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -179,48 +180,55 @@ class VincoloTessereAnnoTest extends TessereTestCase
         $this->assertNull(Tessera::allTenants()->find($this->doppione->id)->getAttribute('anno_non_annullata'));
     }
 
-    public function test_dopo_un_ddl_fallito_si_riprova_solo_dopo_una_pausa(): void
+    public function test_doppione_nato_durante_l_alter_table_non_mette_in_pausa_il_vincolo(): void
     {
         Cache::forget('tessere:vincolo-socio-anno:pausa');
-        $this->doppione->update(['stato' => Tessera::STATO_ANNULLATA]);
-        $this->assertTrue($this->indicePresente());
-        Schema::table('tessere', fn (Blueprint $table) => $table->dropUnique(VincoloTessereAnnoService::INDICE));
-        app()->forgetInstance(VincoloTessereAnnoService::class);
+        $this->eliminaDoppioneIniziale();
 
         // Un doppione nasce fra il controllo e l'ALTER TABLE: l'indice fallisce
         $inserito = false;
         DB::listen(function ($query) use (&$inserito): void {
             if (! $inserito && str_starts_with(strtolower($query->sql), 'update "tessere" set "anno_non_annullata" = anno_validita')) {
                 $inserito = true;
-                DB::table('tessere')->insert([
-                    'id' => (string) Str::uuid(),
-                    'associazione_id' => $this->associazione->id,
-                    'socio_id' => $this->socio->id,
-                    'numero_tessera' => '20260001-C',
-                    'anno_validita' => 2026,
-                    'anno_non_annullata' => 2026,
-                    'data_emissione' => '2026-01-10',
-                    'data_scadenza' => '2026-12-31',
-                    'tipo_scadenza' => Tessera::TIPO_SCADENZA_SOLARE,
-                    'stato' => Tessera::STATO_ATTIVA,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                $this->inserisciTesseraGrezza('20260001-C');
             }
         });
 
         $this->assertFalse($this->vincolo()->applicaSePossibile());
         $this->assertTrue($inserito);
-        $this->assertTrue(Cache::has('tessere:vincolo-socio-anno:pausa'));
+        $this->assertFalse(Cache::has('tessere:vincolo-socio-anno:pausa'));
 
-        // Doppione sistemato subito: durante la pausa nessun nuovo ALTER TABLE
+        // Doppione sistemato: il vincolo si applica subito, senza pausa
         DB::table('tessere')->where('numero_tessera', '20260001-C')->delete();
+        $this->assertTrue($this->vincolo()->applicaSePossibile());
+        $this->assertTrue($this->indicePresente());
+    }
+
+    public function test_dopo_un_altro_errore_del_ddl_si_riprova_solo_dopo_una_pausa(): void
+    {
+        Cache::forget('tessere:vincolo-socio-anno:pausa');
+        $this->eliminaDoppioneIniziale();
+
+        // Lock sulla tabella o permessi mancanti: errore del DDL che non
+        // dipende dai doppioni
         $ddl = 0;
+        $fallisci = true;
         DB::listen(function ($query) use (&$ddl): void {
             if (str_starts_with(strtolower($query->sql), 'create unique index')) {
                 $ddl++;
             }
         });
+        DB::connection()->beforeExecuting(function (string $sql) use (&$fallisci): void {
+            if ($fallisci && str_starts_with(strtolower($sql), 'create unique index')) {
+                throw new QueryException('sqlite', $sql, [], new \RuntimeException('database table is locked'));
+            }
+        });
+
+        $this->assertFalse($this->vincolo()->applicaSePossibile());
+        $this->assertTrue(Cache::has('tessere:vincolo-socio-anno:pausa'));
+
+        // Durante la pausa nessun nuovo ALTER TABLE, anche se ora riuscirebbe
+        $fallisci = false;
         $this->assertFalse($this->vincolo()->applicaSePossibile());
         $this->assertSame(0, $ddl);
 
@@ -229,6 +237,31 @@ class VincoloTessereAnnoTest extends TessereTestCase
         $this->assertTrue($this->vincolo()->applicaSePossibile());
         $this->assertSame(1, $ddl);
         $this->assertTrue($this->indicePresente());
+    }
+
+    /** Toglie il doppione del setUp senza passare dal modello (niente vincolo automatico). */
+    private function eliminaDoppioneIniziale(): void
+    {
+        DB::table('tessere')->where('id', $this->doppione->id)->delete();
+        $this->assertFalse($this->indicePresente());
+    }
+
+    private function inserisciTesseraGrezza(string $numero): void
+    {
+        DB::table('tessere')->insert([
+            'id' => (string) Str::uuid(),
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $this->socio->id,
+            'numero_tessera' => $numero,
+            'anno_validita' => 2026,
+            'anno_non_annullata' => 2026,
+            'data_emissione' => '2026-01-10',
+            'data_scadenza' => '2026-12-31',
+            'tipo_scadenza' => Tessera::TIPO_SCADENZA_SOLARE,
+            'stato' => Tessera::STATO_ATTIVA,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_i_doppioni_dei_soci_nel_cestino_sono_indicati_a_parte(): void

@@ -109,8 +109,11 @@ class RicevutaIstantaneaTest extends TestCase
         $this->assertStringContainsString('Bonifico', $html);
         $this->assertStringContainsString('10/03/2026', $html);
         $this->assertStringContainsString('TRN-001', $html);
-        $this->assertStringNotContainsString('Bianchi', $html);
-        $this->assertStringNotContainsString('Verdi', $html);
+        // Nomi completi: un cognome da solo può comparire per caso nei dati
+        // casuali dell'associazione (es. l'indirizzo "Rotonda Bianchi 35")
+        $this->assertStringNotContainsString('Mariangela Bianchi', $html);
+        $this->assertStringNotContainsString('BNCMNG80A41H501X', $html);
+        $this->assertStringNotContainsString('Giulio Verdi', $html);
         $this->assertStringNotContainsString('Quota Sostenitore', $html);
     }
 

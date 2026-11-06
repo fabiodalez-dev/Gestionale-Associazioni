@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -36,6 +37,7 @@ class Adempimento extends Model
         'associazione_id',
         'titolo',
         'descrizione',
+        'manuale_pagina_id',
         'mese_scadenza',
         'attivo',
     ];
@@ -85,5 +87,15 @@ class Adempimento extends Model
     public function anni(): HasMany
     {
         return $this->hasMany(AdempimentoAnno::class, 'adempimento_id');
+    }
+
+    /**
+     * Procedura del manuale operativo da seguire (issue #12).
+     *
+     * @return BelongsTo<ManualePagina, $this>
+     */
+    public function paginaManuale(): BelongsTo
+    {
+        return $this->belongsTo(ManualePagina::class, 'manuale_pagina_id');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Utente;
+use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Password;
 
@@ -53,7 +54,10 @@ class AdminRecuperaAccesso extends Command
             return self::FAILURE;
         }
 
-        $token = Password::broker('utenti')->createToken($utente);
+        // createToken() è del broker concreto, non del contratto restituito dal facade
+        /** @var PasswordBroker $broker */
+        $broker = Password::broker('utenti');
+        $token = $broker->createToken($utente);
         $url = route('password.reset', ['token' => $token, 'email' => $utente->email]);
         $minuti = (int) config('auth.passwords.utenti.expire', 60);
 

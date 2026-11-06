@@ -23,6 +23,17 @@
             ]),
             'Vita associativa' => array_filter([
                 $voce('area-soci.bacheca', 'area-soci.bacheca', 'bi-megaphone', 'Bacheca'),
+                $voce('area-soci.assemblee', 'area-soci.assemblee*', 'bi-people', 'Assemblee'),
+                $voce('area-soci.discussioni', 'area-soci.discussioni*', 'bi-chat-square-text', 'Discussioni'),
+                $associazione?->impostazioni(\App\Settings\PartecipazioneSettings::class)->rubrica_attiva
+                    ? $voce('area-soci.rubrica', 'area-soci.rubrica*', 'bi-person-lines-fill', 'Rubrica dei soci')
+                    : null,
+                $voce('area-soci.proposte', 'area-soci.proposte*', 'bi-lightbulb', 'Proposte'),
+                $voce('area-soci.manuale', 'area-soci.manuale*', 'bi-book', 'Guide'),
+                // Solo per chi ricopre una carica (issue #11)
+                $socioLayout?->cariche()->attive()->exists()
+                    ? $voce('area-soci.dichiarazione-interessi', 'area-soci.dichiarazione-interessi*', 'bi-shield-check', 'Conflitti di interesse')
+                    : null,
                 $voce('area-soci.sondaggi', 'area-soci.sondaggi*', 'bi-bar-chart', 'Sondaggi'),
                 $voce('area-soci.volontariato', 'area-soci.volontariato*', 'bi-person-raised-hand', 'Volontariato'),
             ]),

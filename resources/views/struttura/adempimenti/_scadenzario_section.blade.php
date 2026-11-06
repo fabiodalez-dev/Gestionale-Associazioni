@@ -59,6 +59,9 @@
                         @if ($completato && $riga)
                             <small class="text-success ms-2"><i class="bi bi-check-circle"></i> {{ $riga->completato_at->format('d/m/Y') }}</small>
                         @endif
+                        @if ($adempimento->manuale_pagina_id)
+                            <a href="{{ route('manuale.show', $adempimento->manuale_pagina_id) }}" class="small ms-2" title="Procedura del manuale"><i class="bi bi-book"></i> Procedura</a>
+                        @endif
                     </div>
                     @if ($puoSpuntare)
                         <form method="POST" action="{{ route('adempimenti.toggle-anno', $adempimento) }}">

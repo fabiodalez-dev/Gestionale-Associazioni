@@ -1,0 +1,144 @@
+@extends('area-soci.layouts.app')
+
+@section('title', $riunione->titolo.' - Area Riservata')
+
+@php
+    $odg = is_array($riunione->odg) ? $riunione->odg : [];
+    $titoloPunto = fn (int $i) => is_array($odg[$i] ?? null) ? ($odg[$i]['punto'] ?? '') : (string) ($odg[$i] ?? '');
+    $esitoColore = ['approvato' => 'success', 'respinto' => 'danger', 'rinviato' => 'warning'];
+@endphp
+
+@section('content')
+    <div class="d-flex justify-content-between flex-wrap align-items-center pt-3 pb-2 mb-3 border-bottom gap-2">
+        <div>
+            <a href="{{ route('area-soci.assemblee') }}" class="text-decoration-none small text-muted"><i class="bi bi-arrow-left me-1"></i>Assemblee</a>
+            <h1 class="h2 mb-0">{{ $riunione->titolo }}</h1>
+            <div class="text-muted">{{ $riunione->organoLabel() }} del {{ $riunione->data_ora->format('d/m/Y H:i') }}</div>
+        </div>
+        <a href="{{ route('area-soci.assemblee.show', $riunione) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Aggiorna</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            @if ($partecipante->isPresente())
+                <span class="text-success"><i class="bi bi-check-circle me-1"></i>Risulti presente{{ $partecipante->presente_at ? ' dalle '.$partecipante->presente_at->format('H:i') : '' }}.</span>
+            @else
+                <span class="text-muted">Non risulti ancora presente: la presenza si registra all'ingresso{{ $riunione->partecipazione_remota ? ' oppure qui, se partecipi a distanza' : '' }}.</span>
+                @if ($riunione->partecipazione_remota && $riunione->stato === 'pianificata' && ! $riunione->data_ora->isFuture())
+                    <form method="POST" action="{{ route('area-soci.assemblee.presenza', $riunione) }}">
+                        @csrf
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-person-check me-1"></i>Partecipo a distanza</button>
+                    </form>
+                @endif
+            @endif
+        </div>
+    </div>
+
+    {{-- Elezioni (issue #9) --}}
+    @foreach ($elezioni as $voceElezione)
+        @php $elezione = $voceElezione['elezione']; @endphp
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span class="fw-semibold">Elezione: {{ $elezione->organoLabel() }}</span>
+                <span class="small text-muted">voto segreto · massimo {{ $elezione->max_preferenze }} {{ $elezione->max_preferenze === 1 ? 'preferenza' : 'preferenze' }}</span>
+            </div>
+            <div class="card-body">
+                @if ($elezione->stato !== 'voto')
+                    <p class="mb-0 text-muted">Il voto è chiuso.{{ $elezione->stato === 'proclamata' ? ' Eletti: '.$elezione->candidature->where('eletta', true)->map(fn ($c) => $c->socio?->nome_completo)->join(', ') : '' }}</p>
+                @elseif (! $riunione->voto_online)
+                    <p class="mb-0 text-muted">Si vota con la scheda cartacea in sala.</p>
+                @elseif ($rappresentati->isEmpty())
+                    <p class="mb-0 text-muted">Per votare devi risultare presente con diritto di voto.</p>
+                @elseif ($voceElezione['daVotare']->isEmpty())
+                    <p class="mb-0 text-success"><i class="bi bi-check2-circle me-1"></i>Hai votato.</p>
+                @else
+                    <form method="POST" action="{{ route('area-soci.elezioni.vota', $elezione) }}" onsubmit="return confirm('Confermi la scheda? Non potrai modificarla.');">
+                        @csrf
+                        @foreach ($voceElezione['daVotare'] as $rappresentatoId => $etichetta)
+                            <fieldset class="mb-3 scheda-elezione" data-max="{{ $elezione->max_preferenze }}">
+                                <legend class="fs-6 fw-semibold">{{ $etichetta }}</legend>
+                                <input type="hidden" name="schede[{{ $rappresentatoId }}][]" value="bianca">
+                                @foreach ($elezione->candidature as $candidatura)
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="schede[{{ $rappresentatoId }}][]" value="{{ $candidatura->id }}" id="pref-{{ $rappresentatoId }}-{{ $candidatura->id }}">
+                                        <label class="form-check-label" for="pref-{{ $rappresentatoId }}-{{ $candidatura->id }}">{{ $candidatura->socio?->nome_completo }}</label>
+                                    </div>
+                                @endforeach
+                                <div class="form-text">Nessuna scelta = scheda bianca.</div>
+                            </fieldset>
+                        @endforeach
+                        <button type="submit" class="btn btn-primary">Vota</button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    @endforeach
+
+    @if (! $riunione->voto_online)
+        <p class="text-muted">In questa assemblea si vota in sala.</p>
+    @elseif ($votazioni->isEmpty() && $elezioni->isEmpty())
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-hourglass display-5 d-block mb-2"></i>
+            Nessuna votazione aperta. Quando la presidenza apre il voto su un punto, lo trovi qui: premi "Aggiorna".
+        </div>
+    @endif
+
+    @foreach ($votazioni as $votazione)
+        @php
+            $votati = $giaVotati->get($votazione->id, []);
+            $ammessi = $rappresentatiPerVotazione->get($votazione->id, collect());
+            $daVotare = $ammessi->except($votati);
+        @endphp
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span class="fw-semibold">{{ $votazione->punto_indice + 1 }}. {{ $titoloPunto($votazione->punto_indice) }}</span>
+                <span class="small text-muted">{{ $votazione->segreta ? 'Voto segreto' : 'Voto palese' }}</span>
+            </div>
+            <div class="card-body">
+                @if ($votazione->isAperta())
+                    @if ($rappresentati->isEmpty())
+                        <p class="text-muted mb-0">Per votare devi risultare presente con diritto di voto.</p>
+                    @elseif ($ammessi->isEmpty())
+                        <p class="text-muted mb-0">Hai dichiarato un conflitto di interesse su questo punto: non partecipi al voto.</p>
+                    @elseif ($daVotare->isEmpty())
+                        <p class="text-success mb-0"><i class="bi bi-check2-circle me-1"></i>Hai votato. Il risultato sarà visibile alla chiusura.</p>
+                    @else
+                        <form method="POST" action="{{ route('area-soci.assemblee.vota', [$riunione, $votazione]) }}"
+                              onsubmit="return confirm('Confermi il voto? Non potrai modificarlo.');">
+                            @csrf
+                            @foreach ($daVotare as $rappresentatoId => $etichetta)
+                                <fieldset class="mb-3">
+                                    <legend class="fs-6 fw-semibold">{{ $etichetta }}</legend>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach ($opzioni as $valore => $label)
+                                            <input type="radio" class="btn-check" name="voti[{{ $rappresentatoId }}]" value="{{ $valore }}"
+                                                   id="voto-{{ $votazione->id }}-{{ $rappresentatoId }}-{{ $valore }}" required>
+                                            <label class="btn btn-outline-primary" for="voto-{{ $votazione->id }}-{{ $rappresentatoId }}-{{ $valore }}">{{ $label }}</label>
+                                        @endforeach
+                                    </div>
+                                </fieldset>
+                            @endforeach
+                            <button type="submit" class="btn btn-primary">Invia il voto</button>
+                        </form>
+                    @endif
+                @else
+                    <span class="badge bg-{{ $esitoColore[$votazione->esito] ?? 'secondary' }}">{{ ucfirst($votazione->esito) }}</span>
+                    <span class="ms-2 small">Favorevoli {{ $votazione->favorevoli }}, contrari {{ $votazione->contrari }}, astenuti {{ $votazione->astenuti }}</span>
+                @endif
+            </div>
+        </div>
+    @endforeach
+@endsection
+
+@push('scripts')
+<script>
+// Non più preferenze del massimo consentito (il server lo verifica comunque)
+document.querySelectorAll('.scheda-elezione').forEach(function (scheda) {
+    var max = parseInt(scheda.dataset.max, 10);
+    scheda.addEventListener('change', function () {
+        var scelte = scheda.querySelectorAll('input[type=checkbox]:checked').length;
+        scheda.querySelectorAll('input[type=checkbox]:not(:checked)').forEach(function (c) { c.disabled = scelte >= max; });
+    });
+});
+</script>
+@endpush

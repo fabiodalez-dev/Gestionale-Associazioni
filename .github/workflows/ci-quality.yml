@@ -1,0 +1,168 @@
+name: Qualità del codice
+
+# Controlli veloci senza database esterno: dipendenze (validate, audit CVE),
+# stile (Pint), analisi statica (PHPStan + Larastan + codice morto),
+# compilazione di viste e rotte, suite PHPUnit (SQLite in memoria) su ogni
+# versione di PHP supportata, build Vite e pacchetto di release.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Dipendenze, stile e analisi statica
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read # Legge i sorgenti.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # Due commit: "git diff --check HEAD^" confronta con il genitore
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, pdo_mysql, pdo_sqlite, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: composer.json valido e lock allineato
+        run: composer validate --strict
+
+      - name: Dipendenze bloccate
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: composer audit (CVE note, produzione e sviluppo)
+        run: composer audit --abandoned=ignore
+
+      - name: Stile del codice (Pint)
+        run: vendor/bin/pint --test
+
+      - name: PHPStan (livello da phpstan.neon)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=2G
+
+      - name: Viste Blade e rotte compilano
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+          php artisan view:cache
+          php artisan route:list --json > /dev/null
+          php artisan config:cache
+          php artisan optimize:clear
+
+      - name: Igiene del diff (spazi finali, marcatori di conflitto)
+        run: git diff --check HEAD^
+
+      - name: Rimuovi il .env di CI
+        if: always()
+        run: rm -f .env
+
+  tests:
+    name: PHPUnit su PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # Legge i sorgenti.
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.4 è la minima di composer.json, 8.5 l'ultima supportata (README)
+        php: ['8.4', '8.5']
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, intl, gd, zip, pdo_mysql, pdo_sqlite, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: Dipendenze bloccate e requisiti di piattaforma
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs
+
+      - name: Sintassi PHP
+        run: |
+          find app bootstrap config database lang routes tests -type f -name '*.php' -print0 \
+            | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: Suite PHPUnit (Unit + Feature)
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+          php artisan test --compact
+
+      - name: Rimuovi il .env di CI
+        if: always()
+        run: rm -f .env
+
+  frontend:
+    name: Asset, audit npm e pacchetto di release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read # Legge i sorgenti.
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: PHP 8.4 (come la GitHub Action di release)
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, pdo_mysql, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: Node 22
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Dipendenze npm bloccate e audit
+        run: |
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=high
+
+      - name: Build Vite
+        run: |
+          npm run build
+          test -f public/build/manifest.json
+
+      # Lo stesso script del tag v*: un errore di pacchetto emerge nella PR,
+      # non al momento della release.
+      - name: Pacchetto di release costruito e verificato
+        run: |
+          bash bin/build-release.sh --skip-npm
+          versione="$(tr -d '[:space:]' < VERSION)"
+          zip="releases/gestionale-associazioni-v${versione}.zip"
+          (cd releases && sha256sum -c "$(basename "$zip").sha256")
+          elenco="$(unzip -Z1 "$zip")"
+          for f in vendor/autoload.php public/build/manifest.json index.php database/installer/schema.sql; do
+            grep -qx "gestionale-associazioni/$f" <<< "$elenco" || { echo "Nel pacchetto manca $f"; exit 1; }
+          done
+          if grep -qx 'gestionale-associazioni/.env' <<< "$elenco"; then
+            echo "Il pacchetto contiene un .env"
+            exit 1
+          fi

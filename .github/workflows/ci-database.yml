@@ -1,0 +1,135 @@
+name: Compatibilità database
+
+# Le stesse migration e lo stesso schema dell'installer su ogni motore
+# supportato (README: MySQL 5.7.8+ o MariaDB 10.2.7+): migration su un
+# database vuoto (come l'updater), iniezione di database/installer/schema.sql
+# (come l'installer web) e dump PHP puro, con i test MySQL reali.
+# Sul motore di riferimento (quello con cui è generato il dump) lo schema
+# viene rigenerato e deve coincidere byte per byte con quello committato.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Settimanale: le immagini dei database cambiano anche senza commit
+    - cron: '41 4 * * 3'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database:
+    name: ${{ matrix.database.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # Legge migration, schema e test.
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+          - name: MySQL 5.7 (minima supportata)
+            image: mysql:5.7@sha256:4bc6bc963e6d8443453676cae56536f4b8156d78bae03c0145cbe47c2aad73bb
+            health_cmd: mysqladmin ping -h 127.0.0.1 -proot --silent
+            riferimento: false
+          - name: MySQL 8.0
+            image: mysql:8.0@sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b
+            health_cmd: mysqladmin ping -h 127.0.0.1 -proot --silent
+            riferimento: false
+          - name: MySQL 8.4 LTS
+            image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+            health_cmd: mysqladmin ping -h 127.0.0.1 -proot --silent
+            riferimento: false
+          - name: MySQL 9.6 (riferimento di schema.sql)
+            image: mysql:9.6@sha256:c5df04bee1a42b74a5841c6409e669cf62126cd0416f00c1cea8ab933b9361b9
+            health_cmd: mysqladmin ping -h 127.0.0.1 -proot --silent
+            riferimento: true
+          - name: MariaDB 10.11 LTS
+            image: mariadb:10.11@sha256:de61fed4a40d3842f3ee09944ba52792156cfd9adf489b2cc670fc6ded28df8d
+            health_cmd: healthcheck.sh --connect --innodb_initialized
+            riferimento: false
+          - name: MariaDB 11.4 LTS
+            image: mariadb:11.4@sha256:67873d30a17f6a9c331f06363b2fa15f38abca415529966d67c84f87f82439fe
+            health_cmd: healthcheck.sh --connect --innodb_initialized
+            riferimento: false
+
+    services:
+      database:
+        image: ${{ matrix.database.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gestione_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="${{ matrix.database.health_cmd }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, pdo_mysql, pdo_sqlite, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - name: Dipendenze bloccate
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Attendi il database via TCP
+        run: |
+          for tentativo in $(seq 1 45); do
+            if MYSQL_PWD=root mysql -h 127.0.0.1 -P 3306 -u root -e 'SELECT VERSION()' 2>/dev/null; then
+              exit 0
+            fi
+            echo "database non pronto ($tentativo/45)"
+            sleep 2
+          done
+          exit 1
+
+      # Le credenziali vanno nel .env e non nell'ambiente del job: phpunit.xml
+      # imposta SQLite per la suite e un DB_CONNECTION reale lo scavalcherebbe.
+      - name: .env di CI puntato sul database
+        run: |
+          cp .env.example .env
+          sed -i \
+            -e 's/^DB_DATABASE=.*/DB_DATABASE=gestione_ci/' \
+            -e 's/^DB_PASSWORD=.*/DB_PASSWORD=root/' \
+            -e 's/^CACHE_STORE=.*/CACHE_STORE=array/' \
+            .env
+          php artisan key:generate --no-interaction
+
+      - name: Migration su database vuoto
+        run: php artisan migrate --force --no-interaction
+
+      - name: Schema dell'installer e dump PHP (test MySQL reali, nessuno saltato)
+        env:
+          INSTALLER_TEST_MYSQL_DSN: mysql://root:root@127.0.0.1:3306/gestione_installer_test
+        run: php artisan test --filter=Mysql --fail-on-skipped
+
+      - name: schema.sql coincide con quello rigenerato dalle migration
+        if: matrix.database.riferimento
+        run: |
+          php artisan installer:genera-schema --output="$RUNNER_TEMP/schema.sql"
+          if ! diff -u database/installer/schema.sql "$RUNNER_TEMP/schema.sql"; then
+            echo "::error file=database/installer/schema.sql::schema.sql non coincide con le migration: rigeneralo con \"php artisan installer:genera-schema\" su MySQL 9.6."
+            exit 1
+          fi
+
+      - name: Rimuovi il .env di CI
+        if: always()
+        run: rm -f .env

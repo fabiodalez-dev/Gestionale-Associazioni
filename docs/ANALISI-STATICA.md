@@ -14,7 +14,7 @@ Equivale a `vendor/bin/phpstan analyse --no-progress --memory-limit=2G`. Per un 
 
 - **Livello 5** di PHPStan su `app/`, `routes/`, `database/`, `config/` e `bootstrap/app.php`. Le rotte, le migration e i seeder sono inclusi soprattutto perché usano classi e metodi di `app/` che altrimenti il rilevatore di codice morto considererebbe inutilizzati.
 - `checkModelProperties: true` e `parseModelCastsMethod: true`: Larastan verifica gli attributi dei model e legge i cast dichiarati nel metodo `casts()`.
-- `phpstan-baseline.neon` contiene **solo** falsi positivi di Larastan sul tipo `array<model property, mixed>` accettato da `create()`/`update()`: non va usato per nascondere errori nuovi.
+- Nessuna baseline: l'unico falso positivo noto di Larastan (l'array validato `array<string, mixed>` rifiutato da `array<model property, mixed>` in `create()`/`update()`) è una regola mirata in `ignoreErrors` di `phpstan.neon`, limitata a quel messaggio e ad `app/`. La CI (workflow "Qualità del codice") fallisce su qualsiasi altro errore.
 
 ## Rilevatore di codice morto
 

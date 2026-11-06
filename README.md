@@ -32,10 +32,10 @@ Costruita con **Laravel 13 / PHP 8.4+**. Si installa anche su un **hosting condi
 - 🎫 **Tesseramento** — tessere con QR e PDF, verifica pubblica, check-in con scanner e kiosk, rinnovi self-service, campagna rinnovi, apertura anno sociale, stampa massiva.
 - 💶 **Quote e pagamenti** — quote per tipo socio, link di pagamento, Stripe e PayPal con credenziali per associazione, ricevute numerate, solleciti, prima nota automatica.
 - 🗓️ **Eventi** — capienza e lista d'attesa con promozione automatica, approvazione, eventi a pagamento, biglietti con QR, presenze, serie ricorrenti, feedback, galleria, budget e spese.
-- 📋 **Registro e governance** — libro soci ufficiale (PDF/Excel), cessazioni, organi sociali e cariche, riunioni del direttivo con votazioni e verbale, verbali firmati, decisioni, adempimenti, scadenzario.
+- 📋 **Registro e governance** — libro soci ufficiale (PDF/Excel), cessazioni, organi sociali e cariche, riunioni del direttivo con votazioni e verbale, assemblee dei soci con aventi diritto, appello, quorum, deleghe, voto online ed elezioni, verbali firmati, decisioni, adempimenti, scadenzario.
 - 🤝 **Organizzazione** — volontari con turni, candidature e registro ore con attestato; spazi con prenotazioni e conflitti; attrezzature e prestiti; progetti con milestone e report; CRM a colonne, contatti esterni, sponsor, referral.
 - ✉️ **Comunicazione** — email brandizzate con SMTP per associazione, coda e log, template, newsletter con opt-out, annunci e convocazioni, sondaggi, compleanni, notifiche.
-- 👤 **Account e area soci** — registrazione con verifica email, area riservata (tessera, quote, prenotazioni, dati personali), richieste di modifica dati, export e cancellazione GDPR.
+- 👤 **Account e area soci** — registrazione con verifica email, area riservata (tessera, quote, prenotazioni, dati personali), richieste di modifica dati, **rubrica interna dei soci** con consenso e contatto mediato, export e cancellazione GDPR.
 - 🔐 **Sicurezza** — 2FA, ruoli e permessi per modulo, perimetro per sede, audit di accessi e modifiche, blocco tentativi, CSP, honeypot, backup pianificati, API REST documentate con token.
 - 📦 **Installazione e aggiornamento senza terminale** — pacchetto di release con tutto dentro, wizard web che inietta lo schema SQL nel database vuoto, aggiornamenti dalla dashboard con verifica del pacchetto, backup e rollback.
 
@@ -106,16 +106,16 @@ Eventi pubblici o riservati ai soci, bozze, capienza con **lista d'attesa e prom
 Prima nota con categorie e movimenti automatici da quote, prenotazioni e donazioni, report economico per anno con export, donazioni dal sito pubblico, scadenzario unificato, solleciti.
 
 ### Registro e governance
-Libro soci ufficiale in PDF ed Excel, cessazioni formali con delibera, organi sociali e cariche con mandati in scadenza, riunioni del direttivo (convocazione, presenze, votazioni, bozza del verbale), verbali numerati con firmatari e approvazione, archivio delle decisioni, adempimenti ricorrenti con promemoria, documenti con cestino e link temporanei, sezione pubblica **Trasparenza**.
+Libro soci ufficiale in PDF ed Excel, cessazioni formali con delibera, organi sociali e cariche con mandati in scadenza, riunioni del direttivo (convocazione, presenze, votazioni, bozza del verbale), **assemblee dei soci** (elenco degli aventi diritto con quota pagata, appello con lettura della tessera, quorum in prima e seconda convocazione, maggioranze per punto con esito calcolato, deleghe dall'area soci o dalla segreteria con limite per delegato, voto online dallo smartphone palese o segreto anche per i deleganti, partecipazione a distanza), **elezioni** degli organi (candidature dall'area soci, scheda segreta con preferenze, scrutinio con schede cartacee e regola di parità, proclamazione che aggiorna le cariche), **conflitti di interesse** (dichiarazione annuale dei titolari di cariche con raccolta e promemoria, conflitti per punto che escludono dal voto, registro PDF), verbali numerati con firmatari e approvazione, archivio delle decisioni, adempimenti ricorrenti con promemoria, documenti con cestino e link temporanei, sezione pubblica **Trasparenza**.
 
 ### Organizzazione
-Volontari con mansioni, disponibilità, turni a posti limitati, candidature dall'area soci, conferme, presenze, registro ore e attestato PDF. Spazi con prenotazioni e rilevazione dei conflitti. Attrezzature con prestiti e restituzioni. Progetti con milestone, avanzamento e report PDF. CRM a colonne (kanban), contatti esterni, sponsor con sezione pubblica, referral porta-un-amico, statistiche annuali con confronto e PDF.
+Volontari con mansioni, disponibilità, turni a posti limitati, candidature dall'area soci, conferme, presenze, registro ore e attestato PDF. Spazi con prenotazioni e rilevazione dei conflitti. Attrezzature con prestiti e restituzioni. Progetti con milestone, avanzamento e report PDF. CRM a colonne (kanban), contatti esterni, sponsor con sezione pubblica, referral porta-un-amico, statistiche annuali con confronto e PDF, **bilancio sociale** annuale con le sezioni delle linee guida, dati calcolati dal gestionale, testi per sezione, approvazione con il verbale e pubblicazione in Trasparenza.
 
 ### Comunicazione
-SMTP per associazione, layout email brandizzato, template modificabili, centro anteprime, coda con retry e log, notifiche di piattaforma. Annunci in bacheca, convocazioni di assemblea con email ai soci, newsletter con anteprima e opt-out (doppio), sondaggi votabili dall'area soci e dagli account, auguri di compleanno, contatti rapidi.
+SMTP per associazione, layout email brandizzato, template modificabili, centro anteprime, coda con retry e log, notifiche di piattaforma. Annunci in bacheca, convocazioni di assemblea con email ai soci, **proposte dei soci** con raccolta di adesioni, soglia configurabile e inserimento nell'ordine del giorno, newsletter con anteprima e opt-out (doppio), sondaggi votabili dall'area soci e dagli account, **discussioni tra soci** per spazi tematici (anche per tag) con regolamento, segnalazioni, moderazione e riepilogo email, auguri di compleanno, contatti rapidi.
 
 ### Piattaforma e amministrazione
-Registrazione autonoma delle associazioni (conferma email, revisione del super admin), sedi e **perimetro per sede** (operatori che vedono solo la propria sede), amministratori su invito, ruoli dell'associazione (presidente, tesoriere, segretario…) con matrice dei permessi, configurazioni (dati, logo, tesseramento, campi obbligatori, pagamenti, email, moduli pubblici), impostazioni di sistema, audit accessi, job falliti, cestino unificato, health check, backup pianificati, API REST v1 (Sanctum e chiavi API) con documentazione OpenAPI, app installabile (PWA).
+Registrazione autonoma delle associazioni (conferma email, revisione del super admin), sedi e **perimetro per sede** (operatori che vedono solo la propria sede), amministratori su invito, ruoli dell'associazione (presidente, tesoriere, segretario…) con matrice dei permessi, configurazioni (dati, logo, tesseramento, campi obbligatori, pagamenti, email, moduli pubblici), impostazioni di sistema, audit accessi, job falliti, cestino unificato, health check, **manuale operativo** interno (procedure per sezione, checklist da spuntare, collegamento agli adempimenti, guide per i soci, storico delle revisioni), backup pianificati, API REST v1 (Sanctum e chiavi API) con documentazione OpenAPI, app installabile (PWA).
 
 ---
 
@@ -247,7 +247,7 @@ A colpo d'occhio: **71 modelli**, **170 controller**, **574 rotte**, **66 migrat
 ## Sviluppo e test
 
 ```bash
-php artisan test            # 1.962 test PHPUnit (SQLite in memoria)
+php artisan test            # 2.085 test PHPUnit (SQLite in memoria)
 npm run test:e2e            # 110 test E2E Playwright (DB dedicato, server automatico)
 composer analyse            # phpstan: larastan livello 5 + rilevatore di codice morto, zero errori
 vendor/bin/pint             # stile del codice
@@ -262,6 +262,21 @@ INSTALLER_TEST_MYSQL_DSN="mysql://utente:password@127.0.0.1:3306/gestione_instal
 ```
 
 Analisi statica: [docs/ANALISI-STATICA.md](docs/ANALISI-STATICA.md).
+
+### Controlli automatici (CI)
+
+Ogni pull request verso `main` (e ogni push su `main`) passa dai workflow in `.github/workflows`, sul modello di Pinakes:
+
+| Workflow | Cosa verifica |
+|---|---|
+| **Qualità del codice** | `composer validate --strict` e `composer audit`, Pint, PHPStan, compilazione di viste/rotte/config, PHPUnit su PHP 8.4 e 8.5, build Vite, `npm audit`, pacchetto di release costruito e controllato come al tag |
+| **Compatibilità database** | migration su database vuoto e test MySQL reali (schema dell'installer, dump PHP) su MySQL 5.7, 8.0, 8.4, 9.6 e MariaDB 10.11, 11.4; su MySQL 9.6 `schema.sql` rigenerato deve coincidere con quello committato |
+| **E2E** | suite Playwright completa su MySQL 8.4 e Chromium, con report e tracce come artifact se fallisce |
+| **Sicurezza e supply chain** | zizmor, actionlint, yamllint, ShellCheck; dependency review delle PR; gitleaks su tutta la storia (`.gitleaks.toml`); Trivy |
+| **CodeQL** | JavaScript dell'applicazione e workflow GitHub Actions (PHP è coperto da PHPStan) |
+| **Pullfrog** | review su richiesta (`workflow_dispatch`), in sola lettura |
+
+Le action sono fissate per SHA e nessun checkout conserva le credenziali; i workflow settimanali (database, sicurezza, CodeQL) girano anche senza commit, perché cambiano le immagini e le CVE.
 
 ---
 

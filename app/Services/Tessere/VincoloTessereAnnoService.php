@@ -173,12 +173,15 @@ class VincoloTessereAnnoService
      * le tessere rimaste fuori (colonna del vincolo vuota, come i doppioni
      * dell'import legacy) appena non sono più doppie. Da chiamare dopo ogni
      * correzione delle tessere e dalle pagine che mostrano i doppioni.
+     *
+     * @param  list<string>|null  $socioIds  solo le tessere di questi soci
+     *                                       (dopo la modifica di una tessera); null = tutte
      */
-    public function sistema(): bool
+    public function sistema(?array $socioIds = null): bool
     {
         $attivo = $this->applicaSePossibile();
         if ($attivo) {
-            $this->riallineaFuoriVincolo();
+            $this->riallineaFuoriVincolo($socioIds);
         }
 
         return $attivo;
@@ -188,8 +191,11 @@ class VincoloTessereAnnoService
      * Valorizza la colonna del vincolo delle tessere non annullate che l'hanno
      * vuota e non hanno più un doppione (stesso socio e anno). Le tessere
      * ancora doppie restano fuori, senza modifiche. Ritorna quante ne rientrano.
+     *
+     * @param  list<string>|null  $socioIds  solo le tessere di questi soci (usa
+     *                                       l'indice socio/anno); null = tutta la tabella
      */
-    public function riallineaFuoriVincolo(): int
+    public function riallineaFuoriVincolo(?array $socioIds = null): int
     {
         if (! Schema::hasColumn('tessere', 'anno_non_annullata')) {
             return 0;
@@ -197,6 +203,7 @@ class VincoloTessereAnnoService
 
         $rientrate = 0;
         $fuori = DB::table('tessere')
+            ->when($socioIds !== null, fn ($q) => $q->whereIn('socio_id', $socioIds))
             ->whereNull('anno_non_annullata')
             ->where('stato', '<>', 'Annullata')
             ->get(['id', 'socio_id', 'anno_validita']);

@@ -339,4 +339,42 @@ class VincoloTessereAnnoTest extends TessereTestCase
             ->assertDontSee('B-SEGRETA')
             ->assertSee("più 1 registrata sotto un'altra associazione", false);
     }
+
+    public function test_dopo_la_modifica_di_una_tessera_il_riallineamento_riguarda_solo_il_suo_socio(): void
+    {
+        DB::table('tessere')->where('id', $this->doppione->id)->delete();
+        $this->assertTrue($this->vincolo()->applicaSePossibile());
+
+        // Tessera di un altro socio rimasta fuori dal vincolo: non è affare
+        // della modifica di una tessera di Bianchi
+        $altro = Socio::factory()->create(['associazione_id' => $this->associazione->id]);
+        $fuori = Tessera::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $altro->id,
+            'anno_validita' => 2026,
+            'stato' => Tessera::STATO_ATTIVA,
+        ]);
+        DB::table('tessere')->where('id', $fuori->id)->update(['anno_non_annullata' => null]);
+        DB::table('tessere')->where('id', $this->prima->id)->update(['anno_non_annullata' => null]);
+
+        $sql = [];
+        DB::listen(function ($query) use (&$sql): void {
+            $sql[] = strtolower($query->sql);
+        });
+        $this->prima->update(['stato' => Tessera::STATO_SOSPESA]);
+
+        // La tessera modificata rientra (calcolo del modello), l'altra no: la
+        // ricerca delle tessere fuori vincolo è filtrata sul socio
+        $this->assertSame(2026, Tessera::allTenants()->find($this->prima->id)->getAttribute('anno_non_annullata'));
+        $this->assertNull(Tessera::allTenants()->find($fuori->id)->getAttribute('anno_non_annullata'));
+        $ricerche = array_filter($sql, fn (string $q): bool => str_starts_with($q, 'select') && str_contains($q, '"anno_non_annullata" is null'));
+        $this->assertNotEmpty($ricerche);
+        foreach ($ricerche as $ricerca) {
+            $this->assertStringContainsString('"socio_id" in', $ricerca);
+        }
+
+        // La pagina Tessere (scansione completa) riporta dentro anche l'altra
+        $this->vincolo()->sistema();
+        $this->assertSame(2026, Tessera::allTenants()->find($fuori->id)->getAttribute('anno_non_annullata'));
+    }
 }

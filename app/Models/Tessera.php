@@ -99,17 +99,21 @@ class Tessera extends Model
         // doppioni, import legacy): annullare, spostare o eliminare l'ultimo
         // doppione dal backoffice aggiunge l'indice o riporta dentro la tessera
         // rimasta, dopo il commit (DDL fuori transazione)
-        $sistemaDopoIlCommit = fn () => DB::afterCommit(
-            fn () => app(VincoloTessereAnnoService::class)->sistema()
-        );
+        // Solo le tessere del socio coinvolto (e del precedente, se la tessera
+        // è stata spostata): niente scansione dell'intera tabella a ogni modifica
+        $sistemaDopoIlCommit = function (Tessera $tessera): void {
+            $soci = array_values(array_unique(array_filter([
+                (string) $tessera->socio_id,
+                (string) $tessera->getOriginal('socio_id'),
+            ])));
+            DB::afterCommit(fn () => app(VincoloTessereAnnoService::class)->sistema($soci));
+        };
         static::saved(function (Tessera $tessera) use ($sistemaDopoIlCommit): void {
             if ($tessera->wasChanged(['socio_id', 'anno_validita', 'stato'])) {
-                $sistemaDopoIlCommit();
+                $sistemaDopoIlCommit($tessera);
             }
         });
-        static::deleted(function () use ($sistemaDopoIlCommit): void {
-            $sistemaDopoIlCommit();
-        });
+        static::deleted($sistemaDopoIlCommit);
     }
 
     /**

@@ -37,13 +37,20 @@ class RicevutaService
             return $esistente;
         }
 
-        // Istantanea dell'intestatario e del pagamento al momento
-        // dell'emissione (issue #20): una correzione successiva del socio o
-        // della quota non cambia la ricevuta già emessa
-        $socio = $this->socio($quota);
-
         try {
-            return DB::transaction(function () use ($quota, $socio): Ricevuta {
+            return DB::transaction(function () use ($quota): ?Ricevuta {
+                // Quota riletta e bloccata: una riassegnazione o correzione
+                // arrivata dopo il caricamento non lascia nella ricevuta un
+                // intestatario o dei dati diversi da quelli della quota
+                $quota = Quota::allTenants()->whereKey($quota->getKey())->lockForUpdate()->first() ?? $quota;
+                if (! $quota->isPagata()) {
+                    return null;
+                }
+
+                // Istantanea dell'intestatario e del pagamento al momento
+                // dell'emissione (issue #20): una correzione successiva del
+                // socio o della quota non cambia la ricevuta già emessa
+                $socio = $this->socio($quota);
                 $anno = (int) $quota->anno;
 
                 // Progressivo per (associazione, anno) sotto lock:

@@ -7,6 +7,7 @@ use App\Models\Ricevuta;
 use App\Models\Socio;
 use App\Services\Pagamenti\RicevutaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\View;
 use Tests\TestCase;
@@ -169,5 +170,24 @@ class RicevutaIstantaneaTest extends TestCase
         $this->assertStringNotContainsString('Quota Sostenitore', $html);
         // L'intestatario ricade sul socio corrente
         $this->assertStringContainsString('Maria Rossi', $html);
+    }
+
+    public function test_l_istantanea_usa_la_quota_riletta_anche_se_riassegnata_dopo_il_caricamento(): void
+    {
+        $quota = $this->quotaPagata($this->socioDiProva());
+        $altro = $this->creaSocio(['nome' => 'Giulio', 'cognome' => 'Verdi', 'numero_socio' => '77']);
+
+        // Un amministratore riassegna la quota dopo che è stata caricata
+        // (es. dal webhook) ma prima dell'emissione della ricevuta
+        DB::table('quote')->where('id', $quota->id)->update(['socio_id' => $altro->id, 'tipo' => 'Quota Sostenitore']);
+
+        $ricevuta = app(RicevutaService::class)->emettiPerQuota($quota);
+
+        $this->assertNotNull($ricevuta);
+        $ricevuta->refresh();
+        $this->assertSame('Giulio', $ricevuta->intestatario_nome);
+        $this->assertSame('Verdi', $ricevuta->intestatario_cognome);
+        $this->assertSame('77', $ricevuta->numero_socio);
+        $this->assertSame('Quota Sostenitore', $ricevuta->tipo_quota);
     }
 }

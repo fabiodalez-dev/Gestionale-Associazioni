@@ -305,7 +305,7 @@ class AggiornamentoPacchettiRealiTest extends TestCase
             return null;
         }
 
-        return preg_match('/^HTTP\/\S+\s+(\d{3})/', $http_response_header[0] ?? '', $m) === 1 ? (int) $m[1] : null;
+        return preg_match('/^HTTP\/\S+\s+(\d{3})/', http_get_last_response_headers()[0] ?? '', $m) === 1 ? (int) $m[1] : null;
     }
 
     private function portaLibera(): int

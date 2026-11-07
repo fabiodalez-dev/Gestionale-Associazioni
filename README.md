@@ -261,6 +261,12 @@ I test che toccano un MySQL reale (iniezione dello schema, dump PHP) si attivano
 INSTALLER_TEST_MYSQL_DSN="mysql://utente:password@127.0.0.1:3306/gestione_installer_test" php artisan test --filter=Mysql
 ```
 
+L'aggiornamento vero parte da due pacchetti: il primo viene installato su un database vuoto e aggiornato al secondo, poi il secondo si aggiorna alla patch successiva con il sito interrogato durante la manutenzione (503, mai 500):
+
+```bash
+INSTALLER_TEST_MYSQL_DSN="mysql://utente:password@127.0.0.1:3306/gestione_installer_test" UPDATE_E2E_PACCHETTO_DA=/percorso/gestionale-associazioni-v0.1.0.zip UPDATE_E2E_PACCHETTO_A=/percorso/gestionale-associazioni-v0.2.0.zip php artisan test --filter=AggiornamentoPacchettiRealiTest
+```
+
 Analisi statica: [docs/ANALISI-STATICA.md](docs/ANALISI-STATICA.md).
 
 ### Controlli automatici (CI)
@@ -271,6 +277,7 @@ Ogni pull request verso `main` (e ogni push su `main`) passa dai workflow in `.g
 |---|---|
 | **Qualità del codice** | `composer validate --strict` e `composer audit`, Pint, PHPStan, compilazione di viste/rotte/config, PHPUnit su PHP 8.4 e 8.5, build Vite, `npm audit`, pacchetto di release costruito e controllato come al tag |
 | **Compatibilità database** | migration su database vuoto e test MySQL reali (schema dell'installer, dump PHP) su MySQL 5.7, 8.0, 8.4, 9.6 e MariaDB 10.11, 11.4; su MySQL 9.6 `schema.sql` rigenerato deve coincidere con quello committato |
+| **Aggiornamento** | il pacchetto pubblicato di v0.1.0 installato su MySQL 8.4 e aggiornato al pacchetto del commit, poi alla patch successiva: dati, upload e `.env` intatti, migration complete, sito in 503 durante la manutenzione |
 | **E2E** | suite Playwright completa su MySQL 8.4 e Chromium, con report e tracce come artifact se fallisce |
 | **Sicurezza e supply chain** | zizmor, actionlint, yamllint, ShellCheck; dependency review delle PR; gitleaks su tutta la storia (`.gitleaks.toml`); Trivy |
 | **CodeQL** | JavaScript dell'applicazione e workflow GitHub Actions (PHP è coperto da PHPStan) |

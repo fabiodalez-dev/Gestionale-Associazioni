@@ -14,9 +14,14 @@
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
     # Redirect Trailing Slashes If Not A Folder...
+    # Il percorso di destinazione si prende da THE_REQUEST (l'URL chiesto dal
+    # browser) e non da REQUEST_URI: quando la radice del progetto è la web
+    # root, il .htaccess principale ha già riscritto /login/ in /public/login/
+    # e REQUEST_URI farebbe redirigere a /public/login, esponendo la cartella.
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
-    RewriteRule ^ %1 [L,R=301]
+    RewriteCond %{THE_REQUEST} ^\S+\s([^?\s]*[^/?\s])/+(?:[?\s])
+    RewriteRule ^ %1 [L,R=301,NE]
 
     # Prefisso URL di questa cartella ("" se è la document root, "/public" o
     # "/gestionale/public" altrimenti). La sostituzione relativa "index.php"

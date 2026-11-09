@@ -140,6 +140,8 @@ Registrazione autonoma delle associazioni (conferma email, revisione del super a
 
 Il `.htaccess` nella radice fa passare tutte le richieste da `public/`; `app/`, `storage/`, `vendor/` e `.env` non sono raggiungibili dal browser e ogni cartella interna ha il proprio `.htaccess` di diniego, valido anche senza mod_rewrite (in quel caso l'app risponde su `/public/`). Se puoi scegliere la document root, puntala a `public/`.
 
+Se la home risponde ma `/install`, `/login` e le altre pagine danno **errore 500** (succede su IONOS, dove la document root è un symlink), controlla che sul server ci siano i `.htaccess` di una versione 0.2.1 o successiva, **sia quello di radice sia `public/.htaccess`**: le versioni precedenti usavano riscritture relative che su quegli hosting falliscono. Molti client FTP nascondono i file che iniziano con il punto: abilita la visualizzazione dei file nascosti prima di caricare. Per verificare che PHP e l'app funzionino a prescindere dal `.htaccess`, apri `https://tuodominio.it/public/index.php/install`.
+
 Lo schema non viene creato eseguendo le migration a runtime ma importando `database/installer/schema.sql`, un dump del database vuoto (struttura più registro delle migration) eseguito istruzione per istruzione via PDO: funziona anche senza `exec()` né client `mysql`, in pochi secondi, sempre uguale. Le tabelle dell'applicazione già presenti vengono ricreate vuote solo dietro conferma esplicita; un database con un'installazione completa non viene mai toccato dal wizard; le tabelle estranee restano intatte. Dettagli in [docs/INSTALLER.md](docs/INSTALLER.md).
 
 ### Da sorgenti

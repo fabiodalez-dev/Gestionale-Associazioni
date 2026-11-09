@@ -18,8 +18,15 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # Prefisso URL di questa cartella ("" se è la document root, "/public" o
+    # "/gestionale/public" altrimenti). La sostituzione relativa "index.php"
+    # dà 500 su alcuni hosting (IONOS) in cui la document root è un symlink
+    # e Apache non riesce a ricavare il prefisso: lo calcoliamo da REQUEST_URI.
+    RewriteCond %{REQUEST_URI}::$0 ^(/.+)/(.*)::\2$
+    RewriteRule ^.*$ - [E=BASE:%1]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteRule ^ index.php [L]
+    RewriteRule ^ %{ENV:BASE}/index.php [L]
 </IfModule>

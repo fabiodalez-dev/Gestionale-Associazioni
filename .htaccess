@@ -8,7 +8,15 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^(?!public/)(.*)$ public/$1 [L,QSA]
+
+    # Prefisso URL della cartella che contiene questo file ("" alla radice,
+    # "/gestionale" in sottocartella). Serve perché la sostituzione relativa
+    # "public/$1" fallisce con 500 su alcuni hosting (IONOS) in cui la
+    # document root è un symlink e Apache non riesce a ricavare il prefisso.
+    RewriteCond %{REQUEST_URI}::$0 ^(/.+)/(.*)::\2$
+    RewriteRule ^.*$ - [E=BASE:%1]
+
+    RewriteRule ^(?!public/)(.*)$ %{ENV:BASE}/public/$1 [L,QSA]
 </IfModule>
 
 # Difesa in profondità: questi file non vanno mai serviti, nemmeno senza mod_rewrite

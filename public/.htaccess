@@ -20,7 +20,7 @@
     # il redirect mostrerebbe /public nell'indirizzo.
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{THE_REQUEST} ^\S+\s+([^?\s]*[^/?\s])/+(\?\S*)?\s
-    RewriteRule ^ %1 [L,R=301]
+    RewriteRule ^ %1 [L,R=301,NE]
 
     # Prefisso URL di questa cartella ("" se è la document root, "/public" o
     # "/gestionale/public" altrimenti). La sostituzione relativa "index.php"

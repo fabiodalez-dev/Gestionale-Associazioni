@@ -27,7 +27,7 @@
                     <form method="POST" action="{{ route('eventi.galleria.store', $evento) }}" enctype="multipart/form-data">
                         @csrf
                         <div class="mb-2">
-                            <input type="file" class="form-control @error('foto.*') is-invalid @enderror"
+                            <input type="file" data-scatta class="form-control @error('foto.*') is-invalid @enderror"
                                    name="foto[]" accept="image/jpeg,image/png,image/webp" multiple required>
                             @error('foto.*')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>

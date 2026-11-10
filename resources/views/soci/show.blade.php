@@ -339,7 +339,7 @@
                 @csrf
                 <div class="col-md-4">
                     <label class="form-label" for="doc_file">File *</label>
-                    <input type="file" class="form-control" id="doc_file" name="file" required>
+                    <input type="file" data-scatta class="form-control" id="doc_file" name="file" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label" for="doc_descrizione">Descrizione</label>

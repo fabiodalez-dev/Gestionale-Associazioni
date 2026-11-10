@@ -166,7 +166,7 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
      * Data di nascita indicata dal codice fiscale (omocodie comprese), o
      * null se il codice manca o non è valido.
      */
-    public static function dataNascitaDaCodiceFiscale(?string $codiceFiscale): ?string
+    public static function dataNascitaDaCodiceFiscale(?string $codiceFiscale): ?Carbon
     {
         $cf = mb_strtoupper(trim((string) $codiceFiscale));
         if (strlen($cf) !== 16) {
@@ -175,7 +175,7 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
 
         $parser = new CodiceFiscale;
 
-        return $parser->tryParse($cf) ? $parser->getBirthdate()->toDateString() : null;
+        return $parser->tryParse($cf) ? Carbon::instance($parser->getBirthdate())->startOfDay() : null;
     }
 
     /**

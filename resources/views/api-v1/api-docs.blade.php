@@ -21,7 +21,7 @@
     <div class="card mb-4">
         <div class="card-header"><i class="bi bi-shield-lock me-1"></i>Autenticazione</div>
         <div class="card-body">
-            <p>Ogni richiesta (eccetto <code>GET /tessere/verify</code>) richiede una credenziale, in una di due forme:</p>
+            <p>Ogni richiesta (eccetto <code>GET /health</code> e <code>GET /tessere/verify</code>) richiede una credenziale, in una di due forme:</p>
             <ol>
                 <li>
                     <strong>Chiave API</strong> (64 caratteri esadecimali, generata dalla pagina Chiavi API):<br>
@@ -85,6 +85,8 @@
             <table class="table table-sm align-middle mb-0">
                 <thead><tr><th>Endpoint</th><th>Descrizione</th><th>Note</th></tr></thead>
                 <tbody>
+                    <tr><td><code>GET /health</code></td><td>Stato dell'API</td><td><span class="badge bg-success">Pubblico</span> versione dell'app e dell'API</td></tr>
+                    <tr><td><code>GET /health/credenziale</code></td><td>Stato e credenziale</td><td>tipo, permessi effettivi, associazione vincolata</td></tr>
                     <tr><td><code>GET /tessere/verify?tessera_id={uuid}</code></td><td>Verifica tessera (QR)</td><td><span class="badge bg-success">Pubblico</span> <code>valid = stato Attiva e non scaduta</code></td></tr>
                     <tr><td><code>GET /tessere</code></td><td>Lista paginata</td><td><code>page</code>, <code>limit</code> (1-100), <code>anno</code>, <code>stato</code></td></tr>
                     <tr><td><code>GET /tessere/search?q=</code></td><td>Ricerca (max 50)</td><td>q min 1 carattere</td></tr>

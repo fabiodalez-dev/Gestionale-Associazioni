@@ -17,6 +17,7 @@ use App\Notifications\Prenotazioni\PagamentoScadutoNotification;
 use App\Notifications\Prenotazioni\PromemoriaEventoNotification;
 use App\Notifications\Prenotazioni\PromozioneListaAttesaNotification;
 use App\Notifications\Prenotazioni\RifiutataNotification;
+use App\Services\Calendario\CalendarioAperture;
 use App\Services\Economia\PrimaNotaService;
 use App\Services\EventiVita\VitaSocialeService;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
@@ -591,8 +592,14 @@ class PrenotazioneService implements GestiscePagamentoPrenotazione
                         ? Prenotazione::STATO_IN_ATTESA_PAGAMENTO
                         : Prenotazione::STATO_CONFERMATA,
                     'promossa_at' => now(),
+                    // 24 ore per pagare dopo la promozione, ma mai in scadenza in un
+                    // giorno di chiusura dell'associazione (#35)
                     'scadenza_pagamento_at' => $aPagamento
-                        ? now()->addHours(self::ORE_FINESTRA_PROMOZIONE)
+                        ? app(CalendarioAperture::class)->scadenzaInGiornoAperto(
+                            now()->addHours(self::ORE_FINESTRA_PROMOZIONE),
+                            $evento->associazione_id,
+                            $evento->sede_id,
+                        )
                         : null,
                 ])->save();
             }

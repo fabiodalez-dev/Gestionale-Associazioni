@@ -111,6 +111,22 @@ class CalendarioAperture
     }
 
     /**
+     * Una scadenza che cade in un giorno chiuso diventa la fine del primo
+     * giorno aperto (#35, come Pinakes): chi deve agire ha un giorno intero
+     * in cui l'associazione risponde. Una scadenza in un giorno aperto resta
+     * com'è.
+     */
+    public function scadenzaInGiornoAperto(CarbonInterface $scadenza, string $associazioneId, ?string $sedeId = null): CarbonImmutable
+    {
+        $scadenza = CarbonImmutable::instance($scadenza);
+        if ($this->aperto($scadenza, $associazioneId, $sedeId)) {
+            return $scadenza;
+        }
+
+        return $this->primoGiornoAperto($scadenza->startOfDay(), $associazioneId, $sedeId)->endOfDay();
+    }
+
+    /**
      * Prossime festività e chiusure attive, per mostrarle in configurazione.
      *
      * @return list<array{data: string, nome: string}>

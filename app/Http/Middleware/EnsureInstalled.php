@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Services\Installer\InstallerService;
+use App\Services\Update\RiparaSchema;
+use App\Services\Update\UpdateService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,6 +36,10 @@ class EnsureInstalled
             if ($request->is('install', 'install/*')) {
                 return redirect('/login');
             }
+
+            // Primo caricamento dopo un cambio di versione: crea tabelle e
+            // colonne mancanti rispetto a schema.sql, dopo la risposta
+            app(RiparaSchema::class)->seNuovaVersione(app(UpdateService::class)->versioneCorrente());
 
             return $next($request);
         }

@@ -869,6 +869,9 @@ class UpdateService
 
         $this->artisanSeparato(['optimize:clear']);
         $this->artisanSeparato(['migrate', '--force', '--no-interaction']);
+        // Una migration registrata non prova che tabelle e colonne esistano:
+        // si crea ciò che manca rispetto a schema.sql (solo aggiunte)
+        $this->artisanSeparato(['app:ripara-schema']);
         $this->artisanSeparato(['app:aggiorna-permessi']);
         try {
             $this->artisanSeparato(['queue:restart']);

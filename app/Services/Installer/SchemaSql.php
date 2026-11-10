@@ -94,6 +94,45 @@ final class SchemaSql
     }
 
     /**
+     * Definizioni delle tabelle del dump: per ogni tabella l'istruzione
+     * CREATE TABLE completa e la definizione di ogni colonna (la riga del
+     * dump senza la virgola finale), nell'ordine del dump. Serve a ricreare
+     * tabelle e colonne mancanti dopo un aggiornamento (RiparaSchema).
+     *
+     * @return array<string, array{create: string, colonne: array<string, string>}>
+     */
+    public static function definizioni(string $sql): array
+    {
+        $definizioni = [];
+
+        foreach (self::istruzioni($sql) as $istruzione) {
+            if (! preg_match('/^CREATE\s+TABLE\s+`([^`]+)`\s*\(/i', $istruzione, $m)) {
+                continue;
+            }
+
+            $colonne = [];
+            foreach (preg_split('/\r\n|\r|\n/', $istruzione) ?: [] as $riga) {
+                // Le righe di colonna iniziano con il nome tra backtick;
+                // chiavi e vincoli (PRIMARY KEY, KEY, UNIQUE, CONSTRAINT) no
+                if (preg_match('/^\s+`([^`]+)`\s+(.+?),?\s*$/', $riga, $c)) {
+                    $colonne[$c[1]] = '`'.$c[1].'` '.$c[2];
+                }
+            }
+            if ($colonne === []) {
+                throw new RuntimeException("schema.sql: nessuna colonna riconosciuta nella tabella `{$m[1]}`.");
+            }
+
+            $definizioni[strtolower($m[1])] = ['create' => rtrim($istruzione, "; \n"), 'colonne' => $colonne];
+        }
+
+        if ($definizioni === []) {
+            throw new RuntimeException('schema.sql non contiene dichiarazioni CREATE TABLE.');
+        }
+
+        return $definizioni;
+    }
+
+    /**
      * Nomi delle migration registrate nel dump (righe INSERT nella tabella
      * `migrations`), ordinati. Servono a far sì che `php artisan migrate`
      * dopo l'installazione applichi solo le migration nuove.

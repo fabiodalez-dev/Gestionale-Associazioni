@@ -7,6 +7,7 @@
         'info' => ['bi-card-text', 'Dati anagrafici'],
         'logo' => ['bi-image', 'Logo'],
         'sedi' => ['bi-geo-alt', 'Sedi'],
+        'chiusure' => ['bi-calendar-x', 'Calendario chiusure'],
         'tesseramento' => ['bi-credit-card-2-front', 'Tesseramento'],
         'template-email' => ['bi-envelope', 'Template email scadenza'],
         'privacy' => ['bi-shield-check', 'Privacy Policy'],
@@ -501,6 +502,10 @@
         @endif
 
         {{-- ============ INVITA AL MINI-SITO (f.22) ============ --}}
+        @if ($section === 'chiusure')
+            @include('struttura.configurazioni._chiusure')
+        @endif
+
         @if ($section === 'moduli')
             @include('struttura.configurazioni._moduli')
         @endif

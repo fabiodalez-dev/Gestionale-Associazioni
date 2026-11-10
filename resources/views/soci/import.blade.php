@@ -5,7 +5,10 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
         <h1 class="h2"><i class="bi bi-upload me-2"></i>Importa Soci da Excel/CSV</h1>
-        <a href="{{ route('soci.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Torna alla lista</a>
+        <div class="d-flex gap-2">
+            <a href="{{ route('soci.importazioni.index') }}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i>Storico importazioni</a>
+            <a href="{{ route('soci.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Torna alla lista</a>
+        </div>
     </div>
 
     <div class="card mb-3">
@@ -37,6 +40,7 @@
             <div class="card-body">
                 <p>
                     <span class="badge bg-success">{{ $report['importati'] }} importati</span>
+                    @if (($report['aggiornati'] ?? 0) > 0)<span class="badge bg-info text-dark">{{ $report['aggiornati'] }} aggiornati</span>@endif
                     <span class="badge bg-{{ count($report['errori']) > 0 ? 'danger' : 'secondary' }}">{{ count($report['errori']) }} righe scartate</span>
                 </p>
                 @if (count($report['errori']) > 0)

@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -35,6 +37,7 @@ class EmailQueue extends Model
 {
     use BelongsToAssociazione;
     use HasUuids;
+    use MassPrunable;
 
     public const STATUS_PENDING = 'pending';
 
@@ -87,5 +90,20 @@ class EmailQueue extends Model
     public function socio(): BelongsTo
     {
         return $this->belongsTo(Socio::class, 'socio_id');
+    }
+
+    /**
+     * Pulizia a durata fissa (#70): le righe con esito definitivo (inviata o
+     * fallita) escono dalla coda dopo 90 giorni; l'esito resta nello storico
+     * (EmailLog). Mai quelle ancora da inviare o in invio.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()
+            ->withoutGlobalScopes()
+            ->whereIn('status', [self::STATUS_SENT, self::STATUS_FAILED])
+            ->where('created_at', '<', now()->subDays(90));
     }
 }

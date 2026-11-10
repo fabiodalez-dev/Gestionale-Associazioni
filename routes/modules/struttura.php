@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Struttura\AmministratoreController;
 use App\Http\Controllers\Struttura\AssociazioneController;
+use App\Http\Controllers\Struttura\ChiusuraController;
 use App\Http\Controllers\Struttura\ConfigurazioniController;
 use App\Http\Controllers\Struttura\GoogleCalendarController;
 use App\Http\Controllers\Struttura\InvitoController;
@@ -95,6 +96,11 @@ Route::middleware(['auth'])->group(function () {
         // Ruoli e permessi dello staff dell'associazione (admin_associazione / super_admin)
         Route::get('/ruoli', [RuoliController::class, 'index'])->name('ruoli.index');
         Route::put('/ruoli/{utente}', [RuoliController::class, 'update'])->name('ruoli.update');
+
+        // Calendario chiusure (#34)
+        Route::post('/configurazioni/chiusure', [ChiusuraController::class, 'store'])->name('chiusure.store');
+        Route::post('/configurazioni/chiusure/{chiusura}/attiva', [ChiusuraController::class, 'toggle'])->whereUuid('chiusura')->name('chiusure.toggle');
+        Route::delete('/configurazioni/chiusure/{chiusura}', [ChiusuraController::class, 'destroy'])->whereUuid('chiusura')->name('chiusure.destroy');
 
         // Sedi (CRUD dentro configurazioni — spec §2.2)
         Route::post('/configurazioni/sedi', [SedeController::class, 'save'])->name('sedi.save');

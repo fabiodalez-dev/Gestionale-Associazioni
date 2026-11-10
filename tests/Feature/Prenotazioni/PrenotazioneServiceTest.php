@@ -451,8 +451,25 @@ class PrenotazioneServiceTest extends TestCase
         $this->assertSame([$b->id], $this->service->idPerTipo('promozione'));
     }
 
+    public function test_finestra_di_pagamento_che_scadrebbe_a_natale_arriva_a_fine_del_primo_giorno_aperto(): void
+    {
+        $this->travelTo('2026-12-24 10:00:00');
+        $evento = Evento::factory()->pubblicato()->conCapienza(1)->aPagamento(15.0)->create([
+            'data_evento' => now()->addWeeks(2),
+        ]);
+        $account = $this->creaAccount($evento);
+
+        $prima = $this->service->crea($account, $evento, 1);
+        $inCoda = $this->service->crea($this->creaAccount($evento), $evento, 1);
+        $this->service->annulla($prima, $account);
+
+        // 24 ore dopo sarebbe Natale; anche Santo Stefano è chiuso: si arriva a fine 27
+        $this->assertSame('2026-12-27 23:59:59', $this->fresca($inCoda)->scadenza_pagamento_at->format('Y-m-d H:i:s'));
+    }
+
     public function test_promozione_di_pagante_apre_finestra_24h(): void
     {
+        $this->travelTo('2026-11-10 10:00:00'); // domani è feriale: 24 ore esatte (#35)
         $evento = Evento::factory()->pubblicato()->conCapienza(1)->aPagamento(15.0)->create([
             'data_evento' => now()->addWeek(),
         ]);

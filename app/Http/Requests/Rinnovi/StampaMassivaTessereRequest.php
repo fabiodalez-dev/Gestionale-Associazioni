@@ -27,6 +27,8 @@ class StampaMassivaTessereRequest extends FormRequest
             'stato' => ['nullable', 'string', 'max:30'],
             'ids' => ['nullable', 'array', 'max:500'],
             'ids.*' => ['uuid'],
+            // Formato scelto al momento della stampa (#47)
+            'formato' => ['nullable', 'in:a4,cr80,biglietti'],
         ];
     }
 }

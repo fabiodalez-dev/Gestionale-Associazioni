@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -32,6 +34,7 @@ class EmailLog extends Model
 {
     use BelongsToAssociazione;
     use HasUuids;
+    use MassPrunable;
 
     public const STATUS_SENT = 'sent';
 
@@ -78,5 +81,16 @@ class EmailLog extends Model
     public function sentBy(): BelongsTo
     {
         return $this->belongsTo(Utente::class, 'sent_by');
+    }
+
+    /**
+     * Pulizia a durata fissa (#70): lo storico delle email inviate resta un
+     * anno, poi viene eliminato dal job notturno model:prune.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()->withoutGlobalScopes()->where('sent_at', '<', now()->subYear());
     }
 }

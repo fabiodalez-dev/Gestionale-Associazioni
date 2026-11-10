@@ -12,6 +12,7 @@ use App\Models\Tessera;
 use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -35,6 +36,62 @@ class CheckinController extends Controller
         return view('tessere.checkin', [
             'eventi' => $eventi,
         ]);
+    }
+
+    /**
+     * Ricerca del socio per chi ha dimenticato la tessera (#50): nome,
+     * cognome, email, telefono, numero socio o tessera, almeno 3 caratteri,
+     * sulla query scoped dell'operatore. Solo i dati per riconoscerlo.
+     */
+    public function cercaSoci(Request $request): JsonResponse
+    {
+        abort_unless($this->puoFareCheckin($request), 403);
+
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) < 3) {
+            return response()->json(['soci' => []]);
+        }
+
+        $cifre = (string) preg_replace('/\D/', '', $q);
+        $perTessera = Tessera::query()->where('numero_tessera', $q)->pluck('socio_id');
+        $parole = preg_split('/\s+/', $q) ?: [];
+
+        $soci = Socio::query()
+            ->where(function ($w) use ($parole, $cifre, $perTessera, $q) {
+                // Ogni parola nel nome o nel cognome: "Rossi Mario" e "Mario Rossi"
+                $w->where(function ($nome) use ($parole) {
+                    foreach ($parole as $parola) {
+                        $nome->where(fn ($p) => $p->where('nome', 'like', '%'.$parola.'%')->orWhere('cognome', 'like', '%'.$parola.'%'));
+                    }
+                })
+                    ->orWhere('email', 'like', '%'.$q.'%')
+                    ->orWhere('numero_socio', $q)
+                    ->orWhereIn('id', $perTessera);
+                if (strlen($cifre) >= 6) {
+                    $w->orWhereRaw("REPLACE(REPLACE(REPLACE(COALESCE(telefono, ''), ' ', ''), '-', ''), '+39', '') LIKE ?", ['%'.$cifre]);
+                }
+            })
+            ->orderBy('cognome')
+            ->orderBy('nome')
+            ->limit(8)
+            ->get(['id', 'nome', 'cognome', 'numero_socio', 'stato']);
+
+        return response()->json(['soci' => $soci->map(fn (Socio $socio) => [
+            'id' => $socio->id,
+            'nome' => trim($socio->cognome.' '.$socio->nome),
+            'numero_socio' => $socio->numero_socio,
+            'stato' => $socio->stato,
+        ])->values()]);
+    }
+
+    private function puoFareCheckin(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user !== null
+            && ((method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin())
+                || $user->can('eventi.update')
+                || $user->can('tessere.view'));
     }
 
     /**
@@ -69,6 +126,11 @@ class CheckinController extends Controller
             $socioId = Socio::query()
                 ->where('numero_socio', $dati['numero_socio'])
                 ->value('id');
+        }
+
+        // Scelto per nome: stessa query scoped (tenant e perimetro di sede)
+        if ($socioId === null && ! empty($dati['socio_id'])) {
+            $socioId = Socio::query()->whereKey($dati['socio_id'])->value('id');
         }
 
         if ($socioId === null) {

@@ -12,6 +12,7 @@ use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
 use App\Models\CategoriaSocio;
 use App\Models\GruppoDinamico;
+use App\Models\Importazione;
 use App\Models\SavedFilter;
 use App\Models\Sede;
 use App\Models\Socio;
@@ -269,17 +270,33 @@ class SocioController extends Controller
         $associazione = Associazione::findOrFail(Socio::currentAssociazioneId());
         $import = new SociImport($associazione, $progressivi, $activityLogger);
 
+        $inizio = hrtime(true);
         Excel::import($import, $request->file('file'));
+
+        // Storico delle importazioni con il report degli errori (#55)
+        Importazione::query()->create([
+            'associazione_id' => $associazione->id,
+            'utente_id' => $request->user()?->id,
+            'tipo' => Importazione::TIPO_SOCI,
+            'nome_file' => mb_substr((string) $request->file('file')?->getClientOriginalName(), 0, 255),
+            'righe_lette' => $import->righeLette,
+            'create' => $import->importati,
+            'aggiornate' => $import->aggiornati,
+            'scartate' => count($import->errori),
+            'errori' => $import->errori,
+            'durata_ms' => (int) ((hrtime(true) - $inizio) / 1_000_000),
+        ]);
 
         return redirect()
             ->route('soci.import')
             ->with('import_report', [
                 'importati' => $import->importati,
+                'aggiornati' => $import->aggiornati,
                 'errori' => $import->errori,
             ])
             ->with(
                 $import->errori === [] ? 'success' : 'warning',
-                "Import completato: {$import->importati} soci importati, ".count($import->errori).' righe scartate.'
+                "Import completato: {$import->importati} soci importati, ".($import->aggiornati > 0 ? "{$import->aggiornati} già presenti aggiornati, " : '').count($import->errori).' righe scartate.'
             );
     }
 

@@ -34,7 +34,7 @@
                 @csrf
                 <div class="flex-grow-1">
                     <label for="allegato-file" class="visually-hidden">File da allegare</label>
-                    <input type="file" name="file" id="allegato-file" class="form-control form-control-sm @error('file') is-invalid @enderror" required>
+                    <input type="file" data-scatta name="file" id="allegato-file" class="form-control form-control-sm @error('file') is-invalid @enderror" required>
                     @error('file')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     <div class="form-text">PDF, documenti, fogli di calcolo, immagini o ZIP, fino a 20 MB.</div>
                 </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Soci;
 
 use App\Http\Controllers\Controller;
 use App\Models\Socio;
+use App\Support\Media\FotoTessera;
 use App\Support\Media\NomeFileSicuro;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,8 @@ class FotoSocioController extends Controller
             'foto.dimensions' => 'La foto deve essere di almeno 150×150 pixel.',
         ]);
 
-        $socio->addMedia($request->file('foto'))
+        // Raddrizzata, ritagliata in 4:5 e senza metadati EXIF (#48)
+        $socio->addMedia(FotoTessera::normalizza($request->file('foto')))
             ->usingFileName(NomeFileSicuro::per($request->file('foto'), 'foto-', NomeFileSicuro::IMMAGINI, 'jpg'))
             ->toMediaCollection(Socio::COLLEZIONE_FOTO);
 

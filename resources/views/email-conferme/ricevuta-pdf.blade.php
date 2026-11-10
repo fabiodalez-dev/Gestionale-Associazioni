@@ -58,6 +58,13 @@
         @endif
     </table>
 
+    @if (! empty($qrVerifica))
+        <div style="margin-top: 18px; font-size: 9px; color: #555;">
+            <img src="{{ $qrVerifica }}" alt="QR di verifica" style="width: 70px; height: 70px; vertical-align: middle;">
+            <span style="vertical-align: middle;">Inquadra il codice per verificare che la ricevuta sia autentica.</span>
+        </div>
+    @endif
+
     <div class="footer">
         Ricevuta n. {{ $ricevuta->numero }}/{{ $ricevuta->anno }} generata il {{ now()->format('d/m/Y H:i') }} — {{ $associazione?->nome }}.
         Documento non valido ai fini fiscali se non accompagnato dalle registrazioni contabili dell'associazione.

@@ -169,6 +169,26 @@
                                         <label for="foto" class="form-label small mb-1">{{ $haFoto ? 'Sostituisci foto' : 'Foto per la tessera' }}</label>
                                         <input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/webp" class="form-control form-control-sm @error('foto') is-invalid @enderror" required>
                                         @error('foto')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        {{-- Dal telefono: apre la fotocamera del dispositivo (#48) --}}
+                                        <input type="file" name="foto" id="fotoScatta" accept="image/*" capture="user" class="d-none" disabled>
+                                        <button type="button" class="btn btn-sm btn-link px-0" id="btnScattaFoto"><i class="bi bi-camera me-1"></i>Scatta con la fotocamera</button>
+                                        <div class="form-text">Viene ritagliata in formato tessera; la posizione e gli altri dati della foto non vengono salvati.</div>
+                                        <script>
+                                            (function () {
+                                                var scatta = document.getElementById('fotoScatta');
+                                                var scegli = document.getElementById('foto');
+                                                document.getElementById('btnScattaFoto').addEventListener('click', function () {
+                                                    scatta.disabled = false;
+                                                    scatta.click();
+                                                });
+                                                scatta.addEventListener('change', function () {
+                                                    if (!scatta.files.length) { scatta.disabled = true; return; }
+                                                    // Una sola foto inviata: quella appena scattata
+                                                    scegli.disabled = true;
+                                                    scatta.form.submit();
+                                                });
+                                            })();
+                                        </script>
                                     </div>
                                     <button type="submit" class="btn btn-sm btn-outline-primary mt-4"><i class="bi bi-upload me-1"></i>Carica</button>
                                 </form>
@@ -319,7 +339,7 @@
                 @csrf
                 <div class="col-md-4">
                     <label class="form-label" for="doc_file">File *</label>
-                    <input type="file" class="form-control" id="doc_file" name="file" required>
+                    <input type="file" data-scatta class="form-control" id="doc_file" name="file" required>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label" for="doc_descrizione">Descrizione</label>

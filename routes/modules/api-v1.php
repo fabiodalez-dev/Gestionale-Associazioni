@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AssociazioneApiController;
+use App\Http\Controllers\Api\V1\HealthApiController;
 use App\Http\Controllers\Api\V1\QuotaApiController;
 use App\Http\Controllers\Api\V1\SocioApiController;
 use App\Http\Controllers\Api\V1\TesseraApiController;
@@ -39,6 +40,14 @@ $uuidPattern = '[a-fA-F0-9-]{36}';
 Route::prefix('api/v1')
     ->withoutMiddleware([ValidateCsrfToken::class, AddCspHeaders::class])
     ->group(function () use ($uuidPattern) {
+
+        // Stato dell'API (#75): pubblico, e con credenziale i suoi permessi
+        Route::get('/health', [HealthApiController::class, 'show'])
+            ->middleware('throttle:api-v1-public')
+            ->name('api.v1.health');
+        Route::get('/health/credenziale', [HealthApiController::class, 'credenziale'])
+            ->middleware([AuthenticateApiV1::class, 'throttle:api-v1'])
+            ->name('api.v1.health.credenziale');
 
         // Verifica tessera da QR code: PUBBLICA, throttle per IP
         Route::get('/tessere/verify', [TesseraApiController::class, 'verify'])

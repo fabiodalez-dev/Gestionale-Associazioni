@@ -12,6 +12,7 @@ use App\Models\StoricoAttivitaSocio;
 use App\Models\Tessera;
 use App\Models\Utente;
 use App\Notifications\Quote\BenvenutoSocioNotification;
+use App\Notifications\Quote\PagamentoDoppioNotification;
 use App\Notifications\Quote\PagamentoQuotaNotification;
 use App\Notifications\Quote\RicevutaQuotaNotification;
 use App\Services\Economia\DonazioneService;
@@ -23,6 +24,7 @@ use App\Services\Tessere\TesseraIssuer;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Orchestratore pagamenti (parità con includes/PaymentService.php legacy):
@@ -428,8 +430,16 @@ class PaymentService
                 return true;
             }
 
-            // Idempotenza: già pagata o transazione già registrata → ack senza ripetere
+            // Idempotenza: già pagata o transazione già registrata → ack senza ripetere.
+            // Ma un'altra transazione su una quota già pagata (incassata in sede,
+            // oppure un secondo checkout) sono soldi presi due volte (#62): ack al
+            // gateway e segnalazione agli admin, senza seconda ricevuta.
             if ($quota->data_pagamento !== null || filled($quota->gateway_transaction_id)) {
+                if ($quota->gateway_transaction_id !== $transactionId) {
+                    $doppio = $quota;
+                    DB::afterCommit(fn () => $this->segnalaPagamentoDoppio($doppio, $gateway, $transactionId));
+                }
+
                 return true;
             }
 
@@ -560,6 +570,44 @@ class PaymentService
      * Emissione delegata a TesseraIssuer: numerazione unificata {anno}{NNNN}
      * (contatore sotto lock), etichetta template e QR di verifica firmato.
      */
+    /**
+     * Avvisa gli admin dell'associazione di un pagamento online arrivato per
+     * una quota già pagata (#62). Mai bloccante: il gateway ha già l'ack.
+     */
+    protected function segnalaPagamentoDoppio(Quota $quota, string $gateway, string $transactionId): void
+    {
+        try {
+            Log::warning('PaymentService: pagamento online su quota già pagata', [
+                'quota_id' => $quota->id, 'gateway' => $gateway, 'transazione' => $transactionId,
+            ]);
+
+            $socio = Socio::allTenants()->withTrashed()->find($quota->socio_id);
+            $precedente = filled($quota->gateway_transaction_id)
+                ? 'transazione '.$quota->gateway_transaction_id.' via '.$quota->gateway
+                : 'registrata in sede il '.($quota->data_pagamento?->format('d/m/Y') ?? '—').' ('.($quota->metodo_pagamento ?: 'metodo non indicato').')';
+
+            $destinatari = Utente::query()
+                ->where('associazione_id', $quota->associazione_id)
+                ->where('ruolo', Utente::RUOLO_ADMIN_ASSOCIAZIONE)
+                ->where('attivo', true)
+                ->get();
+
+            if ($destinatari->isNotEmpty()) {
+                Notification::send($destinatari, new PagamentoDoppioNotification(
+                    quotaId: $quota->id,
+                    socio: $socio !== null ? trim($socio->nome.' '.$socio->cognome) : 'socio eliminato',
+                    anno: (int) $quota->anno,
+                    importo: number_format((float) $quota->importo, 2, ',', '.'),
+                    gateway: $gateway,
+                    transazione: $transactionId,
+                    pagamentoPrecedente: $precedente,
+                ));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('PaymentService: segnalazione pagamento doppio fallita', ['error' => $e->getMessage()]);
+        }
+    }
+
     public function createTesseraForSocio(Socio $socio): ?Tessera
     {
         $anno = (int) now()->year;

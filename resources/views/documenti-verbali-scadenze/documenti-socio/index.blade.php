@@ -161,7 +161,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="document_file_socio" class="form-label">File <span class="text-danger">*</span></label>
-                        <input type="file" class="form-control @error('document_file') is-invalid @enderror"
+                        <input type="file" data-scatta class="form-control @error('document_file') is-invalid @enderror"
                                id="document_file_socio" name="document_file" required
                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png">
                         <div class="form-text">Max 10MB. Formati: pdf, doc, docx, xls, xlsx, ppt, pptx, jpg, jpeg, png.</div>

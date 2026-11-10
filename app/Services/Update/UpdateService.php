@@ -353,8 +353,9 @@ class UpdateService
             $backupFile = $this->backupFile($sorgente, $tmp.'/filebackup_'.now()->format('YmdHis'));
             $this->backupFileInCorso = $backupFile;
             $copiaIniziata = $this->copiaIniziata = true;
-            $this->copia($sorgente, $this->root);
+            $copiati = $this->copia($sorgente, $this->root);
             $this->rimuoviOrfani($sorgente);
+            $this->svuotaOpcache($copiati);
 
             // 6. Post-installazione
             $this->postInstallazione();
@@ -700,9 +701,14 @@ class UpdateService
         return $out;
     }
 
-    /** Copia del pacchetto sulla radice, saltando skip_paths e i preserve_paths già presenti. */
-    private function copia(string $sorgente, string $dest): void
+    /**
+     * Copia del pacchetto sulla radice, saltando skip_paths e i preserve_paths già presenti.
+     *
+     * @return list<string> percorsi assoluti dei file copiati
+     */
+    private function copia(string $sorgente, string $dest): array
     {
+        $copiati = [];
         foreach ($this->fileDelPacchetto($sorgente) as $rel) {
             $da = $sorgente.'/'.$rel;
             $a = $dest.'/'.$rel;
@@ -718,7 +724,51 @@ class UpdateService
             if (! @copy($da, $a)) {
                 throw new RuntimeException('Copia fallita: '.$rel);
             }
+            $copiati[] = $a;
         }
+
+        return $copiati;
+    }
+
+    /**
+     * Dopo la copia dei file: senza questo passo, su hosting con OPcache e
+     * controllo dei timestamp lento, PHP può eseguire per qualche minuto i
+     * file vecchi mescolati ai nuovi. Prima opcache_reset() (svuota la cache
+     * condivisa del web server da cui parte l'aggiornamento), poi, se è
+     * vietato da opcache.restrict_api, l'invalidazione dei soli file copiati.
+     * Senza OPcache non fa nulla e non si ferma mai per un errore.
+     *
+     * @param  list<string>  $file  percorsi assoluti dei file copiati
+     * @return string esito, anche nel log dell'aggiornamento
+     */
+    protected function svuotaOpcache(array $file): string
+    {
+        // opcache_get_status() è false se OPcache non è attivo in questo SAPI
+        // (es. CLI con opcache.enable_cli=0) o se restrict_api lo vieta
+        $stato = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+        if (! is_array($stato) || empty($stato['opcache_enabled'])) {
+            if (! function_exists('opcache_invalidate') || ! filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOL)) {
+                return 'opcache assente';
+            }
+        }
+
+        if (function_exists('opcache_reset') && @opcache_reset()) {
+            Log::info('UpdateService: cache OPcache svuotata');
+
+            return 'opcache svuotata';
+        }
+
+        $invalidati = 0;
+        if (function_exists('opcache_invalidate')) {
+            foreach ($file as $percorso) {
+                if (str_ends_with($percorso, '.php') && @opcache_invalidate($percorso, true)) {
+                    $invalidati++;
+                }
+            }
+        }
+        Log::info('UpdateService: opcache_reset non consentito, file invalidati uno per uno', ['file' => $invalidati]);
+
+        return "opcache: {$invalidati} file invalidati";
     }
 
     /**
@@ -774,6 +824,8 @@ class UpdateService
                 File::copy($src, $dest);
             }
         }
+        // I file sono tornati quelli di prima: anche la cache deve dimenticare i nuovi
+        $this->svuotaOpcache([]);
     }
 
     /**
@@ -817,6 +869,9 @@ class UpdateService
 
         $this->artisanSeparato(['optimize:clear']);
         $this->artisanSeparato(['migrate', '--force', '--no-interaction']);
+        // Una migration registrata non prova che tabelle e colonne esistano:
+        // si crea ciò che manca rispetto a schema.sql (solo aggiunte)
+        $this->artisanSeparato(['app:ripara-schema']);
         $this->artisanSeparato(['app:aggiorna-permessi']);
         try {
             $this->artisanSeparato(['queue:restart']);

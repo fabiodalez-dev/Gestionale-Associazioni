@@ -4,7 +4,7 @@
      Per le convocazioni (addendum) mostra data/luogo assemblea, ordine del
      giorno e il bottone di conferma presenza verso la pagina pubblica
      dell'evento collegato (solo se pubblicato). --}}
-<div class="card mb-3 {{ $annuncio->in_evidenza ? 'border-warning' : '' }}">
+<div id="annuncio-{{ $annuncio->id }}" class="card mb-3 {{ $annuncio->in_evidenza ? 'border-warning' : '' }}">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <h2 class="h5 mb-1">{{ $annuncio->titolo }}</h2>

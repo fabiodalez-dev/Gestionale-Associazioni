@@ -13,10 +13,12 @@ use App\Http\Requests\Struttura\UpdateTesseramentoRequest;
 use App\Http\Requests\Struttura\UploadLogoRequest;
 use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
+use App\Models\Chiusura;
 use App\Models\PaymentGatewaySetting;
 use App\Models\Sede;
 use App\Models\TesseraTemplate;
 use App\Models\TipoSocio;
+use App\Services\Calendario\CalendarioAperture;
 use App\Services\Struttura\LogoAssociazione;
 use App\Services\Struttura\RequiredFieldsService;
 use Illuminate\Http\RedirectResponse;
@@ -61,6 +63,8 @@ class ConfigurazioniController extends Controller
             'associazione' => $associazione,
             'section' => $request->query('section', 'info'),
             'sedi' => Sede::query()->forAssociazione($associazione->id)->orderBy('nome')->get(),
+            'chiusure' => Chiusura::query()->withoutGlobalScopes()->where('associazione_id', $associazione->id)->with('sede')->orderBy('data_inizio')->get(),
+            'prossimeFestivita' => CalendarioAperture::prossimeFestivita(now()),
             'tipiSocio' => TipoSocio::query()->forAssociazione($associazione->id)->orderBy('nome')->get(),
             'tipoSelezionato' => $tipoSelezionato,
             'tesseraTemplate' => $tesseraTemplate,

@@ -705,7 +705,7 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
 
             // Salvataggio: schema iniettato, .env scritto, token del wizard in cookie
             $risposta = $this->post('/install/database', $datiDb);
-            $risposta->assertRedirect(route('installer.admin'))->assertSessionHasNoErrors();
+            $risposta->assertRedirect(route('installer.email'))->assertSessionHasNoErrors();
             $this->suMariaDb = true;
             $cookie = $risposta->getCookie('installer_token', false);
             $this->assertNotNull($cookie, 'Il wizard deve consegnare il token al browser che installa');
@@ -717,7 +717,27 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
             $this->assertMatchesRegularExpression('/^DB_HOST='.preg_quote($cfg['host'], '/').'$/m', $contenutoEnv);
             $this->assertMatchesRegularExpression('/^DB_USERNAME='.preg_quote($cfg['username'], '/').'$/m', $contenutoEnv);
 
-            // Super admin + prima associazione + dati demo
+            // Email SMTP di piattaforma (prima del super admin, che chiude il wizard)
+            $this->get('/install/email')->assertOk();
+            $this->post('/install/email', [
+                'driver' => 'smtp',
+                'from_address' => 'noreply@prima.test',
+                'from_name' => 'APS Prima',
+                'smtp_host' => 'smtp.prima.test',
+                'smtp_port' => 587,
+                'smtp_username' => 'utente-smtp',
+                'smtp_password' => 'segreta-smtp',
+                'smtp_encryption' => 'tls',
+            ])->assertRedirect(route('installer.admin'));
+
+            $contenutoEnv = (string) file_get_contents($env);
+            $this->assertMatchesRegularExpression('/^MAIL_MAILER=smtp$/m', $contenutoEnv);
+            $this->assertMatchesRegularExpression('/^MAIL_HOST=smtp\.prima\.test$/m', $contenutoEnv);
+            $this->assertMatchesRegularExpression('/^MAIL_PORT=587$/m', $contenutoEnv);
+            $this->assertMatchesRegularExpression('/^MAIL_SCHEME=smtp$/m', $contenutoEnv);
+            $this->assertMatchesRegularExpression('/^MAIL_FROM_ADDRESS=noreply@prima\.test$/m', $contenutoEnv);
+
+            // Super admin + prima associazione + dati demo: ultimo step, chiude il wizard
             $this->get('/install/admin')->assertOk();
             $this->post('/install/admin', [
                 'associazione_nome' => 'APS Prima Installazione',
@@ -728,7 +748,7 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
                 'password' => 'cavallo batteria graffetta corretta',
                 'password_confirmation' => 'cavallo batteria graffetta corretta',
                 'dati_demo' => '1',
-            ])->assertRedirect(route('installer.email'))->assertSessionHasNoErrors();
+            ])->assertOk()->assertSee('Installazione completata')->assertSessionHasNoErrors();
 
             $db = DB::connection('mysql');
             $this->assertSame(self::DB_WIZARD, $db->getDatabaseName());
@@ -740,27 +760,7 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
             $this->assertGreaterThan(0, $db->table('soci')->count(), 'I dati dimostrativi creano dei soci');
             $this->assertGreaterThan(1, $db->table('associazioni')->count(), 'I dati dimostrativi creano le associazioni demo');
 
-            // Email SMTP di piattaforma
-            $this->post('/install/email', [
-                'driver' => 'smtp',
-                'from_address' => 'noreply@prima.test',
-                'from_name' => 'APS Prima',
-                'smtp_host' => 'smtp.prima.test',
-                'smtp_port' => 587,
-                'smtp_username' => 'utente-smtp',
-                'smtp_password' => 'segreta-smtp',
-                'smtp_encryption' => 'tls',
-            ])->assertRedirect(route('installer.done'));
-
-            $contenutoEnv = (string) file_get_contents($env);
-            $this->assertMatchesRegularExpression('/^MAIL_MAILER=smtp$/m', $contenutoEnv);
-            $this->assertMatchesRegularExpression('/^MAIL_HOST=smtp\.prima\.test$/m', $contenutoEnv);
-            $this->assertMatchesRegularExpression('/^MAIL_PORT=587$/m', $contenutoEnv);
-            $this->assertMatchesRegularExpression('/^MAIL_SCHEME=smtp$/m', $contenutoEnv);
-            $this->assertMatchesRegularExpression('/^MAIL_FROM_ADDRESS=noreply@prima\.test$/m', $contenutoEnv);
-
-            // Fine: lock scritto, marcatore rimosso
-            $this->get('/install/done')->assertOk();
+            // Lock scritto nella stessa richiesta del super admin, marcatore rimosso
             $this->assertFileExists($cartella.'/installed.lock');
             $this->assertFileDoesNotExist($cartella.'/in-corso');
 

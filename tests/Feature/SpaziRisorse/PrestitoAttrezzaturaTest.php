@@ -27,6 +27,10 @@ class PrestitoAttrezzaturaTest extends TestCase
     {
         parent::setUp();
 
+        // Giorno feriale fisso: "fra una settimana" non deve cadere in una
+        // festività, dove la restituzione slitterebbe (#37)
+        $this->travelTo('2026-11-10 09:00:00');
+
         $this->associazione = Associazione::factory()->create();
         $this->admin = Utente::factory()->adminAssociazione()->create([
             'associazione_id' => $this->associazione->id,
@@ -255,5 +259,21 @@ class PrestitoAttrezzaturaTest extends TestCase
         $response->assertOk();
         $response->assertSee('Prestiti attrezzature');
         $response->assertSee($this->attrezzatura->nome);
+    }
+
+    public function test_restituzione_in_un_giorno_di_chiusura_spostata_al_primo_aperto(): void
+    {
+        $this->actingAs($this->admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('prestiti.store'), [
+                'attrezzatura_id' => $this->attrezzatura->id,
+                'socio_id' => $this->socio->id,
+                'quantita' => 1,
+                'dal' => '2026-12-20',
+                'restituzione_prevista' => '2026-12-25',
+            ])
+            ->assertRedirect(route('prestiti.index'))
+            ->assertSessionHas('success', fn (string $m) => str_contains($m, 'spostata a domenica 27 dicembre 2026'));
+
+        $this->assertSame('2026-12-27', PrestitoAttrezzatura::query()->sole()->restituzione_prevista->toDateString());
     }
 }

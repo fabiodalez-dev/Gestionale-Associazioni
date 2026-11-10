@@ -8,6 +8,7 @@ use App\Models\Evento;
 use App\Models\ManualePagina;
 use App\Models\Prenotazione;
 use App\Models\Socio;
+use App\Models\Tessera;
 use App\Models\Utente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -61,23 +62,67 @@ class RicercaGlobaleController extends Controller
             return null;
         }
 
-        // Scout (driver database) per nome/cognome/email/CF/numero socio,
-        // poi whereIn sulla query scoped → isolamento tenant garantito.
-        $ids = Socio::search($q)->keys()->take(50);
+        // Prima le corrispondenze esatte (tessera o suo QR, telefono comunque
+        // scritto, codice fiscale, email), poi Scout (driver database) per
+        // nome/cognome/email/CF/numero socio. Sempre sulla query scoped:
+        // isolamento tenant e perimetro di sede garantiti.
+        $esatti = $this->sociEsatti($q);
+        $ids = collect($esatti)->merge(Socio::search($q)->keys()->take(50))->unique()->values();
+        $posizione = $ids->flip();
 
         $risultati = Socio::query()
             ->whereIn('id', $ids)
-            ->orderBy('cognome')
-            ->orderBy('nome')
-            ->limit(self::LIMITE_PER_GRUPPO)
+            ->limit(50)
             ->get(['id', 'nome', 'cognome', 'numero_socio', 'email', 'stato'])
+            // Esatti per primi, nell'ordine trovato; poi gli altri in ordine alfabetico
+            ->sortBy(fn (Socio $socio) => in_array($socio->id, $esatti, true)
+                ? sprintf('0%05d', $posizione[$socio->id])
+                : '1'.mb_strtolower($socio->cognome.' '.$socio->nome))
+            ->take(self::LIMITE_PER_GRUPPO)
             ->map(fn (Socio $socio) => [
                 'titolo' => trim($socio->cognome.' '.$socio->nome),
                 'sottotitolo' => 'N. '.$socio->numero_socio.($socio->email ? ' — '.$socio->email : ''),
                 'url' => route('soci.show', $socio),
-            ]);
+            ])
+            ->values();
 
         return $this->gruppo('Soci', 'bi-people', $risultati->all());
+    }
+
+    /**
+     * Soci che corrispondono esattamente al testo cercato, nell'ordine:
+     * QR o numero di tessera, telefono (ignorando spazi, trattini e +39),
+     * codice fiscale, email. Sulla query scoped dell'utente.
+     *
+     * @return list<string>
+     */
+    private function sociEsatti(string $q): array
+    {
+        $ids = [];
+
+        if (preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', $q, $uuid) === 1) {
+            $ids[] = Tessera::query()->whereKey(strtolower($uuid[0]))->value('socio_id');
+        }
+        array_push($ids, ...Tessera::query()->where('numero_tessera', $q)->orderByDesc('anno_validita')->pluck('socio_id')->all());
+
+        // Un telefono: solo cifre e separatori, almeno 6 cifre
+        $cifre = (string) preg_replace('/\D/', '', $q);
+        if (preg_match('/^[\d\s+\-.\/()]+$/', $q) === 1 && strlen($cifre) >= 6) {
+            $nazionale = strlen($cifre) > 10 ? (string) preg_replace('/^(00)?39/', '', $cifre) : $cifre;
+            $colonna = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono, ''), ' ', ''), '-', ''), '.', ''), '/', ''), '(', ''), ')', ''), '+', '')";
+            array_push($ids, ...Socio::query()->whereRaw("{$colonna} LIKE ?", ['%'.$nazionale])->limit(20)->pluck('id')->all());
+        }
+
+        $maiuscolo = mb_strtoupper($q);
+        if (preg_match('/^[A-Z0-9]{16}$/', $maiuscolo) === 1) {
+            array_push($ids, ...Socio::query()->where('codice_fiscale', $maiuscolo)->pluck('id')->all());
+        }
+
+        if (filter_var($q, FILTER_VALIDATE_EMAIL) !== false) {
+            array_push($ids, ...Socio::query()->whereRaw('LOWER(email) = ?', [mb_strtolower($q)])->pluck('id')->all());
+        }
+
+        return array_values(array_unique(array_filter($ids, 'is_string')));
     }
 
     /**

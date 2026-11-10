@@ -15,6 +15,7 @@ use App\Http\Controllers\FrontendPubblico\PagamentoPrenotazioneController;
 use App\Http\Controllers\FrontendPubblico\PasswordResetController;
 use App\Http\Controllers\FrontendPubblico\PrenotazioneController;
 use App\Http\Controllers\FrontendPubblico\RegistrazioneController;
+use App\Http\Controllers\FrontendPubblico\SeoController;
 use App\Http\Controllers\FrontendPubblico\VerificaEmailController;
 use App\Http\Controllers\Privacy\DatiPersonaliController;
 use App\Http\Middleware\FrontendPubblico\AutenticaAccount;
@@ -42,6 +43,11 @@ use Spatie\Honeypot\ProtectAgainstSpam;
 |
 */
 
+// File della piattaforma per motori di ricerca e assistenti AI (#39, #42)
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('seo.robots');
+Route::get('/sitemap.xml', [SeoController::class, 'sitemapIndice'])->name('seo.sitemap');
+Route::get('/llms.txt', [SeoController::class, 'llmsPiattaforma'])->name('seo.llms');
+
 Route::prefix('a/{associazione:slug}')
     ->name('pubblico.')
     ->middleware(RisolviTenantPubblico::class)
@@ -55,8 +61,14 @@ Route::prefix('a/{associazione:slug}')
 
         Route::get('/', [HomeController::class, 'show'])->name('home.show');
 
+        // Motori di ricerca, lettori di feed e assistenti AI (#39, #41, #42)
+        Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+        Route::get('/feed.xml', [SeoController::class, 'feed'])->name('feed');
+        Route::get('/llms.txt', [SeoController::class, 'llms'])->name('llms');
+
         Route::get('/eventi', [CatalogoEventiController::class, 'index'])->name('eventi.index');
         Route::get('/eventi/{evento}', [CatalogoEventiController::class, 'show'])->name('eventi.show');
+        Route::get('/eventi/{evento}/immagine-social.png', [CatalogoEventiController::class, 'immagineSocial'])->name('eventi.immagine-social');
 
         /*
         |------------------------------------------------------------------

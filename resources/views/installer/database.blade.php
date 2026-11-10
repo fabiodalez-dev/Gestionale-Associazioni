@@ -11,7 +11,7 @@
         <div class="alert alert-success mb-3">
             Il database risulta già configurato e lo schema è presente. Puoi proseguire.
         </div>
-        <a href="{{ route('installer.admin') }}" class="btn btn-primary w-100 mb-2">
+        <a href="{{ route('installer.email') }}" class="btn btn-primary w-100 mb-2">
             Continua<i class="bi bi-arrow-right ms-2"></i>
         </a>
     @endif

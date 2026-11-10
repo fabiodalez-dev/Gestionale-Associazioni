@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('install')->name('installer.')->group(function () {
     Route::get('/', [InstallerController::class, 'requirements'])->name('requirements');
+    Route::get('/stato', [InstallerController::class, 'stato'])->name('stato');
     Route::get('/database', [InstallerController::class, 'database'])->name('database');
     Route::post('/database/test', [InstallerController::class, 'databaseTest'])
         ->middleware('throttle:20,1')->name('database.test');
@@ -23,5 +24,4 @@ Route::prefix('install')->name('installer.')->group(function () {
     Route::get('/email', [InstallerController::class, 'email'])->name('email');
     Route::post('/email', [InstallerController::class, 'emailStore'])
         ->middleware('throttle:10,1')->name('email.store');
-    Route::get('/done', [InstallerController::class, 'done'])->name('done');
 });

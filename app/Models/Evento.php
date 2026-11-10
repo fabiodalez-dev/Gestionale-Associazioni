@@ -17,6 +17,9 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
+/**
+ * @property string|null $sede_id sede dell'evento (NULL = tutta l'associazione), colonna aggiunta da add_sedi_perimetro
+ */
 class Evento extends Model implements HasMedia
 {
     use NelPerimetroSede;

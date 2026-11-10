@@ -3,6 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Services\Installer\InstallerService;
+use App\Services\Sistema\CronDiRiserva;
+use App\Services\Update\RiparaSchema;
+use App\Services\Update\UpdateService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,6 +38,13 @@ class EnsureInstalled
                 return redirect('/login');
             }
 
+            // Primo caricamento dopo un cambio di versione: crea tabelle e
+            // colonne mancanti rispetto a schema.sql, dopo la risposta
+            app(RiparaSchema::class)->seNuovaVersione(app(UpdateService::class)->versioneCorrente());
+
+            // Senza cron, le attività programmate partono dal web (#68)
+            app(CronDiRiserva::class)->pianifica();
+
             return $next($request);
         }
 
@@ -56,21 +66,10 @@ class EnsureInstalled
         $token = is_string($token) ? $token : null;
 
         if ($installer->adminExists()) {
-            // Il wizard stesso ha appena creato il super admin e sta
-            // completando gli ultimi step dallo stesso browser (token nel
-            // cookie): restano aperti solo email e fine, non più il database
-            if ($installer->wizardInCorso($token)) {
-                // Fuori dal wizard (es. apre / in un'altra scheda) o indietro
-                // allo step database: si torna allo step email, senza chiudere
-                // il wizard a metà
-                return $rottaInstaller && ! $request->is('install/database*')
-                    ? $next($request)
-                    : redirect()->route('installer.email');
-            }
-
-            // Lock assente ma database già installato (installazione manuale
-            // via CLI, oppure lock perso in un deploy): scrive il lock e
-            // chiude il wizard, che altrimenti resterebbe aperto senza login
+            // Il super admin è l'ultimo step del wizard, che scrive il lock
+            // nella stessa richiesta: qui si arriva solo con un'installazione
+            // manuale via CLI, oppure con il lock perso in un deploy. Si
+            // scrive il lock e si chiude il wizard, per qualunque browser
             $installer->markInstalled();
 
             return $rottaInstaller ? redirect('/login') : $next($request);
@@ -81,8 +80,9 @@ class EnsureInstalled
             // super admin non ancora creato: gli step successivi restano al
             // browser che ha il token, altrimenti chiunque potrebbe creare
             // l'amministratore o rifare il database nel frattempo
-            if (! $request->is('install') && $installer->wizardRivendicato() && $installer->databaseReady() && ! $installer->wizardInCorso($token)) {
-                abort(403, 'Installazione in corso da un altro browser: completala da lì oppure, se è stata interrotta, elimina storage/app/installer-in-corso e ricomincia.');
+            if (! $request->is('install', 'install/stato') && $installer->wizardRivendicato() && $installer->databaseReady() && ! $installer->wizardInCorso($token)) {
+                // Spiegazione e rimedio nella pagina di diagnosi (#31)
+                return redirect()->route('installer.stato');
             }
 
             return $next($request);

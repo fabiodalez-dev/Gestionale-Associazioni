@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Accesso;
+use App\Models\EmailLog;
+use App\Models\EmailQueue;
+use App\Models\Importazione;
 use App\Models\RichiestaRegistrazione;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -119,6 +123,23 @@ Schedule::command('model:prune', [
     '--model' => [MonitoredScheduledTaskLogItem::class],
 ])
     ->dailyAt('04:10')
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Pulizia a durata fissa dei log tecnici (#70)
+|--------------------------------------------------------------------------
+|
+| Accessi falliti dopo 90 giorni e accessi riusciti dopo un anno, coda email
+| con esito definitivo dopo 90 giorni, storico email dopo un anno. Le regole
+| stanno nei metodi prunable() dei modelli; l'audit dei dati (activity log)
+| ha la sua pulizia qui sotto.
+|
+*/
+Schedule::command('model:prune', [
+    '--model' => [Accesso::class, EmailQueue::class, EmailLog::class, Importazione::class],
+])
+    ->dailyAt('04:20')
     ->withoutOverlapping();
 
 /*

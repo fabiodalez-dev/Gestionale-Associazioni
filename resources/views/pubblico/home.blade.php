@@ -2,6 +2,7 @@
 
 @section('title', $associazione->nome.' — Eventi e prenotazioni')
 
+
 @section('content')
     {{-- Hero brandizzato --}}
     <section class="pubblico-hero p-4 p-md-5 mb-5 text-center text-md-start">

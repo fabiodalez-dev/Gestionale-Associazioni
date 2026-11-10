@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToAssociazione;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -24,6 +25,7 @@ class Accesso extends Model
     use BelongsToAssociazione;
     use HasFactory;
     use HasUuids;
+    use MassPrunable;
 
     public const ESITO_LOGIN = 'login';
 
@@ -85,5 +87,20 @@ class Accesso extends Model
     public function autenticabile(): MorphTo
     {
         return $this->morphTo('autenticabile');
+    }
+
+    /**
+     * Pulizia a durata fissa (#70), con il job notturno model:prune:
+     * tentativi falliti dopo 90 giorni, accessi e uscite dopo un anno.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::query()
+            ->withoutGlobalScopes()
+            ->where(fn (Builder $q) => $q
+                ->where(fn (Builder $f) => $f->where('esito', self::ESITO_FALLITO)->where('created_at', '<', now()->subDays(90)))
+                ->orWhere('created_at', '<', now()->subYear()));
     }
 }

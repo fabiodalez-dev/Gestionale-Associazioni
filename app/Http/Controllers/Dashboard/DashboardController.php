@@ -13,6 +13,7 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
 use App\Services\Dashboard\PanoramicaDashboard;
+use App\Services\Sistema\StatoCron;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -26,7 +27,7 @@ class DashboardController extends Controller
      * oppure vista globale (super_admin senza tenant): lo scoping è demandato
      * al global scope BelongsToAssociazione, che in vista globale non filtra.
      */
-    public function index(Request $request, PanoramicaDashboard $panoramica): View
+    public function index(Request $request, PanoramicaDashboard $panoramica, StatoCron $statoCron): View
     {
         /** @var Utente $utente */
         $utente = $request->user();
@@ -69,6 +70,9 @@ class DashboardController extends Controller
             'kpiPrenotazioni' => $this->kpiPrenotazioni(),
             'caricheInScadenza' => $this->caricheInScadenza(),
             'panoramica' => $panoramica->calcola($utente),
+            // Il cron è della piattaforma: lo vede (e lo può sistemare) solo il super admin
+            'cronFermo' => $utente->isSuperAdmin() && $statoCron->fermo(),
+            'comandoCron' => $statoCron->comando(),
             'associazioniGlobali' => $utente->isSuperAdmin() && blank(session('associazione_id')) ? $panoramica->associazioni() : collect(),
         ]);
     }

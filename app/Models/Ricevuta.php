@@ -127,4 +127,14 @@ class Ricevuta extends Model
     {
         return $this->belongsTo(Quota::class, 'quota_id');
     }
+
+    /**
+     * Associazione che ha emesso la ricevuta (verifica pubblica, #77).
+     *
+     * @return BelongsTo<Associazione, $this>
+     */
+    public function associazione(): BelongsTo
+    {
+        return $this->belongsTo(Associazione::class, 'associazione_id');
+    }
 }

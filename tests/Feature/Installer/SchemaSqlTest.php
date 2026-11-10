@@ -121,6 +121,39 @@ class SchemaSqlTest extends TestCase
         SchemaSql::tabelle('SET NAMES utf8mb4;');
     }
 
+    public function test_definizioni_separa_colonne_da_chiavi_e_vincoli(): void
+    {
+        $sql = "CREATE TABLE `soci` (\n"
+            ."  `id` char(36) NOT NULL,\n"
+            ."  `note` text COLLATE utf8mb4_unicode_ci,\n"
+            ."  `stato` varchar(20) NOT NULL DEFAULT 'Attivo, in regola',\n"
+            ."  PRIMARY KEY (`id`),\n"
+            ."  KEY `soci_stato_index` (`stato`),\n"
+            ."  CONSTRAINT `x` FOREIGN KEY (`id`) REFERENCES `altri` (`id`)\n"
+            .") ENGINE=InnoDB;\n";
+
+        $definizioni = SchemaSql::definizioni($sql);
+
+        $this->assertSame(['soci'], array_keys($definizioni));
+        $this->assertSame([
+            'id' => '`id` char(36) NOT NULL',
+            'note' => '`note` text COLLATE utf8mb4_unicode_ci',
+            'stato' => "`stato` varchar(20) NOT NULL DEFAULT 'Attivo, in regola'",
+        ], $definizioni['soci']['colonne']);
+        $this->assertStringStartsWith('CREATE TABLE `soci`', $definizioni['soci']['create']);
+        $this->assertStringEndsWith('ENGINE=InnoDB', $definizioni['soci']['create']);
+    }
+
+    public function test_definizioni_coprono_tutte_le_tabelle_dello_schema(): void
+    {
+        $sql = (string) file_get_contents(database_path('installer/schema.sql'));
+
+        $nomi = array_keys(SchemaSql::definizioni($sql));
+        sort($nomi);
+
+        $this->assertSame(SchemaSql::tabelle($sql), $nomi);
+    }
+
     public function test_migrazioni_legge_le_righe_dell_insert(): void
     {
         $sql = "CREATE TABLE `migrations` (`id` int);\nINSERT INTO `migrations` (`migration`, `batch`) VALUES\n('2026_01_01_000001_b', 1),\n('2026_01_01_000000_a', 1);\n";

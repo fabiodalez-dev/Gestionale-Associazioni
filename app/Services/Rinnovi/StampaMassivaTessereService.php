@@ -30,13 +30,18 @@ class StampaMassivaTessereService
     /**
      * Risposta HTTP con il PDF multi-tessera inline.
      *
+     * Formati (#47): 'a4' una tessera per pagina A4 (documento), 'cr80' una
+     * tessera per pagina in formato carta di credito (85,6 × 54 mm, per le
+     * stampanti di card), 'biglietti' fogli A4 da 10 tessere con linee di
+     * taglio (fogli per biglietti da visita).
+     *
      * @param  Collection<int, Tessera>  $tessere
      */
-    public function render(Associazione $associazione, Collection $tessere): Response
+    public function render(Associazione $associazione, Collection $tessere, string $formato = 'a4'): Response
     {
         $logoImg = $this->logoImg($associazione);
 
-        $pagine = $tessere->map(function (Tessera $tessera) use ($associazione) {
+        $pagine = $tessere->map(function (Tessera $tessera) use ($associazione, $formato) {
             /** @var Socio $socio */
             $socio = $tessera->socio()->withoutGlobalScopes()
                 ->with(['tipoSocio', 'categoriaSocio'])
@@ -51,19 +56,29 @@ class StampaMassivaTessereService
                 'tessera' => $tessera,
                 'socio' => $socio,
                 'qrSvg' => $qrSvg,
+                // PNG per i formati card (#47): dompdf disegna in modo affidabile le immagini, non sempre gli SVG inline
+                'qrImg' => $formato === 'a4' ? null : $this->qr->generateDataUri($qrUrl, 3),
                 'costoStr' => $costo !== null ? '€ '.number_format((float) $costo, 2, ',', '.') : '',
                 'testoTessera' => $this->renderer->testoTessera($tessera, $socio, $associazione, $qrSvg, $qrUrl),
                 'validoFinoAl' => $tessera->data_scadenza->format('d/m/Y'),
             ];
         });
 
-        $pdf = Pdf::loadView('rinnovi.stampa-massiva-pdf', [
+        $vista = $formato === 'a4' ? 'rinnovi.stampa-massiva-pdf' : 'rinnovi.stampa-tessere-card-pdf';
+        // CR80: 85,6 × 54 mm in punti tipografici (1 mm = 72/25,4 pt), dati
+        // come lato corto × lato lungo: in "landscape" dompdf li mette in orizzontale
+        $carta = $formato === 'cr80' ? [0, 0, 153.07, 242.65] : 'a4';
+
+        $pdf = Pdf::loadView($vista, [
             'associazione' => $associazione,
             'pagine' => $pagine,
             'logoImg' => $logoImg,
             'dataOggi' => now()->format('d/m/Y'),
+            'formato' => $formato,
+            'fogli' => $pagine->chunk(10),
         ])
-            ->setPaper('a4', 'portrait')
+            // La CR80 è più larga che alta: in "portrait" dompdf scambierebbe i lati
+            ->setPaper($carta, $formato === 'cr80' ? 'landscape' : 'portrait')
             ->setOption('isRemoteEnabled', true)
             ->setOption('defaultFont', 'DejaVu Sans');
 

@@ -29,7 +29,11 @@ class PagamentoQuotaController extends Controller
         $this->authorize('registraPagamento', $quota);
 
         if ($quota->isPagata()) {
-            return redirect()->route('quote.index')->with('error', 'Questa quota risulta già pagata.');
+            // Mostra il pagamento esistente: chi registra capisce subito se è un doppione (#62)
+            return redirect()->route('quote.index')->with('error', 'Questa quota risulta già pagata'
+                .($quota->data_pagamento !== null ? ' il '.$quota->data_pagamento->format('d/m/Y') : '')
+                .(filled($quota->metodo_pagamento) ? ' ('.$quota->metodo_pagamento.')' : '')
+                .': nessun nuovo pagamento registrato.');
         }
 
         if ($request->isOnlineMethod()) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FrontendPubblico;
 use App\Http\Controllers\Controller;
 use App\Models\Associazione;
 use App\Models\Documento;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -43,6 +44,47 @@ class TrasparenzaController extends Controller
             'associazione' => $associazione,
             'gruppi' => $gruppi->filter(fn ($docs) => $docs->isNotEmpty()),
         ]);
+    }
+
+    /**
+     * Gli stessi dati della pagina come file (#76): CSV in UTF-8 con BOM e
+     * separatore ";" (si apre bene in Excel), oppure JSON con date ISO.
+     */
+    public function esporta(Associazione $associazione, string $formato): StreamedResponse|JsonResponse
+    {
+        $righe = Documento::query()
+            ->where('associazione_id', $associazione->id)
+            ->pubblici()
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (Documento $documento) => [
+                'categoria' => in_array($documento->categoria_pubblica, Documento::CATEGORIE_PUBBLICHE, true) ? $documento->categoria_pubblica : 'altro',
+                'titolo' => $documento->nome_file,
+                'descrizione' => (string) $documento->descrizione,
+                'pubblicato_il' => $documento->created_at?->toDateString(),
+                'dimensione_kb' => $documento->dimensione_kb,
+                'url' => route('pubblico.trasparenza.download', [$associazione->slug, $documento->id]),
+            ]);
+
+        $nome = 'trasparenza-'.$associazione->slug;
+
+        if ($formato === 'json') {
+            return response()->json([
+                'associazione' => $associazione->nome,
+                'generato_il' => now()->toIso8601String(),
+                'documenti' => $righe->values(),
+            ], 200, ['Content-Disposition' => 'inline; filename="'.$nome.'.json"'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        return response()->streamDownload(function () use ($righe): void {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\u{FEFF}");
+            fputcsv($out, ['categoria', 'titolo', 'descrizione', 'pubblicato_il', 'dimensione_kb', 'url'], ';', '"', '');
+            foreach ($righe as $riga) {
+                fputcsv($out, array_values($riga), ';', '"', '');
+            }
+            fclose($out);
+        }, $nome.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /**

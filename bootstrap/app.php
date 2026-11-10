@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureTenantSelected;
+use App\Http\Middleware\IndicizzazioneMotori;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Security headers + Content-Security-Policy su tutte le risposte web (miglioramento 5)
         $middleware->web(append: [
             SecurityHeaders::class,
+            IndicizzazioneMotori::class,
             AddCspHeaders::class,
         ]);
     })

@@ -52,13 +52,28 @@ class InstallerTest extends TestCase
         parent::tearDown();
     }
 
-    /** Simula un wizard che ha già installato lo schema e creato l'admin, dallo stesso browser */
-    private function wizardInCorso(): void
+    /** Simula un wizard che ha già installato lo schema, dallo stesso browser (admin non ancora creato) */
+    private function wizardInCorso(): string
     {
         $this->seed(RolesSeeder::class);
-        Utente::factory()->superAdmin()->create();
         $token = app(InstallerService::class)->segnaWizardInCorso();
         $this->withUnencryptedCookie('installer_token', $token);
+
+        return $token;
+    }
+
+    /** @return array<string, string> */
+    private function datiAdmin(string $associazione = 'APS Demo', string $email = 'mario@apsdemo.it'): array
+    {
+        return [
+            'associazione_nome' => $associazione,
+            'associazione_email' => 'info@'.str_replace(' ', '', strtolower($associazione)).'.it',
+            'nome' => 'Mario',
+            'cognome' => 'Rossi',
+            'email' => $email,
+            'password' => 'SuperSegreta123',
+            'password_confirmation' => 'SuperSegreta123',
+        ];
     }
 
     public function test_app_non_installata_redirige_tutte_le_rotte_a_install(): void
@@ -118,6 +133,7 @@ class InstallerTest extends TestCase
         $this->get('/install')->assertOk();
         $this->get('/install/admin')->assertForbidden();
         $this->post('/install/admin', ['nome' => 'x'])->assertForbidden();
+        $this->get('/install/email')->assertForbidden();
         $this->get('/install/database')->assertForbidden();
 
         // Browser giusto: prosegue
@@ -183,7 +199,7 @@ class InstallerTest extends TestCase
             'host' => '127.0.0.1', 'port' => 3306,
             'database' => 'demo', 'username' => 'root', 'password' => '',
         ], [], [], ['SCRIPT_NAME' => '/gestionale/public/index.php', 'SCRIPT_FILENAME' => '/var/www/gestionale/public/index.php', 'PHP_SELF' => '/gestionale/public/index.php'])
-            ->assertRedirect(route('installer.admin'))->assertSessionHas('success')->assertCookie('installer_token');
+            ->assertRedirect(route('installer.email'))->assertSessionHas('success')->assertCookie('installer_token');
 
         $this->assertFileExists($this->inCorsoFile, 'Dopo lo schema il wizard segna che è in corso');
     }
@@ -191,29 +207,30 @@ class InstallerTest extends TestCase
     public function test_wizard_in_corso_resta_aperto_solo_al_browser_che_lo_sta_facendo(): void
     {
         $this->seed(RolesSeeder::class);
-        Utente::factory()->superAdmin()->create();
         $token = app(InstallerService::class)->segnaWizardInCorso();
 
-        // Altro browser (nessun token o token sbagliato): wizard chiuso, lock scritto
-        $this->get('/install/email')->assertRedirect('/login');
-        $this->assertFileExists($this->lockFile);
-        File::delete($this->lockFile);
-        app(InstallerService::class)->segnaWizardInCorso(); // nuovo marcatore, il token vecchio non vale più
-        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertRedirect('/login');
-        File::delete($this->lockFile);
-
-        // Browser giusto: prosegue, ma lo step database non è più raggiungibile
-        $token = app(InstallerService::class)->segnaWizardInCorso();
-        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertOk();
-        $this->withUnencryptedCookie('installer_token', $token)->get('/install/database')->assertRedirect(route('installer.email'));
-        $this->withUnencryptedCookie('installer_token', $token)->post('/install/database', [
-            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'demo', 'username' => 'root',
-        ])->assertRedirect(route('installer.email'));
+        // Browser giusto: email e admin raggiungibili, l'installer resta aperto
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertOk()->assertSee('3 di 5');
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/admin')->assertOk()->assertSee('4 di 5');
         $this->assertFileDoesNotExist($this->lockFile);
 
-        // Marcatore scaduto: chiuso anche con il token giusto
+        // Token sbagliato o marcatore scaduto: bloccato
+        $this->withUnencryptedCookie('installer_token', 'sbagliato')->get('/install/email')->assertForbidden();
         touch($this->inCorsoFile, time() - 3 * 3600);
-        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertRedirect('/login');
+        $this->assertFalse(app(InstallerService::class)->wizardInCorso($token));
+    }
+
+    public function test_con_il_super_admin_creato_l_installer_e_chiuso_anche_per_chi_installa(): void
+    {
+        $token = $this->wizardInCorso();
+        Utente::factory()->superAdmin()->create();
+
+        // Anche con il token del wizard ancora valido: nessuno step è raggiungibile
+        foreach (['/install', '/install/database', '/install/email', '/install/admin'] as $url) {
+            $this->withUnencryptedCookie('installer_token', $token)->get($url)->assertRedirect('/login');
+        }
+        $this->assertFileExists($this->lockFile);
+        $this->assertFileDoesNotExist($this->inCorsoFile);
     }
 
     public function test_import_schema_fallito_mostra_l_errore_e_non_tocca_env(): void
@@ -255,42 +272,34 @@ class InstallerTest extends TestCase
         $this->assertStringNotContainsString('wp_posts', json_encode(session('errors')));
     }
 
-    public function test_step_admin_crea_super_admin_e_associazione(): void
+    public function test_step_admin_crea_super_admin_e_chiude_subito_l_installer(): void
     {
-        $this->seed(RolesSeeder::class);
-
-        $this->post('/install/admin', [
-            'associazione_nome' => 'APS Demo',
-            'associazione_email' => 'info@apsdemo.it',
-            'nome' => 'Mario',
-            'cognome' => 'Rossi',
-            'email' => 'mario@apsdemo.it',
-            'password' => 'SuperSegreta123',
-            'password_confirmation' => 'SuperSegreta123',
-        ])->assertRedirect(route('installer.email'));
-
-        $admin = Utente::query()->where('email', 'mario@apsdemo.it')->firstOrFail();
-        $this->assertSame('super_admin', $admin->ruolo);
-        $this->assertTrue($admin->hasRole('super_admin'));
-        $this->assertDatabaseHas('associazioni', ['nome' => 'APS Demo', 'email' => 'info@apsdemo.it']);
-    }
-
-    public function test_step_done_scrive_il_lock(): void
-    {
-        $this->wizardInCorso();
+        $token = $this->wizardInCorso();
 
         $this->partialMock(InstallerService::class, function ($mock) {
             $mock->shouldReceive('collegaStorage')->once()->andReturnFalse();
         });
 
-        $this->get('/install/done')
+        $this->post('/install/admin', $this->datiAdmin())
             ->assertOk()
             ->assertSee('Installazione completata')
             ->assertSee('Cron Jobs')
-            ->assertSee('storage:link');
+            ->assertSee('storage:link')
+            ->assertCookieExpired('installer_token');
 
+        $admin = Utente::query()->where('email', 'mario@apsdemo.it')->firstOrFail();
+        $this->assertSame('super_admin', $admin->ruolo);
+        $this->assertTrue($admin->hasRole('super_admin'));
+        $this->assertDatabaseHas('associazioni', ['nome' => 'APS Demo', 'email' => 'info@apsdemo.it']);
+
+        // Lock scritto nella stessa richiesta: niente finestra con l'installer aperto
         $this->assertFileExists($this->lockFile);
         $this->assertFileDoesNotExist($this->inCorsoFile);
+
+        // Ricaricare o tornare indietro porta al login, anche con il vecchio cookie
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/email')->assertRedirect('/login');
+        $this->withUnencryptedCookie('installer_token', $token)->post('/install/admin', $this->datiAdmin())->assertRedirect('/login');
+        $this->assertSame(1, Utente::query()->count());
     }
 
     public function test_installazione_manuale_da_cli_viene_riconosciuta_e_crea_il_lock(): void
@@ -339,7 +348,7 @@ class InstallerTest extends TestCase
 
         // Con conferma esplicita: procede
         $this->post('/install/database', $payload + ['consenti_non_vuoto' => 1])
-            ->assertRedirect(route('installer.admin'));
+            ->assertRedirect(route('installer.email'));
     }
 
     public function test_database_gia_installato_non_viene_mai_sovrascritto_dal_wizard(): void
@@ -393,18 +402,11 @@ class InstallerTest extends TestCase
 
     public function test_dati_demo_opzionali_creano_i_contenuti(): void
     {
-        $this->seed(RolesSeeder::class);
+        $this->wizardInCorso();
 
-        $this->post('/install/admin', [
-            'associazione_nome' => 'APS Reale',
-            'associazione_email' => 'info@apsreale.it',
-            'nome' => 'Mario',
-            'cognome' => 'Rossi',
-            'email' => 'mario@apsreale.it',
-            'password' => 'SuperSegreta123',
-            'password_confirmation' => 'SuperSegreta123',
-            'dati_demo' => 1,
-        ])->assertRedirect(route('installer.email'));
+        $this->post('/install/admin', $this->datiAdmin('APS Reale', 'mario@apsreale.it') + ['dati_demo' => 1])
+            ->assertOk()
+            ->assertSee('Installazione completata');
 
         $this->assertDatabaseHas('associazioni', ['nome' => 'Associazione Demo']);
         $this->assertDatabaseHas('soci', ['cognome' => 'Verdi', 'email' => 'anna.verdi@demo.test']);
@@ -419,7 +421,10 @@ class InstallerTest extends TestCase
 
         $this->post('/install/email', ['driver' => 'log'])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('installer.done'));
+            ->assertRedirect(route('installer.admin'));
+
+        // Saltare l'email non chiude l'installer: manca ancora il super admin
+        $this->assertFileDoesNotExist($this->lockFile);
     }
 
     public function test_step_email_salva_le_impostazioni_smtp(): void
@@ -442,6 +447,6 @@ class InstallerTest extends TestCase
             'smtp_encryption' => 'tls',
         ]);
 
-        $response->assertSessionHasNoErrors()->assertRedirect(route('installer.done'));
+        $response->assertSessionHasNoErrors()->assertRedirect(route('installer.admin'));
     }
 }

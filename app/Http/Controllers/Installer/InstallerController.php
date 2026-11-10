@@ -9,6 +9,7 @@ use App\Http\Requests\Installer\EmailRequest;
 use App\Services\Installer\InstallerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class InstallerController extends Controller
@@ -116,55 +117,28 @@ class InstallerController extends Controller
             sameSite: 'lax',
         );
 
-        return redirect()->route('installer.admin')
+        return redirect()->route('installer.email')
             ->withCookie($cookie)
             ->with('success', "Database configurato: schema installato ({$risultato['tabelle']} tabelle).");
     }
 
-    /** Step 3 — super amministratore e prima associazione */
-    public function admin(): View|RedirectResponse
+    /** Step 3 — email di piattaforma (facoltativo) */
+    public function email(): View|RedirectResponse
     {
         if (! $this->installer->databaseReady()) {
             return redirect()->route('installer.database')
                 ->withErrors(['database' => 'Configura prima il database.']);
         }
 
-        if ($this->installer->adminExists()) {
-            return redirect()->route('installer.email');
-        }
-
-        return view('installer.admin', ['step' => 3]);
+        return view('installer.email', ['step' => 3]);
     }
 
-    public function adminStore(AdminRequest $request): RedirectResponse
+    public function emailStore(EmailRequest $request): RedirectResponse
     {
         if (! $this->installer->databaseReady()) {
             return redirect()->route('installer.database');
         }
 
-        if (! $this->installer->adminExists()) {
-            $this->installer->createAdmin($request->validated());
-
-            if ($request->boolean('dati_demo')) {
-                $this->installer->seedDemo();
-            }
-        }
-
-        return redirect()->route('installer.email');
-    }
-
-    /** Step 4 — email di piattaforma (facoltativo) */
-    public function email(): View|RedirectResponse
-    {
-        if (! $this->installer->adminExists()) {
-            return redirect()->route('installer.admin');
-        }
-
-        return view('installer.email', ['step' => 4]);
-    }
-
-    public function emailStore(EmailRequest $request): RedirectResponse
-    {
         $dati = $request->validated();
 
         if (($dati['driver'] ?? 'log') === 'smtp') {
@@ -186,21 +160,48 @@ class InstallerController extends Controller
             ]);
         }
 
-        return redirect()->route('installer.done');
+        return redirect()->route('installer.admin');
     }
 
-    /** Step 5 — riepilogo e lock */
-    public function done(): View|RedirectResponse
+    /** Step 4 — super amministratore e prima associazione (ultimo step) */
+    public function admin(): View|RedirectResponse
     {
+        if (! $this->installer->databaseReady()) {
+            return redirect()->route('installer.database')
+                ->withErrors(['database' => 'Configura prima il database.']);
+        }
+
+        return view('installer.admin', ['step' => 4]);
+    }
+
+    /**
+     * Crea il super admin e chiude subito l'installer: il lock si scrive
+     * nella stessa richiesta, così non resta nessuna finestra in cui
+     * /install è ancora raggiungibile con un amministratore già creato.
+     * Il riepilogo finale si mostra come risposta di questa richiesta:
+     * ricaricarlo porta al login, perché l'installer è già chiuso.
+     */
+    public function adminStore(AdminRequest $request): Response|RedirectResponse
+    {
+        if (! $this->installer->databaseReady()) {
+            return redirect()->route('installer.database');
+        }
+
         if (! $this->installer->adminExists()) {
-            return redirect()->route('installer.admin');
+            $this->installer->createAdmin($request->validated());
+
+            if ($request->boolean('dati_demo')) {
+                $this->installer->seedDemo();
+            }
         }
 
         $this->installer->markInstalled();
 
-        return view('installer.done', [
-            'step' => 5,
-            'storageCollegato' => $this->installer->collegaStorage(),
-        ]);
+        return response()
+            ->view('installer.done', [
+                'step' => 5,
+                'storageCollegato' => $this->installer->collegaStorage(),
+            ])
+            ->withoutCookie((string) config('installer.in_progress_cookie'));
     }
 }

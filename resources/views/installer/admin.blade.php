@@ -1,7 +1,7 @@
 @extends('installer.layout')
 
 @section('title', 'Amministratore')
-@section('step-label', '3 di 5')
+@section('step-label', '4 di 5')
 
 @section('content')
     <h2>Super amministratore</h2>
@@ -25,7 +25,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100 mt-4">
-            <i class="bi bi-person-plus me-2"></i>Crea account e continua
+            <i class="bi bi-person-plus me-2"></i>Crea account e completa l'installazione
         </button>
     </form>
 @endsection

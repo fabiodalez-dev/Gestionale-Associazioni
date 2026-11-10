@@ -1,7 +1,7 @@
 @extends('installer.layout')
 
 @section('title', 'Email')
-@section('step-label', '4 di 5')
+@section('step-label', '3 di 5')
 
 @section('content')
     <h2>Email di piattaforma <span class="text-muted" style="font-weight: 400;">(facoltativo)</span></h2>
@@ -58,9 +58,9 @@
         </div>
 
         <div class="d-flex gap-2 mt-4">
-            <a href="{{ route('installer.done') }}" class="btn btn-outline-secondary">Salta</a>
+            <a href="{{ route('installer.admin') }}" class="btn btn-outline-secondary">Salta</a>
             <button type="submit" class="btn btn-primary flex-fill">
-                Salva e completa<i class="bi bi-arrow-right ms-2"></i>
+                Salva e continua<i class="bi bi-arrow-right ms-2"></i>
             </button>
         </div>
     </form>

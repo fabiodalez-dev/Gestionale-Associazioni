@@ -23,5 +23,4 @@ Route::prefix('install')->name('installer.')->group(function () {
     Route::get('/email', [InstallerController::class, 'email'])->name('email');
     Route::post('/email', [InstallerController::class, 'emailStore'])
         ->middleware('throttle:10,1')->name('email.store');
-    Route::get('/done', [InstallerController::class, 'done'])->name('done');
 });

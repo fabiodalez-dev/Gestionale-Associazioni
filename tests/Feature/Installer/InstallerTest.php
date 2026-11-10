@@ -131,10 +131,10 @@ class InstallerTest extends TestCase
 
         // Altro browser: niente admin né database, solo la pagina requisiti
         $this->get('/install')->assertOk();
-        $this->get('/install/admin')->assertForbidden();
-        $this->post('/install/admin', ['nome' => 'x'])->assertForbidden();
-        $this->get('/install/email')->assertForbidden();
-        $this->get('/install/database')->assertForbidden();
+        $this->get('/install/admin')->assertRedirect(route('installer.stato'));
+        $this->post('/install/admin', ['nome' => 'x'])->assertRedirect(route('installer.stato'));
+        $this->get('/install/email')->assertRedirect(route('installer.stato'));
+        $this->get('/install/database')->assertRedirect(route('installer.stato'));
 
         // Browser giusto: prosegue
         $this->withUnencryptedCookie('installer_token', $token)->get('/install/admin')->assertOk();
@@ -142,6 +142,30 @@ class InstallerTest extends TestCase
         // Marcatore scaduto: nessuno lo ha più rivendicato, si può riprendere
         touch($this->inCorsoFile, time() - 3 * 3600);
         $this->get('/install/admin')->assertOk();
+    }
+
+    public function test_pagina_di_diagnosi_spiega_cosa_manca_e_come_rimediare(): void
+    {
+        $this->seed(RolesSeeder::class); // schema pronto, nessun admin
+        app(InstallerService::class)->segnaWizardInCorso();
+
+        // Un altro browser trova il wizard rivendicato: finisce sulla diagnosi
+        $this->get('/install/admin')->assertRedirect(route('installer.stato'));
+
+        $this->get('/install/stato')
+            ->assertOk()
+            ->assertSee('Schema del database')
+            ->assertSee('Installato.')
+            ->assertSee('Non ancora creato.')
+            ->assertSee('Avviata 0 minuti fa da un altro browser')
+            ->assertSee('storage/app/installer-in-corso');
+    }
+
+    public function test_pagina_di_diagnosi_chiusa_ad_app_installata(): void
+    {
+        file_put_contents($this->lockFile, 'test');
+
+        $this->get('/install/stato')->assertRedirect('/login');
     }
 
     public function test_pagina_requisiti_raggiungibile_quando_non_installata(): void
@@ -215,7 +239,7 @@ class InstallerTest extends TestCase
         $this->assertFileDoesNotExist($this->lockFile);
 
         // Token sbagliato o marcatore scaduto: bloccato
-        $this->withUnencryptedCookie('installer_token', 'sbagliato')->get('/install/email')->assertForbidden();
+        $this->withUnencryptedCookie('installer_token', 'sbagliato')->get('/install/email')->assertRedirect(route('installer.stato'));
         touch($this->inCorsoFile, time() - 3 * 3600);
         $this->assertFalse(app(InstallerService::class)->wizardInCorso($token));
     }

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('install')->name('installer.')->group(function () {
     Route::get('/', [InstallerController::class, 'requirements'])->name('requirements');
+    Route::get('/stato', [InstallerController::class, 'stato'])->name('stato');
     Route::get('/database', [InstallerController::class, 'database'])->name('database');
     Route::post('/database/test', [InstallerController::class, 'databaseTest'])
         ->middleware('throttle:20,1')->name('database.test');

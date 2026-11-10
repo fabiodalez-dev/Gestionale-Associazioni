@@ -25,6 +25,15 @@ class InstallerController extends Controller
         ]);
     }
 
+    /** Diagnosi di un'installazione rimasta a metà, con causa e rimedio (#31) */
+    public function stato(): View
+    {
+        return view('installer.stato', [
+            'step' => 0,
+            'voci' => $this->installer->diagnosi(),
+        ]);
+    }
+
     /** Step 2 — configurazione database */
     public function database(): View
     {

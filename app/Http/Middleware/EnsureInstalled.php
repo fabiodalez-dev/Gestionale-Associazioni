@@ -80,8 +80,9 @@ class EnsureInstalled
             // super admin non ancora creato: gli step successivi restano al
             // browser che ha il token, altrimenti chiunque potrebbe creare
             // l'amministratore o rifare il database nel frattempo
-            if (! $request->is('install') && $installer->wizardRivendicato() && $installer->databaseReady() && ! $installer->wizardInCorso($token)) {
-                abort(403, 'Installazione in corso da un altro browser: completala da lì oppure, se è stata interrotta, elimina storage/app/installer-in-corso e ricomincia.');
+            if (! $request->is('install', 'install/stato') && $installer->wizardRivendicato() && $installer->databaseReady() && ! $installer->wizardInCorso($token)) {
+                // Spiegazione e rimedio nella pagina di diagnosi (#31)
+                return redirect()->route('installer.stato');
             }
 
             return $next($request);

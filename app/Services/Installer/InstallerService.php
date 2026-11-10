@@ -430,6 +430,82 @@ class InstallerService
         }
     }
 
+    /**
+     * Diagnosi di un'installazione rimasta a metà (#31): per ogni elemento
+     * lo stato e, se non va, cosa fare. Nessuna credenziale né percorso
+     * assoluto: la pagina è raggiungibile senza login finché l'app non è
+     * installata.
+     *
+     * @return list<array{voce: string, ok: bool, dettaglio: string, rimedio: ?string}>
+     */
+    public function diagnosi(): array
+    {
+        $voci = [];
+
+        $env = (string) config('installer.env_file');
+        $voci[] = [
+            'voce' => 'File .env',
+            'ok' => is_file($env),
+            'dettaglio' => is_file($env) ? 'Presente.' : 'Mancante.',
+            'rimedio' => is_file($env) ? null : 'Viene creato da .env.example al primo avvio: controlla che la cartella principale dell\'app sia scrivibile.',
+        ];
+
+        $chiave = filled(config('app.key'));
+        $voci[] = [
+            'voce' => 'Chiave dell\'applicazione',
+            'ok' => $chiave,
+            'dettaglio' => $chiave ? 'Impostata.' : 'Mancante.',
+            'rimedio' => $chiave ? null : 'Ricarica la pagina: viene generata da sola se il file .env è scrivibile.',
+        ];
+
+        $erroreDb = null;
+        try {
+            DB::connection()->getPdo();
+        } catch (\Throwable $e) {
+            $erroreDb = $e instanceof PDOException ? 'connessione rifiutata (codice '.$e->getCode().')' : 'connessione non riuscita';
+        }
+        $voci[] = [
+            'voce' => 'Connessione al database',
+            'ok' => $erroreDb === null,
+            'dettaglio' => $erroreDb === null ? 'Riuscita.' : ucfirst($erroreDb).'.',
+            'rimedio' => $erroreDb === null ? null : 'Torna al passo Database del wizard e verifica host, nome del database, utente e password.',
+        ];
+
+        $schema = $erroreDb === null && $this->databaseReady();
+        $voci[] = [
+            'voce' => 'Schema del database',
+            'ok' => $schema,
+            'dettaglio' => $schema ? 'Installato.' : 'Non installato o incompleto.',
+            'rimedio' => $schema ? null : 'Ripeti il passo Database: lo schema viene reinstallato (le tabelle dell\'app già presenti si ricreano solo con conferma).',
+        ];
+
+        $admin = $schema && $this->adminExists();
+        $voci[] = [
+            'voce' => 'Super amministratore',
+            'ok' => $admin,
+            'dettaglio' => $admin ? 'Creato.' : 'Non ancora creato.',
+            'rimedio' => $admin ? null : 'Completa il passo "Amministratore" del wizard.',
+        ];
+
+        $marcatore = (string) config('installer.in_progress_file');
+        if (is_file($marcatore)) {
+            $minuti = (int) floor((time() - (int) filemtime($marcatore)) / 60);
+            $valido = $this->wizardRivendicato();
+            $voci[] = [
+                'voce' => 'Installazione in corso',
+                'ok' => ! $valido,
+                'dettaglio' => $valido
+                    ? "Avviata {$minuti} minuti fa da un altro browser: solo quel browser può proseguire."
+                    : "Avviata {$minuti} minuti fa, ormai scaduta: chiunque può riprenderla.",
+                'rimedio' => $valido
+                    ? 'Completala dal browser che l\'ha avviata. Se è stata interrotta, elimina via FTP il file storage/app/installer-in-corso e ricomincia, oppure aspetta '.max(0, (int) config('installer.in_progress_ttl_minutes', 120) - $minuti).' minuti.'
+                    : null,
+            ];
+        }
+
+        return $voci;
+    }
+
     public function adminExists(): bool
     {
         return $this->databaseReady()

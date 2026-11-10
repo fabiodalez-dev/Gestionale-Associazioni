@@ -27,8 +27,8 @@
             <div class="d-flex gap-3">
                 <i class="bi bi-alarm fs-4" aria-hidden="true"></i>
                 <div class="flex-fill" style="min-width: 0;">
-                    <strong>Le attività in background non girano da più di un giorno.</strong>
-                    Email in coda, promemoria, scadenze e backup sono fermi.
+                    <strong>Il cron non gira da più di un giorno.</strong>
+                    Email in coda, promemoria, scadenze e backup partono solo quando qualcuno apre il sito, e quindi in ritardo.
                     Nel pannello del tuo hosting (cPanel → Cron Jobs) aggiungi un'attività <strong>ogni minuto</strong> con questo comando:
                     <pre class="mb-0 mt-2 p-2 bg-body rounded small" style="white-space: pre-wrap; word-break: break-all;">{{ $comandoCron }}</pre>
                     <div class="small mt-1">L'avviso sparisce da solo appena il cron riparte.</div>

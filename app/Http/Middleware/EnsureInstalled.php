@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\Installer\InstallerService;
+use App\Services\Sistema\CronDiRiserva;
 use App\Services\Update\RiparaSchema;
 use App\Services\Update\UpdateService;
 use Closure;
@@ -40,6 +41,9 @@ class EnsureInstalled
             // Primo caricamento dopo un cambio di versione: crea tabelle e
             // colonne mancanti rispetto a schema.sql, dopo la risposta
             app(RiparaSchema::class)->seNuovaVersione(app(UpdateService::class)->versioneCorrente());
+
+            // Senza cron, le attività programmate partono dal web (#68)
+            app(CronDiRiserva::class)->pianifica();
 
             return $next($request);
         }

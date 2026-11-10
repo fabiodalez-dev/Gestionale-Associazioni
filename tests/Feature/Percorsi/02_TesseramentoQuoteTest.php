@@ -395,7 +395,7 @@ class Percorso02_TesseramentoQuoteTest extends TestCase
                 'payment_date' => '2026-03-13',
             ])
             ->assertRedirect(route('quote.index'))
-            ->assertSessionHas('error', 'Questa quota risulta già pagata.');
+            ->assertSessionHas('error', fn (string $errore) => str_starts_with($errore, 'Questa quota risulta già pagata il '));
 
         $this->assertSame('contanti', $quota->fresh()->metodo_pagamento);
     }

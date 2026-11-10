@@ -62,7 +62,7 @@ class PagamentoOfflineTest extends TestCase
             'payment_date' => '2026-06-01',
         ]);
 
-        $response->assertSessionHas('error', 'Questa quota risulta già pagata.');
+        $response->assertSessionHas('error', 'Questa quota risulta già pagata il 15/01/2026 (contanti): nessun nuovo pagamento registrato.');
         $this->assertSame('2026-01-15', $quota->fresh()->data_pagamento?->toDateString());
     }
 

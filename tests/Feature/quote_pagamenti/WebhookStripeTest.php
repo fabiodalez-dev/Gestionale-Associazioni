@@ -7,6 +7,7 @@ use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
 use App\Models\Tessera;
 use App\Notifications\Quote\BenvenutoSocioNotification;
+use App\Notifications\Quote\PagamentoDoppioNotification;
 use App\Notifications\Quote\PagamentoQuotaNotification;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -240,5 +241,39 @@ class WebhookStripeTest extends TestCase
                 ->where('tipo_attivita', 'Pagamento Online')
                 ->count()
         );
+    }
+
+    public function test_pagamento_online_su_quota_gia_pagata_in_sede_viene_segnalato(): void
+    {
+        $socio = $this->creaSocio(['nome' => 'Ada', 'cognome' => 'Neri']);
+        $quota = $this->creaQuota($socio, ['data_pagamento' => '2026-03-01', 'metodo_pagamento' => 'contanti', 'anno' => 2026]);
+        $this->configuraStripe();
+        $this->mockFirmaValida();
+
+        $this->postJson(route('webhooks.stripe'), $this->stripePayload($quota), [
+            'Stripe-Signature' => 't=1,v1=abc',
+        ])->assertOk();
+
+        // Nessun effetto sulla quota né seconda ricevuta, ma gli admin lo sanno
+        $this->assertSame('contanti', $quota->fresh()->metodo_pagamento);
+        $this->assertNull($quota->fresh()->gateway_transaction_id);
+        Notification::assertSentTo($this->admin, PagamentoDoppioNotification::class, function (PagamentoDoppioNotification $n) {
+            return $n->socio === 'Ada Neri'
+                && $n->transazione === 'pi_test_456'
+                && str_contains($n->pagamentoPrecedente, '01/03/2026 (contanti)');
+        });
+    }
+
+    public function test_stesso_webhook_ripetuto_non_e_un_pagamento_doppio(): void
+    {
+        $quota = $this->creaQuota($this->creaSocio());
+        $this->configuraStripe();
+        $this->mockFirmaValida();
+
+        foreach ([1, 2] as $_) {
+            $this->postJson(route('webhooks.stripe'), $this->stripePayload($quota), ['Stripe-Signature' => 't=1,v1=abc'])->assertOk();
+        }
+
+        Notification::assertNotSentTo($this->admin, PagamentoDoppioNotification::class);
     }
 }

@@ -16,6 +16,23 @@
         $canonical = url()->current().($paginaCorrente > 1 ? '?page='.$paginaCorrente : '');
     @endphp
     <link rel="canonical" href="{{ $canonical }}">
+    {{-- Anteprima sui social e su WhatsApp (#43) --}}
+    @php
+        // @section('x', valore) arriva già con l'escape: lo si toglie, lo rimette {{ }}
+        $ogDescrizione = html_entity_decode(trim($__env->yieldContent('og_description')), ENT_QUOTES | ENT_HTML5) ?: \Illuminate\Support\Str::limit(trim(strip_tags((string) $associazione->descrizione_pubblica)), 200);
+        $ogImmagine = html_entity_decode(trim($__env->yieldContent('og_image')), ENT_QUOTES | ENT_HTML5) ?: (($associazione->moduli()->mostra_logo && filled($associazione->logoUrl())) ? $associazione->logoUrl() : '');
+    @endphp
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ $associazione->nome }}">
+    <meta property="og:title" content="@yield('title', $associazione->nome)">
+    <meta property="og:url" content="{{ $canonical }}">
+    @if ($ogDescrizione !== '')
+        <meta property="og:description" content="{{ $ogDescrizione }}">
+    @endif
+    @if ($ogImmagine !== '')
+        <meta property="og:image" content="{{ $ogImmagine }}">
+        <meta name="twitter:card" content="{{ $__env->hasSection('og_image') ? 'summary_large_image' : 'summary' }}">
+    @endif
     <link rel="alternate" type="application/rss+xml" title="{{ $associazione->nome }}" href="{{ route('pubblico.feed', $associazione->slug) }}">
     @foreach ($datiStrutturati ?? [] as $blocco)
         <script type="application/ld+json">{!! $blocco !!}</script>

@@ -5,8 +5,10 @@ namespace App\Http\Controllers\FrontendPubblico;
 use App\Http\Controllers\Controller;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Services\FrontendPubblico\ImmagineSocialEvento;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Catalogo eventi del frontend pubblico: lista e dettaglio dei SOLI
@@ -82,6 +84,21 @@ class CatalogoEventiController extends Controller
             'associazione' => $associazione,
             'evento' => $evento,
             'postiDisponibili' => $evento->postiDisponibili(),
+        ]);
+    }
+
+    /**
+     * Immagine per l'anteprima social dell'evento (#43): la copertina se
+     * c'è, altrimenti una generata con titolo, data e luogo.
+     */
+    public function immagineSocial(Associazione $associazione, Evento $evento, ImmagineSocialEvento $immagine): BinaryFileResponse
+    {
+        abort_if($evento->associazione_id !== $associazione->id, 404);
+        abort_unless($evento->stato_pubblicazione === Evento::STATO_PUBBLICATO, 404);
+
+        return response()->file($immagine->percorso($evento, $associazione), [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'public, max-age=86400',
         ]);
     }
 }

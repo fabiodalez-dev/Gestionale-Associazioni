@@ -1,6 +1,8 @@
 @extends('pubblico.layouts.app')
 
 @section('title', $evento->titolo.' — '.$associazione->nome)
+@section('og_image', filled($evento->immagine_url) ? url((string) $evento->immagine_url) : route('pubblico.eventi.immagine-social', [$associazione->slug, $evento->id]))
+@section('og_description', \Illuminate\Support\Str::limit($evento->data_evento->format('d/m/Y H:i').(filled($evento->luogo) ? ' · '.$evento->luogo : '').' — '.trim(strip_tags((string) $evento->descrizione)), 200))
 
 
 @section('content')

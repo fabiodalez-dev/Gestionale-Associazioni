@@ -68,6 +68,7 @@ Route::prefix('a/{associazione:slug}')
 
         Route::get('/eventi', [CatalogoEventiController::class, 'index'])->name('eventi.index');
         Route::get('/eventi/{evento}', [CatalogoEventiController::class, 'show'])->name('eventi.show');
+        Route::get('/eventi/{evento}/immagine-social.png', [CatalogoEventiController::class, 'immagineSocial'])->name('eventi.immagine-social');
 
         /*
         |------------------------------------------------------------------

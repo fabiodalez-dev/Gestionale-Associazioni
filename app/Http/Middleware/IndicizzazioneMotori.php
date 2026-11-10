@@ -20,6 +20,7 @@ class IndicizzazioneMotori
         'pubblico.home.show',
         'pubblico.eventi.index',
         'pubblico.eventi.show',
+        'pubblico.eventi.immagine-social',
         'pubblico.calendario',
         'pubblico.novita',
         'pubblico.iscriviti',

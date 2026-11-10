@@ -7,6 +7,7 @@ use App\Models\Documento;
 use App\Models\Evento;
 use App\Models\Prenotazione;
 use App\Models\Socio;
+use App\Models\Tessera;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -71,6 +72,59 @@ class RicercaGlobaleTest extends TestCase
         $this->assertNotNull($soci);
         $this->assertSame('Rossini Mario', $soci['risultati'][0]['titolo']);
         $this->assertStringContainsString("/soci/{$socio->id}", $soci['risultati'][0]['url']);
+    }
+
+    /** @return list<string> titoli del gruppo Soci */
+    private function sociTrovati(string $q): array
+    {
+        $gruppo = collect($this->actingAs($this->admin)->getJson('/ricerca-globale?q='.urlencode($q))->assertOk()->json('gruppi'))
+            ->firstWhere('gruppo', 'Soci');
+
+        return array_column($gruppo['risultati'] ?? [], 'titolo');
+    }
+
+    public function test_trova_il_socio_dal_telefono_comunque_scritto(): void
+    {
+        Socio::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Lia', 'cognome' => 'Neri', 'telefono' => '+39 333 123 4567']);
+        Socio::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Ugo', 'cognome' => 'Bassi', 'telefono' => '055 765432']);
+
+        foreach (['333 12 34 567', '+393331234567', '3331234567', '333-123-4567'] as $q) {
+            $this->assertSame(['Neri Lia'], $this->sociTrovati($q), "Telefono scritto come: {$q}");
+        }
+        $this->assertSame(['Bassi Ugo'], $this->sociTrovati('055/765432'));
+    }
+
+    public function test_trova_il_socio_da_numero_tessera_qr_codice_fiscale_ed_email(): void
+    {
+        $socio = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id, 'nome' => 'Ada', 'cognome' => 'Bianchi',
+            'codice_fiscale' => 'BNCDAA80A41H501X', 'email' => 'ada.bianchi@example.test',
+        ]);
+        $tessera = Tessera::factory()->create([
+            'associazione_id' => $this->associazione->id, 'socio_id' => $socio->id, 'numero_tessera' => 'T-2026-0042',
+        ]);
+
+        $this->assertSame(['Bianchi Ada'], $this->sociTrovati('T-2026-0042'));
+        $this->assertSame(['Bianchi Ada'], $this->sociTrovati('https://esempio.test/verifica-tessera/'.$tessera->id));
+        $this->assertSame(['Bianchi Ada'], $this->sociTrovati('bncdaa80a41h501x'));
+        $this->assertSame(['Bianchi Ada'], $this->sociTrovati('Ada.Bianchi@Example.test'));
+    }
+
+    public function test_le_corrispondenze_esatte_vengono_prima(): void
+    {
+        // "Rossi Zeno" ha il telefono cercato, gli altri lo contengono solo nel nome
+        Socio::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Zeno', 'cognome' => 'Rossi', 'telefono' => '3471112223']);
+        Socio::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Anna', 'cognome' => 'Alberti', 'telefono' => null]);
+
+        $this->assertSame('Rossi Zeno', $this->sociTrovati('347 111 2223')[0]);
+    }
+
+    public function test_telefono_di_un_altro_tenant_non_trovato(): void
+    {
+        $altra = Associazione::factory()->create();
+        Socio::factory()->create(['associazione_id' => $altra->id, 'telefono' => '3339998887']);
+
+        $this->assertSame([], $this->sociTrovati('3339998887'));
     }
 
     public function test_non_trova_i_soci_di_un_altro_tenant(): void

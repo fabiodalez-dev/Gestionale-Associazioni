@@ -18,6 +18,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use robertogallea\LaravelCodiceFiscale\CodiceFiscale;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -150,6 +151,31 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
                 $socio->codice_referral = self::generaCodiceReferral();
             }
         });
+
+        // Data di nascita mancante: la si ricava dal codice fiscale (#59),
+        // ovunque il socio venga salvato (scheda, iscrizione dal sito, import,
+        // API). Una data già inserita non viene mai sovrascritta.
+        static::saving(function (self $socio) {
+            if ($socio->data_nascita === null && ($data = self::dataNascitaDaCodiceFiscale($socio->codice_fiscale)) !== null) {
+                $socio->data_nascita = $data;
+            }
+        });
+    }
+
+    /**
+     * Data di nascita indicata dal codice fiscale (omocodie comprese), o
+     * null se il codice manca o non è valido.
+     */
+    public static function dataNascitaDaCodiceFiscale(?string $codiceFiscale): ?string
+    {
+        $cf = mb_strtoupper(trim((string) $codiceFiscale));
+        if (strlen($cf) !== 16) {
+            return null;
+        }
+
+        $parser = new CodiceFiscale;
+
+        return $parser->tryParse($cf) ? $parser->getBirthdate()->toDateString() : null;
     }
 
     /**

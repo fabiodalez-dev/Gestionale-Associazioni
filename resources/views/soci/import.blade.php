@@ -37,6 +37,7 @@
             <div class="card-body">
                 <p>
                     <span class="badge bg-success">{{ $report['importati'] }} importati</span>
+                    @if (($report['aggiornati'] ?? 0) > 0)<span class="badge bg-info text-dark">{{ $report['aggiornati'] }} aggiornati</span>@endif
                     <span class="badge bg-{{ count($report['errori']) > 0 ? 'danger' : 'secondary' }}">{{ count($report['errori']) }} righe scartate</span>
                 </p>
                 @if (count($report['errori']) > 0)

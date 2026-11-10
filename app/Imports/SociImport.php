@@ -29,6 +29,32 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 {
     public int $importati = 0;
 
+    /** Soci già presenti aggiornati dal file (#56). */
+    public int $aggiornati = 0;
+
+    /**
+     * Intestazioni riconosciute oltre a quelle esatte (#53): come le scrive
+     * chi esporta da un altro gestionale o da un foglio fatto a mano, in
+     * italiano e in inglese. Le chiavi sono già nella forma "slug" di
+     * Laravel Excel (minuscole, senza accenti, spazi e punti → _).
+     */
+    private const SINONIMI = [
+        'nome' => ['nome_socio', 'first_name', 'firstname', 'name', 'given_name'],
+        'cognome' => ['surname', 'last_name', 'lastname', 'family_name'],
+        'email' => ['e_mail', 'mail', 'email_address', 'indirizzo_email', 'posta_elettronica'],
+        'codice_fiscale' => ['cf', 'c_f', 'codicefiscale', 'cod_fiscale', 'tax_code', 'fiscal_code'],
+        'telefono' => ['tel', 'cellulare', 'cell', 'mobile', 'phone', 'telephone', 'numero_di_telefono', 'recapito_telefonico'],
+        'data_nascita' => ['data_di_nascita', 'nato_il', 'nata_il', 'nascita', 'birth_date', 'birthdate', 'date_of_birth', 'dob'],
+        'data_iscrizione' => ['data_di_iscrizione', 'iscritto_il', 'iscrizione', 'membership_date', 'joined'],
+        'stato' => ['status'],
+        'numero_socio' => ['n_socio', 'numero', 'num_socio', 'matricola', 'member_number', 'tessera_socio'],
+        'indirizzo' => ['via', 'residenza', 'address', 'street'],
+        'citta' => ['comune', 'citta_di_residenza', 'comune_di_residenza', 'localita', 'city', 'town'],
+        'provincia' => ['prov', 'pr', 'province'],
+        'cap' => ['codice_postale', 'zip', 'zip_code', 'postal_code', 'postcode'],
+        'note' => ['annotazioni', 'notes', 'commenti'],
+    ];
+
     /** @var list<array{riga: int, errori: list<string>}> */
     public array $errori = [];
 
@@ -47,7 +73,7 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
                 $numeroRiga = $indice + 2; // +1 heading row, +1 base 1
                 $dati = $this->normalizza($row->toArray());
 
-                $validator = Validator::make($dati, $this->regole(), [], [
+                $validator = Validator::make($dati, $this->regole($this->socioEsistente($dati)?->id), [], [
                     'nome' => 'Nome',
                     'cognome' => 'Cognome',
                     'email' => 'Email',
@@ -64,6 +90,23 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
                 }
 
                 $valido = $validator->validated();
+
+                // Già presente (#56): stesso codice fiscale, oppure stessa email o
+                // numero socio con lo stesso nome e cognome. Si aggiornano solo i
+                // campi presenti nel file, mai svuotati; nome e cognome mai.
+                if (($esistente = $this->socioEsistente($dati)) !== null) {
+                    $esistente->fill(array_filter(
+                        collect($valido)->only(array_keys($dati))->except(['privacy_consenso', 'numero_socio', 'data_iscrizione', 'stato', 'nome', 'cognome'])->all(),
+                        fn ($v) => $v !== null && $v !== ''
+                    ));
+                    if ($esistente->isDirty()) {
+                        $esistente->save();
+                        $this->activityLogger->log($esistente, SocioActivityLogger::TIPO_MODIFICA_ANAGRAFICA, 'Dati aggiornati da import file');
+                    }
+                    $this->aggiornati++;
+
+                    continue;
+                }
 
                 if (blank($valido['numero_socio'] ?? null)) {
                     $valido['numero_socio'] = str_pad((string) $prossimoNumero, 3, '0', STR_PAD_LEFT);
@@ -94,6 +137,7 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
      */
     private function normalizza(array $row): array
     {
+        $row = $this->conSinonimi($row);
         $cf = strtoupper(trim((string) ($row['codice_fiscale'] ?? '')));
 
         return [
@@ -116,22 +160,82 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
     }
 
     /**
+     * Rinomina le colonne riconosciute per sinonimo (#53); a parità vince
+     * l'intestazione esatta.
+     *
+     * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
-    private function regole(): array
+    private function conSinonimi(array $row): array
+    {
+        foreach (self::SINONIMI as $campo => $sinonimi) {
+            if (filled($row[$campo] ?? null)) {
+                continue;
+            }
+            foreach ($sinonimi as $sinonimo) {
+                if (filled($row[$sinonimo] ?? null)) {
+                    $row[$campo] = $row[$sinonimo];
+                    break;
+                }
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * Socio dell'associazione già presente con lo stesso codice fiscale,
+     * email o numero socio, in quest'ordine (#56).
+     *
+     * @param  array<string, mixed>  $dati
+     */
+    private function socioEsistente(array $dati): ?Socio
+    {
+        $base = fn () => Socio::query()->withoutGlobalScopes()->where('associazione_id', $this->associazione->id)->whereNull('deleted_at');
+
+        // Il codice fiscale identifica la persona
+        if (filled($dati['codice_fiscale'] ?? null) && ($trovato = $base()->where('codice_fiscale', $dati['codice_fiscale'])->first()) !== null) {
+            return $trovato;
+        }
+
+        // Email e numero socio solo se anche nome e cognome coincidono: una
+        // persona diversa con l'email di un altro socio resta un errore della
+        // riga, non un aggiornamento dell'anagrafica sbagliata
+        $stessaPersona = fn (Socio $socio) => mb_strtolower(trim((string) $socio->nome)) === mb_strtolower((string) ($dati['nome'] ?? ''))
+            && mb_strtolower(trim((string) $socio->cognome)) === mb_strtolower((string) ($dati['cognome'] ?? ''));
+
+        foreach (['email', 'numero_socio'] as $chiave) {
+            if (filled($dati[$chiave] ?? null)) {
+                $trovato = $chiave === 'email'
+                    ? $base()->whereRaw('LOWER(email) = ?', [mb_strtolower((string) $dati[$chiave])])->first()
+                    : $base()->where($chiave, $dati[$chiave])->first();
+                if ($trovato !== null && $stessaPersona($trovato)) {
+                    return $trovato;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function regole(?string $ignoraSocioId = null): array
     {
         $assocId = $this->associazione->id;
+        $unico = fn (string $colonna) => Rule::unique('soci', $colonna)->where('associazione_id', $assocId)->ignore($ignoraSocioId);
 
         return [
             'nome' => ['required', 'string', 'max:100'],
             'cognome' => ['required', 'string', 'max:100'],
             'email' => [
                 'required', 'email', 'max:255',
-                Rule::unique('soci', 'email')->where('associazione_id', $assocId),
+                $unico('email'),
             ],
             'codice_fiscale' => [
                 'nullable', 'string', 'max:16', 'codice_fiscale',
-                Rule::unique('soci', 'codice_fiscale')->where('associazione_id', $assocId),
+                $unico('codice_fiscale'),
             ],
             'telefono' => ['nullable', 'string', 'max:20'],
             'data_nascita' => ['nullable', 'date'],
@@ -139,7 +243,7 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             'stato' => ['nullable', Rule::in(Socio::STATI)],
             'numero_socio' => [
                 'nullable', 'string', 'max:50',
-                Rule::unique('soci', 'numero_socio')->where('associazione_id', $assocId),
+                $unico('numero_socio'),
             ],
             'indirizzo' => ['nullable', 'string', 'max:255'],
             'citta' => ['nullable', 'string', 'max:100'],

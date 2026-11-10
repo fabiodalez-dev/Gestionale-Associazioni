@@ -61,6 +61,64 @@ class SociImportDocumentiTest extends TestCase
         $this->assertSame('002', Socio::query()->where('email', 'anna.import@example.com')->value('numero_socio'));
     }
 
+    public function test_intestazioni_riconosciute_per_sinonimo(): void
+    {
+        $csv = implode("\n", [
+            'Cognome;Nome;E-mail;C.F.;Cellulare;Data di nascita;Comune;Prov.',
+            'Neri;Lia;lia.neri@example.com;RSSMRA85T10A562S;333 1234567;10/12/1985;Bologna;bo',
+        ]);
+
+        $this->actingAs($this->admin)->post('/soci/import', [
+            'file' => UploadedFile::fake()->createWithContent('export.csv', $csv),
+        ])->assertRedirect(route('soci.import'));
+
+        $socio = Socio::query()->where('email', 'lia.neri@example.com')->firstOrFail();
+        $this->assertSame(['Lia', 'Neri', 'RSSMRA85T10A562S', '333 1234567', 'Bologna', 'BO'], [
+            $socio->nome, $socio->cognome, $socio->codice_fiscale, $socio->telefono, $socio->citta, $socio->provincia,
+        ]);
+        $this->assertSame('1985-12-10', $socio->data_nascita->toDateString());
+    }
+
+    public function test_reimportare_lo_stesso_file_aggiorna_invece_di_duplicare(): void
+    {
+        $prima = implode("\n", [
+            'nome,cognome,email,telefono,citta',
+            'Mario,Rossi,mario.dup@example.com,,Padova',
+        ]);
+        $this->actingAs($this->admin)->post('/soci/import', ['file' => UploadedFile::fake()->createWithContent('a.csv', $prima)]);
+
+        // Stesso socio (email con maiuscole diverse), telefono aggiunto, città vuota
+        $seconda = implode("\n", [
+            'nome,cognome,email,telefono,citta',
+            'Mario,Rossi,Mario.Dup@Example.com,3471112223,',
+        ]);
+        $this->actingAs($this->admin)->post('/soci/import', ['file' => UploadedFile::fake()->createWithContent('b.csv', $seconda)]);
+
+        $report = session('import_report');
+        $this->assertSame(0, $report['importati']);
+        $this->assertSame(1, $report['aggiornati']);
+        $this->assertSame([], $report['errori']);
+
+        $this->assertSame(1, Socio::query()->where('cognome', 'Rossi')->count());
+        $socio = Socio::query()->where('cognome', 'Rossi')->sole();
+        $this->assertSame('3471112223', $socio->telefono);
+        $this->assertSame('Padova', $socio->citta, 'Una cella vuota non cancella il dato');
+        $this->assertSame('mario.dup@example.com', $socio->email);
+    }
+
+    public function test_persona_diversa_con_l_email_di_un_socio_non_lo_sovrascrive(): void
+    {
+        Socio::factory()->create(['associazione_id' => $this->associazione->id, 'nome' => 'Marco', 'cognome' => 'Esposito', 'email' => 'marco@example.com']);
+
+        $csv = implode("\n", ['nome,cognome,email', 'Paolo,Conti,marco@example.com']);
+        $this->actingAs($this->admin)->post('/soci/import', ['file' => UploadedFile::fake()->createWithContent('c.csv', $csv)]);
+
+        $report = session('import_report');
+        $this->assertSame([0, 0], [$report['importati'], $report['aggiornati']]);
+        $this->assertCount(1, $report['errori']);
+        $this->assertSame('Esposito', Socio::query()->where('email', 'marco@example.com')->value('cognome'));
+    }
+
     public function test_upload_download_e_cancellazione_documento_socio(): void
     {
         Storage::fake('local');

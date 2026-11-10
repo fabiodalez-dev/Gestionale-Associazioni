@@ -275,11 +275,12 @@ class SocioController extends Controller
             ->route('soci.import')
             ->with('import_report', [
                 'importati' => $import->importati,
+                'aggiornati' => $import->aggiornati,
                 'errori' => $import->errori,
             ])
             ->with(
                 $import->errori === [] ? 'success' : 'warning',
-                "Import completato: {$import->importati} soci importati, ".count($import->errori).' righe scartate.'
+                "Import completato: {$import->importati} soci importati, ".($import->aggiornati > 0 ? "{$import->aggiornati} già presenti aggiornati, " : '').count($import->errori).' righe scartate.'
             );
     }
 

@@ -183,6 +183,41 @@ class MediaEstesaTest extends TestCase
         $this->assertNull($socio->fresh()->getFirstMedia(Socio::COLLEZIONE_FOTO));
     }
 
+    public function test_foto_dal_telefono_raddrizzata_ritagliata_in_4_5_e_senza_exif(): void
+    {
+        // Foto "di lato" come la salvano i telefoni: pixel orizzontali (sinistra
+        // rossa, destra blu) con l'indicazione EXIF di ruotarla di 90° (Orientation 6)
+        $img = imagecreatetruecolor(800, 600);
+        imagefilledrectangle($img, 0, 0, 399, 599, (int) imagecolorallocate($img, 255, 0, 0));
+        imagefilledrectangle($img, 400, 0, 799, 599, (int) imagecolorallocate($img, 0, 0, 255));
+        ob_start();
+        imagejpeg($img, null, 95);
+        $jpeg = (string) ob_get_clean();
+        // Segmento APP1 Exif minimo, big endian: un solo tag Orientation = 6
+        $tiff = "MM\x00\x2a\x00\x00\x00\x08"."\x00\x01"."\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00"."\x00\x00\x00\x00";
+        $app1 = "\xFF\xE1".pack('n', strlen("Exif\x00\x00".$tiff) + 2)."Exif\x00\x00".$tiff;
+        $percorso = tempnam(sys_get_temp_dir(), 'exif').'.jpg';
+        file_put_contents($percorso, substr($jpeg, 0, 2).$app1.substr($jpeg, 2));
+        $this->assertSame(6, exif_read_data($percorso)['Orientation'] ?? null, 'Il file di prova ha l\'EXIF');
+
+        $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id]);
+        $this->actingAs($this->admin)->post(route('soci.foto.store', $socio), [
+            'foto' => new UploadedFile($percorso, 'IMG_0001.jpg', 'image/jpeg', null, true),
+        ])->assertRedirect(route('soci.show', $socio));
+
+        $originale = $socio->fresh()->getFirstMedia(Socio::COLLEZIONE_FOTO)->getPath();
+        [$larghezza, $altezza] = getimagesize($originale);
+        $this->assertSame([480, 600], [$larghezza, $altezza]);
+        $this->assertArrayNotHasKey('Orientation', @exif_read_data($originale) ?: []);
+
+        // Ruotata di 90° in senso orario: il rosso (prima a sinistra) ora è in alto
+        $salvata = imagecreatefromjpeg($originale);
+        $rgb = imagecolorat($salvata, 240, 20);
+        $this->assertGreaterThan(200, ($rgb >> 16) & 0xFF, 'In alto c\'è il rosso');
+        $this->assertLessThan(60, $rgb & 0xFF);
+        @unlink($percorso);
+    }
+
     public function test_la_foto_deve_essere_un_immagine(): void
     {
         $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id]);

@@ -2,9 +2,6 @@
 
 @section('title', $associazione->nome.' — Eventi e prenotazioni')
 
-@push('jsonld')
-    <script type="application/ld+json">{!! \App\Support\SchemaOrg::json(\App\Support\SchemaOrg::associazione($associazione)) !!}</script>
-@endpush
 
 @section('content')
     {{-- Hero brandizzato --}}

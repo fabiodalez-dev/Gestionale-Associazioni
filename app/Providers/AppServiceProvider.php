@@ -8,8 +8,10 @@ use App\Models\Evento;
 use App\Observers\EventoGoogleCalendarObserver;
 use App\Services\Calendario\CalendarioEsterno;
 use App\Services\Calendario\GoogleCalendarSpatie;
+use App\View\Composers\DatiStrutturatiComposer;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\DebugModeCheck;
@@ -33,6 +35,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Dati strutturati JSON-LD delle pagine pubbliche del mini-sito (#40, #44)
+        View::composer([
+            'pubblico.home',
+            'pubblico.eventi.show',
+            'pubblico.eventi.index',
+            'comunicazione.pubblico.novita',
+            'pubblico.trasparenza',
+        ], DatiStrutturatiComposer::class);
+
         $this->registerHealthChecks();
         $this->forzaUrlApplicazione();
 

@@ -2,12 +2,6 @@
 
 @section('title', 'Trasparenza — '.$associazione->nome)
 
-@push('jsonld')
-    <script type="application/ld+json">{!! \App\Support\SchemaOrg::json(\App\Support\SchemaOrg::briciole([
-        $associazione->nome => route('pubblico.home.show', $associazione->slug),
-        'Trasparenza' => route('pubblico.trasparenza', $associazione->slug),
-    ])) !!}</script>
-@endpush
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-4">

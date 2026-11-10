@@ -17,7 +17,9 @@
     @endphp
     <link rel="canonical" href="{{ $canonical }}">
     <link rel="alternate" type="application/rss+xml" title="{{ $associazione->nome }}" href="{{ route('pubblico.feed', $associazione->slug) }}">
-    @stack('jsonld')
+    @foreach ($datiStrutturati ?? [] as $blocco)
+        <script type="application/ld+json">{!! $blocco !!}</script>
+    @endforeach
     <script>
         // Applica il tema salvato prima del paint per evitare flash
         (function () {

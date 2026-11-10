@@ -18,7 +18,7 @@
     <link rel="canonical" href="{{ $canonical }}">
     {{-- Anteprima sui social e su WhatsApp (#43) --}}
     @php
-        // @section('x', valore) arriva già con l'escape: lo si toglie, lo rimette {{ }}
+        // le sezioni con valore inline arrivano già con l'escape: lo si toglie, lo rimette la stampa
         $ogDescrizione = html_entity_decode(trim($__env->yieldContent('og_description')), ENT_QUOTES | ENT_HTML5) ?: \Illuminate\Support\Str::limit(trim(strip_tags((string) $associazione->descrizione_pubblica)), 200);
         $ogImmagine = html_entity_decode(trim($__env->yieldContent('og_image')), ENT_QUOTES | ENT_HTML5) ?: (($associazione->moduli()->mostra_logo && filled($associazione->logoUrl())) ? $associazione->logoUrl() : '');
     @endphp

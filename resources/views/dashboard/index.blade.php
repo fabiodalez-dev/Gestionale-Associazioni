@@ -22,6 +22,21 @@
         <div class="text-muted small">Aggiornata alle {{ now('Europe/Rome')->format('H:i') }} del {{ now('Europe/Rome')->format('d/m/Y') }}</div>
     </div>
 
+    @if ($cronFermo ?? false)
+        <div class="alert alert-danger" role="alert" data-testid="avviso-cron-fermo">
+            <div class="d-flex gap-3">
+                <i class="bi bi-alarm fs-4" aria-hidden="true"></i>
+                <div class="flex-fill" style="min-width: 0;">
+                    <strong>Le attività in background non girano da più di un giorno.</strong>
+                    Email in coda, promemoria, scadenze e backup sono fermi.
+                    Nel pannello del tuo hosting (cPanel → Cron Jobs) aggiungi un'attività <strong>ogni minuto</strong> con questo comando:
+                    <pre class="mb-0 mt-2 p-2 bg-body rounded small" style="white-space: pre-wrap; word-break: break-all;">{{ $comandoCron }}</pre>
+                    <div class="small mt-1">L'avviso sparisce da solo appena il cron riparte.</div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Card onboarding admin: checklist configurazione tenant (piano Gestione 2, f.23) --}}
     @includeIf('piattaforma._onboarding-card')
 

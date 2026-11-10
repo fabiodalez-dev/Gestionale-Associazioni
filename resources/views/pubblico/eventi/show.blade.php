@@ -2,6 +2,15 @@
 
 @section('title', $evento->titolo.' — '.$associazione->nome)
 
+@push('jsonld')
+    <script type="application/ld+json">{!! \App\Support\SchemaOrg::json(\App\Support\SchemaOrg::evento($evento, $associazione, $postiDisponibili)) !!}</script>
+    <script type="application/ld+json">{!! \App\Support\SchemaOrg::json(\App\Support\SchemaOrg::briciole([
+        $associazione->nome => route('pubblico.home.show', $associazione->slug),
+        'Eventi' => route('pubblico.eventi.index', $associazione->slug),
+        $evento->titolo => route('pubblico.eventi.show', [$associazione->slug, $evento->id]),
+    ])) !!}</script>
+@endpush
+
 @section('content')
     @php
         $esaurito = $postiDisponibili !== null && $postiDisponibili <= 0;

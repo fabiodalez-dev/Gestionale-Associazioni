@@ -2,6 +2,13 @@
 
 @section('title', 'Eventi — '.$associazione->nome)
 
+@push('jsonld')
+    <script type="application/ld+json">{!! \App\Support\SchemaOrg::json(\App\Support\SchemaOrg::briciole([
+        $associazione->nome => route('pubblico.home.show', $associazione->slug),
+        'Eventi' => route('pubblico.eventi.index', $associazione->slug),
+    ])) !!}</script>
+@endpush
+
 @section('content')
     <div class="d-flex justify-content-between flex-wrap align-items-center mb-4 gap-2">
         <h1 class="h3 mb-0">Eventi in programma</h1>

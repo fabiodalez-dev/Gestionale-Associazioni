@@ -10,6 +10,14 @@
     @if (filled($associazione->descrizione_pubblica))
         <meta name="description" content="{{ \Illuminate\Support\Str::limit(strip_tags($associazione->descrizione_pubblica), 160) }}">
     @endif
+    @php
+        // Canonical senza parametri, tranne la pagina di un elenco paginato (#44)
+        $paginaCorrente = (int) request()->query('page', 1);
+        $canonical = url()->current().($paginaCorrente > 1 ? '?page='.$paginaCorrente : '');
+    @endphp
+    <link rel="canonical" href="{{ $canonical }}">
+    <link rel="alternate" type="application/rss+xml" title="{{ $associazione->nome }}" href="{{ route('pubblico.feed', $associazione->slug) }}">
+    @stack('jsonld')
     <script>
         // Applica il tema salvato prima del paint per evitare flash
         (function () {

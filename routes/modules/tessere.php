@@ -46,6 +46,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         ->middleware(ScannerSecurityHeaders::class)
         ->name('tessere.checkin');
     Route::post('/tessere/checkin', [CheckinController::class, 'store'])->name('tessere.checkin.store');
+    Route::get('/tessere/checkin/soci', [CheckinController::class, 'cercaSoci'])
+        ->middleware('throttle:60,1')
+        ->name('tessere.checkin.soci');
 
     Route::put('/tessere/{tessera}', [TesseraController::class, 'update'])
         ->whereUuid('tessera')->name('tessere.update');

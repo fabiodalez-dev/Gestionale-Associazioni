@@ -67,6 +67,52 @@ class CheckinTest extends TessereTestCase
         ]);
     }
 
+    public function test_socio_senza_tessera_trovato_per_nome_e_registrato(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $altra = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $socio = Socio::factory()->create(['associazione_id' => $assoc->id, 'nome' => 'Giulia', 'cognome' => 'Ferraresi', 'numero_socio' => 'S-77']);
+        Socio::factory()->create(['associazione_id' => $altra->id, 'nome' => 'Giulia', 'cognome' => 'Ferraresi']);
+        $evento = Evento::factory()->create(['associazione_id' => $assoc->id]);
+
+        // Nome e cognome in qualunque ordine; solo i soci del tenant
+        foreach (['Ferraresi Giu', 'giulia ferr'] as $q) {
+            $this->actingAs($admin)->getJson('/tessere/checkin/soci?q='.urlencode($q))
+                ->assertOk()
+                ->assertJsonCount(1, 'soci')
+                ->assertJsonPath('soci.0.id', $socio->id)
+                ->assertJsonPath('soci.0.nome', 'Ferraresi Giulia');
+        }
+        $this->actingAs($admin)->getJson('/tessere/checkin/soci?q=Gi')->assertJsonCount(0, 'soci');
+
+        $this->actingAs($admin)->postJson('/tessere/checkin', ['evento_id' => $evento->id, 'socio_id' => $socio->id])
+            ->assertOk()
+            ->assertJson(['success' => true, 'already_checked_in' => false]);
+        $this->assertDatabaseHas('eventi_partecipanti', ['evento_id' => $evento->id, 'socio_id' => $socio->id]);
+
+        // Stesse verifiche della tessera: il secondo passaggio è un doppione
+        $this->actingAs($admin)->postJson('/tessere/checkin', ['evento_id' => $evento->id, 'socio_id' => $socio->id])
+            ->assertJson(['already_checked_in' => true]);
+    }
+
+    public function test_socio_di_un_altro_tenant_non_registrabile_per_id(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $estraneo = Socio::factory()->create(['associazione_id' => Associazione::factory()->create()->id]);
+        $evento = Evento::factory()->create(['associazione_id' => $assoc->id]);
+
+        $this->actingAs($admin)->postJson('/tessere/checkin', ['evento_id' => $evento->id, 'socio_id' => $estraneo->id])
+            ->assertNotFound()
+            ->assertJsonPath('code', 'socio_not_found');
+    }
+
+    public function test_ricerca_per_nome_richiede_login(): void
+    {
+        $this->get('/tessere/checkin/soci?q=Rossi')->assertRedirect('/login');
+    }
+
     public function test_checkin_duplicato_segnalato(): void
     {
         $assoc = Associazione::factory()->create();

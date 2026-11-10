@@ -108,9 +108,15 @@
 
         <!-- Input manuale -->
         <form id="manualForm" class="d-flex gap-2 mb-4" style="max-width:400px;margin:0 auto">
-            <input type="text" id="manualInput" class="form-control" placeholder="Numero tessera o codice PRN-..." style="min-height:44px;font-size:16px">
+            <input type="text" id="manualInput" class="form-control" placeholder="Tessera, codice PRN-... o nome del socio" autocomplete="off" aria-describedby="manual-hint" style="min-height:44px;font-size:16px">
             <button type="submit" class="btn" style="background:var(--brand);color:#fff;white-space:nowrap;min-height:44px"><i class="bi bi-check-lg"></i> OK</button>
         </form>
+
+        <!-- Socio senza tessera: ricerca per nome (#50) -->
+        <div id="manual-suggest" class="list-group mb-3" style="max-width:400px;margin:0 auto" aria-live="polite"></div>
+        <p id="manual-hint" class="small text-muted text-center mb-4" style="max-width:400px;margin:0 auto">
+            Funziona anche con un lettore di codici a barre USB: legge e registra da solo.
+        </p>
 
         <!-- Ultimi check-in -->
         <div style="max-width:400px;margin:0 auto">
@@ -130,6 +136,7 @@
 
     var CHECKIN_URL = @json(route('tessere.checkin.store'));
     var BIGLIETTO_CHECKIN_URL = @json(route('biglietti.checkin'));
+    var SOCI_URL = @json(route('tessere.checkin.soci'));
     var CSRF = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     var currentEventId = null;
@@ -156,6 +163,7 @@
             screenEvents.classList.add('d-none');
             screenCheckin.classList.remove('d-none');
             startScanner();
+            manualInput.focus();
         }
         card.addEventListener('click', select);
         card.addEventListener('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } });
@@ -235,9 +243,13 @@
     }
 
     // ---- Input manuale (numero tessera, numero socio o codice biglietto PRN) ----
+    // Lettore USB (#51): scrive il codice e preme Invio, come una tastiera.
+    // Il campo resta sempre a fuoco e si svuota dopo ogni lettura.
     document.getElementById('manualForm').addEventListener('submit', function(e) {
         e.preventDefault();
         var val = manualInput.value.trim();
+        manualInput.value = '';
+        svuotaSuggerimenti();
         if (!val) return;
         if (/^PRN-/i.test(val)) {
             doCheckinBiglietto({ codice: val.toUpperCase() });
@@ -246,6 +258,47 @@
         } else {
             doCheckin({ numero_tessera: val });
         }
+    });
+
+    // ---- Socio senza tessera: ricerca per nome (#50) ----
+    var suggestEl = document.getElementById('manual-suggest');
+    var suggestTimer = null;
+    function svuotaSuggerimenti() { suggestEl.textContent = ''; }
+    function sembraUnCodice(v) {
+        return /^PRN-/i.test(v) || /^[a-f0-9]{64}$/i.test(v) || /^[a-f0-9-]{36}$/i.test(v) || /^\d+$/.test(v);
+    }
+    manualInput.addEventListener('input', function() {
+        clearTimeout(suggestTimer);
+        var q = manualInput.value.trim();
+        if (q.length < 3 || sembraUnCodice(q)) { svuotaSuggerimenti(); return; }
+        suggestTimer = setTimeout(function() {
+            fetch(SOCI_URL + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json' } })
+                .then(function(r) { return r.ok ? r.json() : { soci: [] }; })
+                .then(function(d) {
+                    if (manualInput.value.trim() !== q) return;
+                    svuotaSuggerimenti();
+                    (d.soci || []).forEach(function(socio) {
+                        var b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+                        var nome = document.createElement('span');
+                        nome.textContent = socio.nome;
+                        var num = document.createElement('small');
+                        num.className = 'text-muted';
+                        num.textContent = 'N. ' + (socio.numero_socio || '—');
+                        b.appendChild(nome);
+                        b.appendChild(num);
+                        b.addEventListener('click', function() {
+                            manualInput.value = '';
+                            svuotaSuggerimenti();
+                            doCheckin({ socio_id: socio.id });
+                            manualInput.focus();
+                        });
+                        suggestEl.appendChild(b);
+                    });
+                })
+                .catch(function() {});
+        }, 300);
     });
 
     // ---- Check-in ----
@@ -355,7 +408,10 @@
 
         overlay.appendChild(card);
         overlay.classList.remove('d-none');
-        setTimeout(function() { overlay.classList.add('d-none'); }, 2000);
+        setTimeout(function() {
+            overlay.classList.add('d-none');
+            if (currentEventId) manualInput.focus();
+        }, 2000);
     }
 
     function addRecent(iconCls, text) {

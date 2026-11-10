@@ -41,9 +41,11 @@ class CheckinTesseraRequest extends FormRequest
                     ->where('associazione_id', $associazioneId)
                     ->whereNull('deleted_at'),
             ],
-            'tessera_id' => ['nullable', 'uuid', 'required_without_all:numero_tessera,numero_socio'],
-            'numero_tessera' => ['nullable', 'string', 'max:50', 'required_without_all:tessera_id,numero_socio'],
-            'numero_socio' => ['nullable', 'string', 'max:50', 'required_without_all:tessera_id,numero_tessera'],
+            'tessera_id' => ['nullable', 'uuid', 'required_without_all:numero_tessera,numero_socio,socio_id'],
+            'numero_tessera' => ['nullable', 'string', 'max:50', 'required_without_all:tessera_id,numero_socio,socio_id'],
+            'numero_socio' => ['nullable', 'string', 'max:50', 'required_without_all:tessera_id,numero_tessera,socio_id'],
+            // Socio scelto per nome da chi ha dimenticato la tessera (#50)
+            'socio_id' => ['nullable', 'uuid', 'required_without_all:tessera_id,numero_tessera,numero_socio'],
         ];
     }
 
@@ -54,7 +56,7 @@ class CheckinTesseraRequest extends FormRequest
     {
         return [
             'evento_id.exists' => 'Evento non valido per questa associazione.',
-            'tessera_id.required_without_all' => 'Fornisci tessera, numero tessera o numero socio.',
+            'tessera_id.required_without_all' => 'Fornisci tessera, numero tessera, numero socio o scegli il socio per nome.',
         ];
     }
 

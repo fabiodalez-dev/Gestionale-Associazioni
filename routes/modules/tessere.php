@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Quote\VerificaRicevutaController;
 use App\Http\Controllers\Tessere\CheckinController;
 use App\Http\Controllers\Tessere\ScannerTesseraController;
 use App\Http\Controllers\Tessere\TesseraController;
@@ -71,6 +72,11 @@ Route::middleware(['auth', 'tenant'])->group(function () {
 | chiunque possieda l'UUID (capability token); i QR contengono URL firmati.
 */
 Route::middleware(['throttle:30,1'])->group(function () {
+    // Verifica pubblica di una ricevuta dal QR del PDF (#77): URL firmato
+    Route::get('/verifica-ricevuta/{ricevuta}', VerificaRicevutaController::class)
+        ->whereUuid('ricevuta')
+        ->middleware('signed')
+        ->name('ricevute.verifica');
     Route::get('/verifica-tessera/{tessera?}', [VerificaTesseraController::class, 'show'])
         ->name('tessere.verifica');
     Route::get('/api/verifica-tessera/{tessera}', [VerificaTesseraController::class, 'json'])

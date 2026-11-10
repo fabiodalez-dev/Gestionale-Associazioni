@@ -5,9 +5,11 @@ namespace App\Services\Pagamenti;
 use App\Models\Quota;
 use App\Models\Ricevuta;
 use App\Models\Socio;
+use App\Services\Tessere\TesseraQrService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Ricevute di pagamento quota (f.21 PIANO-VITA-SOCIALE): una sola
@@ -101,6 +103,8 @@ class RicevutaService
             'socio' => $socio,
             // Istantanea dell'emissione, dati correnti per le ricevute storiche
             'dati' => $ricevuta->datiStampa($quota, $socio),
+            // QR di verifica pubblica (#77): URL firmato, non indovinabile
+            'qrVerifica' => app(TesseraQrService::class)->generateDataUri(URL::signedRoute('ricevute.verifica', ['ricevuta' => $ricevuta->id]), 2),
         ]);
 
         return (string) $pdf->output();

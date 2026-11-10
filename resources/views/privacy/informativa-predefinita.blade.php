@@ -39,7 +39,7 @@
 <p>I dati sono trattati con strumenti informatici e cartacei da persone autorizzate dell'associazione, con misure di sicurezza adeguate. Possono essere comunicati a fornitori di servizi tecnici (gestionale, posta elettronica, pagamenti online) nominati responsabili del trattamento, e a enti e autorità quando richiesto dalla legge. Non sono diffusi né trasferiti fuori dall'Unione europea senza garanzie adeguate.</p>
 
 <h4>Conservazione</h4>
-<p>Per la durata del rapporto associativo e, dopo la sua cessazione, per il tempo previsto dagli obblighi di legge (di norma dieci anni per i documenti contabili). Le richieste di iscrizione non accolte sono cancellate entro dodici mesi.</p>
+<p>Per la durata del rapporto associativo e, dopo la sua cessazione, per il tempo previsto dagli obblighi di legge (di norma dieci anni per i documenti contabili). Le richieste di iscrizione non accolte sono cancellate entro dodici mesi. I registri tecnici sono cancellati automaticamente: i tentativi di accesso falliti dopo novanta giorni, gli altri accessi e lo storico delle email inviate dopo dodici mesi.</p>
 
 <h4>Diritti dell'interessato</h4>
 <p>In ogni momento è possibile chiedere l'accesso ai propri dati, la rettifica, la cancellazione, la limitazione del trattamento, la portabilità e opporsi al trattamento (artt. 15-22 GDPR), scrivendo a {{ $associazione->email }}. È inoltre possibile proporre reclamo al Garante per la protezione dei dati personali (www.garanteprivacy.it).</p>

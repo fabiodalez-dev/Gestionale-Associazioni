@@ -9,6 +9,14 @@
         <a href="{{ route('pubblico.home.show', $associazione->slug) }}" class="small">Torna alla home</a>
     </div>
 
+    @if ($gruppi->isNotEmpty())
+        <p class="small text-muted mb-4">
+            Elenco scaricabile:
+            <a href="{{ route('pubblico.trasparenza.esporta', [$associazione->slug, 'csv']) }}">CSV</a> ·
+            <a href="{{ route('pubblico.trasparenza.esporta', [$associazione->slug, 'json']) }}">JSON</a>
+        </p>
+    @endif
+
     @if ($gruppi->isEmpty())
         <div class="text-center text-muted py-5">
             <i class="bi bi-journal-check display-5 d-block mb-2"></i>

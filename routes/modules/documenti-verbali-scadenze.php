@@ -95,6 +95,9 @@ Route::prefix('a/{associazione:slug}')
     ->middleware(RisolviTenantPubblico::class)
     ->group(function (): void {
         Route::get('/trasparenza', [TrasparenzaController::class, 'index'])->name('trasparenza');
+        Route::get('/trasparenza.{formato}', [TrasparenzaController::class, 'esporta'])
+            ->whereIn('formato', ['csv', 'json'])
+            ->name('trasparenza.esporta');
         Route::get('/trasparenza/{documento}/download', [TrasparenzaController::class, 'download'])
             ->name('trasparenza.download');
     });

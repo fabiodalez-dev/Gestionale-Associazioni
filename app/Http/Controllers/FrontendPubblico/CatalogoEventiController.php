@@ -5,6 +5,7 @@ namespace App\Http\Controllers\FrontendPubblico;
 use App\Http\Controllers\Controller;
 use App\Models\Associazione;
 use App\Models\Evento;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -13,19 +14,60 @@ use Illuminate\View\View;
  */
 class CatalogoEventiController extends Controller
 {
-    public function index(Associazione $associazione): View
+    /**
+     * Catalogo con ricerca e filtri (#46): testo, periodo, gratuiti o a
+     * pagamento, solo con posti liberi. I filtri stanno nell'URL (si può
+     * condividere); senza JavaScript è un normale form GET, con JavaScript la
+     * stessa rotta restituisce solo l'elenco e la pagina non si ricarica.
+     */
+    public function index(Request $request, Associazione $associazione): View
     {
-        $eventi = Evento::query()
+        $filtri = [
+            'q' => mb_substr(trim((string) $request->query('q', '')), 0, 100),
+            'periodo' => in_array($request->query('periodo'), ['settimana', 'mese'], true) ? (string) $request->query('periodo') : '',
+            'prezzo' => in_array($request->query('prezzo'), ['gratuiti', 'a_pagamento'], true) ? (string) $request->query('prezzo') : '',
+            'posti' => $request->boolean('posti'),
+        ];
+
+        $query = Evento::query()
             ->where('associazione_id', $associazione->id)
             ->pubblicati()
             ->where('data_evento', '>=', now())
-            ->orderBy('data_evento')
-            ->get();
+            ->orderBy('data_evento');
 
-        return view('pubblico.eventi.index', [
+        if ($filtri['q'] !== '') {
+            foreach (preg_split('/\s+/', $filtri['q']) ?: [] as $parola) {
+                $query->where(fn ($w) => $w
+                    ->where('titolo', 'like', '%'.$parola.'%')
+                    ->orWhere('descrizione', 'like', '%'.$parola.'%')
+                    ->orWhere('luogo', 'like', '%'.$parola.'%'));
+            }
+        }
+        if ($filtri['periodo'] === 'settimana') {
+            $query->where('data_evento', '<=', now()->endOfWeek());
+        } elseif ($filtri['periodo'] === 'mese') {
+            $query->where('data_evento', '<=', now()->endOfMonth());
+        }
+        if ($filtri['prezzo'] === 'gratuiti') {
+            $query->where(fn ($w) => $w->whereNull('prezzo')->orWhere('prezzo', '<=', 0));
+        } elseif ($filtri['prezzo'] === 'a_pagamento') {
+            $query->where('prezzo', '>', 0);
+        }
+
+        $eventi = $query->get();
+        if ($filtri['posti']) {
+            // null = capienza illimitata
+            $eventi = $eventi->filter(fn (Evento $evento) => $evento->postiDisponibili() !== 0)->values();
+        }
+
+        $dati = [
             'associazione' => $associazione,
             'eventi' => $eventi,
-        ]);
+            'filtri' => $filtri,
+            'filtriAttivi' => $filtri['q'] !== '' || $filtri['periodo'] !== '' || $filtri['prezzo'] !== '' || $filtri['posti'],
+        ];
+
+        return view($request->header('X-Elenco-Eventi') === '1' ? 'pubblico.eventi._elenco' : 'pubblico.eventi.index', $dati);
     }
 
     public function show(Associazione $associazione, Evento $evento): View

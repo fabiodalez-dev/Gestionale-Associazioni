@@ -413,6 +413,25 @@ CREATE TABLE `cessazioni` (
   CONSTRAINT `cessazioni_socio_id_foreign` FOREIGN KEY (`socio_id`) REFERENCES `soci` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `chiusure`;
+CREATE TABLE `chiusure` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sede_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `titolo` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `data_inizio` date NOT NULL,
+  `data_fine` date NOT NULL,
+  `ogni_anno` tinyint(1) NOT NULL DEFAULT '0',
+  `attiva` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `chiusure_associazione_id_data_inizio_index` (`associazione_id`,`data_inizio`),
+  KEY `chiusure_sede_id_foreign` (`sede_id`),
+  CONSTRAINT `chiusure_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chiusure_sede_id_foreign` FOREIGN KEY (`sede_id`) REFERENCES `sedi` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `conflitti_riunione`;
 CREATE TABLE `conflitti_riunione` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2504,6 +2523,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_190000_create_bilanci_sociali_table', 1),
 ('2026_11_05_100100_add_checkin_posti_origine_to_prenotazioni', 1),
 ('2026_11_05_120000_add_snapshot_intestatario_to_ricevute_table', 1),
-('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1);
+('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1),
+('2026_11_10_100000_create_chiusure_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

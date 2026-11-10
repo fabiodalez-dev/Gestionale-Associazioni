@@ -28,6 +28,10 @@ class EventoSpazioConflittoTest extends TestCase
     {
         parent::setUp();
 
+        // Un martedì feriale fisso: le date relative dei test non devono
+        // cadere in una festività, dove gli spazi sono chiusi (#36)
+        $this->travelTo('2026-11-10 09:00:00');
+
         $this->associazione = Associazione::factory()->create();
         $this->admin = Utente::factory()->adminAssociazione()->create([
             'associazione_id' => $this->associazione->id,

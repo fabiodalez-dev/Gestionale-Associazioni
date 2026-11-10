@@ -3,6 +3,7 @@
 namespace Tests\Feature\SpaziRisorse;
 
 use App\Models\Associazione;
+use App\Models\Chiusura;
 use App\Models\PrenotazioneSpazio;
 use App\Models\Spazio;
 use App\Models\Utente;
@@ -23,6 +24,10 @@ class PrenotazioneSpazioTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Un martedì feriale fisso: le date relative dei test non devono
+        // cadere in una festività, dove gli spazi sono chiusi (#36)
+        $this->travelTo('2026-11-10 09:00:00');
 
         $this->associazione = Associazione::factory()->create();
         $this->admin = Utente::factory()->adminAssociazione()->create([
@@ -275,5 +280,32 @@ class PrenotazioneSpazioTest extends TestCase
             0,
             PrenotazioneSpazio::query()->where('titolo', 'Richiesta in gara')->count()
         );
+    }
+
+    public function test_prenotazione_in_un_giorno_di_chiusura_rifiutata_con_il_primo_giorno_aperto(): void
+    {
+        $spazio = Spazio::factory()->create(['associazione_id' => $this->associazione->id]);
+        Chiusura::query()->create([
+            'associazione_id' => $this->associazione->id, 'titolo' => 'Disinfestazione',
+            'data_inizio' => '2026-11-12', 'data_fine' => '2026-11-13',
+        ]);
+
+        $this->actingAs($this->admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->from(route('spazi.prenotazioni.index'))
+            ->post(route('spazi.prenotazioni.store'), [
+                'spazio_id' => $spazio->id, 'titolo' => 'Prove coro',
+                'dal' => '2026-11-12T18:00', 'al' => '2026-11-12T20:00',
+            ])
+            ->assertSessionHasErrors(['dal' => 'Il 12/11/2026 la sede è chiusa (Disinfestazione). Il primo giorno aperto è sabato 14 novembre 2026.']);
+
+        // E nelle festività nazionali
+        $this->actingAs($this->admin)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('spazi.prenotazioni.store'), [
+                'spazio_id' => $spazio->id, 'titolo' => 'Tombolata',
+                'dal' => '2026-12-25T18:00', 'al' => '2026-12-25T20:00',
+            ])
+            ->assertSessionHasErrors('dal');
+
+        $this->assertSame(0, PrenotazioneSpazio::query()->count());
     }
 }

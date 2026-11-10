@@ -178,6 +178,8 @@ class Organizzazione3FoundationTest extends TestCase
 
     public function test_prenotazione_spazio_rileva_conflitti_di_overlap(): void
     {
+        $this->travelTo('2026-11-10 09:00:00'); // giorno feriale: niente festività (#36)
+
         $esistente = PrenotazioneSpazio::factory()->create([
             'dal' => now()->addDay()->setTime(10, 0),
             'al' => now()->addDay()->setTime(12, 0),

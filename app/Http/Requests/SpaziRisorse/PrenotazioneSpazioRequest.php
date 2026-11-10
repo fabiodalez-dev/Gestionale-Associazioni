@@ -4,6 +4,7 @@ namespace App\Http\Requests\SpaziRisorse;
 
 use App\Models\PrenotazioneSpazio;
 use App\Models\Spazio;
+use App\Services\Calendario\CalendarioAperture;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -51,7 +52,41 @@ class PrenotazioneSpazioRequest extends FormRequest
             }
 
             $this->validaConflitti($validator);
+            $this->validaChiusure($validator);
         });
+    }
+
+    /**
+     * Niente prenotazioni nei giorni in cui la sede dello spazio è chiusa
+     * (#36): festività nazionali e calendario chiusure (#34). Il messaggio
+     * propone il primo giorno aperto.
+     */
+    protected function validaChiusure(Validator $validator): void
+    {
+        $dal = $this->date('dal');
+        $al = $this->date('al');
+        $spazio = Spazio::query()->find((string) $this->input('spazio_id'));
+
+        if ($dal === null || $al === null || $spazio === null) {
+            return;
+        }
+
+        $calendario = app(CalendarioAperture::class);
+        $giorno = $dal->copy()->startOfDay();
+        for ($i = 0; $i < 60 && $giorno->lte($al); $i++, $giorno = $giorno->addDay()) {
+            $motivo = $calendario->motivoChiusura($giorno, $spazio->associazione_id, $spazio->sede_id);
+            if ($motivo !== null) {
+                $primo = $calendario->primoGiornoAperto($giorno, $spazio->associazione_id, $spazio->sede_id);
+                $validator->errors()->add('dal', sprintf(
+                    'Il %s la sede è chiusa (%s). Il primo giorno aperto è %s.',
+                    $giorno->format('d/m/Y'),
+                    $motivo,
+                    $primo->translatedFormat('l j F Y'),
+                ));
+
+                return;
+            }
+        }
     }
 
     /**

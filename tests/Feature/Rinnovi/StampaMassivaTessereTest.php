@@ -51,6 +51,53 @@ class StampaMassivaTessereTest extends RinnoviTestCase
         $response->assertHeader('content-type', 'application/pdf');
     }
 
+    /** Pagine e dimensioni (MediaBox) del PDF prodotto da dompdf. */
+    private function paginePdf(string $pdf): array
+    {
+        preg_match_all('#/Type\s*/Page[^s]#', $pdf, $pagine);
+        preg_match('#/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)#', $pdf, $box);
+
+        return [count($pagine[0]), isset($box[3]) ? [round((float) $box[3]), round((float) $box[4])] : null];
+    }
+
+    public function test_formato_carta_di_credito_una_tessera_per_pagina_cr80(): void
+    {
+        $this->configuraTenant();
+        $this->creaTessera();
+        $this->creaTessera();
+
+        $pdf = (string) $this->actingAs($this->admin)
+            ->get(route('tessere.stampa-massiva', ['anno' => now()->year, 'formato' => 'cr80']))
+            ->assertOk()->getContent();
+
+        // 85,6 × 54 mm = 243 × 153 punti, una tessera per pagina
+        $this->assertSame([2, [243.0, 153.0]], $this->paginePdf($pdf));
+    }
+
+    public function test_fogli_a4_da_dieci_tessere(): void
+    {
+        $this->configuraTenant();
+        for ($i = 0; $i < 23; $i++) {
+            $this->creaTessera();
+        }
+
+        $pdf = (string) $this->actingAs($this->admin)
+            ->get(route('tessere.stampa-massiva', ['anno' => now()->year, 'formato' => 'biglietti']))
+            ->assertOk()->getContent();
+
+        // 23 tessere → 3 fogli A4 (595 × 842 punti)
+        $this->assertSame([3, [595.0, 842.0]], $this->paginePdf($pdf));
+    }
+
+    public function test_formato_sconosciuto_rifiutato(): void
+    {
+        $this->configuraTenant();
+
+        $this->actingAs($this->admin)
+            ->get(route('tessere.stampa-massiva', ['anno' => now()->year, 'formato' => 'a3']))
+            ->assertSessionHasErrors('formato');
+    }
+
     public function test_selezione_esplicita_per_id(): void
     {
         $this->configuraTenant();

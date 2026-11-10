@@ -13,10 +13,21 @@
             <i class="bi bi-qr-code-scan me-1"></i>Check-in
         </a>
         {{-- Stampa massiva (f.4 piano Vita sociale — modulo rinnovi): PDF unico con i filtri correnti --}}
-        <a href="{{ route('tessere.stampa-massiva', ['anno' => $anno, 'search' => $search, 'stato' => $stato]) }}"
-           class="btn btn-outline-secondary" target="_blank" rel="noopener">
-            <i class="bi bi-printer me-1"></i>Stampa PDF
-        </a>
+        <div class="btn-group">
+            <a href="{{ route('tessere.stampa-massiva', ['anno' => $anno, 'search' => $search, 'stato' => $stato]) }}"
+               class="btn btn-outline-secondary" target="_blank" rel="noopener">
+                <i class="bi bi-printer me-1"></i>Stampa PDF
+            </a>
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                <span class="visually-hidden">Scegli il formato</span>
+            </button>
+            {{-- Formato scelto al momento della stampa (#47) --}}
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" target="_blank" rel="noopener" href="{{ route('tessere.stampa-massiva', ['anno' => $anno, 'search' => $search, 'stato' => $stato, 'formato' => 'a4']) }}">Una per pagina A4</a></li>
+                <li><a class="dropdown-item" target="_blank" rel="noopener" href="{{ route('tessere.stampa-massiva', ['anno' => $anno, 'search' => $search, 'stato' => $stato, 'formato' => 'cr80']) }}">Formato carta di credito (stampante di card)</a></li>
+                <li><a class="dropdown-item" target="_blank" rel="noopener" href="{{ route('tessere.stampa-massiva', ['anno' => $anno, 'search' => $search, 'stato' => $stato, 'formato' => 'biglietti']) }}">10 per foglio A4 da biglietti da visita</a></li>
+            </ul>
+        </div>
         <a href="{{ route('tessere.export', ['anno' => $anno, 'search' => $search, 'stato' => $stato]) }}" class="btn btn-outline-secondary">
             <i class="bi bi-download me-1"></i>CSV
         </a>

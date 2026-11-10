@@ -44,7 +44,7 @@ class StampaMassivaTessereController extends Controller
                 ->with('warning', 'Nessuna tessera da stampare con i filtri selezionati.');
         }
 
-        return $this->stampa->render($associazione, $tessere);
+        return $this->stampa->render($associazione, $tessere, (string) ($request->validated('formato') ?? 'a4'));
     }
 
     /**

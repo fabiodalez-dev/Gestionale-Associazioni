@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Health\JobFallitiCheck;
+use App\Health\RiscrittureIndirizziCheck;
 use App\Listeners\RegistraAccesso;
 use App\Models\Evento;
 use App\Observers\EventoGoogleCalendarObserver;
@@ -78,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
                 ->warnWhenUsedSpaceIsAbovePercentage(70)
                 ->failWhenUsedSpaceIsAbovePercentage(90),
             JobFallitiCheck::new()->label('Job falliti (24 ore)')->failWhenMoreThan(10),
+            RiscrittureIndirizziCheck::new()->label('Riscritture degli indirizzi (.htaccess)'),
         ];
 
         if ($this->app->environment('production')) {

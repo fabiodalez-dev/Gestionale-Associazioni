@@ -7,9 +7,11 @@ use App\Http\Requests\SpaziRisorse\PrestitoAttrezzaturaRequest;
 use App\Models\Attrezzatura;
 use App\Models\PrestitoAttrezzatura;
 use App\Models\Socio;
+use App\Services\Calendario\CalendarioAperture;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -72,6 +74,19 @@ class PrestitoAttrezzaturaController extends Controller
         // sulla stessa attrezzatura, così che la somma dei pezzi in prestito non
         // superi la quantità totale (la validazione del Form Request è un
         // check-then-act non atomico aggirabile sotto concorrenza).
+        // La restituzione prevista cade in un giorno di apertura (#37): se è
+        // un festivo o una chiusura della sede, slitta al primo giorno aperto
+        $spostata = null;
+        $perSede = Attrezzatura::query()->with('spazio')->find($attrezzaturaId);
+        if ($perSede !== null) {
+            $prevista = Carbon::parse((string) $validated['restituzione_prevista'])->startOfDay();
+            $aperta = app(CalendarioAperture::class)->primoGiornoAperto($prevista, $perSede->associazione_id, $perSede->spazio?->sede_id);
+            if (! $aperta->isSameDay($prevista)) {
+                $validated['restituzione_prevista'] = $aperta->toDateString();
+                $spostata = $aperta;
+            }
+        }
+
         DB::transaction(function () use ($validated, $attrezzaturaId, $richiesta): void {
             $attrezzatura = $this->lockAttrezzatura($attrezzaturaId);
 
@@ -97,7 +112,9 @@ class PrestitoAttrezzaturaController extends Controller
 
         return redirect()
             ->route('prestiti.index')
-            ->with('success', 'Prestito registrato con successo.');
+            ->with('success', 'Prestito registrato con successo.'.($spostata !== null
+                ? ' La restituzione cadeva in un giorno di chiusura: spostata a '.$spostata->translatedFormat('l j F Y').'.'
+                : ''));
     }
 
     /**

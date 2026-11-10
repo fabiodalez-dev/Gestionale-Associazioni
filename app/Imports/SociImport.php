@@ -29,6 +29,9 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
 {
     public int $importati = 0;
 
+    /** Righe di dati lette dal file (#55). */
+    public int $righeLette = 0;
+
     /** Soci già presenti aggiornati dal file (#56). */
     public int $aggiornati = 0;
 
@@ -70,6 +73,7 @@ class SociImport implements SkipsEmptyRows, ToCollection, WithHeadingRow
             $prossimoNumero = (int) $this->progressivi->prossimoNumeroSocio($this->associazione->id);
 
             foreach ($rows as $indice => $row) {
+                $this->righeLette++;
                 $numeroRiga = $indice + 2; // +1 heading row, +1 base 1
                 $dati = $this->normalizza($row->toArray());
 

@@ -3,6 +3,7 @@
 use App\Models\Accesso;
 use App\Models\EmailLog;
 use App\Models\EmailQueue;
+use App\Models\Importazione;
 use App\Models\RichiestaRegistrazione;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -136,7 +137,7 @@ Schedule::command('model:prune', [
 |
 */
 Schedule::command('model:prune', [
-    '--model' => [Accesso::class, EmailQueue::class, EmailLog::class],
+    '--model' => [Accesso::class, EmailQueue::class, EmailLog::class, Importazione::class],
 ])
     ->dailyAt('04:20')
     ->withoutOverlapping();

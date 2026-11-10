@@ -4,6 +4,7 @@ namespace Tests\Feature\Soci;
 
 use App\Models\Associazione;
 use App\Models\DocumentoSocio;
+use App\Models\Importazione;
 use App\Models\Socio;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,6 +118,43 @@ class SociImportDocumentiTest extends TestCase
         $this->assertSame([0, 0], [$report['importati'], $report['aggiornati']]);
         $this->assertCount(1, $report['errori']);
         $this->assertSame('Esposito', Socio::query()->where('email', 'marco@example.com')->value('cognome'));
+    }
+
+    public function test_storico_importazioni_con_report_errori_in_csv(): void
+    {
+        $csv = implode("\n", ['nome,cognome,email', 'Mario,Rossi,mario.storico@example.com', ',Senza,manca@example.com']);
+        $this->actingAs($this->admin)->post('/soci/import', ['file' => UploadedFile::fake()->createWithContent('elenco-2026.csv', $csv)]);
+
+        $importazione = Importazione::query()->sole();
+        $this->assertSame(['elenco-2026.csv', 2, 1, 0, 1], [
+            $importazione->nome_file, $importazione->righe_lette, $importazione->create, $importazione->aggiornate, $importazione->scartate,
+        ]);
+        $this->assertSame($this->admin->id, $importazione->utente_id);
+
+        $this->actingAs($this->admin)->get(route('soci.importazioni.index'))
+            ->assertOk()->assertSee('elenco-2026.csv')->assertSee(route('soci.importazioni.errori', $importazione->id), false);
+
+        $report = $this->actingAs($this->admin)->get(route('soci.importazioni.errori', $importazione->id))
+            ->assertOk()->assertDownload()->streamedContent();
+        $this->assertStringStartsWith("\u{FEFF}riga;errore", $report);
+        $this->assertStringContainsString('3;', $report);
+
+        // Dopo dodici mesi lo storico viene eliminato
+        $importazione->forceFill(['created_at' => now()->subMonths(13)])->save();
+        $this->artisan('model:prune', ['--model' => [Importazione::class]]);
+        $this->assertSame(0, Importazione::query()->withoutGlobalScopes()->count());
+    }
+
+    public function test_storico_di_un_altra_associazione_non_visibile(): void
+    {
+        $altra = Importazione::query()->create([
+            'associazione_id' => Associazione::factory()->create()->id,
+            'tipo' => Importazione::TIPO_SOCI, 'nome_file' => 'altrui.csv', 'scartate' => 1,
+            'errori' => [['riga' => 2, 'errori' => ['x']]],
+        ]);
+
+        $this->actingAs($this->admin)->get(route('soci.importazioni.index'))->assertDontSee('altrui.csv');
+        $this->actingAs($this->admin)->get(route('soci.importazioni.errori', $altra->id))->assertNotFound();
     }
 
     public function test_upload_download_e_cancellazione_documento_socio(): void

@@ -986,6 +986,28 @@ CREATE TABLE `health_check_result_history_items` (
   KEY `health_check_result_history_items_batch_index` (`batch`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `importazioni`;
+CREATE TABLE `importazioni` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `utente_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tipo` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nome_file` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `righe_lette` int unsigned NOT NULL DEFAULT '0',
+  `create` int unsigned NOT NULL DEFAULT '0',
+  `aggiornate` int unsigned NOT NULL DEFAULT '0',
+  `scartate` int unsigned NOT NULL DEFAULT '0',
+  `errori` json DEFAULT NULL,
+  `durata_ms` int unsigned NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `importazioni_associazione_id_created_at_index` (`associazione_id`,`created_at`),
+  KEY `importazioni_utente_id_foreign` (`utente_id`),
+  CONSTRAINT `importazioni_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `importazioni_utente_id_foreign` FOREIGN KEY (`utente_id`) REFERENCES `utenti` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `job_batches`;
 CREATE TABLE `job_batches` (
   `id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -2524,6 +2546,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_11_05_100100_add_checkin_posti_origine_to_prenotazioni', 1),
 ('2026_11_05_120000_add_snapshot_intestatario_to_ricevute_table', 1),
 ('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1),
-('2026_11_10_100000_create_chiusure_table', 1);
+('2026_11_10_100000_create_chiusure_table', 1),
+('2026_11_10_110000_create_importazioni_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

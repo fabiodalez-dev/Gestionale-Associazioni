@@ -6,6 +6,7 @@ use App\Http\Controllers\Soci\CategoriaSocioController;
 use App\Http\Controllers\Soci\DocumentoSocioController;
 use App\Http\Controllers\Soci\FotoSocioController;
 use App\Http\Controllers\Soci\GruppoDinamicoController;
+use App\Http\Controllers\Soci\ImportazioneController;
 use App\Http\Controllers\Soci\SavedFilterController;
 use App\Http\Controllers\Soci\SocioController;
 use App\Http\Controllers\Soci\SocioStatoController;
@@ -36,6 +37,9 @@ Route::middleware(['auth', 'tenant'])->group(function () {
     Route::get('/soci/export', [SocioController::class, 'export'])->name('soci.export');
     Route::get('/soci/import', [SocioController::class, 'import'])->name('soci.import');
     Route::post('/soci/import', [SocioController::class, 'importStore'])->name('soci.import.store');
+    // Storico delle importazioni con report errori (#55)
+    Route::get('/soci/importazioni', [ImportazioneController::class, 'index'])->name('soci.importazioni.index');
+    Route::get('/soci/importazioni/{importazione}/errori.csv', [ImportazioneController::class, 'errori'])->whereUuid('importazione')->name('soci.importazioni.errori');
     Route::get('/soci/search', [SocioController::class, 'search'])->name('soci.search');
     Route::get('/soci/verifica-dati', [SocioController::class, 'verificaDati'])->middleware('throttle:60,1')->name('soci.verifica-dati');
 

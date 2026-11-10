@@ -17,6 +17,8 @@ class MessaggioSocioTest extends ComunicazioneTestCase
 {
     public function test_admin_accoda_l_email_e_traccia_lo_storico(): void
     {
+        // Nome con apostrofo e & fisso: prima era casuale e a volte li conteneva
+        $this->associazione->update(['nome' => "APS D'Amico & figli"]);
         $this->configuraSmtp();
 
         $socio = Socio::factory()->create([
@@ -42,8 +44,9 @@ class MessaggioSocioTest extends ComunicazioneTestCase
         // Testo escapato (niente HTML libero) + a-capo convertiti
         $this->assertStringContainsString('&lt;giovedì&gt;', $coda->body_html);
         $this->assertStringContainsString('<br', $coda->body_html);
-        // Layout brandizzato del tenant
-        $this->assertStringContainsString($this->associazione->nome, $coda->body_html);
+        // Layout brandizzato del tenant (il nome è nell'HTML con l'escape: un
+        // nome casuale come "D'amico" diventa D&#039;amico)
+        $this->assertStringContainsString(e($this->associazione->nome), $coda->body_html);
 
         $storico = StoricoAttivitaSocio::allTenants()->where('socio_id', $socio->id)->firstOrFail();
         $this->assertSame(MessaggioSocioController::TIPO_ATTIVITA, $storico->tipo_attivita);

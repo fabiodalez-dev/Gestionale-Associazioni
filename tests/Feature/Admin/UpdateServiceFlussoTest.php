@@ -41,6 +41,30 @@ class UpdateServiceFlussoTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_dopo_la_copia_svuota_opcache_con_i_file_copiati(): void
+    {
+        $updater = new UpdateServiceDiProva($this->root);
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto);
+
+        $this->assertTrue($esito['success'], (string) $esito['error']);
+        $this->assertCount(1, $updater->opcacheSvuotata, 'Una sola volta, dopo copia e orfani');
+        $this->assertContains($this->root.'/app/nuovo.php', $updater->opcacheSvuotata[0]);
+        $this->assertContains($this->root.'/app/comune.php', $updater->opcacheSvuotata[0]);
+        // Con o senza OPcache nel processo di test, non si ferma mai e dice cosa ha fatto
+        $this->assertMatchesRegularExpression('/^opcache/', $updater->esitiOpcache[0]);
+    }
+
+    public function test_dopo_il_rollback_svuota_di_nuovo_opcache(): void
+    {
+        $updater = new UpdateServiceDiProva($this->root);
+        $updater->fallisciPostInstallazione = true;
+
+        $esito = $updater->applicaAggiornamento('0.0.0', null, $this->pacchetto);
+
+        $this->assertFalse($esito['success']);
+        $this->assertCount(2, $updater->opcacheSvuotata, 'Dopo la copia e dopo il ripristino dei file');
+    }
+
     public function test_aggiornamento_da_pacchetto_copia_preserva_e_pulisce(): void
     {
         $updater = new UpdateServiceDiProva($this->root);
@@ -353,6 +377,19 @@ class UpdateServiceDiProva extends UpdateService
 
     /** Contenuto del file di manutenzione mentre girano migration e comandi. */
     public ?string $manutenzioneDuranteIlPost = null;
+
+    /** @var list<list<string>> file passati a ogni svuotamento di OPcache */
+    public array $opcacheSvuotata = [];
+
+    /** @var list<string> esiti reali dello svuotamento (OPcache del processo di test) */
+    public array $esitiOpcache = [];
+
+    protected function svuotaOpcache(array $file): string
+    {
+        $this->opcacheSvuotata[] = $file;
+
+        return $this->esitiOpcache[] = parent::svuotaOpcache($file);
+    }
 
     protected function backupDatabase(): string
     {

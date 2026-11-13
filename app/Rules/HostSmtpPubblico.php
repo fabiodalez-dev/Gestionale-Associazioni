@@ -57,6 +57,13 @@ class HostSmtpPubblico implements ValidationRule
             return null;
         }
 
+        // Relay interni decisi dall'operatore della piattaforma (non dal
+        // tenant): es. il postfix locale di un hosting condiviso. Niente
+        // risoluzione né pinning: il nome resta com'è.
+        if (in_array($host, self::hostPrivatiAmmessi(), true)) {
+            return [];
+        }
+
         foreach (self::SUFFISSI_LOCALI as $suffisso) {
             if ($host === ltrim($suffisso, '.') || str_ends_with($host, $suffisso)) {
                 return null;
@@ -82,6 +89,21 @@ class HostSmtpPubblico implements ValidationRule
         }
 
         return $indirizzi;
+    }
+
+    /**
+     * Host locali o privati che l'operatore ha dichiarato ammessi come relay
+     * (config mail.smtp_tenant_host_privati, env SMTP_TENANT_HOST_PRIVATI,
+     * separati da virgola).
+     *
+     * @return list<string>
+     */
+    public static function hostPrivatiAmmessi(): array
+    {
+        $valore = config('mail.smtp_tenant_host_privati', '');
+        $lista = is_array($valore) ? $valore : explode(',', (string) $valore);
+
+        return array_values(array_filter(array_map(fn ($h) => strtolower(trim((string) $h, "[] \t")), $lista)));
     }
 
     /**

@@ -6,6 +6,8 @@ use App\Models\Associazione;
 use App\Models\SmtpSetting;
 use App\Models\Socio;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -53,7 +55,20 @@ class TenantNotificationMailer
 
         $nome = 'tenant-'.$associazione->id;
 
-        config(["mail.mailers.{$nome}" => TenantMailer::mailerConfig($settings)]);
+        try {
+            config(["mail.mailers.{$nome}" => TenantMailer::mailerConfig($settings)]);
+        } catch (InvalidArgumentException $e) {
+            // Host SMTP del tenant non ammesso (locale/privato non in allowlist,
+            // non risolvibile): si ripiega sul mailer di default invece di far
+            // fallire la notifica e il job in coda
+            Log::warning('SMTP del tenant non utilizzabile, uso il mailer di default', [
+                'associazione_id' => $associazione->id,
+                'smtp_host' => $settings->smtp_host,
+                'motivo' => $e->getMessage(),
+            ]);
+
+            return $message;
+        }
 
         return $message
             ->mailer($nome)

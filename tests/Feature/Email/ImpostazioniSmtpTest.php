@@ -6,6 +6,8 @@ use App\Models\Associazione;
 use App\Models\EmailTemplate;
 use App\Models\SmtpSetting;
 use App\Services\Email\TenantMailer;
+use App\Services\Email\TenantNotificationMailer;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
@@ -86,6 +88,44 @@ class ImpostazioniSmtpTest extends EmailTestCase
         $config = TenantMailer::mailerConfig($settings);
         $this->assertSame('smtp.example.com', $config['host']);
         $this->assertSame('smtp.example.com', $config['peer_name']);
+    }
+
+    public function test_relay_privato_in_allowlist_dell_operatore_resta_ammesso(): void
+    {
+        config(['mail.smtp_tenant_host_privati' => 'localhost, 127.0.0.1']);
+
+        $this->actingAs($this->admin)->post(route('email-impostazioni.store'), [
+            'smtp_host' => '127.0.0.1', 'smtp_port' => 25, 'smtp_pass' => 'x', 'smtp_encryption' => 'none',
+            'from_email' => 'noreply@example.com', 'max_per_hour' => 100,
+        ])->assertRedirect(route('email-impostazioni.index'))->assertSessionHasNoErrors();
+
+        $settings = SmtpSetting::allTenants()->where('associazione_id', $this->associazione->id)->firstOrFail();
+        $config = TenantMailer::mailerConfig($settings);
+        $this->assertSame('127.0.0.1', $config['host']);
+
+        // Un altro host privato, non in allowlist, resta rifiutato
+        $settings->forceFill(['smtp_host' => '10.0.0.5'])->save();
+        $this->expectException(\InvalidArgumentException::class);
+        TenantMailer::mailerConfig($settings);
+    }
+
+    public function test_ipv6_viene_passato_al_transport_fra_parentesi_quadre(): void
+    {
+        $settings = $this->configuraSmtp();
+        $settings->forceFill(['smtp_host' => '2606:4700:4700::1111'])->save();
+
+        $config = TenantMailer::mailerConfig($settings);
+        $transport = Mail::build($config)->getSymfonyTransport();
+        $this->assertStringContainsString('[2606:4700:4700::1111]', (string) $transport);
+    }
+
+    public function test_notifica_con_smtp_del_tenant_non_ammesso_ripiega_sul_mailer_di_default(): void
+    {
+        $settings = $this->configuraSmtp();
+        $settings->forceFill(['smtp_host' => '10.0.0.5'])->save();
+
+        $message = TenantNotificationMailer::applica(new MailMessage, $this->associazione->fresh());
+        $this->assertNull($message->mailer, 'con host non ammesso la notifica usa il mailer di default');
     }
 
     public function test_primo_salvataggio_crea_le_impostazioni_e_seedda_i_template(): void

@@ -35,6 +35,11 @@ return [
     |
     */
 
+    // SMTP dei tenant: host locali/privati ammessi come relay dall'operatore
+    // della piattaforma (es. "localhost,127.0.0.1"); per tutti gli altri
+    // host vale solo un server di posta pubblico (HostSmtpPubblico)
+    'smtp_tenant_host_privati' => env('SMTP_TENANT_HOST_PRIVATI', ''),
+
     'mailers' => [
 
         'smtp' => [

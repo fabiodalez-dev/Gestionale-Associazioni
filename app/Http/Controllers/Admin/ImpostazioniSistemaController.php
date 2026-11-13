@@ -147,8 +147,12 @@ class ImpostazioniSistemaController extends Controller
         $tokenSoci = Socio::allTenants()->withTrashed()
             ->where(fn ($q) => $q->whereNotNull('password_reset_token')->orWhereNotNull('password_reset_expires'))
             ->update(['password_reset_token' => null, 'password_reset_expires' => null]);
+        // Inviti con nonce pendente più quelli legacy ancora aperti (nessun
+        // invito registrato, utente mai entrato); le righe già chiuse restano
+        // fuori dal conteggio
         $inviti = Utente::query()
-            ->where(fn ($q) => $q->whereNotNull('invito_token')->orWhereNotNull('invito_scade_at'))
+            ->where(fn ($q) => $q->whereNotNull('invito_token')
+                ->orWhere(fn ($q) => $q->whereNull('invito_scade_at')->whereNull('last_login')))
             ->update(Utente::invitoChiuso());
         $tokenBroker = DB::table((string) config('auth.passwords.utenti.table', 'password_reset_tokens'))->delete();
 

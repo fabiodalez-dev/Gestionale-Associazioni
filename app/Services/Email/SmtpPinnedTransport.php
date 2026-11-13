@@ -28,9 +28,15 @@ class SmtpPinnedTransport
     {
         $scheme = (string) ($config['scheme'] ?? 'smtp');
 
+        // Un IPv6 va fra parentesi quadre: SocketStream compone host:porta così com'è
+        $host = (string) $config['host'];
+        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+            $host = '['.$host.']';
+        }
+
         $transport = (new EsmtpTransportFactory)->create(new Dsn(
             $scheme,
-            (string) $config['host'],
+            $host,
             $config['username'] ?? null,
             $config['password'] ?? null,
             isset($config['port']) ? (int) $config['port'] : null,

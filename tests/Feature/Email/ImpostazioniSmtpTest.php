@@ -92,7 +92,18 @@ class ImpostazioniSmtpTest extends EmailTestCase
 
     public function test_relay_privato_in_allowlist_dell_operatore_resta_ammesso(): void
     {
-        config(['mail.smtp_tenant_host_privati' => 'localhost, 127.0.0.1']);
+        config(['mail.smtp_tenant_host_privati' => 'localhost, 127.0.0.1, 10.1.2.3:2500']);
+
+        // Host in allowlist ma porta non di posta: l'host locale non apre ogni porta
+        $this->actingAs($this->admin)->from(route('email-impostazioni.index'))->post(route('email-impostazioni.store'), [
+            'smtp_host' => '127.0.0.1', 'smtp_port' => 22, 'smtp_pass' => 'x', 'smtp_encryption' => 'none',
+            'from_email' => 'noreply@example.com', 'max_per_hour' => 100,
+        ])->assertSessionHasErrors('smtp_host');
+        // Voce host:porta: vale solo quella porta
+        $this->actingAs($this->admin)->from(route('email-impostazioni.index'))->post(route('email-impostazioni.store'), [
+            'smtp_host' => '10.1.2.3', 'smtp_port' => 25, 'smtp_pass' => 'x', 'smtp_encryption' => 'none',
+            'from_email' => 'noreply@example.com', 'max_per_hour' => 100,
+        ])->assertSessionHasErrors('smtp_host');
 
         $this->actingAs($this->admin)->post(route('email-impostazioni.store'), [
             'smtp_host' => '127.0.0.1', 'smtp_port' => 25, 'smtp_pass' => 'x', 'smtp_encryption' => 'none',

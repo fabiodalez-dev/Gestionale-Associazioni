@@ -53,10 +53,15 @@ class TenantMailer
 
             return ['success' => true, 'error' => null];
         } catch (Throwable $e) {
-            // Messaggio SMTP grezzo (mai stack trace): salvato in error_message e mostrato all'admin nel test
+            // Messaggio SMTP grezzo (mai stack trace): salvato in error_message e
+            // mostrato all'admin nel test. Per un relay privato dell'hosting il
+            // dettaglio resta nel log: all'amministratore di associazione non
+            // va riflesso l'errore di un servizio interno
             report($e);
 
-            return ['success' => false, 'error' => $e->getMessage()];
+            $privato = HostSmtpPubblico::relayPrivatoAmmesso(strtolower(trim((string) $settings->smtp_host, "[] \t")), (int) $settings->smtp_port);
+
+            return ['success' => false, 'error' => $privato ? 'Invio non riuscito tramite il relay interno: controlla il log del server.' : $e->getMessage()];
         }
     }
 
@@ -75,7 +80,7 @@ class TenantMailer
         // interna). La connessione va all'IP appena validato, il nome resta
         // il peer TLS (driver smtp-pinned).
         $host = (string) $settings->smtp_host;
-        $indirizzi = HostSmtpPubblico::indirizziAmmessi($host);
+        $indirizzi = HostSmtpPubblico::indirizziAmmessi($host, (int) $settings->smtp_port);
         if ($indirizzi === null) {
             throw new InvalidArgumentException(HostSmtpPubblico::MESSAGGIO.' Correggi l\'host nelle impostazioni email.');
         }

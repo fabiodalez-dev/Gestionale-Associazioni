@@ -69,13 +69,21 @@ return [
     'enabled_while_serving_exceptions' => env('CSP_ENABLED_WHILE_SERVING_EXCEPTIONS', false),
 
     /*
-     * Generatore del nonce (non usato: la policy consente 'unsafe-inline'
-     * per compatibilità con Bootstrap/TinyMCE/GrapesJS come nel legacy).
+     * Generatore del nonce per gli script inline (@cspNonce nelle view).
      */
     'nonce_generator' => RandomString::class,
 
     /*
-     * Imposta a false per disabilitare il nonce nei contesti in cui non è desiderato.
+     * Il generatore resta sempre registrato: la direttiva @cspNonce usata
+     * nelle view non deve mai fallire, anche con il nonce fuori dalla policy.
      */
-    'nonce_enabled' => env('CSP_NONCE_ENABLED', false),
+    'nonce_enabled' => true,
+
+    /*
+     * Nonce nella policy (script-src 'self' 'nonce-…', senza 'unsafe-inline').
+     * Con CSP_NONCE_ENABLED=false si torna alla policy precedente con
+     * 'unsafe-inline': utile solo se si sono aggiunte view personalizzate
+     * con script o handler on* inline senza nonce.
+     */
+    'nonce_policy' => env('CSP_NONCE_ENABLED', true),
 ];

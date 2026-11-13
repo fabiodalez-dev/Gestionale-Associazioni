@@ -129,7 +129,7 @@
 </div>
 
 @push('scripts')
-<script>
+<script @cspNonce>
     // Mostra/nasconde i dettagli assemblea in base al tipo selezionato
     (function () {
         var tipo = document.getElementById('tipo');

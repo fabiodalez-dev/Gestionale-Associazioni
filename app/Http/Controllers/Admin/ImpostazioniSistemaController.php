@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Socio;
 use App\Models\Utente;
+use App\Services\Installer\InstallerService;
 use App\Services\Sistema\EnvEditor;
 use App\Support\LimiteAccessi;
 use Illuminate\Contracts\View\View;
@@ -62,6 +63,16 @@ class ImpostazioniSistemaController extends Controller
 
         $modifiche = $this->modificheDaInput($campi, $dati, $request);
 
+        // Segreti generabili (password dei backup): se richiesto e il campo
+        // resta vuoto, si genera un valore casuale da mostrare una sola volta
+        $generati = [];
+        foreach ($campi as $chiave => $campo) {
+            if (! empty($campo['generabile']) && $request->boolean($chiave.'_genera') && ($modifiche[$chiave] ?? '') === '') {
+                $modifiche[$chiave] = InstallerService::nuovaPasswordBackup();
+                $generati[] = ['label' => (string) $campo['label'], 'chiave' => $chiave, 'valore' => $modifiche[$chiave]];
+            }
+        }
+
         if ($sezione === 'database') {
             $errore = $this->verificaDatabase($modifiche);
             if ($errore !== null) {
@@ -75,9 +86,16 @@ class ImpostazioniSistemaController extends Controller
             return back()->withInput($request->except($this->campiSegreti($campi)))->with('error', $e->getMessage());
         }
 
+        if ($generati !== []) {
+            activity('sicurezza')->causedBy($request->user())
+                ->withProperties(['chiavi' => array_column($generati, 'chiave')])
+                ->log('Generata la password degli archivi di backup');
+        }
+
         return redirect()
             ->route('impostazioni-sistema.index', ['sezione' => $sezione])
-            ->with('success', $sezioni[$sezione]['titolo'].': impostazioni salvate.');
+            ->with('success', $sezioni[$sezione]['titolo'].': impostazioni salvate.')
+            ->with('segreti_generati', $generati);
     }
 
     /**
@@ -283,7 +301,7 @@ class ImpostazioniSistemaController extends Controller
                     'BACKUP_NOTIFICATION_MAIL' => ['label' => 'Email notifiche backup e salute', 'tipo' => 'email', 'rules' => ['nullable', 'email', 'max:255']],
                     'FAILED_JOB_EMAILS' => ['label' => 'Email avvisi job falliti', 'tipo' => 'text', 'rules' => ['nullable', 'string', 'max:500', $this->elencoEmail()], 'placeholder' => 'admin@tuodominio.it, tecnico@tuodominio.it', 'help' => 'Separate da virgola. Vuoto = email notifiche backup. Al massimo un avviso ogni 15 minuti per tipo di job.'],
                     'FAILED_JOB_MONITOR_ENABLED' => ['label' => 'Avvisi job falliti attivi', 'tipo' => 'bool', 'rules' => $bool, 'default' => 'true'],
-                    'BACKUP_ARCHIVE_PASSWORD' => ['label' => 'Password archivi di backup', 'tipo' => 'password', 'segreto' => true, 'rules' => ['nullable', 'string', 'max:255'], 'help' => 'Se impostata, gli zip di backup vengono cifrati. Conservala altrove: senza non potrai ripristinarli.'],
+                    'BACKUP_ARCHIVE_PASSWORD' => ['label' => 'Password archivi di backup', 'tipo' => 'password', 'segreto' => true, 'generabile' => true, 'rules' => ['nullable', 'string', 'max:255'], 'help' => 'Se impostata, gli zip di backup (che contengono anche il .env con le credenziali) vengono cifrati. Vale per i backup creati da qui in avanti: quelli già esistenti restano come sono. Conservala altrove: senza non potrai ripristinarli.'],
                     'UPDATE_GITHUB_TOKEN' => ['label' => 'Token GitHub', 'tipo' => 'password', 'segreto' => true, 'rules' => ['nullable', 'string', 'max:255'], 'help' => 'Facoltativo: evita il limite di 60 richieste/ora di GitHub nel controllo aggiornamenti.'],
                     'UPDATE_SELF_ENABLED' => ['label' => 'Aggiornamento in-app abilitato', 'tipo' => 'bool', 'rules' => $bool, 'default' => 'true'],
                 ],
@@ -365,6 +383,9 @@ class ImpostazioniSistemaController extends Controller
         }
         if (config('mail.default') === 'log') {
             $avvisi[] = 'Le email non vengono inviate (mailer "log"): configura l\'SMTP di sistema per il recupero password.';
+        }
+        if (blank(config('backup.backup.password'))) {
+            $avvisi[] = 'I backup non sono cifrati e contengono il file .env con le credenziali: genera una password in "Backup e aggiornamenti".';
         }
         if (! str_starts_with((string) config('app.url'), 'https://') && app()->isProduction()) {
             $avvisi[] = 'APP_URL non usa HTTPS: in produzione i link nelle email devono essere https.';

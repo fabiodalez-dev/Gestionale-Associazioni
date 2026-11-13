@@ -12,25 +12,6 @@ use RuntimeException;
  */
 class IscrizioneException extends RuntimeException
 {
-    /**
-     * Vero quando l'esito NON va mostrato all'utente: il controller risponde
-     * come per una richiesta accettata (modulo pubblico, niente oracolo).
-     */
-    public bool $rispostaNeutra = false;
-
-    /**
-     * Ospite anonimo con email già di un socio: la richiesta non viene creata
-     * ma la risposta è identica al successo. Il messaggio esplicito resta
-     * riservato agli account autenticati, titolari di quell'email.
-     */
-    public static function emailGiaSocioOspite(): self
-    {
-        $e = new self('Risulta già un socio con questa email.');
-        $e->rispostaNeutra = true;
-
-        return $e;
-    }
-
     public static function iscrizioniChiuse(): self
     {
         return new self('Le iscrizioni a questa associazione non sono aperte.');
@@ -49,6 +30,14 @@ class IscrizioneException extends RuntimeException
     public static function richiestaGiaInAttesa(): self
     {
         return new self('Hai già una richiesta di iscrizione in attesa di approvazione.');
+    }
+
+    /**
+     * Link di conferma dell'email (iscrizione da ospite) scaduto, già usato o inesistente.
+     */
+    public static function confermaNonValida(): self
+    {
+        return new self('Il link di conferma non è più valido (scaduto o già usato): se la richiesta non è arrivata, compila di nuovo il modulo.');
     }
 
     public static function richiestaGiaGestita(): self

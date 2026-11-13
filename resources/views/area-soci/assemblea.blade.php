@@ -52,7 +52,7 @@
                 @elseif ($voceElezione['daVotare']->isEmpty())
                     <p class="mb-0 text-success"><i class="bi bi-check2-circle me-1"></i>Hai votato.</p>
                 @else
-                    <form method="POST" action="{{ route('area-soci.elezioni.vota', $elezione) }}" onsubmit="return confirm('Confermi la scheda? Non potrai modificarla.');">
+                    <form method="POST" action="{{ route('area-soci.elezioni.vota', $elezione) }}" data-conferma="Confermi la scheda? Non potrai modificarla.">
                         @csrf
                         @foreach ($voceElezione['daVotare'] as $rappresentatoId => $etichetta)
                             <fieldset class="mb-3 scheda-elezione" data-max="{{ $elezione->max_preferenze }}">
@@ -104,7 +104,7 @@
                         <p class="text-success mb-0"><i class="bi bi-check2-circle me-1"></i>Hai votato. Il risultato sarà visibile alla chiusura.</p>
                     @else
                         <form method="POST" action="{{ route('area-soci.assemblee.vota', [$riunione, $votazione]) }}"
-                              onsubmit="return confirm('Confermi il voto? Non potrai modificarlo.');">
+                              data-conferma="Confermi il voto? Non potrai modificarlo.">
                             @csrf
                             @foreach ($daVotare as $rappresentatoId => $etichetta)
                                 <fieldset class="mb-3">
@@ -131,7 +131,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 // Non più preferenze del massimo consentito (il server lo verifica comunque)
 document.querySelectorAll('.scheda-elezione').forEach(function (scheda) {
     var max = parseInt(scheda.dataset.max, 10);

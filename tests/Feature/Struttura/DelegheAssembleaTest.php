@@ -374,4 +374,20 @@ class DelegheAssembleaTest extends TestCase
 
         $this->assertSame(0, DelegaRiunione::query()->count());
     }
+
+    public function test_le_deleghe_non_contano_se_l_assemblea_non_le_ammette(): void
+    {
+        $delegante = $this->avente();
+        $delegato = $this->avente();
+        $this->registra($delegante, $delegato);
+        $this->segnaPresente($delegato);
+
+        $this->assertSame(1, DelegheService::queryValide($this->riunione->fresh())->count());
+
+        // Limite portato a zero dopo la registrazione: la delega resta ma non conta
+        $this->riunione->update(['max_deleghe_per_socio' => 0]);
+
+        $this->assertSame(0, DelegheService::queryValide($this->riunione->fresh())->count());
+        $this->assertSame(1, app(AssembleaService::class)->quorum($this->riunione->fresh())['presenti']);
+    }
 }

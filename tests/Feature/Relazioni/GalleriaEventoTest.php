@@ -299,4 +299,28 @@ class GalleriaEventoTest extends TestCase
             ->get('/eventi/'.$this->evento->id.'/galleria/'.$mediaAltrui->id.'/file')
             ->assertNotFound();
     }
+
+    public function test_upload_rifiuta_immagini_oltre_8000_pixel(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/eventi/'.$this->evento->id.'/galleria', [
+                'foto' => [UploadedFile::fake()->image('panorama.jpg', 8001, 10)],
+            ])
+            ->assertSessionHasErrors('foto.0');
+
+        $this->assertCount(0, $this->evento->fresh()->getMedia(Evento::COLLEZIONE_GALLERIA));
+    }
+
+    public function test_foto_salvata_con_nome_casuale_e_nome_originale_come_etichetta(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/eventi/'.$this->evento->id.'/galleria', [
+                'foto' => [UploadedFile::fake()->image('<script>festa.html.png')],
+            ])
+            ->assertSessionHas('success');
+
+        $media = $this->evento->fresh()->getFirstMedia(Evento::COLLEZIONE_GALLERIA);
+        $this->assertMatchesRegularExpression('/^foto-[0-9a-f]{24}\.png$/', $media->file_name);
+        $this->assertSame('<script>festa.html', $media->name);
+    }
 }

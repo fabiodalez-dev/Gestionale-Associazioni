@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\AreaSoci;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AreaSoci\LoginSocioRequest;
 use App\Http\Requests\AreaSoci\RichiestaResetPasswordRequest;
 use App\Mail\AreaSoci\ImpostaPasswordSocioMail;
 use App\Models\Socio;
@@ -20,15 +21,19 @@ class PasswordResetController extends Controller
 {
     public function sendLink(RichiestaResetPasswordRequest $request): RedirectResponse
     {
-        /** @var Socio|null $socio */
-        // Nessun link a chi non ha diritto di accesso (in attesa, cessato):
-        // la risposta resta neutra in ogni caso
-        $socio = Socio::allTenants()
+        // La stessa email può essere socia di più associazioni: un link (e un
+        // token) per ciascuna iscrizione, ognuno con il nome dell'associazione
+        // nell'email. Nessun link a chi non ha diritto di accesso (in attesa,
+        // cessato): la risposta resta neutra in ogni caso
+        $soci = Socio::allTenants()
+            ->with('associazione:id,nome')
             ->whereIn('stato', Socio::STATI_CON_ACCESSO_AREA_SOCI)
             ->where('email', $request->string('email')->toString())
-            ->first();
+            ->orderBy('id')
+            ->limit(LoginSocioRequest::MAX_CANDIDATI)
+            ->get();
 
-        if ($socio !== null) {
+        foreach ($soci as $socio) {
             $token = bin2hex(random_bytes(32));
 
             // Un solo token valido per socio: sovrascrive l'eventuale precedente.

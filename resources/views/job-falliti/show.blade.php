@@ -13,7 +13,7 @@
                 @csrf
                 <button class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i>Riprova</button>
             </form>
-            <form method="POST" action="{{ route('job-falliti.destroy', $job['uuid']) }}" onsubmit="return confirm('Eliminare questo job fallito?')">
+            <form method="POST" action="{{ route('job-falliti.destroy', $job['uuid']) }}" data-conferma="Eliminare questo job fallito?">
                 @csrf
                 @method('DELETE')
                 <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Elimina</button>

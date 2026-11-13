@@ -266,10 +266,26 @@ class SocioController extends Controller
     ): RedirectResponse {
         $this->authorize('create', Socio::class);
 
+        // Il lettore si sceglie dal CONTENUTO del file, non dall'estensione
+        // indicata dal client (un CSV rinominato .xlsx o viceversa)
+        $file = $request->file('file');
+        $tipo = match (strtolower((string) $file->guessExtension())) {
+            'xlsx', 'zip' => ExcelFormat::XLSX,
+            'xls' => ExcelFormat::XLS,
+            'csv', 'txt' => ExcelFormat::CSV,
+            default => null,
+        };
+
+        if ($tipo === null) {
+            return redirect()
+                ->route('soci.import')
+                ->withErrors(['file' => 'Formato del file non riconosciuto: carica un file Excel (xlsx, xls) o CSV.']);
+        }
+
         $associazione = Associazione::findOrFail(Socio::currentAssociazioneId());
         $import = new SociImport($associazione, $progressivi, $activityLogger);
 
-        Excel::import($import, $request->file('file'));
+        Excel::import($import, $file, null, $tipo);
 
         return redirect()
             ->route('soci.import')

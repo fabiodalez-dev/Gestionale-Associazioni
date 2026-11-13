@@ -58,7 +58,7 @@
     </div>
 
 <script src="{{ asset('assets/vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
-<script>
+<script @cspNonce>
 (function() {
     'use strict';
 

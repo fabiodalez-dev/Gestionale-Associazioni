@@ -29,7 +29,7 @@
         <div class="d-flex gap-2 align-items-end">
             <form method="GET" action="{{ route('statistiche-annuali.index') }}">
                 <label class="form-label small mb-1" for="anno">Anno</label>
-                <select class="form-select form-select-sm" id="anno" name="anno" onchange="this.form.submit()">
+                <select class="form-select form-select-sm" id="anno" name="anno" data-invio-automatico>
                     @foreach ($anniDisponibili as $a)
                         <option value="{{ $a }}" @selected($a === $anno)>{{ $a }}</option>
                     @endforeach
@@ -98,7 +98,7 @@
 
 @push('scripts')
 <script src="{{ asset('assets/vendor/chartjs/chart.umd.min.js') }}"></script>
-<script>
+<script @cspNonce>
 (function () {
     var canvas = document.getElementById('chartConfronto');
     if (!canvas || typeof Chart === 'undefined') return;

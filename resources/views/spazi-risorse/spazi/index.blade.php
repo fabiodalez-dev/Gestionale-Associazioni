@@ -87,7 +87,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form method="POST" action="{{ route('spazi.destroy', $spazio) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questo spazio? Le prenotazioni collegate verranno rimosse.');">
+                                      data-conferma="Eliminare questo spazio? Le prenotazioni collegate verranno rimosse.">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
@@ -163,7 +163,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('spazioForm');
         const titolo = document.getElementById('spazioModalTitolo');

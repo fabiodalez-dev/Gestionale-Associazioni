@@ -7,7 +7,7 @@
         </button>
     </form>
     <form method="POST" action="{{ route('soci.rifiuta', $socio) }}" class="d-inline"
-          onsubmit="return confirm('Rifiutare ed eliminare definitivamente questa pre-iscrizione?');">
+          data-conferma="Rifiutare ed eliminare definitivamente questa pre-iscrizione?">
         @csrf
         <button type="submit" class="btn btn-sm btn-outline-danger" title="Rifiuta">
             <i class="bi bi-x-lg"></i> Rifiuta
@@ -23,7 +23,7 @@
         <i class="bi bi-cash-coin"></i> Conferma pagamento
     </button>
     <form method="POST" action="{{ route('soci.rifiuta', $socio) }}" class="d-inline"
-          onsubmit="return confirm('Rifiutare ed eliminare definitivamente questa pre-iscrizione?');">
+          data-conferma="Rifiutare ed eliminare definitivamente questa pre-iscrizione?">
         @csrf
         <button type="submit" class="btn btn-sm btn-icon btn-ghost btn-ghost-danger" title="Rifiuta" aria-label="Rifiuta">
             <i class="bi bi-x-lg"></i>
@@ -34,7 +34,7 @@
         <i class="bi bi-pencil"></i>
     </a>
     <form method="POST" action="{{ route('soci.destroy', $socio) }}" class="d-inline"
-          onsubmit="return confirm('Spostare il socio nel cestino?');">
+          data-conferma="Spostare il socio nel cestino?">
         @csrf
         @method('DELETE')
         <button type="submit" class="btn btn-sm btn-icon btn-ghost btn-ghost-danger" title="Elimina" aria-label="Elimina">

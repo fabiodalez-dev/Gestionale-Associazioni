@@ -50,7 +50,7 @@
                     </div>
                 </form>
                 @if ($scheda->attiva)
-                    <form method="POST" action="{{ route('area-soci.rubrica.revoca') }}" class="mt-2" onsubmit="return confirm('Uscire dalla rubrica?');">
+                    <form method="POST" action="{{ route('area-soci.rubrica.revoca') }}" class="mt-2" data-conferma="Uscire dalla rubrica?">
                         @csrf @method('DELETE')
                         <button type="submit" class="btn btn-link text-danger p-0">Esci dalla rubrica</button>
                     </form>

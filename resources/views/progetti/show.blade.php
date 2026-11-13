@@ -33,7 +33,7 @@
         @endcan
         @can('delete', $progetto)
             <form method="POST" action="{{ route('progetti.destroy', $progetto) }}"
-                  onsubmit="return confirm('Eliminare questo progetto? I collegamenti a movimenti, eventi e turni verranno azzerati.');">
+                  data-conferma="Eliminare questo progetto? I collegamenti a movimenti, eventi e turni verranno azzerati.">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Elimina</button>
@@ -172,7 +172,7 @@
                             </div>
                             @can('update', $progetto)
                                 <form method="POST" action="{{ route('progetti.milestone.destroy', [$progetto, $milestone]) }}"
-                                      onsubmit="return confirm('Eliminare questa milestone?');">
+                                      data-conferma="Eliminare questa milestone?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger border-0"><i class="bi bi-x-lg"></i></button>

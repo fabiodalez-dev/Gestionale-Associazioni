@@ -164,7 +164,7 @@
 </div>
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function () {
     var dataNascita = document.getElementById('data_nascita');
     var card = document.getElementById('cardTutore');

@@ -393,4 +393,69 @@ class RiunioniTest extends TestCase
 
         $this->assertSame(0, Riunione::query()->count());
     }
+
+    public function test_riunione_con_votazioni_concluse_non_si_elimina_le_altre_si(): void
+    {
+        $svolta = Riunione::factory()->svolta()->create(['associazione_id' => $this->associazione->id]);
+        VotazioneRiunione::create([
+            'associazione_id' => $this->associazione->id,
+            'riunione_id' => $svolta->id,
+            'punto_indice' => 0,
+            'esito' => VotazioneRiunione::ESITO_APPROVATO,
+            'favorevoli' => 3,
+            'contrari' => 0,
+            'astenuti' => 0,
+        ]);
+
+        $this->actAsAdmin()->delete(route('riunioni.destroy', $svolta))
+            ->assertRedirect(route('riunioni.show', $svolta))
+            ->assertSessionHas('error', fn (string $m) => str_contains($m, 'votazioni già concluse'));
+        $this->assertNotNull(Riunione::query()->find($svolta->id));
+
+        // Senza votazioni concluse si elimina come prima
+        $vuota = Riunione::factory()->svolta()->create(['associazione_id' => $this->associazione->id]);
+        $this->actAsAdmin()->delete(route('riunioni.destroy', $vuota))->assertRedirect(route('riunioni.index'));
+        $this->assertNull(Riunione::query()->find($vuota->id));
+    }
+
+    public function test_presenze_bloccate_su_riunioni_annullate_o_con_votazioni_concluse(): void
+    {
+        $annullata = Riunione::factory()->create(['associazione_id' => $this->associazione->id, 'stato' => Riunione::STATO_ANNULLATA]);
+        $partecipante = RiunionePartecipante::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'riunione_id' => $annullata->id,
+        ]);
+
+        $this->actAsAdmin()
+            ->put(route('riunioni.partecipanti.presenza', [$annullata, $partecipante]), ['stato' => RiunionePartecipante::STATO_CONFERMATO])
+            ->assertSessionHas('error');
+        $this->assertNotSame(RiunionePartecipante::STATO_CONFERMATO, $partecipante->fresh()->stato);
+
+        // Direttivo svolto senza votazioni: le presenze si registrano ancora (flusso in uso)
+        $svolta = Riunione::factory()->svolta()->create(['associazione_id' => $this->associazione->id]);
+        $presente = RiunionePartecipante::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'riunione_id' => $svolta->id,
+        ]);
+
+        $this->actAsAdmin()
+            ->put(route('riunioni.partecipanti.presenza', [$svolta, $presente]), ['stato' => RiunionePartecipante::STATO_CONFERMATO])
+            ->assertSessionHas('success');
+
+        // Registrata la votazione, le presenze restano quelle del voto
+        VotazioneRiunione::create([
+            'associazione_id' => $this->associazione->id,
+            'riunione_id' => $svolta->id,
+            'punto_indice' => 0,
+            'esito' => VotazioneRiunione::ESITO_APPROVATO,
+            'favorevoli' => 1,
+            'contrari' => 0,
+            'astenuti' => 0,
+        ]);
+
+        $this->actAsAdmin()
+            ->put(route('riunioni.partecipanti.presenza', [$svolta, $presente]), ['stato' => RiunionePartecipante::STATO_ASSENTE])
+            ->assertSessionHas('error');
+        $this->assertSame(RiunionePartecipante::STATO_CONFERMATO, $presente->fresh()->stato);
+    }
 }

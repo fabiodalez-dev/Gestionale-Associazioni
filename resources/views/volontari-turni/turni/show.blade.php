@@ -21,7 +21,7 @@
         <div class="d-flex gap-2">
             <a href="{{ route('turni.edit', $turno) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Modifica</a>
             <a href="{{ route('turni.index') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Turni</a>
-            <form method="POST" action="{{ route('turni.destroy', $turno) }}" onsubmit="return confirm('Eliminare il turno?');">
+            <form method="POST" action="{{ route('turni.destroy', $turno) }}" data-conferma="Eliminare il turno?">
                 @csrf @method('DELETE')
                 <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
             </form>
@@ -71,7 +71,7 @@
                                         <form method="POST" action="{{ route('turni.conferma', [$turno, $a]) }}">@csrf
                                             <button class="btn btn-sm btn-success" title="Conferma"><i class="bi bi-check-lg"></i></button>
                                         </form>
-                                        <form method="POST" action="{{ route('turni.rimuovi', [$turno, $a]) }}" onsubmit="return confirm('Rimuovere?');">@csrf @method('DELETE')
+                                        <form method="POST" action="{{ route('turni.rimuovi', [$turno, $a]) }}" data-conferma="Rimuovere?">@csrf @method('DELETE')
                                             <button class="btn btn-sm btn-outline-danger" title="Rimuovi"><i class="bi bi-x-lg"></i></button>
                                         </form>
                                     </span>
@@ -82,7 +82,7 @@
                                     <span><i class="bi bi-check-circle-fill text-success me-1"></i>{{ $a->socio?->nome_completo }}
                                         @if ($a->ore_effettive !== null)<span class="badge bg-secondary">{{ $a->ore_effettive }} h</span>@endif
                                     </span>
-                                    <form method="POST" action="{{ route('turni.rimuovi', [$turno, $a]) }}" onsubmit="return confirm('Rimuovere?');">@csrf @method('DELETE')
+                                    <form method="POST" action="{{ route('turni.rimuovi', [$turno, $a]) }}" data-conferma="Rimuovere?">@csrf @method('DELETE')
                                         <button class="btn btn-sm btn-outline-danger" title="Rimuovi"><i class="bi bi-x-lg"></i></button>
                                     </form>
                                 </li>

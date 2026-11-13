@@ -20,7 +20,7 @@
             <form method="GET" action="{{ route('turni.index') }}" class="row g-2 align-items-end">
                 <div class="col-6 col-md-3">
                     <label class="form-label small mb-1" for="filtro_stato">Stato</label>
-                    <select class="form-select form-select-sm" id="filtro_stato" name="stato" onchange="this.form.submit()">
+                    <select class="form-select form-select-sm" id="filtro_stato" name="stato" data-invio-automatico>
                         <option value="all" @selected($stato === 'all')>Tutti</option>
                         <option value="{{ \App\Models\Turno::STATO_APERTO }}" @selected($stato === \App\Models\Turno::STATO_APERTO)>Aperti</option>
                         <option value="{{ \App\Models\Turno::STATO_CHIUSO }}" @selected($stato === \App\Models\Turno::STATO_CHIUSO)>Chiusi</option>
@@ -28,7 +28,7 @@
                 </div>
                 <div class="col-6 col-md-4">
                     <label class="form-label small mb-1" for="filtro_evento">Per evento</label>
-                    <select class="form-select form-select-sm" id="filtro_evento" name="evento" onchange="this.form.submit()">
+                    <select class="form-select form-select-sm" id="filtro_evento" name="evento" data-invio-automatico>
                         <option value="">Tutti gli eventi</option>
                         @foreach ($eventi as $e)
                             <option value="{{ $e->id }}" @selected($eventoId === $e->id)>{{ $e->titolo }}</option>

@@ -10,7 +10,7 @@
     @if (filled($associazione->descrizione_pubblica))
         <meta name="description" content="{{ \Illuminate\Support\Str::limit(strip_tags($associazione->descrizione_pubblica), 160) }}">
     @endif
-    <script>
+    <script @cspNonce>
         // Applica il tema salvato prima del paint per evitare flash
         (function () {
             var t = localStorage.getItem('theme');
@@ -137,7 +137,9 @@
     </footer>
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script>
+
+    <script src="{{ asset('assets/js/azioni-dichiarative.js') }}"></script>
+    <script @cspNonce>
         // Toggle tema chiaro/scuro (stessa chiave localStorage dell'app)
         document.getElementById('themeToggle').addEventListener('click', function () {
             var html = document.documentElement;

@@ -153,7 +153,7 @@
 </div>
 
 @if ($prenotazione->stato === \App\Models\Prenotazione::STATO_IN_ATTESA_PAGAMENTO && $prenotazione->scadenza_pagamento_at !== null)
-<script>
+<script @cspNonce>
     (function () {
         var el = document.getElementById('countdown');
         if (!el) return;
@@ -174,7 +174,7 @@
 </script>
 @endif
 @if (($esitoPagamento ?? null) === 'success' && $prenotazione->stato === \App\Models\Prenotazione::STATO_IN_ATTESA_PAGAMENTO)
-<script>
+<script @cspNonce>
     // Il webhook di conferma può arrivare dopo il redirect del gateway:
     // ricarica (senza query string) finché lo stato non si aggiorna
     setTimeout(function () {

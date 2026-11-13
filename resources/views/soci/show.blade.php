@@ -173,7 +173,7 @@
                                     <button type="submit" class="btn btn-sm btn-outline-primary mt-4"><i class="bi bi-upload me-1"></i>Carica</button>
                                 </form>
                                 @if ($haFoto)
-                                    <form method="POST" action="{{ route('soci.foto.destroy', $socio) }}" class="mt-4" onsubmit="return confirm('Rimuovere la foto?')">
+                                    <form method="POST" action="{{ route('soci.foto.destroy', $socio) }}" class="mt-4" data-conferma="Rimuovere la foto?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Rimuovi</button>
@@ -369,7 +369,7 @@
                                             <i class="bi bi-download"></i>
                                         </a>
                                         <form method="POST" action="{{ route('soci.documenti.destroy', [$socio, $documento]) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare definitivamente questo documento?');">
+                                              data-conferma="Eliminare definitivamente questo documento?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>

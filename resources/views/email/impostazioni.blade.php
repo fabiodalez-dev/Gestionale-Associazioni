@@ -161,7 +161,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.getElementById('btnTestSmtp')?.addEventListener('click', function () {
     const btn = this;
     const result = document.getElementById('testSmtpResult');

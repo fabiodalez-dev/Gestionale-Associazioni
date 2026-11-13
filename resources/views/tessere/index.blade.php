@@ -245,7 +245,7 @@
 
 @push('scripts')
 <script src="{{ asset('assets/vendor/chartjs/chart.umd.min.js') }}"></script>
-<script>
+<script @cspNonce>
 (function() {
     'use strict';
 

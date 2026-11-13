@@ -58,7 +58,7 @@
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="POST" action="{{ route('amministratori.destroy', $u) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare definitivamente questo utente?');">
+                                  data-conferma="Eliminare definitivamente questo utente?">
                                 @csrf
                                 @method('DELETE')
                                 <button class="btn btn-sm btn-outline-danger" type="submit" title="Elimina">
@@ -105,7 +105,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.addEventListener('DOMContentLoaded', function () {
     @if ($editUtente || $errors->any())
         new bootstrap.Modal(document.getElementById('modalAmministratore')).show();

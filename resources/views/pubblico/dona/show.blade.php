@@ -95,7 +95,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function () {
     var campo = document.getElementById('campoImporto');
     document.querySelectorAll('.btn-importo').forEach(function (btn) {

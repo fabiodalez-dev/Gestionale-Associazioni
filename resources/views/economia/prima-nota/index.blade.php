@@ -147,7 +147,7 @@
                             @endcan
                             @can('delete', $movimento)
                                 <form method="POST" action="{{ route('prima-nota.destroy', $movimento) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questo movimento?');">
+                                      data-conferma="Eliminare questo movimento?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
@@ -247,7 +247,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function () {
     var modalEl = document.getElementById('movimentoModal');
     if (!modalEl) return;

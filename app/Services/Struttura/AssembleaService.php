@@ -3,12 +3,14 @@
 namespace App\Services\Struttura;
 
 use App\Models\DelegaRiunione;
+use App\Models\Elezione;
 use App\Models\Quota;
 use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\VotazioneRiunione;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -177,6 +179,42 @@ class AssembleaService
     }
 
     /**
+     * Votazioni concluse nella riunione: voto per punto chiuso o registrato a
+     * mano (risultato fissato) oppure elezione già scrutinata o proclamata.
+     * Un voto online ancora aperto non conta.
+     */
+    public function haVotazioniChiuse(Riunione $riunione): bool
+    {
+        $votazioni = VotazioneRiunione::query()
+            ->where('riunione_id', $riunione->id)
+            ->where(fn ($q) => $q->whereNull('aperta_at')->orWhereNotNull('chiusa_at'))
+            ->exists();
+
+        return $votazioni || Elezione::query()
+            ->where('riunione_id', $riunione->id)
+            ->whereIn('stato', [Elezione::STATO_SCRUTINIO, Elezione::STATO_PROCLAMATA])
+            ->exists();
+    }
+
+    /**
+     * Perché le presenze della riunione non si possono più modificare (null
+     * se si possono): riunione annullata, assemblea già svolta (l'elenco è
+     * chiuso) o votazioni concluse, i cui numeri dipendono dai presenti.
+     * Nelle riunioni del direttivo svolte le presenze si registrano ancora,
+     * finché non ci sono votazioni: è il flusso "segna svolta, poi presenze e
+     * voti" già in uso.
+     */
+    public function motivoPresenzeBloccate(Riunione $riunione): ?string
+    {
+        return match (true) {
+            $riunione->stato === Riunione::STATO_ANNULLATA => 'La riunione è annullata: le presenze non si modificano.',
+            $this->haVotazioniChiuse($riunione) => 'Ci sono votazioni già concluse in questa riunione: le presenze non si modificano più, perché i risultati dipendono dai presenti.',
+            $riunione->isAssemblea() && $riunione->isSvolta() => 'L\'assemblea risulta già svolta: le presenze non si modificano. Se serve una correzione, riporta prima la riunione a "pianificata".',
+            default => null,
+        };
+    }
+
+    /**
      * Partecipante dell'assemblea dal codice letto: QR della tessera (URL di
      * verifica o id), numero tessera dell'anno più recente o numero socio.
      */
@@ -215,15 +253,39 @@ class AssembleaService
                 ->value('socio_id');
         }
 
+        // Il QR di un socio cestinato o cessato non vale: si prova come numero
+        if ($socioId !== null && ! $this->socioUtilizzabile($socioId)) {
+            $socioId = null;
+        }
+
         $socioId ??= Tessera::withoutGlobalScope('sede')
             ->where('numero_tessera', $codice)
+            ->whereIn('socio_id', $this->sociUtilizzabili())
             ->orderByDesc('anno_validita')
             ->value('socio_id');
 
-        return $socioId ?? Socio::query()
-            ->withoutGlobalScope('sede')
+        return $socioId ?? $this->sociUtilizzabili()
             ->where('numero_socio', $codice)
             ->value('id');
+    }
+
+    /**
+     * Soci che un codice può identificare: non cestinati (SoftDeletes) e non
+     * cessati (radiati, deceduti, trasferiti).
+     *
+     * @return Builder<Socio>
+     */
+    private function sociUtilizzabili(): Builder
+    {
+        return Socio::query()
+            ->withoutGlobalScope('sede')
+            ->whereNotIn('stato', Socio::STATI_CESSATI)
+            ->select('id');
+    }
+
+    private function socioUtilizzabile(string $socioId): bool
+    {
+        return $this->sociUtilizzabili()->whereKey($socioId)->exists();
     }
 
     /**

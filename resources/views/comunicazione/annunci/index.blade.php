@@ -82,9 +82,9 @@
                             @can('update', $annuncio)
                                 @if ($annuncio->isConvocazione() && $annuncio->isPubblicato())
                                     <form method="POST" action="{{ route('annunci.invia-convocazione', $annuncio) }}" class="d-inline"
-                                          onsubmit="return confirm(@js($annuncio->convocazione_inviata_at
+                                          data-conferma="{{ $annuncio->convocazione_inviata_at
                                               ? 'Convocazione già inviata il '.$annuncio->convocazione_inviata_at->format('d/m/Y H:i').'. Inviarla di nuovo a tutti i soci attivi?'
-                                              : 'Inviare la convocazione via email a tutti i soci attivi?'));">
+                                              : 'Inviare la convocazione via email a tutti i soci attivi?' }}">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Invia convocazione ai soci">
                                             <i class="bi bi-send"></i>
@@ -97,7 +97,7 @@
                             @endcan
                             @can('delete', $annuncio)
                                 <form method="POST" action="{{ route('annunci.destroy', $annuncio) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare definitivamente questo annuncio?');">
+                                      data-conferma="Eliminare definitivamente questo annuncio?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">

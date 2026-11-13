@@ -12,7 +12,7 @@
         </button>
         @endcan
         @can('cancel', new \App\Models\EmailQueue)
-        <form method="POST" action="{{ route('email-coda.cancel-pending') }}" onsubmit="return confirm('Annullare tutte le email pendenti?');">
+        <form method="POST" action="{{ route('email-coda.cancel-pending') }}" data-conferma="Annullare tutte le email pendenti?">
             @csrf
             <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-circle me-1"></i>Annulla Pendenti</button>
         </form>
@@ -120,7 +120,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.getElementById('btnProcessQueue')?.addEventListener('click', function () {
     const btn = this;
     const progress = document.getElementById('processProgress');

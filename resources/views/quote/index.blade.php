@@ -35,7 +35,7 @@
             <label class="visually-hidden" for="filterYear">Anno</label>
             <div class="filter-field">
                 <span><i class="bi bi-calendar3 me-1"></i>Anno</span>
-                <select name="year" id="filterYear" class="form-select" onchange="this.form.submit()">
+                <select name="year" id="filterYear" class="form-select" data-invio-automatico>
                     <option value="Tutti">Tutti</option>
                     @foreach ($anni as $anno)
                         <option value="{{ $anno }}" @selected((string) $filtroAnno === (string) $anno)>{{ $anno }}</option>
@@ -360,7 +360,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.addEventListener('DOMContentLoaded', function () {
     // --- Copia link pagamento ---
     const copyBtn = document.getElementById('copyPaymentLink');

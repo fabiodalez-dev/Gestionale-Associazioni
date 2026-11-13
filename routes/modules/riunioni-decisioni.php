@@ -87,6 +87,7 @@ Route::middleware(['auth', 'tenant'])->group(function () {
         Route::post('{elezione}/apri-voto', [ElezioneController::class, 'apriVoto'])->name('apri-voto');
         Route::post('{elezione}/scrutinio', [ElezioneController::class, 'scrutinio'])->name('scrutinio');
         Route::post('{elezione}/proclama', [ElezioneController::class, 'proclama'])->name('proclama');
+        Route::post('{elezione}/conferma-cariche', [ElezioneController::class, 'confermaCariche'])->name('conferma-cariche');
     });
 
     // ----- Archivio Decisioni (f.19) -----

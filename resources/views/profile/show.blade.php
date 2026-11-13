@@ -25,6 +25,13 @@
         </div>
     @endif
 
+    @if ($twoFactorObbligatoria ?? false)
+        <div class="alert alert-warning d-flex align-items-start" role="alert">
+            <i class="bi bi-shield-lock me-2 fs-5"></i>
+            <div>{{ \App\Http\Middleware\EnsureSuperAdmin2fa::MESSAGGIO }} Le altre pagine restano bloccate finché non confermi il codice dell'app di autenticazione.</div>
+        </div>
+    @endif
+
     <div class="row g-4">
         {{-- Cambio password --}}
         <div class="col-12 col-lg-6">
@@ -124,7 +131,7 @@
                                     <i class="bi bi-arrow-repeat me-1"></i>Rigenera codici di recupero
                                 </button>
                             </form>
-                            <form method="POST" action="{{ route('two-factor.disable') }}" onsubmit="return confirm('Disattivare l\'autenticazione a due fattori?');">
+                            <form method="POST" action="{{ route('two-factor.disable') }}" data-conferma="Disattivare l'autenticazione a due fattori?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-outline-danger btn-sm">

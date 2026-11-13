@@ -136,7 +136,7 @@
         </form>
 
         @push('scripts')
-            <script>
+            <script @cspNonce>
                 document.getElementById('selezionaTutti')?.addEventListener('change', function () {
                     document.querySelectorAll('.socio-check:not(:disabled)')
                         .forEach((cb) => { cb.checked = this.checked; });

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Eventi;
 
 use App\Http\Controllers\Controller;
+use App\Support\Csp\CspNonce;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -16,7 +17,8 @@ use Illuminate\Http\Response;
  * SecurityHeaders, escluso sulla rotta): la pagina richiede
  * Permissions-Policy: camera=(self) per lo scanner QR. Rispetto al legacy
  * la CSP è irrigidita: html5-qrcode è servita come asset locale, quindi
- * nessuna sorgente CDN esterna è ammessa.
+ * nessuna sorgente CDN esterna è ammessa; gli script inline della view
+ * sono ammessi tramite nonce (CspNonce), non più con 'unsafe-inline'.
  */
 class CheckinPageController extends Controller
 {
@@ -24,7 +26,7 @@ class CheckinPageController extends Controller
     {
         $csp = "default-src 'self'; "
             ."style-src 'self' 'unsafe-inline'; "
-            ."script-src 'self' 'unsafe-inline'; "
+            .'script-src '.CspNonce::scriptSrc().'; '
             ."img-src 'self' data: blob:; "
             ."media-src 'self' blob:; "
             ."connect-src 'self'; "

@@ -4,6 +4,7 @@ namespace Tests\Feature\Piattaforma;
 
 use App\Mail\Piattaforma\EsitoRegistrazioneMail;
 use App\Mail\Piattaforma\NuovaRichiestaRegistrazioneMail;
+use App\Mail\Piattaforma\TentativoRegistrazioneMail;
 use App\Mail\Piattaforma\VerificaEmailRegistrazioneMail;
 use App\Models\Associazione;
 use App\Models\RichiestaRegistrazione;
@@ -157,8 +158,11 @@ class PercorsoAssociazioneTest extends TestCase
         $this->assertNotNull($richiesta->refresh()->email_verificata_at);
         Mail::assertSent(NuovaRichiestaRegistrazioneMail::class, fn ($m) => $m->hasTo('super@piattaforma.test'));
 
-        // Un secondo invio con la stessa email è bloccato finché la prima è in attesa
-        $this->post('/registrati', $this->moduloRegistrazione(['admin_email' => 'altra@aurora.test']))->assertSessionHasErrors('email');
+        // Un secondo invio con la stessa email dell'associazione non dà errori (il modulo
+        // pubblico non rivela quali email sono già in uso): la richiesta resta non
+        // confermata e, se confermata, il super admin la vede come doppione
+        $this->post('/registrati', $this->moduloRegistrazione(['admin_email' => 'altra@aurora.test']))
+            ->assertSessionHasNoErrors()->assertRedirect(route('registrazione.inviata'));
         // Prima dell'approvazione l'amministratore non può accedere
         $this->post('/login', ['email' => 'marta.ferraresi@aurora.test', 'password' => self::PASSWORD_ADMIN]);
         $this->assertGuest();
@@ -418,9 +422,70 @@ class PercorsoAssociazioneTest extends TestCase
             'admin_password' => 'password',
             'codice_fiscale' => '123',
             'privacy' => null,
-        ]))->assertSessionHasErrors(['email', 'admin_email', 'admin_password', 'codice_fiscale', 'privacy']);
+        ]))->assertSessionHasErrors(['admin_password', 'codice_fiscale', 'privacy'])
+            // Email già in uso: nessun errore dedicato, sarebbe un oracolo sugli iscritti
+            ->assertSessionDoesntHaveErrors(['email', 'admin_email']);
 
         $this->assertSame(0, RichiestaRegistrazione::query()->count());
+    }
+
+    public function test_email_amministratore_gia_in_uso_risposta_neutra_e_avviso_al_titolare(): void
+    {
+        config(['piattaforma.registrazione_associazioni' => 'revisione']);
+        Utente::factory()->create(['email' => 'esiste@utente.test']);
+
+        // Risposta di riferimento: una richiesta nuova
+        $nuova = $this->post('/registrati', $this->moduloRegistrazione());
+        $this->esci();
+
+        // Stessa email di un account: stessa redirect e stessi dati in sessione,
+        // nessuna richiesta creata, avviso (non il link di conferma) al titolare
+        $doppia = $this->post('/registrati', $this->moduloRegistrazione(['admin_email' => 'Esiste@Utente.test']));
+        $doppia->assertSessionHasNoErrors()
+            ->assertRedirect($nuova->headers->get('Location'))
+            ->assertSessionHas('registrazione_nome', 'Polisportiva Aurora')
+            ->assertSessionHas('registrazione_email', 'esiste@utente.test');
+        $this->get(route('registrazione.inviata'))->assertOk()->assertSee('Controlla la tua email');
+
+        $this->assertSame(0, RichiestaRegistrazione::query()->where('admin_email', 'esiste@utente.test')->count());
+        Mail::assertSent(TentativoRegistrazioneMail::class, fn ($m) => $m->hasTo('esiste@utente.test')
+            && str_contains($m->render(), 'recuperala'));
+        Mail::assertNotSent(VerificaEmailRegistrazioneMail::class, fn ($m) => $m->hasTo('esiste@utente.test'));
+
+        // Anche un'email con una richiesta già confermata in attesa non ne crea una seconda
+        $this->esci();
+        $this->confermaEmail('marta.ferraresi@aurora.test');
+        $this->esci();
+        $this->post('/registrati', $this->moduloRegistrazione(['nome' => 'Altro nome']))->assertSessionHasNoErrors()
+            ->assertRedirect(route('registrazione.inviata'));
+        $this->assertSame(1, RichiestaRegistrazione::query()->where('admin_email', 'marta.ferraresi@aurora.test')->count());
+        Mail::assertSent(TentativoRegistrazioneMail::class, fn ($m) => $m->hasTo('marta.ferraresi@aurora.test'));
+
+        // Gli avvisi contano nel limite di invii per indirizzo: niente inondazioni
+        for ($i = 0; $i < 5; $i++) {
+            app(RegistrazioneAssociazioni::class)->registra($this->moduloRegistrazione(['admin_email' => 'esiste@utente.test']), '203.0.113.9');
+        }
+        Mail::assertSent(TentativoRegistrazioneMail::class, fn ($m) => $m->hasTo('esiste@utente.test'), 3);
+    }
+
+    public function test_codice_fiscale_gia_iscritto_risposta_neutra_e_doppione_segnalato_al_super_admin(): void
+    {
+        config(['piattaforma.registrazione_associazioni' => 'automatica']);
+        Associazione::factory()->create(['nome' => 'Aurora già iscritta', 'codice_fiscale' => '91234560375', 'email' => 'segreteria@aurora.test']);
+
+        // Nessun errore che riveli il doppione: la richiesta nasce come le altre
+        $this->post('/registrati', $this->moduloRegistrazione())->assertSessionHasNoErrors()->assertRedirect(route('registrazione.inviata'));
+        $richiesta = RichiestaRegistrazione::query()->sole();
+
+        // Dopo la conferma anche in modalità automatica passa dal super admin...
+        $this->confermaEmail('marta.ferraresi@aurora.test')->assertOk();
+        $this->assertSame(1, Associazione::query()->count());
+        Mail::assertSent(NuovaRichiestaRegistrazioneMail::class, fn ($m) => $m->hasTo('super@piattaforma.test'));
+
+        // ...che all'approvazione vede l'avviso di doppione
+        $this->actingAs($this->superAdmin)->post(route('richieste-registrazione.approva', $richiesta))
+            ->assertSessionHas('warning', fn ($m) => str_contains($m, 'Esiste già'));
+        $this->assertSame(1, Associazione::query()->count());
     }
 
     public function test_solo_il_super_admin_vede_e_gestisce_le_richieste(): void

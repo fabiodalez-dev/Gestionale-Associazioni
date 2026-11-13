@@ -118,7 +118,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.querySelectorAll('.btn-detail').forEach(function (btn) {
     btn.addEventListener('click', function () {
         const meta = document.getElementById('detailMeta');

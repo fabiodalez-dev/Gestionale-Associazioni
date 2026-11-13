@@ -5,6 +5,7 @@ namespace Tests\Feature\Installer;
 use App\Models\Utente;
 use App\Services\Installer\InstallerService;
 use Database\Seeders\RolesSeeder;
+use Dotenv\Dotenv;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -582,5 +583,60 @@ class InstallerTest extends TestCase
         ]);
 
         $response->assertSessionHasNoErrors()->assertRedirect(route('installer.done'));
+    }
+
+    /** .env di prova isolato con BACKUP_ARCHIVE_PASSWORD vuota (come .env.example) */
+    private function envConPasswordBackupVuota(): string
+    {
+        $env = sys_get_temp_dir().'/installer_test_'.uniqid().'.env';
+        file_put_contents($env, "APP_NAME=Demo\nBACKUP_ARCHIVE_PASSWORD=\n");
+        config(['installer.env_file' => $env]);
+        $this->beforeApplicationDestroyed(fn () => File::delete($env));
+
+        return $env;
+    }
+
+    public function test_il_wizard_genera_la_password_dei_backup_e_la_mostra_una_volta(): void
+    {
+        $env = $this->envConPasswordBackupVuota();
+        $this->seed(RolesSeeder::class);
+
+        $this->post('/install/admin', [
+            'associazione_nome' => 'APS Demo',
+            'associazione_email' => 'info@apsdemo.it',
+            'nome' => 'Mario',
+            'cognome' => 'Rossi',
+            'email' => 'mario@apsdemo.it',
+            'password' => 'SuperSegreta123',
+            'password_confirmation' => 'SuperSegreta123',
+        ])->assertRedirect(route('installer.email'));
+
+        $password = (string) (Dotenv::parse((string) file_get_contents($env))['BACKUP_ARCHIVE_PASSWORD'] ?? '');
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{32}$/', $password);
+        $this->assertTrue(session(InstallerService::SESSIONE_PASSWORD_BACKUP));
+
+        $token = app(InstallerService::class)->segnaWizardInCorso();
+        $this->withUnencryptedCookie('installer_token', $token);
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('collegaStorage')->andReturnTrue();
+        });
+
+        $this->get('/install/done')->assertOk()->assertSee($password)->assertSee('BACKUP_ARCHIVE_PASSWORD');
+        // Mostrata una sola volta: il segnale in sessione è consumato
+        $this->assertNull(session(InstallerService::SESSIONE_PASSWORD_BACKUP));
+    }
+
+    public function test_installazione_esistente_senza_password_backup_non_la_riceve_in_automatico(): void
+    {
+        // Compatibilità: il lock perso o l'installazione da CLI passano da
+        // markInstalled, non dal wizard: niente password generata di nascosto
+        $env = $this->envConPasswordBackupVuota();
+        $this->seed(RolesSeeder::class);
+        Utente::factory()->superAdmin()->create();
+
+        $this->get('/login')->assertOk();
+
+        $this->assertFileExists($this->lockFile);
+        $this->assertSame('', Dotenv::parse((string) file_get_contents($env))['BACKUP_ARCHIVE_PASSWORD'] ?? '');
     }
 }

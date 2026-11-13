@@ -9,6 +9,7 @@ use App\Models\Utente;
 use App\Services\Soci\SociFilter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Honeypot\ProtectAgainstSpam;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 
 /**
@@ -19,6 +20,7 @@ use Tests\TestCase;
  */
 class SociMinorenniTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     private Associazione $associazione;
@@ -151,7 +153,7 @@ class SociMinorenniTest extends TestCase
 
     public function test_pubblico_minorenne_con_tutore_crea_il_preiscritto_con_tutore(): void
     {
-        $this->post('/a/minori/iscriviti', $this->payloadPubblico([
+        $this->inviaEConfermaIscrizioneOspite('/a/minori/iscriviti', $this->payloadPubblico([
             'tutore_nome' => 'Paolo Junior',
             'tutore_telefono' => '+39 339 9876543',
             'tutore_email' => 'paolo.junior@example.com',
@@ -165,7 +167,7 @@ class SociMinorenniTest extends TestCase
 
     public function test_pubblico_maggiorenne_non_richiede_il_tutore(): void
     {
-        $this->post('/a/minori/iscriviti', $this->payloadPubblico([
+        $this->inviaEConfermaIscrizioneOspite('/a/minori/iscriviti', $this->payloadPubblico([
             'data_nascita' => '1990-05-05',
         ]))->assertSessionHas('success');
 

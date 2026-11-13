@@ -133,7 +133,7 @@
                         <hr>
                         <form method="POST"
                               action="{{ route('pubblico.account.prenotazioni.annulla', ['associazione' => $associazione->slug, 'prenotazione' => $prenotazione->id]) }}"
-                              onsubmit="return confirm('Vuoi davvero annullare questa prenotazione? L\'operazione non è reversibile.');">
+                              data-conferma="Vuoi davvero annullare questa prenotazione? L'operazione non è reversibile.">
                             @csrf
                             <button type="submit" class="btn btn-outline-danger btn-sm">
                                 <i class="bi bi-x-circle me-1"></i>Annulla prenotazione

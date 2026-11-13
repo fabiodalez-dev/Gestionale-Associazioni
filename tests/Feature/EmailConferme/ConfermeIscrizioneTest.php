@@ -11,6 +11,7 @@ use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
 use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
 use Illuminate\Support\Facades\Notification;
 use Spatie\Honeypot\ProtectAgainstSpam;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 
 /**
  * f.19 — Conferme iscrizione complete: email immediata "richiesta ricevuta"
@@ -20,6 +21,8 @@ use Spatie\Honeypot\ProtectAgainstSpam;
  */
 class ConfermeIscrizioneTest extends EmailConfermeTestCase
 {
+    use ConfermaIscrizioneOspite;
+
     private Account $account;
 
     protected function setUp(): void
@@ -114,7 +117,8 @@ class ConfermeIscrizioneTest extends EmailConfermeTestCase
 
     public function test_ospite_riceve_la_conferma_via_mail_on_demand(): void
     {
-        $this->post($this->urlIscriviti(), [
+        // Invio da ospite e clic sul link di conferma dell'email: il riepilogo parte dopo il clic
+        $this->inviaEConfermaIscrizioneOspite($this->urlIscriviti(), [
             'nome' => 'Giulia',
             'cognome' => 'Neri',
             'email' => 'giulia.neri@example.com',

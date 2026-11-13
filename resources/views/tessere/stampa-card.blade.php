@@ -131,7 +131,8 @@
         </div>
     </div>
 
-    <button class="no-print print-btn" onclick="window.print()"><i class="bi bi-printer me-1"></i> Stampa</button>
+    <button class="no-print print-btn" data-stampa><i class="bi bi-printer me-1"></i> Stampa</button>
 
+<script src="{{ asset('assets/js/azioni-dichiarative.js') }}"></script>
 </body>
 </html>

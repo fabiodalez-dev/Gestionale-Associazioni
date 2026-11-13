@@ -136,7 +136,11 @@ class ConflittoController extends Controller
         $this->authorize('update', $riunione);
         abort_unless($conflitto->riunione_id === $riunione->id, 404);
 
-        $conflitto->delete();
+        try {
+            $this->conflitti->rimuoviConflitto($conflitto);
+        } catch (ConflittoNonValidoException $e) {
+            return redirect()->route('riunioni.show', $riunione)->with('error', $e->getMessage());
+        }
 
         return redirect()->route('riunioni.show', $riunione)->with('success', 'Conflitto di interesse rimosso.');
     }

@@ -79,7 +79,7 @@
                             @endcan
                             @can('delete', $sondaggio)
                                 <form method="POST" action="{{ route('sondaggi.destroy', $sondaggio) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare il sondaggio e tutte le risposte?');">
+                                      data-conferma="Eliminare il sondaggio e tutte le risposte?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">

@@ -49,7 +49,7 @@
                     @enderror
 
                     <form method="POST" action="{{ route('pubblico.account.privacy.cancella', $associazione->slug) }}"
-                          onsubmit="return confirm('Confermi la cancellazione definitiva del tuo account? L\'operazione NON è reversibile.');">
+                          data-conferma="Confermi la cancellazione definitiva del tuo account? L'operazione NON è reversibile.">
                         @csrf
                         <div class="mb-3">
                             <label for="password" class="form-label">Conferma con la tua password</label>

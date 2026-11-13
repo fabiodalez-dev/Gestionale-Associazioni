@@ -78,7 +78,7 @@
                             @endcan
                             @can($config['ability_force'], $record)
                                 <form method="POST" action="{{ route('cestino.elimina-definitivamente', ['tipo' => $riga['tipo'], 'id' => $record->getKey()]) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare definitivamente questo elemento? L\'operazione non è reversibile.');">
+                                      data-conferma="Eliminare definitivamente questo elemento? L'operazione non è reversibile.">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina definitivamente">

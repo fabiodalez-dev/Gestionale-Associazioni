@@ -331,7 +331,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.addEventListener('DOMContentLoaded', function () {
     // Anteprima URL del mini-sito mentre si modifica lo slug
     var campoSlug = document.getElementById('slug');

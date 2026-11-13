@@ -53,7 +53,7 @@
     @endcan
     @can('delete', $quota)
         <form method="POST" action="{{ route('quote.destroy', $quota) }}" class="d-inline"
-              onsubmit="return confirm('Eliminare definitivamente questa quota?');">
+              data-conferma="Eliminare definitivamente questa quota?">
             @csrf
             @method('DELETE')
             <button type="submit" class="btn btn-outline-danger" title="Elimina">

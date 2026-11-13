@@ -13,7 +13,7 @@ class UploadLogoRequest extends ConfigurazioniRequest
     public function rules(): array
     {
         return [
-            'logo_file' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'logo_file' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:2048', 'dimensions:max_width=8000,max_height=8000'],
         ];
     }
 
@@ -26,6 +26,7 @@ class UploadLogoRequest extends ConfigurazioniRequest
             'logo_file.required' => 'Seleziona un file per il logo.',
             'logo_file.mimes' => 'Logo non valido: sono ammessi solo file JPG e PNG.',
             'logo_file.max' => 'Logo non valido: dimensione massima 2 MB.',
+            'logo_file.dimensions' => 'Logo non valido: al massimo 8000×8000 pixel.',
         ];
     }
 }

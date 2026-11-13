@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Relazioni\GalleriaUploadRequest;
 use App\Models\Associazione;
 use App\Models\Evento;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
@@ -53,7 +54,12 @@ class GalleriaEventoController extends Controller
         $files = array_slice($request->file('foto'), 0, $disponibili);
 
         foreach ($files as $file) {
-            $evento->addMedia($file)->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
+            // Nome su disco casuale con estensione dal contenuto; il nome
+            // originale resta solo come etichetta (colonna name)
+            $evento->addMedia($file)
+                ->usingName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
+                ->usingFileName(NomeFileSicuro::per($file, 'foto-', NomeFileSicuro::IMMAGINI, 'jpg'))
+                ->toMediaCollection(Evento::COLLEZIONE_GALLERIA);
         }
 
         return redirect()

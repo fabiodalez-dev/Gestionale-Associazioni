@@ -80,6 +80,28 @@ class AnnunciTest extends ComunicazioneTestCase
         $this->assertStringNotContainsString('<script', $annuncio->corpo_html);
     }
 
+    public function test_store_ripulisce_il_css_dell_annuncio_mantenendo_il_layout(): void
+    {
+        $this->actingAs($this->admin)->post(route('annunci.store'), [
+            'titolo' => 'Annuncio con stile',
+            'corpo_html' => '<p class="evidenza">Festa sociale</p><style>.evidenza{color:#0d9488;font-weight:bold;padding:8px}'
+                .'.evidenza{background-image:url(https://traccia.test/pixel.gif)}.navbar::after{content:"Sessione scaduta"}'
+                .'@import "https://evil.test/x.css";</style>',
+            'pubblicato_dal' => now()->subHour()->format('Y-m-d\TH:i'),
+            'pubblicato_al' => '',
+            'in_evidenza' => '0',
+            'solo_soci' => '0',
+        ])->assertRedirect(route('annunci.index'));
+
+        $html = Annuncio::allTenants()->where('titolo', 'Annuncio con stile')->value('corpo_html');
+
+        $this->assertStringContainsString('.evidenza{color:#0d9488;font-weight:bold;padding:8px}', $html);
+        $this->assertStringNotContainsString('traccia.test', $html);
+        $this->assertStringNotContainsString('url(', $html);
+        $this->assertStringNotContainsString('@import', $html);
+        $this->assertStringNotContainsString('Sessione scaduta', $html);
+    }
+
     public function test_validazione_titolo_e_corpo_obbligatori(): void
     {
         $this->actingAs($this->admin)
@@ -236,5 +258,15 @@ class AnnunciTest extends ComunicazioneTestCase
             ->assertSee('Assemblea riservata ai soci')
             ->assertDontSee('Bozza Invisibile')
             ->assertDontSee('Annuncio Altrui Segreto');
+    }
+
+    public function test_i_blocchi_style_dell_annuncio_non_arrivano_nella_pagina(): void
+    {
+        $annuncio = new Annuncio(['corpo_html' => '<style>.navbar{display:none}</style><p style="color:red">Ciao</p>']);
+
+        $html = $annuncio->corpoHtmlPerPagina();
+        $this->assertStringNotContainsString('<style', $html);
+        $this->assertStringNotContainsString('.navbar', $html);
+        $this->assertStringContainsString('<p style="color:red">Ciao</p>', $html);
     }
 }

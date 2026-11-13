@@ -43,14 +43,20 @@ test.describe('Catalogo pubblico e autenticazione account', () => {
         expect(spenta?.status()).toBe(404);
     });
 
-    test('registrazione felice → avviso di verifica email', async ({ page }) => {
+    test('registrazione felice → accesso con invito a controllare la posta', async ({ page }) => {
         const email = emailUnica('registrazione');
 
         await registraAccount(page, { email });
 
+        // Risposta neutra (identica per un'email già registrata): niente login automatico
+        await expect(page).toHaveURL(new RegExp(`/a/${SLUG}/login$`));
+        await expect(page.getByText(/registrazione ricevuta/i)).toBeVisible();
+
+        // Dopo l'accesso, da non verificato, l'area riservata rimanda all'avviso
+        await loginAccount(page, email);
+        await page.goto(`/a/${SLUG}/account`);
         await expect(page).toHaveURL(new RegExp(`/a/${SLUG}/verifica-email$`));
         await expect(page.getByRole('heading', { name: /verifica il tuo indirizzo email/i })).toBeVisible();
-        await expect(page.getByText(/registrazione completata/i)).toBeVisible();
         await expect(page.getByText(email)).toBeVisible();
     });
 
@@ -76,7 +82,8 @@ test.describe('Catalogo pubblico e autenticazione account', () => {
         const email = emailUnica('non-verificato');
 
         await registraAccount(page, { email });
-        await expect(page).toHaveURL(/verifica-email$/);
+        await expect(page).toHaveURL(/login$/);
+        await loginAccount(page, email);
 
         // Tentativo di prenotare da non verificato: il middleware riporta all'avviso
         await prenota(page, evento.evento_id);
@@ -116,7 +123,8 @@ test.describe('Catalogo pubblico e autenticazione account', () => {
         const email = emailUnica('verifica-link');
 
         await registraAccount(page, { email });
-        await expect(page).toHaveURL(/verifica-email$/);
+        await expect(page).toHaveURL(/login$/);
+        await loginAccount(page, email);
 
         const { url } = fixture<{ url: string }>('link-verifica', { email });
         await page.goto(url);

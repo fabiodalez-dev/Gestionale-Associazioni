@@ -5,6 +5,7 @@ namespace App\Services\Iscrizioni;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\CampoPersonalizzato;
+use App\Models\IscrizioneDaConfermare;
 use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\StoricoAttivitaSocio;
@@ -16,6 +17,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Mews\Purifier\Facades\Purifier;
 
@@ -29,7 +32,9 @@ use Mews\Purifier\Facades\Purifier;
  *              tipi reali dei campi personalizzati);
  * - salva():   transazione: crea il Socio ('In Attesa' o 'Attivo' a seconda
  *              della modalità), salva i valori dei campi personalizzati e la
- *              RichiestaIscrizione con lo snapshot di tutti i dati inviati.
+ *              RichiestaIscrizione con lo snapshot di tutti i dati inviati;
+ * - preparaConfermaOspite() / confermaOspite(): per gli ospiti senza account
+ *              salva() parte solo dopo il clic sul link inviato all'email.
  *
  * Nome, cognome ed email arrivano dall'account loggato (non dal form).
  */
@@ -77,9 +82,113 @@ class FormIscrizioneService
         'tutore_email' => 'Email del tutore',
     ];
 
+    /** Validità del link di conferma inviato agli ospiti, in ore. */
+    public const ORE_VALIDITA_CONFERMA = 48;
+
+    /** Email di conferma al massimo per indirizzo e associazione nelle 24 ore. */
+    public const CONFERME_PER_INDIRIZZO = 3;
+
     public function __construct(
         private readonly NumeroProgressivoService $numeriProgressivi,
     ) {}
+
+    /**
+     * Ospite senza account: la richiesta non diventa subito un socio. I dati
+     * validati restano in IscrizioneDaConfermare (cifrati, 48 ore) finché chi
+     * ha compilato il modulo non conferma l'email con il link ricevuto; solo
+     * allora confermaOspite() crea socio e richiesta come salva().
+     *
+     * Ritorna null quando non c'è nulla da confermare (email già di un socio o
+     * con una richiesta in attesa, troppi invii verso lo stesso indirizzo):
+     * il controller risponde comunque come per un invio riuscito.
+     *
+     * @param  array<string, mixed>  $dati  input validato con rules(ospite: true)
+     *
+     * @throws IscrizioneException
+     */
+    public function preparaConfermaOspite(array $dati, Associazione $associazione, ?string $ip, ?string $referral = null): ?IscrizioneDaConfermare
+    {
+        if (! $associazione->iscrizioni()->iscrizioni_socio_aperte) {
+            throw IscrizioneException::iscrizioniChiuse();
+        }
+
+        // Pulizia delle conferme scadute (anche senza scheduler attivo)
+        IscrizioneDaConfermare::query()->where('scade_at', '<', now())->delete();
+
+        $email = (string) ($dati['email'] ?? '');
+
+        if ($this->richiestaPendenteOspite($associazione, $email) || $this->emailDiUnSocio($associazione, $email)) {
+            Log::info('Iscrizione ospite: email già di un socio o con una richiesta in attesa, nessuna conferma inviata', [
+                'associazione_id' => $associazione->id,
+            ]);
+
+            return null;
+        }
+
+        $chiave = 'iscrizione-conferma:'.$associazione->id.':'.sha1(mb_strtolower(trim($email)));
+        if (RateLimiter::hit($chiave, 86400) > self::CONFERME_PER_INDIRIZZO) {
+            Log::info('Iscrizione ospite: limite di email di conferma raggiunto', ['associazione_id' => $associazione->id]);
+
+            return null;
+        }
+
+        return IscrizioneDaConfermare::create([
+            'associazione_id' => $associazione->id,
+            'email' => $email,
+            'dati_form' => $dati,
+            'ip' => $ip,
+            'referral_codice' => filled($referral) ? mb_substr(trim((string) $referral), 0, 50) : null,
+            'scade_at' => now()->addHours(self::ORE_VALIDITA_CONFERMA),
+        ]);
+    }
+
+    /**
+     * Link firmato e temporaneo per confermare l'email dell'ospite: punta al
+     * modulo /a/{slug}/iscriviti con il parametro "conferma".
+     */
+    public function linkConferma(IscrizioneDaConfermare $pendente, Associazione $associazione): string
+    {
+        return URL::temporarySignedRoute('pubblico.iscriviti', $pendente->scade_at, [
+            'associazione' => $associazione->slug,
+            'conferma' => $pendente->id,
+        ]);
+    }
+
+    /**
+     * Click sul link di conferma: la richiesta in sospeso diventa una
+     * RichiestaIscrizione (e un socio "In Attesa", o attivo in modalità
+     * diretta) con gli stessi controlli di salva(). La riga viene consumata
+     * nella stessa transazione: un secondo clic non crea doppioni, mentre
+     * un errore la lascia al suo posto fino alla scadenza.
+     *
+     * @throws IscrizioneException
+     */
+    public function confermaOspite(string $id, Associazione $associazione): RichiestaIscrizione
+    {
+        return DB::transaction(function () use ($id, $associazione): RichiestaIscrizione {
+            $pendente = IscrizioneDaConfermare::query()
+                ->where('associazione_id', $associazione->id)
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($pendente === null || $pendente->isScaduta()
+                || IscrizioneDaConfermare::query()->whereKey($pendente->id)->delete() === 0) {
+                throw IscrizioneException::confermaNonValida();
+            }
+
+            $richiesta = $this->salva(null, $pendente->dati_form, $associazione, $pendente->ip);
+
+            // Codice "porta un amico" catturato all'invio del modulo: il link può
+            // essere aperto da un altro dispositivo, senza la sessione di allora
+            if (blank($richiesta->referral_codice) && filled($pendente->referral_codice)
+                && Socio::withoutGlobalScopes()->where('associazione_id', $associazione->id)->where('codice_referral', $pendente->referral_codice)->exists()) {
+                $richiesta->forceFill(['referral_codice' => $pendente->referral_codice])->saveQuietly();
+            }
+
+            return $richiesta;
+        });
+    }
 
     /**
      * Schema risolto del form per il tenant.
@@ -169,10 +278,12 @@ class FormIscrizioneService
      * account collegato subito, richiesta già approvata (gestita_da null).
      *
      * @param  array<string, mixed>  $dati  input validato con rules() (snapshot integrale in dati_form)
+     * @param  ?string  $ip  IP da registrare con i consensi (default: richiesta corrente; per le
+     *                       conferme degli ospiti quello dell'invio del modulo)
      *
      * @throws IscrizioneException
      */
-    public function salva(?Account $account, array $dati, ?Associazione $associazione = null): RichiestaIscrizione
+    public function salva(?Account $account, array $dati, ?Associazione $associazione = null, ?string $ip = null): RichiestaIscrizione
     {
         $associazione ??= Associazione::query()->findOrFail($account?->associazione_id);
 
@@ -191,17 +302,13 @@ class FormIscrizioneService
 
         // Una sola richiesta in_attesa per account; per gli ospiti il
         // dedup è sull'email del socio preiscritto
-        $pendente = RichiestaIscrizione::query()
-            ->forAssociazione($associazione->id)
-            ->inAttesa()
-            ->when(
-                $account !== null,
-                fn ($q) => $q->where('account_id', $account->id),
-                fn ($q) => $q->whereHas('socio', fn ($s) => $s->withoutGlobalScopes()
-                    ->where('associazione_id', $associazione->id)
-                    ->where('email', $email))
-            )
-            ->exists();
+        $pendente = $account !== null
+            ? RichiestaIscrizione::query()
+                ->forAssociazione($associazione->id)
+                ->inAttesa()
+                ->where('account_id', $account->id)
+                ->exists()
+            : $this->richiestaPendenteOspite($associazione, $email);
 
         if ($pendente) {
             throw IscrizioneException::richiestaGiaInAttesa();
@@ -209,23 +316,17 @@ class FormIscrizioneService
 
         // Email già appartenente a un socio del tenant → messaggio amichevole
         // (il vincolo unique(associazione_id, email) lo bloccherebbe comunque)
-        $emailOccupata = Socio::withoutGlobalScopes()
-            ->where('associazione_id', $associazione->id)
-            ->where('email', $email)
-            ->exists();
-
-        if ($emailOccupata) {
-            // L'account autenticato è titolare dell'email: messaggio esplicito.
-            // L'ospite anonimo no: risposta neutra, altrimenti il modulo pubblico
-            // direbbe a chiunque chi è socio
-            throw $account !== null
-                ? IscrizioneException::emailGiaSocio()
-                : IscrizioneException::emailGiaSocioOspite();
+        if ($this->emailDiUnSocio($associazione, $email)) {
+            // Qui arriva solo chi ha dimostrato di possedere l'email: l'account
+            // autenticato, oppure l'ospite che ha aperto il link di conferma
+            // (l'invio anonimo risponde in modo neutro in preparaConfermaOspite).
+            // Il messaggio esplicito quindi non rivela nulla a terzi.
+            throw IscrizioneException::emailGiaSocio();
         }
 
         $schema = $this->schema($associazione);
 
-        return DB::transaction(function () use ($account, $associazione, $dati, $schema, $nome, $cognome, $email): RichiestaIscrizione {
+        return DB::transaction(function () use ($account, $associazione, $dati, $schema, $nome, $cognome, $email, $ip): RichiestaIscrizione {
             $diretta = $associazione->isIscrizioneDiretta();
 
             $socio = Socio::create(array_merge(
@@ -268,7 +369,7 @@ class FormIscrizioneService
             ]);
 
             app(RegistroConsensi::class)->registra(
-                $associazione, $socio, (array) ($dati['consensi'] ?? []), 'iscrizione_online', request()->ip()
+                $associazione, $socio, (array) ($dati['consensi'] ?? []), 'iscrizione_online', $ip ?? request()->ip()
             );
 
             $account?->forceFill(array_merge(
@@ -300,6 +401,31 @@ class FormIscrizioneService
 
             return $richiesta;
         });
+    }
+
+    /**
+     * Richiesta in attesa di un ospite con questa email (dedup sul preiscritto).
+     */
+    private function richiestaPendenteOspite(Associazione $associazione, string $email): bool
+    {
+        return RichiestaIscrizione::query()
+            ->forAssociazione($associazione->id)
+            ->inAttesa()
+            ->whereHas('socio', fn ($s) => $s->withoutGlobalScopes()
+                ->where('associazione_id', $associazione->id)
+                ->where('email', $email))
+            ->exists();
+    }
+
+    /**
+     * Email già di un socio del tenant (vincolo unique(associazione_id, email)).
+     */
+    private function emailDiUnSocio(Associazione $associazione, string $email): bool
+    {
+        return Socio::withoutGlobalScopes()
+            ->where('associazione_id', $associazione->id)
+            ->where('email', $email)
+            ->exists();
     }
 
     // ------------------------------------------------------------------

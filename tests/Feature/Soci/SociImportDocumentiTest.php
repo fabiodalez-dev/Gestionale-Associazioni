@@ -117,4 +117,24 @@ class SociImportDocumentiTest extends TestCase
             'file' => UploadedFile::fake()->create('malware.php', 10),
         ])->assertSessionHasErrors('file');
     }
+
+    public function test_import_sceglie_il_lettore_dal_contenuto_non_dall_estensione(): void
+    {
+        $csv = implode("\n", [
+            'nome,cognome,email,stato',
+            'Carla,Neri,carla.import@example.com,Attivo',
+        ]);
+
+        // Un CSV chiamato .xlsx: col lettore scelto dall'estensione l'import
+        // falliva. File reale (non fake): il tipo si ricava dal contenuto
+        $percorso = tempnam(sys_get_temp_dir(), 'import');
+        file_put_contents($percorso, $csv);
+        $file = new UploadedFile($percorso, 'soci.xlsx', null, null, true);
+
+        $this->actingAs($this->admin)->post('/soci/import', ['file' => $file])
+            ->assertRedirect(route('soci.import'));
+
+        $this->assertSame(1, session('import_report')['importati']);
+        $this->assertTrue(Socio::query()->where('email', 'carla.import@example.com')->exists());
+    }
 }

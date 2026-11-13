@@ -66,7 +66,7 @@
                                     <i class="bi bi-eye me-1"></i>Anteprima
                                 </button>
                                 <button type="submit" class="btn btn-primary" @disabled(! $isConfigured)
-                                        onclick="return confirm('Inviare la newsletter a {{ $destinatariCount }} soci attivi?');">
+                                        data-conferma="Inviare la newsletter a {{ $destinatariCount }} soci attivi?">
                                     <i class="bi bi-send me-1"></i>Invia a {{ $destinatariCount }} soci
                                 </button>
                                 <span class="text-muted small">
@@ -80,7 +80,7 @@
                               id="anteprimaForm" class="d-none">
                             @csrf
                         </form>
-                        <script>
+                        <script @cspNonce>
                             document.getElementById('anteprimaForm').addEventListener('submit', function () {
                                 this.querySelectorAll('[data-clone]').forEach(function (el) { el.remove(); });
                                 var src = document.getElementById('newsletterForm');

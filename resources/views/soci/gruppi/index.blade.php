@@ -66,7 +66,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" action="{{ route('config-gruppi.destroy', $gruppo) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare il gruppo «{{ $gruppo->nome_gruppo }}»?');">
+                                              data-conferma="Eliminare il gruppo «{{ $gruppo->nome_gruppo }}»?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

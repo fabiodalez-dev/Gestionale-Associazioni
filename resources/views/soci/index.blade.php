@@ -108,7 +108,7 @@
             <i class="bi bi-link-45deg me-1"></i>Link di pagamento da inviare al socio:
             <code id="paymentLink">{{ session('payment_link') }}</code>
             <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
-                    onclick="navigator.clipboard.writeText(document.getElementById('paymentLink').textContent)">
+                    data-copia-da="paymentLink">
                 <i class="bi bi-clipboard"></i> Copia
             </button>
         </div>
@@ -244,7 +244,7 @@
                 <div class="d-flex gap-2 flex-wrap align-items-center">
                     <form method="GET" action="{{ route('soci.index') }}" class="d-flex gap-2 align-items-center">
                         <label class="small text-muted" for="preset_id">Preset:</label>
-                        <select class="form-select form-select-sm" id="preset_id" name="preset_id" onchange="this.form.submit()" style="width:auto">
+                        <select class="form-select form-select-sm" id="preset_id" name="preset_id" data-invio-automatico style="width:auto">
                             <option value="">— Nessuno —</option>
                             @foreach ($presets as $preset)
                                 <option value="{{ $preset->id }}" @selected($presetCorrente?->id === $preset->id)>
@@ -273,7 +273,7 @@
                     </form>
                     @if ($presetCorrente)
                         <form method="POST" action="{{ route('soci.filtri.destroy', $presetCorrente) }}"
-                              onsubmit="return confirm('Eliminare il preset «{{ $presetCorrente->name }}»?');">
+                              data-conferma="Eliminare il preset «{{ $presetCorrente->name }}»?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-bookmark-x"></i> Elimina preset</button>
@@ -342,7 +342,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function () {
     const form = document.getElementById('filtersForm');
     const results = document.getElementById('sociResults');

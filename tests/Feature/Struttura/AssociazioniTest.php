@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Struttura;
 
+use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Sede;
 use App\Models\TesseraTemplate;
@@ -171,6 +172,83 @@ class AssociazioniTest extends TestCase
         $this->assertSame(Utente::RUOLO_ADMIN_ASSOCIAZIONE, $admin->ruolo);
         $this->assertFalse($admin->attivo, 'senza associazione l\'utente resta disattivato');
         $this->assertNull($admin->remember_token);
+    }
+
+    public function test_eliminazione_cancella_le_chiavi_api_e_revoca_i_token_degli_utenti(): void
+    {
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $associazione = Associazione::factory()->create(['nome' => 'Tenant Con Chiavi']);
+        $altra = Associazione::factory()->create();
+        $admin = Utente::factory()->adminAssociazione()->create(['associazione_id' => $associazione->id]);
+        $admin->createToken('script', ['soci:read']);
+        $estraneo = Utente::factory()->adminAssociazione()->create(['associazione_id' => $altra->id]);
+        $estraneo->createToken('script', ['soci:read']);
+        $chiaveTenant = ApiKey::create([
+            'associazione_id' => $associazione->id, 'api_key' => ApiKey::generaChiave(),
+            'nome' => 'Tenant', 'permessi' => ['*'], 'attiva' => true,
+        ]);
+        $chiaveAltra = ApiKey::create([
+            'associazione_id' => $altra->id, 'api_key' => ApiKey::generaChiave(),
+            'nome' => 'Altra', 'permessi' => ['*'], 'attiva' => true,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->delete('/associazioni/'.$associazione->id, ['conferma_nome' => 'Tenant Con Chiavi'])
+            ->assertRedirect(route('associazioni.index'));
+
+        // Nessuna chiave del tenant sopravvive (né come orfana né come globale)
+        $this->assertNull(ApiKey::find($chiaveTenant->id));
+        $this->assertSame(0, ApiKey::query()->whereNull('associazione_id')->count());
+        $this->assertNotNull(ApiKey::find($chiaveAltra->id));
+
+        $this->assertSame(0, $admin->tokens()->count());
+        $this->assertFalse($admin->fresh()->attivo);
+        $this->assertSame(1, $estraneo->tokens()->count());
+    }
+
+    public function test_rimozione_admin_revoca_i_suoi_token_sanctum(): void
+    {
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $associazione = Associazione::factory()->create();
+        $admin = Utente::factory()->adminAssociazione()->create(['associazione_id' => $associazione->id]);
+        $admin->createToken('script', ['soci:read']);
+        $collega = Utente::factory()->adminAssociazione()->create(['associazione_id' => $associazione->id]);
+        $collega->createToken('script', ['soci:read']);
+
+        $this->actingAs($superAdmin)
+            ->post('/associazioni/'.$associazione->id.'/rimuovi-admin', ['utente_id' => $admin->id])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(0, $admin->tokens()->count());
+        $this->assertSame(1, $collega->tokens()->count());
+    }
+
+    public function test_ricollegare_un_admin_disattivato_non_lo_riattiva_ma_avvisa(): void
+    {
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $associazione = Associazione::factory()->create(['nome' => 'Destinazione', 'email' => 'dest@example.com']);
+        $scollegato = Utente::factory()->adminAssociazione()->create([
+            'associazione_id' => null,
+            'attivo' => false,
+            'nome' => 'Rientro',
+            'cognome' => 'Admin',
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->put('/associazioni/'.$associazione->id, [
+                'nome' => 'Destinazione',
+                'email' => 'dest@example.com',
+                'attiva' => '1',
+                'link_admin_user_id' => $scollegato->id,
+            ])
+            ->assertRedirect(route('associazioni.index'))
+            ->assertSessionHas('warning', fn ($w) => str_contains((string) $w, 'Rientro Admin') && str_contains((string) $w, 'disattivato'));
+
+        $scollegato->refresh();
+        $this->assertSame($associazione->id, $scollegato->associazione_id);
+        // Riattivazione solo consapevole, dalla pagina Amministratori
+        $this->assertFalse($scollegato->attivo);
     }
 
     public function test_ricerca_utenti_solo_super_admin_ed_esclude_super_admin(): void

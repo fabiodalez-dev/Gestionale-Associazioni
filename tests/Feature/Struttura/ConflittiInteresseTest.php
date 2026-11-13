@@ -290,4 +290,35 @@ class ConflittiInteresseTest extends TestCase
 
         $this->assertSame([$attivo->id], $titolari->pluck('id')->all());
     }
+
+    public function test_conflitti_non_modificabili_con_il_voto_del_punto_aperto_o_chiuso(): void
+    {
+        $riunione = Riunione::factory()->assemblea()->create([
+            'associazione_id' => $this->associazione->id,
+            'data_ora' => now()->subMinutes(5),
+            'voto_online' => true,
+            'odg' => [['punto' => 'Contratto', 'descrizione' => null], ['punto' => 'Varie', 'descrizione' => null]],
+        ]);
+        $soci = collect(range(1, 3))->map(fn () => $this->titolare());
+        $soci->each(fn (Socio $s) => $this->partecipante($riunione, $s));
+        $esistente = app(ConflittiService::class)->dichiaraConflitto($riunione, 0, $soci[0], null);
+
+        $votazione = app(VotoAssembleaService::class)->apri($riunione, 0, false);
+
+        // Voto aperto: niente nuovi conflitti né rimozioni sul punto
+        $this->actAsAdmin()->post(route('riunioni.conflitti.store', $riunione), ['punto_indice' => 0, 'socio' => $soci[1]->id])
+            ->assertSessionHas('error', fn (string $m) => str_contains($m, 'già aperto'));
+        $this->actAsAdmin()->delete(route('riunioni.conflitti.destroy', [$riunione, $esistente]))
+            ->assertSessionHas('error');
+
+        // Sugli altri punti si può ancora
+        $this->actAsAdmin()->post(route('riunioni.conflitti.store', $riunione), ['punto_indice' => 1, 'socio' => $soci[1]->id])
+            ->assertSessionHas('success');
+
+        app(VotoAssembleaService::class)->chiudi($votazione->fresh());
+
+        $this->actAsAdmin()->delete(route('riunioni.conflitti.destroy', [$riunione, $esistente]))
+            ->assertSessionHas('error', fn (string $m) => str_contains($m, 'già chiuso'));
+        $this->assertSame(2, ConflittoRiunione::query()->count());
+    }
 }

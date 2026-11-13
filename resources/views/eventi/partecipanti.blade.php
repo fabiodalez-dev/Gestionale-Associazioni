@@ -41,7 +41,7 @@
             </a>
             @if ($sociDisponibili->isNotEmpty())
                 <form method="POST" action="{{ route('eventi.partecipanti.storeAll', $evento) }}" class="d-inline"
-                      onsubmit="return confirm('Aggiungere tutti i soci attivi all\'evento?');">
+                      data-conferma="Aggiungere tutti i soci attivi all'evento?">
                     @csrf
                     <button type="submit" class="btn btn-outline-primary">
                         <i class="bi bi-people-fill me-1"></i>Aggiungi Tutti i Soci
@@ -156,7 +156,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" action="{{ route('eventi.partecipanti.destroy', [$evento, $p->id]) }}" class="d-inline"
-                                              onsubmit="return confirm('Rimuovere questo partecipante dall\'evento?');">
+                                              data-conferma="Rimuovere questo partecipante dall'evento?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger btn-sm" title="Rimuovi"
@@ -275,7 +275,7 @@
 
     @if ($errors->any())
         @push('scripts')
-            <script>
+            <script @cspNonce>
                 document.addEventListener('DOMContentLoaded', function () {
                     new bootstrap.Modal(document.getElementById('addSocioModal')).show();
                 });

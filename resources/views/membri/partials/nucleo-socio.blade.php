@@ -61,7 +61,7 @@
                         </span>
                         @if ($puoGestire)
                             <form method="POST" action="{{ route('nuclei.membri.destroy', [$nucleoSocio, $membro]) }}" class="d-inline"
-                                  onsubmit="return confirm('Rimuovere {{ $membro->nome_completo }} dal nucleo?');">
+                                  data-conferma="Rimuovere {{ $membro->nome_completo }} dal nucleo?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger py-0" title="Rimuovi dal nucleo">
@@ -146,14 +146,14 @@
                             <label class="form-label small mb-1" for="nucleo-esistente">Oppure aggiungi a un nucleo esistente</label>
                             <div class="d-flex gap-2">
                                 <select class="form-select form-select-sm" id="nucleo-esistente"
-                                        onchange="document.getElementById('formAggiungiANucleo').action = this.options[this.selectedIndex].dataset.action || '';">
+                                        data-imposta-action="formAggiungiANucleo">
                                     <option value="">— Seleziona nucleo —</option>
                                     @foreach ($nucleiDisponibili as $nucleoOpzione)
                                         <option value="{{ $nucleoOpzione->id }}" data-action="{{ route('nuclei.membri.store', $nucleoOpzione) }}">{{ $nucleoOpzione->nome }}</option>
                                     @endforeach
                                 </select>
                                 <form method="POST" action="" id="formAggiungiANucleo"
-                                      onsubmit="return this.action !== '' && this.action !== window.location.href;">
+                                      data-richiede-action>
                                     @csrf
                                     <input type="hidden" name="socio_id" value="{{ $socio->id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-person-plus me-1"></i>Aggiungi</button>

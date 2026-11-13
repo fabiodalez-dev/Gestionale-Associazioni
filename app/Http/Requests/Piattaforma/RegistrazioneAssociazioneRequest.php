@@ -30,30 +30,30 @@ class RegistrazioneAssociazioneRequest extends FormRequest
     }
 
     /**
+     * Nessuna regola "unique": il modulo pubblico non deve dire a chiunque quali
+     * email, codici fiscali o partite IVA sono già sulla piattaforma. I doppioni
+     * li gestisce RegistrazioneAssociazioni (email dell'amministratore già in uso:
+     * nessuna richiesta e un avviso al titolare; dati dell'associazione già in uso:
+     * la richiesta confermata passa dal super admin, che vede l'avviso di doppione).
+     *
      * @return array<string, list<mixed>>
      */
     public function rules(): array
     {
-        // Blocca un secondo invio solo se la prima richiesta è stata confermata via email:
-        // richieste mai confermate non devono poter "occupare" l'email di qualcun altro
-        $inAttesa = fn (string $colonna) => Rule::unique('richieste_registrazione', $colonna)
-            ->where('stato', RichiestaRegistrazione::STATO_IN_ATTESA)
-            ->whereNotNull('email_verificata_at');
-
         return [
             'nome' => ['required', 'string', 'max:255'],
             'tipo' => ['nullable', Rule::in(array_keys(RichiestaRegistrazione::TIPI))],
-            'email' => ['required', 'email', 'max:255', Rule::unique('associazioni', 'email'), $inAttesa('email')],
+            'email' => ['required', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:20'],
-            'codice_fiscale' => ['nullable', 'string', 'regex:/^([A-Z0-9]{11}|[A-Z0-9]{16})$/', Rule::unique('associazioni', 'codice_fiscale')],
-            'partita_iva' => ['nullable', 'digits:11', Rule::unique('associazioni', 'partita_iva')],
+            'codice_fiscale' => ['nullable', 'string', 'regex:/^([A-Z0-9]{11}|[A-Z0-9]{16})$/'],
+            'partita_iva' => ['nullable', 'digits:11'],
             'citta' => ['nullable', 'string', 'max:100'],
             'provincia' => ['nullable', 'string', 'size:2', 'alpha'],
             'numero_soci_stimato' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'messaggio' => ['nullable', 'string', 'max:2000'],
             'admin_nome' => ['required', 'string', 'max:100'],
             'admin_cognome' => ['nullable', 'string', 'max:100'],
-            'admin_email' => ['required', 'email', 'max:255', Rule::unique('utenti', 'email'), $inAttesa('admin_email')],
+            'admin_email' => ['required', 'email', 'max:255'],
             'admin_password' => ['required', ...PasswordPolicy::rules([$this->input('admin_email'), $this->input('admin_nome'), $this->input('admin_cognome'), $this->input('nome')])],
             'privacy' => ['accepted'],
         ];
@@ -91,11 +91,7 @@ class RegistrazioneAssociazioneRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'email.unique' => 'Questa email è già usata da un\'associazione iscritta o in attesa di approvazione.',
-            'admin_email.unique' => 'Esiste già un account con questa email: accedi oppure usa un\'altra email.',
-            'codice_fiscale.unique' => 'Un\'associazione con questo codice fiscale è già iscritta.',
             'codice_fiscale.regex' => 'Il codice fiscale deve avere 11 cifre (enti) o 16 caratteri.',
-            'partita_iva.unique' => 'Un\'associazione con questa partita IVA è già iscritta.',
             'privacy.accepted' => 'Serve il consenso al trattamento dei dati per inviare la richiesta.',
         ];
     }

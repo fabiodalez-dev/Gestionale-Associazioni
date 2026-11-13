@@ -163,6 +163,7 @@ DROP TABLE IF EXISTS `api_keys`;
 CREATE TABLE `api_keys` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `associazione_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `globale` tinyint(1) NOT NULL DEFAULT '0',
   `api_key_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `api_key_prefix` varchar(8) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `nome` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -175,7 +176,7 @@ CREATE TABLE `api_keys` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `api_keys_api_key_hash_unique` (`api_key_hash`),
   KEY `api_keys_associazione_id_index` (`associazione_id`),
-  CONSTRAINT `api_keys_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE SET NULL
+  CONSTRAINT `api_keys_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `associazioni`;
@@ -753,6 +754,7 @@ CREATE TABLE `elezioni` (
   `schede_bianche_sala` smallint unsigned NOT NULL DEFAULT '0',
   `schede_nulle_sala` smallint unsigned NOT NULL DEFAULT '0',
   `proclamata_at` datetime DEFAULT NULL,
+  `cariche_confermate_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -966,6 +968,23 @@ CREATE TABLE `health_check_result_history_items` (
   PRIMARY KEY (`id`),
   KEY `health_check_result_history_items_created_at_index` (`created_at`),
   KEY `health_check_result_history_items_batch_index` (`batch`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `iscrizioni_da_confermare`;
+CREATE TABLE `iscrizioni_da_confermare` (
+  `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `associazione_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `dati_form` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `ip` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `referral_codice` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `scade_at` datetime NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `iscrizioni_da_confermare_associazione_id_email_index` (`associazione_id`,`email`),
+  KEY `iscrizioni_da_confermare_scade_at_index` (`scade_at`),
+  CONSTRAINT `iscrizioni_da_confermare_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `job_batches`;
@@ -2510,6 +2529,9 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1),
 ('2026_11_13_100000_add_invito_to_utenti_table', 1),
 ('2026_11_13_110000_hash_api_keys_table', 1),
-('2026_11_13_120000_backfill_expires_at_personal_access_tokens', 1);
+('2026_11_13_120000_backfill_expires_at_personal_access_tokens', 1),
+('2026_11_13_130000_add_cariche_confermate_at_to_elezioni_table', 1),
+('2026_11_13_140500_add_globale_to_api_keys_table', 1),
+('2026_11_13_150000_create_iscrizioni_da_confermare_table', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

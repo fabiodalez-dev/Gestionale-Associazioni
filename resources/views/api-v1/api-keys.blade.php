@@ -48,7 +48,7 @@
             <strong><i class="bi bi-exclamation-triangle me-1"></i>Copia ora la chiave: non sarà più visibile per intero.</strong>
             <div class="input-group mt-2">
                 <input type="text" class="form-control font-monospace" value="{{ session('nuova_chiave') }}" readonly id="nuovaChiaveInput">
-                <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('nuovaChiaveInput').value)">
+                <button class="btn btn-outline-secondary" type="button" data-copia-da="nuovaChiaveInput">
                     <i class="bi bi-clipboard"></i> Copia
                 </button>
             </div>
@@ -60,7 +60,7 @@
             <strong><i class="bi bi-exclamation-triangle me-1"></i>Copia ora il token: non sarà più visibile.</strong>
             <div class="input-group mt-2">
                 <input type="text" class="form-control font-monospace" value="{{ session('nuovo_token') }}" readonly id="nuovoTokenInput">
-                <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('nuovoTokenInput').value)">
+                <button class="btn btn-outline-secondary" type="button" data-copia-da="nuovoTokenInput">
                     <i class="bi bi-clipboard"></i> Copia
                 </button>
             </div>
@@ -100,6 +100,9 @@
                                 <td>
                                     @if ($chiave->isGlobale())
                                         <span class="badge bg-warning text-dark"><i class="bi bi-globe2 me-1"></i>Globale</span>
+                                    @elseif ($chiave->associazione_id === null)
+                                        {{-- Senza associazione e senza flag globale: rifiutata dall'API --}}
+                                        <span class="badge bg-danger" title="Chiave senza associazione: non autentica. Eliminala.">Senza associazione (non valida)</span>
                                     @else
                                         {{ $chiave->associazione?->nome ?? '—' }}
                                     @endif
@@ -138,7 +141,7 @@
                                     @endcan
                                     @can('delete', $chiave)
                                         <form method="POST" action="{{ route('api-keys.destroy', $chiave) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare definitivamente questa chiave API? L\'azione è irreversibile.');">
+                                              data-conferma="Eliminare definitivamente questa chiave API? L'azione è irreversibile.">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -163,9 +166,16 @@
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-person-badge me-1"></i>I miei token personali (Sanctum)</span>
-            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#apiTokenModal">
-                <i class="bi bi-plus-lg me-1"></i>Nuovo Token
-            </button>
+            <div class="d-flex gap-2">
+                @if (app(\App\Policies\PersonalAccessTokenPolicy::class)->viewAny(auth()->user()))
+                    <a href="{{ route('api-tokens.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-people me-1"></i>Token degli utenti
+                    </a>
+                @endif
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#apiTokenModal">
+                    <i class="bi bi-plus-lg me-1"></i>Nuovo Token
+                </button>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -198,7 +208,7 @@
                                 </td>
                                 <td class="text-end">
                                     <form method="POST" action="{{ route('api-tokens.destroy', $token->id) }}" class="d-inline"
-                                          onsubmit="return confirm('Revocare questo token?');">
+                                          data-conferma="Revocare questo token?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Revoca">
@@ -318,7 +328,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     // Warning chiave globale
     const globaleSwitch = document.getElementById('apiKeyGlobale');
     if (globaleSwitch) {

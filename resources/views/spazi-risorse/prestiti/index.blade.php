@@ -71,7 +71,7 @@
                                     </form>
                                 @endif
                                 <form method="POST" action="{{ route('prestiti.destroy', $p) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questo prestito dallo storico?');">
+                                      data-conferma="Eliminare questo prestito dallo storico?">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
@@ -160,7 +160,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         @if ($errors->any())
             new bootstrap.Modal(document.getElementById('prestitoModal')).show();

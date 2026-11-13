@@ -8,10 +8,16 @@ use App\Models\Elezione;
 use App\Models\RiunionePartecipante;
 use App\Models\SchedaElezione;
 use App\Models\Socio;
+use App\Models\Utente;
 use App\Models\VotanteElezione;
+use App\Notifications\Struttura\CaricheElezioneDaConfermareNotification;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 /**
  * Elezioni e rinnovo delle cariche (issue #9).
@@ -26,7 +32,9 @@ use Illuminate\Support\Facades\DB;
  *   classifica con la regola di parità dell'elezione; eletti i primi
  *   "posti" con almeno una preferenza.
  * - Proclamazione: chiude le cariche attive dei ruoli dell'organo e crea
- *   la carica degli eletti per la durata del mandato.
+ *   la carica degli eletti per la durata del mandato; se chi proclama non
+ *   gestisce le cariche (CaricaPolicy) la sostituzione aspetta la conferma
+ *   di un admin dell'associazione.
  */
 class ElezioniService
 {
@@ -232,6 +240,15 @@ class ElezioniService
                 throw new ElezioneNonValidaException('Le preferenze in sala indicano una candidatura non valida.');
             }
 
+            // Ogni scheda valida dà al massimo una preferenza a un candidato
+            foreach ($preferenzeSala as $candidaturaId => $preferenze) {
+                if ($preferenze > $valideSala) {
+                    $nome = $candidature[$candidaturaId]->socio->nome_completo;
+
+                    throw new ElezioneNonValidaException("Le preferenze in sala per {$nome} ({$preferenze}) sono più delle schede valide in sala ({$valideSala}).");
+                }
+            }
+
             $totaleSala = array_sum($preferenzeSala);
             if ($totaleSala > $valideSala * $elezione->max_preferenze) {
                 throw new ElezioneNonValidaException("Le preferenze in sala ({$totaleSala}) sono più di quelle possibili con {$valideSala} schede valide.");
@@ -275,47 +292,144 @@ class ElezioniService
     }
 
     /**
-     * Proclamazione: chiude le cariche uscenti il giorno prima dell'elezione
-     * e crea quelle degli eletti dal giorno dell'elezione.
+     * Proclamazione: l'elezione passa a "proclamata" e, se chi proclama può
+     * gestire le cariche (CaricaPolicy::create, cioè admin_associazione),
+     * chiude subito le cariche uscenti il giorno prima dell'elezione e crea
+     * quelle degli eletti dal giorno dell'elezione. Altrimenti (permesso
+     * riunioni.update senza governance delle cariche) gli eletti restano
+     * registrati sulle candidature e la sostituzione delle cariche aspetta
+     * la conferma di un admin (confermaCariche), che riceve una notifica.
+     * Senza utente (chiamate interne) le cariche si aggiornano subito.
      *
      * @return int eletti
      */
-    public function proclama(Elezione $elezione): int
+    public function proclama(Elezione $elezione, ?Utente $utente = null): int
     {
         if ($elezione->stato !== Elezione::STATO_SCRUTINIO) {
             throw new ElezioneNonValidaException('Si proclama dopo lo scrutinio.');
         }
 
-        return DB::transaction(function () use ($elezione): int {
-            $inizio = $elezione->riunione->data_ora->copy()->startOfDay();
-            $fineUscenti = $inizio->copy()->subDay();
+        $aggiornaCariche = $utente === null || Gate::forUser($utente)->allows('create', Carica::class);
 
-            Carica::query()
-                ->withoutGlobalScope('sede')
-                ->attive()
-                ->whereIn('ruolo', $elezione->ruoliUscenti())
-                ->get()
-                ->each(fn (Carica $carica) => $carica->update([
-                    'fine' => $carica->inizio->isAfter($fineUscenti) ? $carica->inizio : $fineUscenti,
-                ]));
+        $eletti = DB::transaction(function () use ($elezione, $aggiornaCariche): int {
+            // Riletta con il lock: un doppio invio non proclama due volte
+            $bloccata = Elezione::query()->whereKey($elezione->id)->lockForUpdate()->firstOrFail();
 
-            $eletti = Candidatura::query()->where('elezione_id', $elezione->id)->where('eletta', true)->get();
-
-            foreach ($eletti as $candidatura) {
-                Carica::create([
-                    'associazione_id' => $elezione->associazione_id,
-                    'socio_id' => $candidatura->socio_id,
-                    'ruolo' => $elezione->ruoloEletti(),
-                    'inizio' => $inizio->toDateString(),
-                    'fine' => $inizio->copy()->addMonthsNoOverflow($elezione->durata_mandato_mesi)->subDay()->toDateString(),
-                    'note' => "Eletto/a nell'elezione del {$inizio->format('d/m/Y')} ({$elezione->organoLabel()}).",
-                ]);
+            if ($bloccata->stato !== Elezione::STATO_SCRUTINIO) {
+                throw new ElezioneNonValidaException('Si proclama dopo lo scrutinio.');
             }
 
-            $elezione->update(['stato' => Elezione::STATO_PROCLAMATA, 'proclamata_at' => now()]);
+            $eletti = $aggiornaCariche
+                ? $this->sostituisciCariche($bloccata)
+                : Candidatura::query()->where('elezione_id', $bloccata->id)->where('eletta', true)->count();
 
-            return $eletti->count();
+            $bloccata->forceFill([
+                'stato' => Elezione::STATO_PROCLAMATA,
+                'proclamata_at' => now(),
+                'cariche_confermate_at' => $aggiornaCariche ? now() : null,
+            ])->save();
+
+            return $eletti;
         });
+
+        $elezione->refresh();
+
+        if (! $aggiornaCariche) {
+            $this->notificaCaricheDaConfermare($elezione);
+        }
+
+        return $eletti;
+    }
+
+    /**
+     * Conferma (da parte di un admin) della sostituzione delle cariche di
+     * un'elezione proclamata da chi non gestisce le cariche.
+     *
+     * @return int cariche create
+     */
+    public function confermaCariche(Elezione $elezione): int
+    {
+        return DB::transaction(function () use ($elezione): int {
+            $bloccata = Elezione::query()->whereKey($elezione->id)->lockForUpdate()->firstOrFail();
+
+            if ($bloccata->stato !== Elezione::STATO_PROCLAMATA) {
+                throw new ElezioneNonValidaException('Le cariche si confermano dopo la proclamazione.');
+            }
+
+            if ($bloccata->getAttribute('cariche_confermate_at') !== null) {
+                throw new ElezioneNonValidaException('Le cariche di questa elezione sono già state aggiornate.');
+            }
+
+            $create = $this->sostituisciCariche($bloccata);
+
+            $bloccata->forceFill(['cariche_confermate_at' => now()])->save();
+
+            return $create;
+        });
+    }
+
+    /** Cariche in attesa di conferma dopo la proclamazione? */
+    public function caricheDaConfermare(Elezione $elezione): bool
+    {
+        return $elezione->stato === Elezione::STATO_PROCLAMATA && $elezione->getAttribute('cariche_confermate_at') === null;
+    }
+
+    /**
+     * Chiude le cariche attive dei ruoli dell'organo il giorno prima
+     * dell'elezione e crea quelle degli eletti per la durata del mandato.
+     */
+    private function sostituisciCariche(Elezione $elezione): int
+    {
+        $inizio = $elezione->riunione->data_ora->copy()->startOfDay();
+        $fineUscenti = $inizio->copy()->subDay();
+
+        Carica::query()
+            ->withoutGlobalScope('sede')
+            ->attive()
+            ->whereIn('ruolo', $elezione->ruoliUscenti())
+            ->get()
+            ->each(fn (Carica $carica) => $carica->update([
+                'fine' => $carica->inizio->isAfter($fineUscenti) ? $carica->inizio : $fineUscenti,
+            ]));
+
+        $eletti = Candidatura::query()->where('elezione_id', $elezione->id)->where('eletta', true)->get();
+
+        foreach ($eletti as $candidatura) {
+            Carica::create([
+                'associazione_id' => $elezione->associazione_id,
+                'socio_id' => $candidatura->socio_id,
+                'ruolo' => $elezione->ruoloEletti(),
+                'inizio' => $inizio->toDateString(),
+                'fine' => $inizio->copy()->addMonthsNoOverflow($elezione->durata_mandato_mesi)->subDay()->toDateString(),
+                'note' => "Eletto/a nell'elezione del {$inizio->format('d/m/Y')} ({$elezione->organoLabel()}).",
+            ]);
+        }
+
+        return $eletti->count();
+    }
+
+    /**
+     * Avviso agli admin attivi dell'associazione. Best-effort: la
+     * proclamazione è già registrata e non deve fallire per la posta.
+     */
+    private function notificaCaricheDaConfermare(Elezione $elezione): void
+    {
+        try {
+            $admin = Utente::query()
+                ->where('associazione_id', $elezione->associazione_id)
+                ->where('ruolo', Utente::RUOLO_ADMIN_ASSOCIAZIONE)
+                ->where('attivo', true)
+                ->get();
+
+            if ($admin->isNotEmpty()) {
+                Notification::send($admin, new CaricheElezioneDaConfermareNotification($elezione));
+            }
+        } catch (Throwable $e) {
+            Log::error('Elezione: notifica delle cariche da confermare non inviata', [
+                'elezione_id' => $elezione->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

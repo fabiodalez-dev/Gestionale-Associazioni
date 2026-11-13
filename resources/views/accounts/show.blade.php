@@ -33,7 +33,7 @@
             </a>
             @if ($account->attivo)
                 <form method="POST" action="{{ route('accounts.disattiva', $account) }}" class="m-0"
-                      onsubmit="return confirm('Disattivare questo account? Non potrà più accedere né prenotare.');">
+                      data-conferma="Disattivare questo account? Non potrà più accedere né prenotare.">
                     @csrf
                     @method('PATCH')
                     <button type="submit" class="btn btn-outline-danger">
@@ -132,7 +132,7 @@
                                     @endforeach
                                 </select>
                                 <button type="submit" class="btn btn-primary"
-                                        onclick="return confirm('Collegare questo account al socio selezionato?');">
+                                        data-conferma="Collegare questo account al socio selezionato?">
                                     <i class="bi bi-link-45deg me-1"></i>Collega
                                 </button>
                             </div>
@@ -141,7 +141,7 @@
 
                         <hr>
                         <form method="POST" action="{{ route('accounts.promuovi-socio', $account) }}" class="m-0"
-                              onsubmit="return confirm('Creare un nuovo socio (stato Attivo) dall\'anagrafica di questo account e collegarlo?');">
+                              data-conferma="Creare un nuovo socio (stato Attivo) dall'anagrafica di questo account e collegarlo?">
                             @csrf
                             <button type="submit" class="btn btn-outline-primary">
                                 <i class="bi bi-person-plus me-1"></i>Promuovi a nuovo socio

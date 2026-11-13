@@ -64,7 +64,7 @@
                                 </button>
                             </form>
                             <form method="POST" action="{{ route('soci.note.destroy', [$socio, $nota]) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare questa nota?');">
+                                  data-conferma="Eliminare questa nota?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina nota">

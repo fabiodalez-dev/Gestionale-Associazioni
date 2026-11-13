@@ -195,7 +195,7 @@
                                 <a href="#" class="btn btn-soft" id="crmCreaSocio" data-base="{{ route('soci.create') }}"><i class="bi bi-person-plus"></i>Iscrivi come socio</a>
                             @endif
                             <button type="submit" form="crmPersa" class="btn btn-outline-secondary">Non andato a buon fine</button>
-                            <button type="submit" form="crmElimina" class="btn btn-outline-danger" onclick="return confirm('Eliminare questo contatto?')"><i class="bi bi-trash"></i></button>
+                            <button type="submit" form="crmElimina" class="btn btn-outline-danger" data-conferma="Eliminare questo contatto?"><i class="bi bi-trash"></i></button>
                         </div>
                         <div class="d-flex gap-2 ms-auto">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
@@ -214,6 +214,6 @@
     <script src="{{ asset('assets/vendor/sortablejs/Sortable.min.js') }}"></script>
     <script src="{{ asset('assets/js/crm.js') }}"></script>
     @if ($errors->any())
-        <script>document.addEventListener('DOMContentLoaded', function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('crmModal')).show(); });</script>
+        <script @cspNonce>document.addEventListener('DOMContentLoaded', function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('crmModal')).show(); });</script>
     @endif
 @endpush

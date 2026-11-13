@@ -135,4 +135,15 @@ class Annuncio extends Model
     {
         return $this->belongsTo(Utente::class, 'creato_da');
     }
+
+    /**
+     * Corpo per le pagine dell'app (bacheca, novità): senza blocchi <style>.
+     * Quei blocchi servono all'impaginazione delle email; mostrati dentro la
+     * pagina varrebbero per tutta la pagina (es. .navbar{display:none}).
+     * Gli attributi style restano: valgono solo per il proprio elemento.
+     */
+    public function corpoHtmlPerPagina(): string
+    {
+        return (string) preg_replace('#<style\b[^>]*>.*?</style\s*>#is', '', (string) $this->corpo_html);
+    }
 }

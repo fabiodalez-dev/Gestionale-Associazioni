@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Struttura;
 
 use App\Http\Controllers\Controller;
 use App\Models\Candidatura;
+use App\Models\Carica;
 use App\Models\Elezione;
 use App\Models\Riunione;
 use App\Models\SchedaElezione;
@@ -20,7 +21,8 @@ use Illuminate\View\View;
 /**
  * Elezioni e rinnovo delle cariche, lato segreteria (issue #9): creazione
  * dall'assemblea, candidature, apertura del voto, scrutinio con le schede
- * cartacee e proclamazione. Governance: RiunionePolicy sull'assemblea.
+ * cartacee e proclamazione. Governance: RiunionePolicy sull'assemblea;
+ * la conferma delle cariche dopo la proclamazione segue CaricaPolicy::create.
  */
 class ElezioneController extends Controller
 {
@@ -166,17 +168,40 @@ class ElezioneController extends Controller
         ), 'Scrutinio completato: controlla i risultati e proclama gli eletti.');
     }
 
-    public function proclama(Elezione $elezione): RedirectResponse
+    public function proclama(Request $request, Elezione $elezione): RedirectResponse
     {
         $this->authorize('update', $elezione->riunione);
 
         try {
-            $eletti = $this->elezioni->proclama($elezione);
+            $eletti = $this->elezioni->proclama($elezione, $request->user());
         } catch (ElezioneNonValidaException $e) {
             return $this->indietro($elezione, 'error', $e->getMessage());
         }
 
+        if ($this->elezioni->caricheDaConfermare($elezione->refresh())) {
+            return $this->indietro($elezione, 'success', "Eletti proclamati: {$eletti}. L'aggiornamento delle cariche nel registro degli organi sociali va confermato da un amministratore dell'associazione, che è stato avvisato.");
+        }
+
         return $this->indietro($elezione, 'success', "Eletti proclamati: {$eletti} nuove cariche registrate, cariche uscenti chiuse. Assegna ora i ruoli interni dalla pagina degli organi sociali.");
+    }
+
+    /**
+     * Conferma della sostituzione delle cariche dopo una proclamazione fatta
+     * da chi non gestisce le cariche: riservata a chi può crearle
+     * (CaricaPolicy::create, admin_associazione).
+     */
+    public function confermaCariche(Elezione $elezione): RedirectResponse
+    {
+        $this->authorize('view', $elezione->riunione);
+        $this->authorize('create', Carica::class);
+
+        try {
+            $create = $this->elezioni->confermaCariche($elezione);
+        } catch (ElezioneNonValidaException $e) {
+            return $this->indietro($elezione, 'error', $e->getMessage());
+        }
+
+        return $this->indietro($elezione, 'success', "Cariche aggiornate: {$create} nuove cariche registrate, cariche uscenti chiuse. Assegna ora i ruoli interni dalla pagina degli organi sociali.");
     }
 
     private function esegui(Elezione $elezione, callable $azione, string $successo): RedirectResponse

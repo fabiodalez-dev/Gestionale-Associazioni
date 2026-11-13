@@ -86,7 +86,7 @@
         </div>
     </div>
     <div class="col-md-2">
-        <select class="form-select" name="status" onchange="this.form.submit()">
+        <select class="form-select" name="status" data-invio-automatico>
             <option value="all" @selected($status === 'all')>Tutti gli stati</option>
             @foreach ($stati as $s)
                 <option value="{{ $s }}" @selected($status === $s)>{{ $s }}</option>
@@ -94,7 +94,7 @@
         </select>
     </div>
     <div class="col-md-2">
-        <select class="form-select" name="type" onchange="this.form.submit()">
+        <select class="form-select" name="type" data-invio-automatico>
             <option value="all" @selected($type === 'all')>Tutti i tipi</option>
             @foreach ($tipi as $t)
                 <option value="{{ $t }}" @selected($type === $t)>{{ $t }}</option>
@@ -102,7 +102,7 @@
         </select>
     </div>
     <div class="col-md-2">
-        <select class="form-select" name="priority" onchange="this.form.submit()">
+        <select class="form-select" name="priority" data-invio-automatico>
             <option value="all" @selected($priority === 'all')>Tutte le priorità</option>
             @foreach ($priorita as $p)
                 <option value="{{ $p }}" @selected($priority === $p)>{{ $p }}</option>
@@ -184,7 +184,7 @@
                         <td class="text-end">
                             @if ($scadenza->isAttiva())
                                 <form method="POST" action="{{ route('scadenze.completa', $scadenza) }}" class="d-inline"
-                                      onsubmit="return confirm('Segnare questa scadenza come completata?');">
+                                      data-conferma="Segnare questa scadenza come completata?">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-outline-success" title="Completa">
                                         <i class="bi bi-check-lg"></i>
@@ -196,7 +196,7 @@
                                 <i class="bi bi-pencil"></i>
                             </a>
                             <form method="POST" action="{{ route('scadenze.destroy', $scadenza) }}" class="d-inline"
-                                  onsubmit="return confirm('Sei sicuro di voler eliminare questa scadenza?');">
+                                  data-conferma="Sei sicuro di voler eliminare questa scadenza?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -322,7 +322,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         @if ($scadenzaInModifica || $errors->any())
             new bootstrap.Modal(document.getElementById('scadenzaModal')).show();

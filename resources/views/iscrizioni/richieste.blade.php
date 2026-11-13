@@ -316,7 +316,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         document.addEventListener('DOMContentLoaded', function () {
             // Le modali sono condivise: il bottone della riga imposta action e nome
             function collega(selettoreBottoni, idForm) {

@@ -123,6 +123,6 @@
 </div>
 
 @if ($errors->any() && old('titolo'))
-<script>document.addEventListener('DOMContentLoaded',()=>new bootstrap.Modal(document.getElementById('riunioneModal')).show());</script>
+<script @cspNonce>document.addEventListener('DOMContentLoaded',()=>new bootstrap.Modal(document.getElementById('riunioneModal')).show());</script>
 @endif
 @endsection

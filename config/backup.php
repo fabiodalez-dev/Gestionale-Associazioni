@@ -190,6 +190,11 @@ return [
          * Vuota (come nel .env del wizard e di .env.example) = archivi non
          * cifrati: una stringa vuota passata a spatie fa fallire ogni backup
          * (ZipArchive::close(): Invalid argument), notturni e dell'updater.
+         *
+         * Gli zip includono il .env (serve al ripristino), quindi conviene
+         * cifrarli: il wizard genera la password nelle installazioni nuove e
+         * la pagina Impostazioni di sistema la genera su quelle esistenti.
+         * I backup già creati non vengono toccati.
          */
         'password' => env('BACKUP_ARCHIVE_PASSWORD') ?: null,
 

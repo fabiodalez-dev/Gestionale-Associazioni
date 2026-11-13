@@ -139,7 +139,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </a>
                                         <form method="POST" action="{{ route('eventi.destroy', $evento) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare questo evento?');">
+                                              data-conferma="Eliminare questo evento?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger btn-sm" title="Elimina"
@@ -403,7 +403,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         document.addEventListener('DOMContentLoaded', function () {
             var modalEl = document.getElementById('eventoModal');
 

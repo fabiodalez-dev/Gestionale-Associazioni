@@ -31,7 +31,7 @@
                                     <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-arrow-counterclockwise me-1"></i>Ripristina</button>
                                 </form>
                                 <form method="POST" action="{{ route('soci.force-destroy', $socio->id) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare DEFINITIVAMENTE questo socio? L\'operazione non è reversibile.');">
+                                      data-conferma="Eliminare DEFINITIVAMENTE questo socio? L'operazione non è reversibile.">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-octagon me-1"></i>Elimina definitivamente</button>

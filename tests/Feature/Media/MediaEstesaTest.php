@@ -242,4 +242,47 @@ class MediaEstesaTest extends TestCase
         $this->actingAs($this->admin)->delete(route('allegati.destroy', ['riunioni', $riunione->id, $media->id]))->assertRedirect();
         $this->assertNull($riunione->fresh()->getFirstMedia('allegati'));
     }
+
+    public function test_foto_del_socio_oltre_8000_pixel_rifiutata(): void
+    {
+        $socio = Socio::factory()->create(['associazione_id' => $this->associazione->id]);
+
+        $this->actingAs($this->admin)->post(route('soci.foto.store', $socio), [
+            'foto' => UploadedFile::fake()->image('enorme.jpg', 200, 8001),
+        ])->assertSessionHasErrors('foto');
+
+        $this->assertNull($socio->fresh()->getFirstMedia(Socio::COLLEZIONE_FOTO));
+    }
+
+    public function test_allegato_salvato_con_nome_casuale_e_scaricato_col_nome_originale(): void
+    {
+        $riunione = Riunione::factory()->create(['associazione_id' => $this->associazione->id]);
+
+        $this->actingAs($this->admin)->post(route('allegati.store', ['riunioni', $riunione->id]), [
+            'file' => UploadedFile::fake()->create('verbale firmato.pdf', 10, 'application/pdf'),
+        ])->assertSessionHas('success');
+
+        $media = $riunione->fresh()->getFirstMedia('allegati');
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{24}\.pdf$/', $media->file_name);
+        $this->actingAs($this->admin)->get(route('allegati.index', ['riunioni', $riunione->id]))->assertSee('verbale firmato.pdf');
+        $this->actingAs($this->admin)->get(route('allegati.download', ['riunioni', $riunione->id, $media->id]))
+            ->assertOk()->assertDownload('verbale firmato.pdf');
+    }
+
+    public function test_allegato_tra_10_e_20_mb_si_carica(): void
+    {
+        $riunione = Riunione::factory()->create(['associazione_id' => $this->associazione->id]);
+
+        // File reale di 15 MB: medialibrary controlla la dimensione vera (prima il limite era 10 MB)
+        $percorso = tempnam(sys_get_temp_dir(), 'allegato');
+        file_put_contents($percorso, "%PDF-1.4\n".str_repeat('0', 15 * 1024 * 1024));
+        $file = new UploadedFile($percorso, 'bilancio.pdf', 'application/pdf', null, true);
+
+        $this->actingAs($this->admin)->post(route('allegati.store', ['riunioni', $riunione->id]), ['file' => $file])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $this->assertGreaterThan(10 * 1024 * 1024, $riunione->fresh()->getFirstMedia('allegati')->size);
+        @unlink($percorso);
+    }
 }

@@ -33,7 +33,7 @@
                 <i class="bi bi-download me-1"></i>Esporta CSV
             </a>
             <form method="POST" action="{{ route('eventi.prenotazioni.promuovi', $evento) }}" class="m-0"
-                  onsubmit="return confirm('Promuovere la lista d\'attesa (FIFO, nei limiti della capienza)?');">
+                  data-conferma="Promuovere la lista d'attesa (FIFO, nei limiti della capienza)?">
                 @csrf
                 <button type="submit" class="btn btn-primary" {{ $conteggi['numero_in_coda'] === 0 ? 'disabled' : '' }}>
                     <i class="bi bi-arrow-up-circle me-1"></i>Promuovi lista d'attesa
@@ -89,7 +89,7 @@
         <div class="col-12 col-md-4">
             <div class="input-group">
                 <label class="input-group-text" for="stato"><i class="bi bi-funnel"></i></label>
-                <select class="form-select" id="stato" name="stato" onchange="this.form.submit()">
+                <select class="form-select" id="stato" name="stato" data-invio-automatico>
                     <option value="all" @selected($stato === 'all')>Tutti gli stati</option>
                     @foreach ($stati as $s)
                         <option value="{{ $s }}" @selected($stato === $s)>{{ $badgeStato[$s][1] ?? ucfirst($s) }}</option>
@@ -189,7 +189,7 @@
                                     <div class="btn-group btn-group-sm" role="group">
                                         @if ($prenotazione->stato === Prenotazione::STATO_IN_APPROVAZIONE)
                                             <form method="POST" action="{{ route('eventi.prenotazioni.approva', [$evento, $prenotazione->id]) }}" class="d-inline"
-                                                  onsubmit="return confirm('Approvare la prenotazione {{ $prenotazione->codice }}?{{ (float) $prenotazione->importo_totale > 0 ? ' L\'utente avrà 30 minuti per pagare.' : '' }}');">
+                                                  data-conferma="Approvare la prenotazione {{ $prenotazione->codice }}?{{ (float) $prenotazione->importo_totale > 0 ? ' L\'utente avrà 30 minuti per pagare.' : '' }}">
                                                 @csrf
                                                 <button type="submit" class="btn btn-outline-success" title="Approva prenotazione">
                                                     <i class="bi bi-check-lg"></i>
@@ -205,7 +205,7 @@
                                         @endif
                                         @if (in_array($prenotazione->stato, [Prenotazione::STATO_IN_ATTESA_PAGAMENTO, Prenotazione::STATO_SCADUTA], true) && $prenotazione->pagata_at === null && (float) $prenotazione->importo_totale > 0)
                                             <form method="POST" action="{{ route('eventi.prenotazioni.conferma-pagamento', [$evento, $prenotazione->id]) }}" class="d-inline"
-                                                  onsubmit="return confirm('Registrare il pagamento offline e confermare la prenotazione {{ $prenotazione->codice }}?');">
+                                                  data-conferma="Registrare il pagamento offline e confermare la prenotazione {{ $prenotazione->codice }}?">
                                                 @csrf
                                                 <button type="submit" class="btn btn-outline-success" title="Conferma pagamento offline">
                                                     <i class="bi bi-cash-coin"></i>
@@ -222,7 +222,7 @@
                                         @endif
                                         @if ($prenotazione->isAttiva() || $prenotazione->stato === Prenotazione::STATO_LISTA_ATTESA)
                                             <form method="POST" action="{{ route('eventi.prenotazioni.annulla', [$evento, $prenotazione->id]) }}" class="d-inline"
-                                                  onsubmit="return confirm('Annullare la prenotazione {{ $prenotazione->codice }}? I posti liberati promuovono la lista d\'attesa.');">
+                                                  data-conferma="Annullare la prenotazione {{ $prenotazione->codice }}? I posti liberati promuovono la lista d'attesa.">
                                                 @csrf
                                                 <button type="submit" class="btn btn-outline-danger" title="Annulla prenotazione">
                                                     <i class="bi bi-x-circle"></i>
@@ -288,7 +288,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         document.addEventListener('DOMContentLoaded', function () {
             // La modale di rifiuto è condivisa tra le righe: il bottone imposta action e codice
             document.querySelectorAll('.btn-rifiuta-prenotazione').forEach(function (bottone) {

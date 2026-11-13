@@ -9,6 +9,7 @@ use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\TipoSocio;
 use App\Models\Utente;
+use App\Notifications\Iscrizioni\ConfermaEmailIscrizioneNotification;
 use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
 use App\Services\Iscrizioni\ApprovazioneIscrizioneService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -151,10 +152,21 @@ class QuotaAmmissioneTest extends TestCase
         $this->associazione->update(['modalita_iscrizione' => 'diretta']);
         $this->withoutMiddleware(ProtectAgainstSpam::class);
 
+        Notification::fake();
+
         $this->post('/a/quote-coerenti/iscriviti', [
             'nome' => 'Paolo', 'cognome' => 'Riva', 'email' => 'paolo.riva@example.com',
             'telefono' => '+39 333 0000003', 'data_nascita' => '1985-06-01', 'privacy' => '1',
         ])->assertSessionHas('success');
+
+        // Da ospite il socio nasce al clic sul link di conferma dell'email
+        $link = null;
+        Notification::assertSentOnDemand(ConfermaEmailIscrizioneNotification::class, function (ConfermaEmailIscrizioneNotification $n) use (&$link): bool {
+            $link = $n->url;
+
+            return true;
+        });
+        $this->get((string) $link)->assertSessionHas('success');
 
         $socio = Socio::withoutGlobalScopes()->where('email', 'paolo.riva@example.com')->firstOrFail();
         $quota = Quota::allTenants()->where('socio_id', $socio->id)->first();

@@ -35,7 +35,7 @@
             <form method="GET" action="{{ route('attivita-admin.index') }}" class="row g-2 align-items-end">
                 <div class="col-6 col-md-3">
                     <label class="form-label small mb-1" for="filtro_stato">Stato</label>
-                    <select class="form-select form-select-sm" id="filtro_stato" name="stato" onchange="this.form.submit()">
+                    <select class="form-select form-select-sm" id="filtro_stato" name="stato" data-invio-automatico>
                         <option value="{{ \App\Models\AttivitaAdmin::STATO_APERTA }}" @selected($stato === \App\Models\AttivitaAdmin::STATO_APERTA)>Aperte</option>
                         <option value="{{ \App\Models\AttivitaAdmin::STATO_COMPLETATA }}" @selected($stato === \App\Models\AttivitaAdmin::STATO_COMPLETATA)>Completate</option>
                         <option value="all" @selected($stato === 'all')>Tutte</option>
@@ -43,7 +43,7 @@
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label small mb-1" for="filtro_assegnatario">Assegnatario</label>
-                    <select class="form-select form-select-sm" id="filtro_assegnatario" name="assegnatario" onchange="this.form.submit()">
+                    <select class="form-select form-select-sm" id="filtro_assegnatario" name="assegnatario" data-invio-automatico>
                         <option value="tutte" @selected($assegnatario === 'tutte')>Tutte</option>
                         <option value="mie" @selected($assegnatario === 'mie')>Le mie attività</option>
                     </select>
@@ -121,7 +121,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form method="POST" action="{{ route('attivita-admin.destroy', $item) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questa attività?');">
+                                      data-conferma="Eliminare questa attività?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>

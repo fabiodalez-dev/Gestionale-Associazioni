@@ -21,12 +21,12 @@ class FotoSocioController extends Controller
         Gate::authorize('update', $socio);
 
         $request->validate([
-            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:min_width=150,min_height=150'],
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:min_width=150,min_height=150,max_width=8000,max_height=8000'],
         ], [
             'foto.image' => 'La foto deve essere un\'immagine JPG, PNG o WebP.',
             'foto.mimes' => 'La foto deve essere un\'immagine JPG, PNG o WebP.',
             'foto.max' => 'La foto supera i 5 MB.',
-            'foto.dimensions' => 'La foto deve essere di almeno 150×150 pixel.',
+            'foto.dimensions' => 'La foto deve essere di almeno 150×150 pixel e al massimo 8000×8000.',
         ]);
 
         $socio->addMedia($request->file('foto'))

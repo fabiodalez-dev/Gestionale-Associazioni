@@ -3,6 +3,7 @@
 namespace Tests\Feature\AreaSoci;
 
 use App\Mail\AreaSoci\ImpostaPasswordSocioMail;
+use App\Models\Associazione;
 use App\Models\Socio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -224,5 +225,53 @@ class SetPasswordTest extends TestCase
 
         $response->assertSessionHasErrors('token');
         $this->assertNull($socio->fresh()->password_hash);
+    }
+
+    public function test_stessa_email_in_due_associazioni_riceve_un_link_per_ciascuna(): void
+    {
+        Mail::fake();
+
+        $alfa = Associazione::factory()->create(['nome' => 'Circolo Alfa']);
+        $beta = Associazione::factory()->create(['nome' => 'Circolo Beta']);
+        $socioA = Socio::factory()->create(['associazione_id' => $alfa->id, 'email' => 'doppio@example.com']);
+        $socioB = Socio::factory()->create(['associazione_id' => $beta->id, 'email' => 'doppio@example.com']);
+
+        $this->from(route('area-soci.login'))
+            ->post(route('area-soci.password.email'), ['email' => 'doppio@example.com'])
+            ->assertSessionHas('status');
+
+        // Un token per socio, ciascuno sul proprio record
+        foreach ([$socioA, $socioB] as $socio) {
+            $socio->refresh();
+            $this->assertNotNull($socio->password_reset_token);
+            Mail::assertSent(ImpostaPasswordSocioMail::class, function (ImpostaPasswordSocioMail $mail) use ($socio) {
+                $token = basename((string) parse_url($mail->url, PHP_URL_PATH));
+
+                return $mail->socio->is($socio) && hash('sha256', $token) === $socio->password_reset_token;
+            });
+        }
+        Mail::assertSent(ImpostaPasswordSocioMail::class, 2);
+        $this->assertNotSame($socioA->password_reset_token, $socioB->password_reset_token);
+
+        // Il link di Beta imposta la password di Beta, non quella di Alfa
+        $urlBeta = '';
+        Mail::assertSent(ImpostaPasswordSocioMail::class, function (ImpostaPasswordSocioMail $mail) use ($socioB, &$urlBeta) {
+            if ($mail->socio->is($socioB)) {
+                $urlBeta = $mail->url;
+            }
+
+            return true;
+        });
+        $token = basename((string) parse_url($urlBeta, PHP_URL_PATH));
+
+        $this->get(route('area-soci.set-password', ['token' => $token]))->assertOk()->assertSee('Circolo Beta');
+        $this->post(route('area-soci.set-password.store', ['token' => $token]), [
+            'password' => 'Una-Password-Molto-Robusta-2026!',
+            'password_confirmation' => 'Una-Password-Molto-Robusta-2026!',
+        ])->assertRedirect(route('area-soci.login'));
+
+        $this->assertTrue(Hash::check('Una-Password-Molto-Robusta-2026!', (string) $socioB->fresh()->password_hash));
+        $this->assertNull($socioA->fresh()->password_hash);
+        $this->assertNotNull($socioA->fresh()->password_reset_token);
     }
 }

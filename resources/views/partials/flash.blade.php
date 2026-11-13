@@ -21,7 +21,7 @@
 
 @once
     @push('scripts')
-        <script>
+        <script @cspNonce>
             // I messaggi di successo spariscono dopo 5 secondi; gli errori restano visibili.
             document.addEventListener('DOMContentLoaded', function () {
                 document.querySelectorAll('.alert.auto-dismiss').forEach(function (el) {

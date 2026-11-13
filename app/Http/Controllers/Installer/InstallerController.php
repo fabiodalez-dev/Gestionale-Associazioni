@@ -257,6 +257,8 @@ class InstallerController extends Controller
         return view('installer.done', [
             'step' => 5,
             'storageCollegato' => $this->installer->collegaStorage(),
+            // Mostrata una sola volta: il segnale in sessione sparisce alla lettura
+            'passwordBackup' => $this->installer->passwordBackupDaMostrare(),
         ]);
     }
 }

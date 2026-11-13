@@ -46,7 +46,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" action="{{ route('config-tags.destroy', $tag) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare il tag «{{ $tag->nome_tag }}»? Verrà rimosso da tutti i soci.');">
+                                              data-conferma="Eliminare il tag «{{ $tag->nome_tag }}»? Verrà rimosso da tutti i soci.">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

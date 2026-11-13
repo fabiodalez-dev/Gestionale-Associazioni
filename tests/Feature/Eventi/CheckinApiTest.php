@@ -44,6 +44,7 @@ class CheckinApiTest extends TestCase
 
         ApiKey::create([
             'associazione_id' => null, // chiave globale super_admin
+            'globale' => true, // flag esplicito (audit run-2): NULL da solo non basta
             'api_key' => $this->chiaveGlobale,
             'nome' => 'Chiave globale test',
             'permessi' => ['*'],
@@ -530,5 +531,33 @@ class CheckinApiTest extends TestCase
         $https = $this->get('https://localhost/checkin');
         $https->assertOk();
         $this->assertStringStartsWith('upgrade-insecure-requests; ', (string) $https->headers->get('Content-Security-Policy'));
+    }
+
+    // ---- API eventi nel gruppo api (niente sessione né cookie) ----
+
+    public function test_api_eventi_senza_sessione_ne_cookie(): void
+    {
+        $risposte = [
+            $this->getJson('/api/v1', $this->headers()),
+            $this->getJson('/api/v1/eventi', $this->headers())->assertOk(),
+            $this->getJson('/api/v1/eventi/'.$this->evento->id, $this->headers()),
+            $this->postJson('/api/v1/eventi/'.$this->evento->id.'/checkin', ['codice' => 'inesistente'], $this->headers()),
+            $this->getJson('/api/v1/eventi'),
+        ];
+
+        foreach ($risposte as $risposta) {
+            $this->assertSame([], $risposta->headers->getCookies(), 'Le risposte /api/v1 degli eventi non devono impostare cookie.');
+            $this->assertFalse($risposta->baseRequest->hasSession());
+            $this->assertContains('api', $risposta->baseRequest->route()?->gatherMiddleware() ?? []);
+        }
+
+        $this->assertSame(url('/api/v1/eventi'), route('api.v1.eventi.index'));
+        $this->assertSame(url('/api/v1'), route('api.v1.ping'));
+        $this->assertSame(url('/api/v1/eventi/x/checkin'), route('api.v1.eventi.checkin', 'x'));
+    }
+
+    public function test_pagina_checkin_resta_nel_gruppo_web(): void
+    {
+        $this->assertContains('web', app('router')->getRoutes()->getByName('eventi.checkin')->gatherMiddleware());
     }
 }

@@ -10,7 +10,7 @@
         </div>
         <form method="GET" action="{{ route('apertura-anno.index') }}" class="d-flex gap-2 align-items-center">
             <label class="form-label mb-0" for="selettoreAnno">Anno</label>
-            <select class="form-select" id="selettoreAnno" name="anno" onchange="this.form.submit()" style="width: auto;">
+            <select class="form-select" id="selettoreAnno" name="anno" data-invio-automatico style="width: auto;">
                 @foreach ([$annoCorrente, $annoProssimo] as $a)
                     <option value="{{ $a }}" @selected($a === $anno)>{{ $a }}</option>
                 @endforeach
@@ -87,7 +87,7 @@
     </div>
 
     <form method="POST" action="{{ route('apertura-anno.genera') }}"
-          onsubmit="return confirm('Generare {{ $anteprima['da_generare'] }} quote per l\'anno {{ $anno }}?');">
+          data-conferma="Generare {{ $anteprima['da_generare'] }} quote per l'anno {{ $anno }}?">
         @csrf
         <input type="hidden" name="anno" value="{{ $anno }}">
         <button type="submit" class="btn btn-primary" @disabled($anteprima['da_generare'] === 0)>

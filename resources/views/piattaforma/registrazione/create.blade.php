@@ -47,7 +47,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         document.getElementById('formRegistrazione').addEventListener('submit', function () {
             setTimeout(function () { document.getElementById('btnRegistrati').disabled = true; }, 0);
         });

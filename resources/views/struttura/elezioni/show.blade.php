@@ -16,7 +16,7 @@
         </h1>
     </div>
     @if ($elezione->stato === 'candidature')
-        <form method="POST" action="{{ route('elezioni.destroy', $elezione) }}" onsubmit="return confirm('Eliminare l\'elezione e le candidature?');">
+        <form method="POST" action="{{ route('elezioni.destroy', $elezione) }}" data-conferma="Eliminare l'elezione e le candidature?">
             @csrf @method('DELETE')
             <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash3 me-1"></i>Elimina</button>
         </form>
@@ -72,7 +72,7 @@
                                                     <button type="submit" class="btn btn-sm btn-outline-success" title="Il candidato ha accettato (modulo firmato)">Accettata</button>
                                                 </form>
                                             @endunless
-                                            <form method="POST" action="{{ route('elezioni.candidature.ritira', [$elezione, $c]) }}" onsubmit="return confirm('Ritirare la candidatura?');">
+                                            <form method="POST" action="{{ route('elezioni.candidature.ritira', [$elezione, $c]) }}" data-conferma="Ritirare la candidatura?">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Ritira</button>
                                             </form>
@@ -116,7 +116,7 @@
                 <div class="card-header"><i class="bi bi-ui-checks me-2"></i>Chiudi il voto e scrutina</div>
                 <div class="card-body">
                     <p class="small text-muted">Schede online ricevute: <strong class="tabular">{{ $schedeOnline }}</strong>. Inserisci i risultati delle schede cartacee scrutinate in sala (lascia vuoto se non ce ne sono).</p>
-                    <form method="POST" action="{{ route('elezioni.scrutinio', $elezione) }}" onsubmit="return confirm('Chiudere il voto e fare lo scrutinio?');">
+                    <form method="POST" action="{{ route('elezioni.scrutinio', $elezione) }}" data-conferma="Chiudere il voto e fare lo scrutinio?">
                         @csrf
                         <div class="row g-2 mb-3">
                             <div class="col-4"><label class="form-label small" for="schValide">Schede valide in sala</label><input type="number" min="0" name="schede_valide" id="schValide" class="form-control form-control-sm"></div>
@@ -151,17 +151,26 @@
         </div>
 
         @if ($elezione->stato === 'candidature')
-            <form method="POST" action="{{ route('elezioni.apri-voto', $elezione) }}" onsubmit="return confirm('Aprire il voto? Le candidature verranno chiuse.');">
+            <form method="POST" action="{{ route('elezioni.apri-voto', $elezione) }}" data-conferma="Aprire il voto? Le candidature verranno chiuse.">
                 @csrf
                 <button type="submit" class="btn btn-primary w-100"><i class="bi bi-box-arrow-in-down me-1"></i>Apri il voto</button>
                 <div class="form-text">Richiede il quorum costitutivo dell'assemblea ({{ $quorum['presenti'] }} presenti con diritto di voto).</div>
             </form>
         @elseif ($elezione->stato === 'scrutinio')
-            <form method="POST" action="{{ route('elezioni.proclama', $elezione) }}" onsubmit="return confirm('Proclamare gli eletti? Le cariche uscenti verranno chiuse.');">
+            <form method="POST" action="{{ route('elezioni.proclama', $elezione) }}" data-conferma="Proclamare gli eletti? Le cariche uscenti verranno chiuse.">
                 @csrf
                 <button type="submit" class="btn btn-success w-100"><i class="bi bi-award me-1"></i>Proclama gli eletti</button>
                 <div class="form-text">Chiude le cariche attive ({{ implode(', ', $elezione->ruoliUscenti()) }}) e crea quelle degli eletti.</div>
             </form>
+        @elseif ($elezione->stato === 'proclamata' && $elezione->cariche_confermate_at === null)
+            <div class="alert alert-warning small">Proclamata il {{ $elezione->proclamata_at?->format('d/m/Y H:i') }}. Gli eletti sono registrati, ma la sostituzione delle cariche nel registro degli organi sociali aspetta la conferma di un amministratore dell'associazione.</div>
+            @can('create', \App\Models\Carica::class)
+                <form method="POST" action="{{ route('elezioni.conferma-cariche', $elezione) }}" data-conferma="Confermare le cariche? Le cariche uscenti verranno chiuse e create quelle degli eletti.">
+                    @csrf
+                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-check2-circle me-1"></i>Conferma le cariche</button>
+                    <div class="form-text">Chiude le cariche attive ({{ implode(', ', $elezione->ruoliUscenti()) }}) e crea quelle degli eletti.</div>
+                </form>
+            @endcan
         @elseif ($elezione->stato === 'proclamata')
             <div class="alert alert-success small">Proclamata il {{ $elezione->proclamata_at?->format('d/m/Y H:i') }}. Assegna i ruoli interni dalla <a href="{{ route('organi-sociali.index') }}">pagina degli organi sociali</a>.</div>
         @endif

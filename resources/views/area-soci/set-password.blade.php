@@ -3,7 +3,7 @@
 @section('title', 'Area Soci - Imposta password')
 @section('brand-icon', 'bi-shield-lock')
 @section('heading', 'Imposta la password')
-@section('subheading', 'Area Soci')
+@section('subheading', filled($nomeAssociazione ?? null) ? 'Area Soci di '.$nomeAssociazione : 'Area Soci')
 
 @section('content')
     @if (! $tokenValido)

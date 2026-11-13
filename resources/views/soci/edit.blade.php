@@ -22,7 +22,7 @@
                 </form>
             @endif
             <form method="POST" action="{{ route('soci.rifiuta', $socio) }}" class="d-inline"
-                  onsubmit="return confirm('Rifiutare ed eliminare definitivamente questa pre-iscrizione?');">
+                  data-conferma="Rifiutare ed eliminare definitivamente questa pre-iscrizione?">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-outline-danger">Rifiuta</button>
             </form>

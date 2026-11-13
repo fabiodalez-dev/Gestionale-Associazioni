@@ -42,6 +42,7 @@ class TessereApiTest extends TestCase
 
         ApiKey::create([
             'associazione_id' => null,
+            'globale' => true, // flag esplicito (audit run-2): NULL da solo non basta
             'api_key' => $this->chiaveGlobale,
             'nome' => 'Globale',
             'permessi' => ['*'],

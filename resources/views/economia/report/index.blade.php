@@ -108,7 +108,7 @@
 
 @push('scripts')
 <script src="{{ asset('assets/vendor/chartjs/chart.umd.min.js') }}"></script>
-<script>
+<script @cspNonce>
 (function () {
     var canvas = document.getElementById('chartMensile');
     if (!canvas || typeof Chart === 'undefined') return;

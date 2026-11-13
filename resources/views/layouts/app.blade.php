@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', session('app_name', config('app.name', 'Associazione Soci Manager')))</title>
-    <script>
+    <script @cspNonce>
         // Applica il tema salvato prima del paint per evitare flash
         (function () {
             var t = localStorage.getItem('theme');
@@ -47,6 +47,8 @@
     </div>
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+    <script src="{{ asset('assets/js/azioni-dichiarative.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
     @auth
         {{-- Ricerca globale ⌘K (f.1 piano "Gestione 2" — modulo operativita) --}}

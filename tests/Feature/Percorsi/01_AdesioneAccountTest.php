@@ -13,6 +13,7 @@ use App\Models\Tessera;
 use App\Models\Utente;
 use App\Models\ValoreCampoPersonalizzato;
 use App\Notifications\Accounts\BenvenutoAccount;
+use App\Notifications\Accounts\TentativoRegistrazioneAccount;
 use App\Notifications\Accounts\VerificaEmailAccount;
 use App\Notifications\Iscrizioni\ConfermaRichiestaInviataNotification;
 use App\Notifications\Iscrizioni\IscrizioneApprovataNotification;
@@ -23,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 
 /**
@@ -36,6 +38,7 @@ use Tests\TestCase;
  */
 class Percorso01_AdesioneAccountTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     private const PASSWORD = 'Lampione-Viola-Treno-42';
@@ -127,14 +130,15 @@ class Percorso01_AdesioneAccountTest extends TestCase
     {
         $dati = $this->datiRegistrazione($override);
 
+        // Risposta neutra: si torna all'accesso con l'invito a controllare la posta
         $this->post($this->urlTenant('registrati'), $dati)
-            ->assertRedirect($this->urlTenant('verifica-email'));
+            ->assertRedirect($this->urlTenant('login'));
 
         /** @var Account $account */
         $account = Account::allTenants()->where('email', $dati['email'])->firstOrFail();
 
-        // Chiude il browser senza verificare
-        $this->post($this->urlTenant('logout'));
+        // Chiude il browser senza verificare (dopo la registrazione non è loggata:
+        // un logout da ospite salverebbe come "pagina richiesta" la home del sito)
         $this->assertGuest('account');
 
         // Dal telefono apre il link dell'email: verificata, invitata ad accedere
@@ -197,9 +201,11 @@ class Percorso01_AdesioneAccountTest extends TestCase
             ->assertSee('name="email"', false)
             ->assertSee('name="privacy"', false);
 
-        // Compila il modulo: nasce l'account, è loggata ma non verificata
+        // Compila il modulo: nasce l'account non verificato e torna all'accesso con
+        // l'invito a controllare la posta (stessa risposta di un'email già registrata,
+        // quindi niente login automatico)
         $this->post($this->urlTenant('registrati'), $this->datiRegistrazione())
-            ->assertRedirect($this->urlTenant('verifica-email'))
+            ->assertRedirect($this->urlTenant('login'))
             ->assertSessionHas('success');
 
         /** @var Account $account */
@@ -211,6 +217,10 @@ class Percorso01_AdesioneAccountTest extends TestCase
         $this->assertNull($account->email_verified_at);
         $this->assertNotNull($account->privacy_accettata_at);
         $this->assertTrue(Hash::check(self::PASSWORD, $account->password));
+        $this->assertGuest('account');
+
+        // Accede prima di aver verificato l'email
+        $this->post($this->urlTenant('login'), ['email' => 'giulia.verdi@example.com', 'password' => self::PASSWORD]);
         $this->assertAuthenticatedAs($account, 'account');
 
         // La pagina di avviso la invita a controllare la casella
@@ -632,11 +642,14 @@ class Percorso01_AdesioneAccountTest extends TestCase
         $account = $this->registraEVerifica();
         $this->post($this->urlTenant('logout'));
 
-        // Qualcuno prova a registrarsi di nuovo con la stessa email
+        // Qualcuno prova a registrarsi di nuovo con la stessa email: stessa risposta di
+        // una registrazione nuova (niente oracolo), nessun duplicato, avviso a Giulia
         $this->from($this->urlTenant('registrati'))
             ->post($this->urlTenant('registrati'), $this->datiRegistrazione(['nome' => 'Impostore']))
-            ->assertRedirect($this->urlTenant('registrati'))
-            ->assertSessionHasErrors(['email' => 'Esiste già un account registrato con questo indirizzo email.']);
+            ->assertRedirect($this->urlTenant('login'))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+        Notification::assertSentTo($account, TentativoRegistrazioneAccount::class);
 
         $this->assertSame(1, Account::allTenants()->where('email', 'giulia.verdi@example.com')->count());
         $this->assertSame('Giulia', $account->fresh()->nome);
@@ -661,7 +674,8 @@ class Percorso01_AdesioneAccountTest extends TestCase
         $this->assertSame(1, RichiestaIscrizione::allTenants()->where('account_id', $account->id)->count());
         $this->assertSame(1, Socio::allTenants()->where('email', 'giulia.verdi@example.com')->count());
 
-        // Un ospite senza account prova a iscriversi con la stessa email
+        // Un ospite senza account prova a iscriversi con la stessa email: risposta
+        // neutra (come un invio riuscito, niente oracolo sulle iscrizioni), nessun doppione
         $this->post($this->urlTenant('logout'));
 
         $this->from($this->urlTenant('iscriviti'))
@@ -671,8 +685,9 @@ class Percorso01_AdesioneAccountTest extends TestCase
                 'email' => 'giulia.verdi@example.com',
                 'privacy' => '1',
             ]))
-            ->assertRedirect($this->urlTenant('iscriviti'))
-            ->assertSessionHasErrors('iscrizione');
+            ->assertRedirect($this->urlTenant())
+            ->assertSessionDoesntHaveErrors()
+            ->assertSessionHas('success');
 
         $this->assertSame(1, RichiestaIscrizione::allTenants()->count());
         $this->assertSame(1, Socio::allTenants()->count());
@@ -965,7 +980,7 @@ class Percorso01_AdesioneAccountTest extends TestCase
 
         // L'email è libera: la stessa persona potrà registrarsi di nuovo
         $this->post($this->urlTenant('registrati'), $this->datiRegistrazione())
-            ->assertRedirect($this->urlTenant('verifica-email'));
+            ->assertRedirect($this->urlTenant('login'));
 
         $this->assertSame(
             1,
@@ -1062,8 +1077,9 @@ class Percorso01_AdesioneAccountTest extends TestCase
             ->assertSee('name="privacy"', false)
             ->assertSee('name="telefono"', false);
 
-        // E la compila: la preiscrizione nasce senza account, in attesa dell'admin
-        $this->post($linkInvito, $this->datiIscrizione([
+        // E la compila e conferma l'email dal link ricevuto: la preiscrizione nasce
+        // senza account, in attesa dell'admin
+        $this->inviaEConfermaIscrizioneOspite($linkInvito, $this->datiIscrizione([
             'nome' => 'Luca',
             'cognome' => 'Neri',
             'email' => 'luca.neri@example.com',

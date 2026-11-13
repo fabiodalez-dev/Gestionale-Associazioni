@@ -30,7 +30,7 @@
         <div class="input-group input-group-sm">
             <input type="text" class="form-control" id="linkTemporaneoInput" value="{{ session('link_temporaneo') }}" readonly>
             <button class="btn btn-outline-secondary" type="button"
-                    onclick="navigator.clipboard.writeText(document.getElementById('linkTemporaneoInput').value)">
+                    data-copia-da="linkTemporaneoInput">
                 <i class="bi bi-clipboard me-1"></i>Copia
             </button>
         </div>
@@ -48,7 +48,7 @@
         </div>
     </div>
     <div class="col-md-4">
-        <select class="form-select" name="category" onchange="this.form.submit()">
+        <select class="form-select" name="category" data-invio-automatico>
             <option value="all" @selected($category === 'all' || $category === '')>Tutte le categorie</option>
             @foreach ($categorie as $cat)
                 <option value="{{ $cat }}" @selected($category === $cat)>{{ $cat }}</option>
@@ -106,7 +106,7 @@
                             @can('update', $documento)
                                 @if ($documento->pubblico)
                                     <form method="POST" action="{{ route('documenti.trasparenza', $documento) }}" class="d-inline"
-                                          onsubmit="return confirm('Rimuovere questo documento dalla pagina Trasparenza pubblica?');">
+                                          data-conferma="Rimuovere questo documento dalla pagina Trasparenza pubblica?">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-outline-success" title="Rimuovi dalla Trasparenza">
                                             <i class="bi bi-globe2"></i>
@@ -121,7 +121,7 @@
                             @endcan
                             @can('delete', $documento)
                             <form method="POST" action="{{ route('documenti.destroy', $documento) }}" class="d-inline"
-                                  onsubmit="return confirm('Sei sicuro di voler eliminare questo documento?');">
+                                  data-conferma="Sei sicuro di voler eliminare questo documento?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -241,7 +241,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         // Preview del nome file selezionato (comportamento legacy)
         const input = document.getElementById('document_file');

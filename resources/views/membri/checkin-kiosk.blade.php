@@ -94,7 +94,7 @@
 <div id="kioskResult" class="kiosk-result d-none" role="alert" aria-live="assertive"></div>
 
 <script src="{{ asset('assets/vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
-<script>
+<script @cspNonce>
 (function () {
     'use strict';
 

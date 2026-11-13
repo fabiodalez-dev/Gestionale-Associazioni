@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\AreaSoci;
 
+use App\Http\Requests\AreaSoci\LoginSocioRequest;
 use App\Models\Associazione;
 use App\Models\Socio;
 use App\Models\Utente;
@@ -214,5 +215,113 @@ class LoginSocioTest extends TestCase
 
         $this->assertGuest('socio');
         $this->assertAuthenticatedAs($admin, 'web');
+    }
+
+    /** Stessa email in due associazioni: soci distinti, ciascuno con la propria password */
+    private function socioInDueAssociazioni(string $passwordA, string $passwordB): array
+    {
+        $a = Associazione::factory()->create(['nome' => 'Circolo Alfa']);
+        $b = Associazione::factory()->create(['nome' => 'Circolo Beta']);
+        $socioA = Socio::factory()->conAccessoAreaSoci($passwordA)->create(['associazione_id' => $a->id, 'email' => 'doppio@example.com']);
+        $socioB = Socio::factory()->conAccessoAreaSoci($passwordB)->create(['associazione_id' => $b->id, 'email' => 'doppio@example.com']);
+
+        return [$socioA, $socioB];
+    }
+
+    public function test_stessa_email_in_due_associazioni_entra_dove_combacia_la_password(): void
+    {
+        // Prima si prendeva il primo socio con quell'email (first() senza
+        // ordine): l'altra iscrizione era irraggiungibile
+        [$socioA, $socioB] = $this->socioInDueAssociazioni('password-alfa-1', 'password-beta-2');
+
+        $this->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'password-beta-2'])
+            ->assertRedirect(route('area-soci.dashboard'));
+        $this->assertAuthenticatedAs($socioB, 'socio');
+
+        $this->post(route('area-soci.logout'));
+
+        $this->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'password-alfa-1'])
+            ->assertRedirect(route('area-soci.dashboard'));
+        $this->assertAuthenticatedAs($socioA, 'socio');
+    }
+
+    public function test_stessa_email_e_stessa_password_propone_la_scelta_dell_associazione(): void
+    {
+        [$socioA, $socioB] = $this->socioInDueAssociazioni('stessa-password-1', 'stessa-password-1');
+
+        $this->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'stessa-password-1'])
+            ->assertRedirect(route('area-soci.login'));
+        $this->assertGuest('socio');
+
+        // La pagina di login mostra le associazioni (solo dopo la password giusta)
+        $this->get(route('area-soci.login'))
+            ->assertOk()
+            ->assertSee('Circolo Alfa')
+            ->assertSee('Circolo Beta')
+            ->assertDontSee('Password dimenticata');
+
+        $this->post(route('area-soci.login.attempt'), ['socio_scelto' => $socioB->id])
+            ->assertRedirect(route('area-soci.dashboard'));
+        $this->assertAuthenticatedAs($socioB, 'socio');
+        $this->assertNull(session(LoginSocioRequest::SESSIONE_SCELTA));
+    }
+
+    public function test_la_scelta_accetta_solo_i_soci_verificati_in_sessione(): void
+    {
+        [$socioA] = $this->socioInDueAssociazioni('stessa-password-1', 'stessa-password-1');
+        $estraneo = Socio::factory()->conAccessoAreaSoci('altra-password-9')->create();
+
+        // Senza scelta in sospeso l'id non basta per entrare
+        $this->from(route('area-soci.login'))
+            ->post(route('area-soci.login.attempt'), ['socio_scelto' => $socioA->id])
+            ->assertSessionHasErrors('email');
+        $this->assertGuest('socio');
+
+        // Con una scelta in sospeso, un id fuori dall'elenco viene rifiutato
+        $this->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'stessa-password-1']);
+        $this->from(route('area-soci.login'))
+            ->post(route('area-soci.login.attempt'), ['socio_scelto' => $estraneo->id])
+            ->assertSessionHasErrors('email');
+        $this->assertGuest('socio');
+        $this->assertNull(session(LoginSocioRequest::SESSIONE_SCELTA));
+    }
+
+    public function test_la_scelta_scade(): void
+    {
+        [$socioA] = $this->socioInDueAssociazioni('stessa-password-1', 'stessa-password-1');
+
+        $this->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'stessa-password-1']);
+        $this->travel(LoginSocioRequest::SCELTA_TTL + 1)->seconds();
+
+        $this->get(route('area-soci.login'))->assertOk()->assertSee('Password dimenticata');
+        $this->from(route('area-soci.login'))
+            ->post(route('area-soci.login.attempt'), ['socio_scelto' => $socioA->id])
+            ->assertSessionHasErrors('email');
+        $this->assertGuest('socio');
+    }
+
+    public function test_annulla_la_scelta_torna_al_login(): void
+    {
+        $this->socioInDueAssociazioni('stessa-password-1', 'stessa-password-1');
+
+        $this->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'stessa-password-1']);
+        $this->post(route('area-soci.login.attempt'), ['annulla_scelta' => '1'])
+            ->assertRedirect(route('area-soci.login'));
+
+        $this->assertNull(session(LoginSocioRequest::SESSIONE_SCELTA));
+        $this->get(route('area-soci.login'))->assertSee('Password dimenticata');
+    }
+
+    public function test_stessa_email_con_password_errata_resta_errore_generico_senza_associazioni(): void
+    {
+        $this->socioInDueAssociazioni('password-alfa-1', 'password-beta-2');
+
+        $this->from(route('area-soci.login'))
+            ->post(route('area-soci.login.attempt'), ['email' => 'doppio@example.com', 'password' => 'sbagliata'])
+            ->assertSessionHasErrors(['email' => 'Credenziali non valide.']);
+
+        $this->assertNull(session(LoginSocioRequest::SESSIONE_SCELTA));
+        $this->get(route('area-soci.login'))->assertDontSee('Circolo Alfa')->assertDontSee('Circolo Beta');
+        $this->assertGuest('socio');
     }
 }

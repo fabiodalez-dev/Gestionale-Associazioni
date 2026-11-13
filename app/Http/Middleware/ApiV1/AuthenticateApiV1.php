@@ -19,7 +19,9 @@ use Symfony\Component\HttpFoundation\Response;
  *    esadecimali) passata come `Authorization: Bearer {key}` oppure come header
  *    `X-API-Key: {key}`. In tabella c'è solo l'hash sha256: il lookup confronta
  *    l'hash della chiave presentata, mai il valore in chiaro.
- *    Chiave scopata (associazione_id valorizzato) o globale (NULL, super_admin).
+ *    Chiave scopata (associazione_id valorizzato) o globale (flag `globale`
+ *    con associazione_id NULL, solo super_admin); una chiave con
+ *    associazione_id NULL senza flag è orfana e viene rifiutata.
  * 2. Personal access token Sanctum (`Authorization: Bearer {id}|{token}`) con
  *    abilities nella stessa sintassi dei permessi legacy (`soci:read`, `*`, …).
  *    Il separatore `|` del formato Sanctum distingue i due meccanismi.
@@ -88,6 +90,12 @@ class AuthenticateApiV1
             return $this->error(403, 'key_disabled', 'API key disattivata.');
         }
 
+        // Chiave senza associazione ma non globale (orfana, es. associazione
+        // eliminata): mai trattata come globale cross-tenant
+        if ($apiKey->associazione_id === null && ! $apiKey->isGlobale()) {
+            return $this->error(403, 'association_disabled', 'Questa API key non è collegata ad alcuna associazione attiva.');
+        }
+
         // Chiave scopata con associazione disattivata (le globali saltano il check)
         if (! $apiKey->isGlobale() && ! $apiKey->associazione?->attiva) {
             return $this->error(403, 'association_disabled', 'L\'associazione collegata a questa API key non è attiva.');
@@ -101,6 +109,7 @@ class AuthenticateApiV1
         $context = new ApiClientContext(
             associazioneId: $apiKey->associazione_id,
             permessi: $apiKey->permessi ?? [],
+            globale: $apiKey->isGlobale(),
         );
 
         if ($permesso !== null && ! $context->hasPermesso($permesso)) {
@@ -170,6 +179,8 @@ class AuthenticateApiV1
         $context = new ApiClientContext(
             associazioneId: $utente->associazione_id ?: null,
             permessi: $accessToken->abilities ?? [],
+            // Solo un super_admin senza associazione ha un token globale
+            globale: $utente->isSuperAdmin() && empty($utente->associazione_id),
         );
 
         if ($permesso !== null && ! $context->hasPermesso($permesso)) {

@@ -78,7 +78,7 @@
                         @elseif ($mia && $elezione->stato === 'candidature')
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <span class="small text-success"><i class="bi bi-check-circle me-1"></i>Sei candidato/a.</span>
-                                <form method="POST" action="{{ route('area-soci.elezioni.ritira', $elezione) }}" onsubmit="return confirm('Ritirare la candidatura?');">@csrf @method('DELETE')<button type="submit" class="btn btn-sm btn-outline-danger">Ritira la candidatura</button></form>
+                                <form method="POST" action="{{ route('area-soci.elezioni.ritira', $elezione) }}" data-conferma="Ritirare la candidatura?">@csrf @method('DELETE')<button type="submit" class="btn btn-sm btn-outline-danger">Ritira la candidatura</button></form>
                             </div>
                         @elseif ($elezione->candidatureAperte())
                             <form method="POST" action="{{ route('area-soci.elezioni.candida', $elezione) }}">
@@ -105,7 +105,7 @@
                         <p class="mb-2">Hai delegato <strong>{{ $delegaData->delegato?->nome_completo }}</strong>. Se partecipi di persona la delega decade e voti tu.</p>
                         @if ($aperta)
                             <form method="POST" action="{{ route('area-soci.assemblee.revoca', $riunione) }}"
-                                  onsubmit="return confirm('Revocare la delega?');">
+                                  data-conferma="Revocare la delega?">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="btn btn-outline-danger btn-sm">Revoca la delega</button>
                             </form>

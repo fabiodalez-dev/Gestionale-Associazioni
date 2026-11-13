@@ -11,6 +11,7 @@ use App\Models\Riunione;
 use App\Models\RiunionePartecipante;
 use App\Models\Socio;
 use App\Models\Utente;
+use App\Models\VotazioneRiunione;
 use App\Notifications\Struttura\DichiarazioneInteressiNotification;
 use App\Settings\PartecipazioneSettings;
 use Illuminate\Support\Collection;
@@ -168,6 +169,8 @@ class ConflittiService
             throw new ConflittoNonValidoException('Il punto indicato non esiste nell\'ordine del giorno.');
         }
 
+        $this->verificaPuntoNonVotato($riunione, $puntoIndice);
+
         $partecipa = RiunionePartecipante::query()
             ->where('riunione_id', $riunione->id)
             ->where('socio_id', $socio->id)
@@ -181,6 +184,33 @@ class ConflittiService
             ['riunione_id' => $riunione->id, 'punto_indice' => $puntoIndice, 'socio_id' => $socio->id],
             ['associazione_id' => $riunione->associazione_id, 'motivazione' => filled($motivazione) ? trim((string) $motivazione) : null],
         );
+    }
+
+    public function rimuoviConflitto(ConflittoRiunione $conflitto): void
+    {
+        $this->verificaPuntoNonVotato($conflitto->riunione, (int) $conflitto->punto_indice);
+
+        $conflitto->delete();
+    }
+
+    /**
+     * Il conflitto cambia chi vota e la base delle maggioranze: una volta
+     * aperto (o chiuso) il voto online sul punto non si aggiunge né si toglie,
+     * altrimenti il risultato non corrisponderebbe più a chi ha votato.
+     */
+    private function verificaPuntoNonVotato(Riunione $riunione, int $puntoIndice): void
+    {
+        $votazione = VotazioneRiunione::query()
+            ->where('riunione_id', $riunione->id)
+            ->where('punto_indice', $puntoIndice)
+            ->whereNotNull('aperta_at')
+            ->first();
+
+        if ($votazione !== null) {
+            throw new ConflittoNonValidoException($votazione->isAperta()
+                ? 'Il voto su questo punto è già aperto: i conflitti di interesse si registrano o si tolgono prima di aprirlo.'
+                : 'Il voto su questo punto è già chiuso: i conflitti di interesse non si possono più modificare.');
+        }
     }
 
     /**

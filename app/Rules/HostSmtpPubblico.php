@@ -38,40 +38,59 @@ class HostSmtpPubblico implements ValidationRule
      */
     public static function ammesso(string $valore): bool
     {
+        return self::indirizziAmmessi($valore) !== null;
+    }
+
+    /**
+     * Gli indirizzi IP pubblici a cui l'host risolve ORA, oppure null se
+     * l'host è locale, privato, riservato o non risolvibile. Chi si connette
+     * usa uno di questi IP (non il nome), così il DNS non può cambiare
+     * indirizzo tra la validazione e la connessione. Lista vuota solo nei
+     * test, dove la risoluzione è saltata.
+     *
+     * @return list<string>|null
+     */
+    public static function indirizziAmmessi(string $valore): ?array
+    {
         $host = strtolower(trim($valore, "[] \t"));
         if ($host === '') {
-            return false;
+            return null;
         }
 
         foreach (self::SUFFISSI_LOCALI as $suffisso) {
             if ($host === ltrim($suffisso, '.') || str_ends_with($host, $suffisso)) {
-                return false;
+                return null;
             }
         }
 
-        $indirizzi = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : self::risolvi($host);
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            $indirizzi = [$host];
+        } else {
+            if (app()->runningUnitTests()) {
+                return [];
+            }
+            $indirizzi = self::risolvi($host);
+            if ($indirizzi === []) {
+                return null; // non risolvibile: nulla a cui connettersi in modo verificato
+            }
+        }
 
         foreach ($indirizzi as $ip) {
             if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                return false;
+                return null;
             }
         }
 
-        return true;
+        return $indirizzi;
     }
 
     /**
-     * Risoluzione DNS best-effort: se il nome non si risolve non c'è nulla da
-     * sondare (la connessione fallirebbe comunque). Nei test niente DNS.
+     * Risoluzione DNS (A e AAAA).
      *
      * @return list<string>
      */
     private static function risolvi(string $host): array
     {
-        if (app()->runningUnitTests()) {
-            return [];
-        }
-
         $ipv4 = gethostbynamel($host) ?: [];
         $ipv6 = [];
         foreach (dns_get_record($host, DNS_AAAA) ?: [] as $record) {

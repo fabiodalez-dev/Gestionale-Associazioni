@@ -71,14 +71,19 @@ class TenantMailer
     {
         // Ricontrollo a ogni connessione, non solo al salvataggio: copre le
         // impostazioni salvate prima della regola e i nomi che cambiano
-        // indirizzo dopo la validazione (DNS a TTL basso verso la rete interna)
-        if (! HostSmtpPubblico::ammesso((string) $settings->smtp_host)) {
+        // indirizzo dopo la validazione (DNS a TTL basso verso la rete
+        // interna). La connessione va all'IP appena validato, il nome resta
+        // il peer TLS (driver smtp-pinned).
+        $host = (string) $settings->smtp_host;
+        $indirizzi = HostSmtpPubblico::indirizziAmmessi($host);
+        if ($indirizzi === null) {
             throw new InvalidArgumentException(HostSmtpPubblico::MESSAGGIO.' Correggi l\'host nelle impostazioni email.');
         }
 
         $config = [
-            'transport' => 'smtp',
-            'host' => $settings->smtp_host,
+            'transport' => 'smtp-pinned',
+            'host' => $indirizzi[0] ?? $host,
+            'peer_name' => $host,
             'port' => $settings->smtp_port,
             'username' => $settings->smtp_user,
             'password' => (string) $settings->smtp_pass_encrypted, // decifrata dal cast 'encrypted'

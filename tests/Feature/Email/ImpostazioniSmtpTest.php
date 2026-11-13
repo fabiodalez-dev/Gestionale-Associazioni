@@ -6,6 +6,9 @@ use App\Models\Associazione;
 use App\Models\EmailTemplate;
 use App\Models\SmtpSetting;
 use App\Services\Email\TenantMailer;
+use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
+use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 
 class ImpostazioniSmtpTest extends EmailTestCase
 {
@@ -60,6 +63,29 @@ class ImpostazioniSmtpTest extends EmailTestCase
 
         $this->expectException(\InvalidArgumentException::class);
         TenantMailer::mailerConfig($settings);
+    }
+
+    public function test_il_mailer_del_tenant_si_connette_all_ip_validato_con_il_nome_come_peer_tls(): void
+    {
+        $settings = $this->configuraSmtp();
+        $settings->forceFill(['smtp_host' => '93.184.216.34'])->save();
+
+        $config = TenantMailer::mailerConfig($settings);
+        $this->assertSame('smtp-pinned', $config['transport']);
+        $this->assertSame('93.184.216.34', $config['host']);
+        $this->assertSame('93.184.216.34', $config['peer_name']);
+
+        $transport = Mail::build($config)->getSymfonyTransport();
+        $this->assertInstanceOf(EsmtpTransport::class, $transport);
+        /** @var SocketStream $stream */
+        $stream = $transport->getStream();
+        $this->assertSame('93.184.216.34', $stream->getStreamOptions()['ssl']['peer_name']);
+
+        // Con un nome (risoluzione saltata nei test) il peer resta il nome
+        $settings->forceFill(['smtp_host' => 'smtp.example.com'])->save();
+        $config = TenantMailer::mailerConfig($settings);
+        $this->assertSame('smtp.example.com', $config['host']);
+        $this->assertSame('smtp.example.com', $config['peer_name']);
     }
 
     public function test_primo_salvataggio_crea_le_impostazioni_e_seedda_i_template(): void

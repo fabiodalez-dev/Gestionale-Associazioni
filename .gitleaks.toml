@@ -26,3 +26,12 @@ paths = ['''^public/assets/vendor/.*\.min\.js$''']
 description = "Segnaposto della documentazione API"
 regexTarget = "line"
 regexes = ['''Bearer LA_TUA_API_KEY''']
+
+# Password fittizia di un test dell'installer nel commit a7b0d2c (poi sostituita
+# da una nel formato delle password di prova): resta nella storia della PR,
+# che non si riscrive. Eccezione limitata a quel file e a quel valore.
+[[allowlists]]
+description = "Password fittizia storica di InstallerServiceTest"
+condition = "AND"
+paths = ['''^tests/Feature/Installer/InstallerServiceTest\.php$''']
+regexes = ['''^Abc123generata$''']

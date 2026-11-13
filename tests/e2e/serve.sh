@@ -17,6 +17,9 @@ export REGISTRAZIONE_ASSOCIAZIONI=revisione
 # Honeypot attivo ma senza soglia temporale: Playwright compila i form
 # più in fretta di un umano e il fake-success renderebbe i test flaky.
 export HONEYPOT_SECONDS=0
+# Il super admin delle fixture non ha la 2FA: l'obbligo (acceso fuori da
+# APP_ENV=testing) lo fermerebbe sul profilo. È coperto dai test PHPUnit.
+export SUPER_ADMIN_2FA_OBBLIGATORIA=false
 export DEBUGBAR_ENABLED=false
 export TELESCOPE_ENABLED=false
 

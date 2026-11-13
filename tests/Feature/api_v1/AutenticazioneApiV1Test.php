@@ -234,9 +234,12 @@ class AutenticazioneApiV1Test extends TestCase
 
     public function test_token_sanctum_senza_scadenza_scade_con_il_limite_di_sistema(): void
     {
-        // config sanctum.expiration (365 giorni): anche un token creato senza
-        // expires_at non resta valido per sempre.
-        $this->assertSame(525600, config('sanctum.expiration'));
+        // Per compatibilità con le installazioni esistenti il limite di sistema
+        // è spento (null): i token vecchi senza expires_at restano validi.
+        // Se l'operatore lo imposta (SANCTUM_TOKEN_EXPIRATION), vale anche per
+        // i token creati senza expires_at.
+        $this->assertNull(config('sanctum.expiration'));
+        config(['sanctum.expiration' => 525600]);
 
         $utente = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
         $token = $utente->createToken('eterno', ['soci:read'], null)->plainTextToken;

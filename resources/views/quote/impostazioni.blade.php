@@ -51,6 +51,12 @@
         {{-- PayPal --}}
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
+                @if ($settings?->paypal_enabled && blank($settings?->paypal_webhook_id))
+                    <div class="alert alert-warning rounded-0 mb-0 small">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        PayPal è abilitato ma manca il <strong>Webhook ID</strong>: i webhook non possono essere verificati, quindi PayPal non viene proposto ai paganti finché non lo inserisci (lo trovi nella dashboard PayPal Developer, sezione Webhooks).
+                    </div>
+                @endif
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-paypal me-2"></i><strong>PayPal</strong></span>
                     <div class="form-check form-switch mb-0">

@@ -53,7 +53,11 @@ return [
     |
     */
 
-    'expiration' => (int) env('SANCTUM_TOKEN_EXPIRATION', 525600),
+    // Nessuna scadenza di sistema retroattiva: i token creati prima
+    // dell'introduzione della scadenza per token (365 giorni alla creazione,
+    // ApiTokenController) devono continuare a funzionare. Impostare
+    // SANCTUM_TOKEN_EXPIRATION (minuti) per applicare comunque un limite.
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION') !== null ? (int) env('SANCTUM_TOKEN_EXPIRATION') : null,
 
     /*
     |--------------------------------------------------------------------------

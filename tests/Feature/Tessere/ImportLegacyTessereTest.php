@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Tessere;
 
+use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Socio;
 use App\Models\Tessera;
@@ -20,6 +21,33 @@ use Tests\TestCase;
 class ImportLegacyTessereTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_le_chiavi_api_legacy_in_chiaro_vengono_importate_come_hash_e_restano_valide(): void
+    {
+        $associazione = Associazione::factory()->create();
+
+        config(['database.connections.legacy' => ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']]);
+        Schema::connection('legacy')->create('api_keys', function (Blueprint $table): void {
+            $table->char('id', 36)->primary();
+            $table->char('associazione_id', 36)->nullable();
+            $table->string('api_key', 64);
+            $table->string('nome');
+            $table->text('permessi');
+            $table->boolean('attiva')->default(true);
+        });
+        $chiaveInChiaro = str_repeat('ab', 32);
+        DB::connection('legacy')->table('api_keys')->insert([
+            'id' => (string) Str::uuid(), 'associazione_id' => $associazione->id, 'api_key' => $chiaveInChiaro,
+            'nome' => 'Legacy', 'permessi' => json_encode(['*']), 'attiva' => true,
+        ]);
+
+        $this->artisan('app:import-legacy', ['--tables' => 'api_keys'])->assertSuccessful();
+
+        $importata = ApiKey::query()->where('nome', 'Legacy')->sole();
+        $this->assertSame(ApiKey::hashChiave($chiaveInChiaro), $importata->api_key_hash);
+        $this->assertSame(ApiKey::prefissoChiave($chiaveInChiaro), $importata->api_key_prefix);
+        $this->getJson('/api/v1/', ['Authorization' => 'Bearer '.$chiaveInChiaro])->assertOk();
+    }
 
     public function test_le_tessere_importate_entrano_nel_vincolo_socio_anno_tranne_i_doppioni(): void
     {

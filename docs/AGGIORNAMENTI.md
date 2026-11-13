@@ -48,6 +48,21 @@ Regole:
 - una migration che tocca molti dati va provata su una copia del database di produzione;
 - se una migration fallisce, l'updater fa il rollback dei file ma **non** del database: si ripristina il backup del passo 3 (`storage/app/private/<nome app>/*.zip` di spatie o il `.sql.gz` dell'updater), si corregge e si riprova.
 
+## Note per chi aggiorna da una versione precedente alle correzioni di sicurezza
+
+Le correzioni dell'audit di sicurezza (branch `fix/security-audit-run-1`) sono pensate per non interrompere le installazioni esistenti. Cosa cambia in pratica:
+
+- **Chiavi API legacy**: la migration converte le chiavi in chiaro in hash (`api_key_hash`) e conserva un prefisso per riconoscerle; le chiavi già distribuite continuano a funzionare. La chiave in chiaro non è più recuperabile dal pannello: chi l'ha persa ne genera una nuova. `app:import-legacy` hasha le chiavi del gestionale precedente durante l'import.
+- **Token Sanctum**: i token nuovi scadono dopo 365 giorni (o prima, se indicato); quelli esistenti senza scadenza restano validi. Per imporre un limite anche a questi, impostare `SANCTUM_TOKEN_EXPIRATION` (minuti).
+- **Inviti amministratore**: i link inviati prima dell'aggiornamento (senza nonce) restano accettati finché l'invitato non ha mai effettuato un accesso; dopo il primo login, o dopo un reinvio, valgono solo i link nuovi.
+- **Verifica tessere**: il QR deve contenere l'URL firmato (lo è da sempre per le tessere emesse da questa applicazione). Le tessere importate con `qr_code_url` legacy senza firma restano verificabili con il solo UUID (eccezione limitata a quelle righe, che solo l'import o l'emissione possono scrivere). Una volta ristampate, `php artisan tessere:firma-qr` riscrive i loro URL firmati e chiude l'eccezione (`--dry-run` per contarle).
+- **PayPal**: il Webhook ID è obbligatorio. Le associazioni che hanno PayPal abilitato senza Webhook ID vedono un avviso nelle impostazioni pagamenti e PayPal non viene proposto ai paganti finché il campo non è compilato.
+- **CORS**: l'API non emette più `Access-Control-Allow-Origin: *`. Un'integrazione da browser su un'altra origine va dichiarata in `CORS_ALLOWED_ORIGINS`.
+- **Area soci**: soci in attesa di approvazione e soci cessati non accedono più al portale; soci sospesi o in attesa di pagamento sì.
+- **Utenti staff senza associazione**: non vedono più la vista globale; chi è stato rimosso da un'associazione resta disattivato finché non viene ricollegato.
+- **Link di pagamento**: dopo il pagamento il link resta valido un'ora per la ricevuta; poi la ricevuta si scarica dall'area riservata.
+- **Seeder**: `php artisan migrate --seed` in produzione crea solo ruoli e permessi.
+
 ## Dove guardare quando qualcosa va storto
 
 - Storico nella pagina `/aggiornamenti` (`update_logs`: versione, esito, messaggio d'errore).

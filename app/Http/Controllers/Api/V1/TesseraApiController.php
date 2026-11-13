@@ -43,15 +43,18 @@ class TesseraApiController extends Controller
             return $this->apiError(400, 'invalid_tessera_id', 'Parametro tessera_id mancante o non valido (UUID richiesto).');
         }
 
-        // Controllo prima della lookup: la risposta non dice se l'UUID esiste
-        if (! $qr->firmaValida($tesseraId, $request->query('signature'))) {
-            return $this->apiError(403, 'invalid_signature', 'Parametro signature mancante o non valido: usa la firma contenuta nell\'URL del QR code della tessera.');
-        }
+        $firmaValida = $qr->firmaValida($tesseraId, $request->query('signature'));
 
         /** @var Tessera|null $tessera */
         $tessera = Tessera::allTenants()
             ->with(['socio' => fn ($q) => $q->withoutGlobalScope('associazione'), 'associazione:id,nome'])
             ->find(strtolower($tesseraId));
+
+        // Senza firma valida la risposta non dice se l'UUID esiste. Unica
+        // eccezione: tessere importate con QR legacy senza firma.
+        if (! $firmaValida && ($tessera === null || ! $qr->qrLegacySenzaFirma($tessera))) {
+            return $this->apiError(403, 'invalid_signature', 'Parametro signature mancante o non valido: usa la firma contenuta nell\'URL del QR code della tessera.');
+        }
 
         if (! $tessera) {
             return $this->apiError(404, 'tessera_not_found', 'Tessera non trovata.');

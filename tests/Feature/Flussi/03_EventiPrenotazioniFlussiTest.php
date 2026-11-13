@@ -1345,9 +1345,9 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
             ->assertOk()
             ->assertSee('Serata di stand-up comedy');
 
-        $this->post(route('feedback-eventi.store', ['token' => $f1->token]), ['voto' => 4, 'commento' => 'Divertente, audio da migliorare'])
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $f1->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 4, 'commento' => 'Divertente, audio da migliorare'])
             ->assertOk();
-        $this->post(route('feedback-eventi.store', ['token' => $f2->token]), ['voto' => 5])
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $f2->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 5])
             ->assertOk();
 
         $f1->refresh();
@@ -1358,13 +1358,13 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
         $this->assertNull($f2->fresh()->commento);
 
         // Secondo invio: rifiutato, voto invariato
-        $this->post(route('feedback-eventi.store', ['token' => $f1->token]), ['voto' => 1, 'commento' => 'Ripensamento'])
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $f1->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 1, 'commento' => 'Ripensamento'])
             ->assertSessionHasErrors('voto');
         $this->assertSame(4, $f1->fresh()->voto);
         $this->assertSame('Divertente, audio da migliorare', $f1->fresh()->commento);
 
         // Voto fuori scala respinto dalla validazione
-        $this->post(route('feedback-eventi.store', ['token' => $f2->token]), ['voto' => 9])->assertSessionHasErrors('voto');
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $f2->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 9])->assertSessionHasErrors('voto');
 
         $stats = $this->comeAdmin()
             ->get(route('eventi.feedback.index', $evento))

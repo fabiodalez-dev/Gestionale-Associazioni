@@ -160,7 +160,9 @@ class AmministratoriTest extends TestCase
     {
         $utente = Utente::factory()->adminAssociazione()->create();
 
-        // Firma valida ma nessun nonce (vecchio formato del link)
+        // Firma valida ma nessun nonce (vecchio formato del link) su un utente
+        // che ha già un invito registrato: rifiutato
+        $this->linkInvito($utente, 'nonce-registrato-xxxxxxxxxxxx');
         $senzaNonce = URL::temporarySignedRoute('invito.show', now()->addDays(7), ['utente' => $utente->id]);
         $this->get($senzaNonce)->assertForbidden();
 
@@ -168,6 +170,27 @@ class AmministratoriTest extends TestCase
         $primo = $this->linkInvito($utente, 'primo-nonce-aaaaaaaaaaaaaaaa');
         $this->linkInvito($utente, 'secondo-nonce-bbbbbbbbbbbbbbb');
         $this->get($primo)->assertForbidden();
+    }
+
+    public function test_link_senza_nonce_inviato_prima_dell_aggiornamento_vale_finche_l_utente_non_accede(): void
+    {
+        // Compatibilità: un invito spedito dalla versione precedente (nessun
+        // invito registrato, utente mai entrato) deve poter essere accettato
+        $utente = Utente::factory()->adminAssociazione()->create(['last_login' => null]);
+        $vecchioLink = URL::temporarySignedRoute('invito.show', now()->addDays(7), ['utente' => $utente->id]);
+
+        $this->get($vecchioLink)->assertOk();
+        $this->post($vecchioLink, ['password' => 'Password-Di-Transizione-1', 'password_confirmation' => 'Password-Di-Transizione-1'])
+            ->assertRedirect(route('login'));
+        $this->assertTrue(auth()->guard('web')->attempt(['email' => $utente->email, 'password' => 'Password-Di-Transizione-1']));
+
+        // Dopo il primo accesso la via di transizione si chiude
+        $utente->forceFill(['last_login' => now()])->save();
+        $this->get($vecchioLink)->assertForbidden();
+
+        // E non riattiva mai un utente disattivato
+        $altro = Utente::factory()->adminAssociazione()->create(['last_login' => null, 'attivo' => false]);
+        $this->get(URL::temporarySignedRoute('invito.show', now()->addDays(7), ['utente' => $altro->id]))->assertForbidden();
     }
 
     public function test_invito_dal_pannello_salva_il_nonce_e_lo_mette_nel_link(): void

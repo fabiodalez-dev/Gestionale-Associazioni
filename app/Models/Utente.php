@@ -104,8 +104,19 @@ class Utente extends Authenticatable
      */
     public function invitoValido(?string $nonce): bool
     {
-        return $this->attivo
-            && is_string($nonce) && $nonce !== ''
+        if (! $this->attivo) {
+            return false;
+        }
+
+        // Transizione: link firmati inviati prima dell'introduzione del nonce
+        // (nessun invito registrato in tabella) restano accettati finché
+        // l'utente non ha mai effettuato un accesso; al primo login o al primo
+        // reinvio dell'invito questa via si chiude da sola.
+        if ($this->invito_token === null && $this->invito_scade_at === null) {
+            return ($nonce === null || $nonce === '') && $this->last_login === null;
+        }
+
+        return is_string($nonce) && $nonce !== ''
             && is_string($this->invito_token)
             && $this->invito_scade_at !== null && $this->invito_scade_at->isFuture()
             && hash_equals($this->invito_token, hash('sha256', $nonce));

@@ -67,12 +67,12 @@ class VerificaTesseraController extends Controller
             return ['not_found', null];
         }
 
-        // Firma mancante o manomessa → not_found, prima di toccare il DB. La
-        // firma è quella dell'URL di verifica (stessa per la pagina HTML e per
-        // l'endpoint JSON dello scanner, che la ricava dal QR scansionato)
-        if (! $this->qr->firmaValida($tesseraId, $request->query('signature'))) {
-            return ['not_found', null];
-        }
+        // Firma mancante o manomessa → not_found (stessa risposta di una tessera
+        // inesistente). La firma è quella dell'URL di verifica (stessa per la
+        // pagina HTML e per l'endpoint JSON dello scanner, che la ricava dal QR
+        // scansionato). Unica eccezione: tessere importate con QR legacy senza
+        // firma (vedi TesseraQrService::qrLegacySenzaFirma).
+        $firmaValida = $this->qr->firmaValida($tesseraId, $request->query('signature'));
 
         try {
             // La verifica è cross-tenant per design: si bypassa il global scope
@@ -93,7 +93,7 @@ class VerificaTesseraController extends Controller
             return ['not_found', null];
         }
 
-        if ($tessera === null) {
+        if ($tessera === null || (! $firmaValida && ! $this->qr->qrLegacySenzaFirma($tessera))) {
             return ['not_found', null];
         }
 

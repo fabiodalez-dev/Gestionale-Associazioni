@@ -172,6 +172,48 @@ class VerificaPubblicaTest extends TestCase
             ->assertExactJson(['stato' => 'not_found']);
     }
 
+    public function test_tessera_importata_con_qr_legacy_senza_firma_resta_verificabile(): void
+    {
+        // Compatibilità con le installazioni esistenti: una tessera importata dal
+        // vecchio gestionale ha stampato un QR con l'URL senza firma; quel QR
+        // deve continuare a funzionare. Le tessere emesse da qui hanno sempre
+        // l'URL firmato e per loro il solo UUID non basta.
+        $legacy = $this->creaTessera();
+        $legacy->forceFill(['qr_code_url' => url('/verifica-tessera/'.$legacy->id)])->save();
+
+        $this->get('/verifica-tessera/'.$legacy->id)
+            ->assertOk()
+            ->assertSee('Tessera Valida')
+            ->assertSee($legacy->numero_tessera);
+        $this->getJson('/api/verifica-tessera/'.$legacy->id)
+            ->assertOk()
+            ->assertJsonPath('stato', 'valida');
+        $this->getJson('/api/v1/tessere/verify?tessera_id='.$legacy->id)
+            ->assertOk()
+            ->assertJsonPath('valid', true);
+
+        // Tessera con qr_code_url firmato (emessa da questa app): solo UUID → not_found
+        $moderna = $this->creaTessera();
+        $moderna->forceFill(['qr_code_url' => app(TesseraQrService::class)->verificationUrl($moderna)])->save();
+        $this->get('/verifica-tessera/'.$moderna->id)->assertOk()->assertSee('Tessera Non Trovata');
+        $this->getJson('/api/v1/tessere/verify?tessera_id='.$moderna->id)->assertForbidden();
+    }
+
+    public function test_il_comando_tessere_firma_qr_chiude_la_finestra_legacy(): void
+    {
+        $legacy = $this->creaTessera();
+        $legacy->forceFill(['qr_code_url' => url('/verifica-tessera/'.$legacy->id)])->save();
+        $this->get('/verifica-tessera/'.$legacy->id)->assertOk()->assertSee('Tessera Valida');
+
+        $this->artisan('tessere:firma-qr', ['--dry-run' => true])->expectsOutputToContain('1 tessere')->assertSuccessful();
+        $this->assertStringNotContainsString('signature=', (string) $legacy->fresh()->qr_code_url);
+
+        $this->artisan('tessere:firma-qr')->expectsOutputToContain('1 tessere aggiornate')->assertSuccessful();
+        $this->assertStringContainsString('signature=', (string) $legacy->fresh()->qr_code_url);
+        $this->get('/verifica-tessera/'.$legacy->id)->assertOk()->assertSee('Tessera Non Trovata');
+        $this->get($legacy->fresh()->qr_code_url)->assertOk()->assertSee('Tessera Valida');
+    }
+
     public function test_la_firma_del_qr_vale_anche_per_l_endpoint_json_dello_scanner(): void
     {
         $tessera = $this->creaTessera();

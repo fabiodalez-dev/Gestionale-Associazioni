@@ -82,6 +82,19 @@ class TesseraQrService
      * Il confronto è a tempo costante e non tocca il database: si può fare
      * prima della lookup, così la risposta non rivela se l'UUID esiste.
      */
+    /**
+     * Compatibilità: una tessera importata dal gestionale precedente può avere
+     * stampato un QR con l'URL di verifica senza firma (qr_code_url legacy).
+     * Per quelle sole tessere il solo UUID resta accettato; le tessere emesse
+     * da questa applicazione hanno sempre l'URL firmato.
+     */
+    public function qrLegacySenzaFirma(Tessera $tessera): bool
+    {
+        $url = (string) ($tessera->qr_code_url ?? '');
+
+        return $url !== '' && ! str_contains($url, 'signature=');
+    }
+
     public function firmaValida(string $tesseraId, mixed $signature): bool
     {
         if (! is_string($signature) || $signature === '') {

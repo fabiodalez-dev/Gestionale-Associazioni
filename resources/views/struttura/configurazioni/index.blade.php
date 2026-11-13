@@ -537,7 +537,7 @@
                     <div class="input-group mb-3">
                         <input type="text" class="form-control" id="link_invito" readonly value="{{ $linkIscrizione }}">
                         <button class="btn btn-outline-primary" type="button" id="btnCopiaInvito"
-                                data-copia-da="link_invito" data-copia-feedback="<i class=&quot;bi bi-check-lg me-1&quot;></i>Copiato!" data-copia-ripristina="2000">
+                                data-copia-da="link_invito" data-copia-icona="bi bi-check-lg me-1" data-copia-feedback="Copiato!" data-copia-ripristina="2000">
                             <i class="bi bi-clipboard me-1"></i>Copia link
                         </button>
                     </div>

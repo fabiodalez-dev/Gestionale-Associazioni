@@ -14,7 +14,7 @@
  *   <select data-mostra-se-valore="v" data-mostra-target="id">  mostra l'elemento solo se value === v
  *   <input type=checkbox data-seleziona-tutti="selettore">      spunta/despunta i checkbox indicati
  *   <button data-copia-da="id">                copia value (o testo) dell'elemento negli appunti
- *     data-copia-feedback="html" data-copia-ripristina="ms"
+ *     data-copia-feedback="testo" [data-copia-icona="classi bi"] data-copia-ripristina="ms"
  *   <button data-stampa>                       window.print()
  */
 (function () {
@@ -115,12 +115,23 @@
         if (feedback === null) {
             return;
         }
+        var icona = pulsante.getAttribute('data-copia-icona');
         promessa.then(function () {
-            var originale = pulsante.innerHTML;
-            pulsante.innerHTML = feedback;
+            // Niente innerHTML: il contenuto originale si conserva come nodi e il
+            // feedback (testo più icona facoltativa) si costruisce senza
+            // reinterpretare stringhe come HTML
+            var originale = Array.prototype.map.call(pulsante.childNodes, function (n) { return n.cloneNode(true); });
+            var nodi = [];
+            if (icona) {
+                var i = document.createElement('i');
+                i.className = icona;
+                nodi.push(i);
+            }
+            nodi.push(document.createTextNode(feedback));
+            pulsante.replaceChildren.apply(pulsante, nodi);
             var ms = parseInt(pulsante.getAttribute('data-copia-ripristina') || '', 10);
             if (ms > 0) {
-                setTimeout(function () { pulsante.innerHTML = originale; }, ms);
+                setTimeout(function () { pulsante.replaceChildren.apply(pulsante, originale); }, ms);
             }
         });
     }

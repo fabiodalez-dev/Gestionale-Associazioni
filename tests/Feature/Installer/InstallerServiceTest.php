@@ -138,14 +138,14 @@ class InstallerServiceTest extends TestCase
 
     public function test_password_backup_da_mostrare_una_sola_volta(): void
     {
-        file_put_contents($this->env, "BACKUP_ARCHIVE_PASSWORD=Abc123generata\n");
+        file_put_contents($this->env, "BACKUP_ARCHIVE_PASSWORD=Backup-Prova-Generata-42\n");
         $installer = app(InstallerService::class);
 
         // Senza il segnale del wizard non si mostra nulla (installazioni esistenti)
         $this->assertNull($installer->passwordBackupDaMostrare());
 
         session()->put(InstallerService::SESSIONE_PASSWORD_BACKUP, true);
-        $this->assertSame('Abc123generata', $installer->passwordBackupDaMostrare());
+        $this->assertSame('Backup-Prova-Generata-42', $installer->passwordBackupDaMostrare());
         $this->assertNull($installer->passwordBackupDaMostrare());
     }
 }

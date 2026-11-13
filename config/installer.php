@@ -18,6 +18,10 @@ return [
     // contiene l'hash di un token che sta solo nel cookie del browser che
     // installa, cancellato dal lock. Senza marcatore e token validi, un
     // database già installato chiude il wizard anche se il lock manca.
+    // Il TTL vale per il token del browser: scaduto, nemmeno chi ha avviato
+    // il wizard può proseguire. Il marcatore invece non scade mai da solo
+    // (altrimenti lo step admin si riaprirebbe a chiunque): per ricominciare
+    // si elimina a mano il file in-corso, come indica il messaggio 403.
     'in_progress_file' => env('INSTALLER_IN_PROGRESS_FILE', storage_path('app/installer-in-corso')),
     'in_progress_ttl_minutes' => 120,
     'in_progress_cookie' => 'installer_token',

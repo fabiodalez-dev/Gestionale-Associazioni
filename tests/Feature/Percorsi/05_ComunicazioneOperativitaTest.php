@@ -51,6 +51,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Honeypot\ProtectAgainstSpam;
 use Tests\TestCase;
@@ -824,8 +825,9 @@ class Percorso05_ComunicazioneOperativitaTest extends TestCase
         $this->assertEqualsWithDelta(40.0, (float) $entrataDonazione->importo, 0.001);
         $this->assertSame(PrimaNotaService::CATEGORIA_DONAZIONI, $entrataDonazione->categoria?->nome);
 
-        // Il donatore torna sulla pagina di esito
-        $this->get(route('pubblico.dona.esito', [$this->associazione->slug, $donazione->id, 'esito' => 'success']))
+        // Il donatore torna sulla pagina di esito con l'URL firmato consegnato
+        // al gateway (audit run-1: il solo UUID della donazione non basta)
+        $this->get(URL::signedRoute('pubblico.dona.esito', ['associazione' => $this->associazione->slug, 'donazione' => $donazione->id, 'esito' => 'success']))
             ->assertOk()
             ->assertSee('40,00');
 

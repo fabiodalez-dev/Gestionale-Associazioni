@@ -31,6 +31,7 @@ use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use App\Services\Pagamenti\Pagabile;
 use App\Services\Rinnovi\PromemoriaRinnoviService;
+use App\Services\Tessere\TesseraQrService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -266,6 +267,12 @@ class Flussi02_TesseramentoEconomiaFlussiTest extends TestCase
                 $this->capture[] = $orderId;
 
                 return $this->rispostaCapture;
+            }
+
+            public function showOrderDetails(PaymentGatewaySetting $config, string $orderId): ?array
+            {
+                // Il capture finto riporta già il custom_id: i dettagli ordine non servono
+                return null;
             }
 
             public function verifyWebhookSignature(PaymentGatewaySetting $config, array $headers, array $event): bool
@@ -1002,9 +1009,11 @@ class Flussi02_TesseramentoEconomiaFlussiTest extends TestCase
             ->assertSessionHas('success');
         $this->assertSame(Tessera::STATO_ANNULLATA, $tessera->fresh()->stato);
 
-        // Lo scanner pubblico la vede non più valida
+        // Lo scanner pubblico (con la firma del QR, obbligatoria: audit run-1)
+        // la vede non più valida
         $this->comeOspite();
-        $this->getJson(route('tessere.verifica.json', $tessera->id))
+        $qr = app(TesseraQrService::class);
+        $this->getJson(route('tessere.verifica.json', ['tessera' => $tessera->id, 'signature' => $qr->signature($tessera)]))
             ->assertOk()
             ->assertJson([
                 'stato' => 'scaduta',
@@ -1015,8 +1024,8 @@ class Flussi02_TesseramentoEconomiaFlussiTest extends TestCase
                 ],
             ]);
 
-        // UUID inesistente
-        $this->getJson(route('tessere.verifica.json', '00000000-0000-4000-8000-000000000000'))
+        // UUID inesistente (firma corretta per quell'UUID)
+        $this->getJson(route('tessere.verifica.json', ['tessera' => '00000000-0000-4000-8000-000000000000', 'signature' => $qr->signature('00000000-0000-4000-8000-000000000000')]))
             ->assertOk()
             ->assertExactJson(['stato' => 'not_found']);
     }
@@ -1638,9 +1647,13 @@ class Flussi02_TesseramentoEconomiaFlussiTest extends TestCase
         Notification::assertSentOnDemand(RicevutaDonazioneNotification::class,
             fn ($n, $canali, $notifiable) => $notifiable->routes['mail'] === 'lia.benefattrice@example.com');
 
-        // Pagina di esito
+        // Pagina di esito: solo con l'URL firmato consegnato al gateway
+        // (audit run-1); il solo UUID della donazione non basta
+        $urlEsito = $stripe->checkout[1]['success'];
+        $this->assertStringContainsString('signature=', $urlEsito);
+        $this->get($urlEsito)->assertOk()->assertSee('Grazie di cuore');
         $this->get(route('pubblico.dona.esito', ['associazione' => $this->associazione->slug, 'donazione' => $donazione->id, 'esito' => 'success']))
-            ->assertOk();
+            ->assertForbidden();
 
         // Elenco admin con il totale delle donazioni pagate
         $this->comeAdmin()

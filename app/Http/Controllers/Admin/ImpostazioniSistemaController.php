@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\Socio;
 use App\Models\Utente;
 use App\Services\Sistema\EnvEditor;
 use App\Support\LimiteAccessi;
@@ -140,9 +141,28 @@ class ImpostazioniSistemaController extends Controller
             $sessioni = DB::table((string) config('session.table', 'sessions'))->where('id', '!=', $request->session()->getId())->delete();
         }
 
-        activity('sicurezza')->causedBy($request->user())->withProperties(['ricordami' => $utenti + $account, 'sessioni' => $sessioni])->log('Revocati tutti gli accessi ricordati');
+        // Anche i link pendenti che danno un accesso senza password: token
+        // "imposta password" dei soci, inviti degli utenti e token del broker
+        // di recupero password (utenti e account)
+        $tokenSoci = Socio::allTenants()->withTrashed()
+            ->where(fn ($q) => $q->whereNotNull('password_reset_token')->orWhereNotNull('password_reset_expires'))
+            ->update(['password_reset_token' => null, 'password_reset_expires' => null]);
+        $inviti = Utente::query()
+            ->where(fn ($q) => $q->whereNotNull('invito_token')->orWhereNotNull('invito_scade_at'))
+            ->update(['invito_token' => null, 'invito_scade_at' => null]);
+        $tokenBroker = DB::table((string) config('auth.passwords.utenti.table', 'password_reset_tokens'))->delete();
 
-        return back()->with('success', 'Accessi revocati: '.($utenti + $account).' "Ricordami" annullati'.(config('session.driver') === 'database' ? ', '.$sessioni.' sessioni chiuse' : '').'. Tutti dovranno accedere di nuovo.');
+        activity('sicurezza')->causedBy($request->user())->withProperties([
+            'ricordami' => $utenti + $account,
+            'sessioni' => $sessioni,
+            'token_soci' => $tokenSoci,
+            'inviti' => $inviti,
+            'token_recupero' => $tokenBroker,
+        ])->log('Revocati tutti gli accessi ricordati');
+
+        $link = $tokenSoci + $inviti + $tokenBroker;
+
+        return back()->with('success', 'Accessi revocati: '.($utenti + $account).' "Ricordami" annullati'.(config('session.driver') === 'database' ? ', '.$sessioni.' sessioni chiuse' : '').', '.$link.' link di invito o recupero password annullati. Tutti dovranno accedere di nuovo.');
     }
 
     /**

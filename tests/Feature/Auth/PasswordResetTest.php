@@ -67,6 +67,38 @@ class PasswordResetTest extends TestCase
         });
     }
 
+    public function test_la_richiesta_del_link_e_limitata_a_cinque_al_minuto(): void
+    {
+        Notification::fake();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/forgot-password', ['email' => 'nessuno@example.com'])->assertRedirect();
+        }
+
+        // La sesta richiesta nello stesso minuto viene respinta (throttle per IP)
+        $this->post('/forgot-password', ['email' => 'nessuno@example.com'])->assertStatus(429);
+    }
+
+    public function test_il_reset_e_limitato_a_dieci_tentativi_al_minuto(): void
+    {
+        $utente = Utente::factory()->create(['email' => 'admin@example.com']);
+
+        $dati = [
+            'token' => 'token-sbagliato',
+            'email' => 'admin@example.com',
+            'password' => self::NUOVA_PASSWORD,
+            'password_confirmation' => self::NUOVA_PASSWORD,
+        ];
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->post('/reset-password', $dati)->assertSessionHasErrors('email');
+        }
+
+        // L'undicesimo tentativo nello stesso minuto viene respinto: niente brute force sul token
+        $this->post('/reset-password', $dati)->assertStatus(429);
+        $this->assertFalse(Hash::check(self::NUOVA_PASSWORD, $utente->fresh()->password_hash));
+    }
+
     public function test_email_inesistente_riceve_la_stessa_risposta(): void
     {
         Notification::fake();

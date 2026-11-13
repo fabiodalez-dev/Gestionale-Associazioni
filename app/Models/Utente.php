@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -69,6 +71,7 @@ class Utente extends Authenticatable
     protected array $activityLogExcept = [
         'password_hash',
         'last_login',
+        'invito_token',
     ];
 
     protected function casts(): array
@@ -79,6 +82,7 @@ class Utente extends Authenticatable
             'last_login' => 'datetime',
             'password_hash' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'invito_scade_at' => 'datetime',
         ];
     }
 
@@ -93,6 +97,33 @@ class Utente extends Authenticatable
     public function getAuthPassword(): string
     {
         return (string) $this->password_hash;
+    }
+
+    /**
+     * Vero se il nonce dell'invito corrisponde a quello pendente e non scaduto.
+     */
+    public function invitoValido(?string $nonce): bool
+    {
+        return $this->attivo
+            && is_string($nonce) && $nonce !== ''
+            && is_string($this->invito_token)
+            && $this->invito_scade_at !== null && $this->invito_scade_at->isFuture()
+            && hash_equals($this->invito_token, hash('sha256', $nonce));
+    }
+
+    /**
+     * Revoca le credenziali vive dell'utente: remember-me e sessioni server
+     * (solo con SESSION_DRIVER=database). Usato alla disattivazione e quando
+     * un super admin impone una nuova password.
+     */
+    public function revocaSessioni(): void
+    {
+        $this->forceFill(['remember_token' => Str::random(60)])->save();
+
+        $tabella = (string) config('session.table', 'sessions');
+        if (config('session.driver') === 'database' && Schema::hasTable($tabella)) {
+            DB::table($tabella)->where('user_id', $this->getKey())->delete();
+        }
     }
 
     /**

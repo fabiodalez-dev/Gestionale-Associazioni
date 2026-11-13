@@ -254,8 +254,10 @@ class AssociazioneController extends Controller
     }
 
     /**
-     * Rimuove un admin dall'associazione: scollega soltanto
-     * (associazione_id → NULL), il ruolo NON viene cambiato (spec §1.5).
+     * Rimuove un admin dall'associazione: scollega (associazione_id → NULL)
+     * e disattiva, il ruolo NON viene cambiato (spec §1.5). Un utente staff
+     * senza associazione non ha un contesto in cui lavorare: resta
+     * disattivato finché il super admin non lo ricollega a un'associazione.
      */
     public function removeAdmin(Request $request, Associazione $associazione): RedirectResponse
     {
@@ -266,7 +268,7 @@ class AssociazioneController extends Controller
         $aggiornati = Utente::query()
             ->where('id', $request->input('utente_id'))
             ->where('associazione_id', $associazione->id) // scoping difensivo
-            ->update(['associazione_id' => null]);
+            ->update(['associazione_id' => null, 'attivo' => false, 'remember_token' => null]);
 
         return redirect()
             ->route('associazioni.index', ['edit' => $associazione->id])
@@ -278,7 +280,8 @@ class AssociazioneController extends Controller
 
     /**
      * Eliminazione con conferma forte (digitare il nome — spec §9.16):
-     * i dati figli vengono rimossi per cascade FK, gli utenti restano scollegati.
+     * i dati figli vengono rimossi per cascade FK, gli utenti restano scollegati
+     * e disattivati.
      * Le prenotazioni si eliminano prima: prenotazioni.account_id è RESTRICT
      * (voluto per la cancellazione GDPR del singolo account) e su InnoDB
      * bloccherebbe la cascade associazione → accounts.
@@ -295,8 +298,11 @@ class AssociazioneController extends Controller
         $nome = $associazione->nome;
 
         DB::transaction(function () use ($associazione): void {
-            // Gli utenti collegati vengono scollegati (il cascade DB li eliminerebbe)
-            Utente::query()->where('associazione_id', $associazione->id)->update(['associazione_id' => null]);
+            // Gli utenti collegati vengono scollegati (il cascade DB li
+            // eliminerebbe) e disattivati: senza associazione non hanno un
+            // contesto in cui operare
+            Utente::query()->where('associazione_id', $associazione->id)
+                ->update(['associazione_id' => null, 'attivo' => false, 'remember_token' => null]);
 
             // Dipendenze delle prenotazioni (feedback, ...) già in cascade
             Prenotazione::allTenants()->where('associazione_id', $associazione->id)->delete();

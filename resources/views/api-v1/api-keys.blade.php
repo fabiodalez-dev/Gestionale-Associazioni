@@ -94,7 +94,8 @@
                             <tr>
                                 <td class="fw-semibold">{{ $chiave->nome }}</td>
                                 <td>
-                                    <code>{{ substr($chiave->api_key, 0, 8) }}...{{ substr($chiave->api_key, -4) }}</code>
+                                    {{-- In tabella c'è solo l'hash: resta visibile il prefisso di 8 caratteri --}}
+                                    <code>{{ $chiave->api_key_prefix }}&hellip;</code>
                                 </td>
                                 <td>
                                     @if ($chiave->isGlobale())

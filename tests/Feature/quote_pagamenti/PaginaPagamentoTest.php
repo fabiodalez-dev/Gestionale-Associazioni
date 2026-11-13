@@ -7,7 +7,9 @@ use App\Models\Quota;
 use App\Models\Socio;
 use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
+use App\Services\Pagamenti\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class PaginaPagamentoTest extends TestCase
@@ -204,5 +206,70 @@ class PaginaPagamentoTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader('content-type', 'application/pdf');
+    }
+
+    // ------------------------------------------------------------------
+    // Hardening (audit run-1): il token scaduto non serve più la ricevuta
+    // né rivela lo stato della quota; dopo il pagamento online il token
+    // resta valido solo per una breve finestra di grazia
+    // ------------------------------------------------------------------
+
+    public function test_ricevuta_pubblica_non_servita_con_token_scaduto_anche_se_pagata(): void
+    {
+        $quota = $this->quotaConToken([
+            'payment_token_expires' => now()->subHour(),
+            'data_pagamento' => now()->toDateString(),
+            'metodo_pagamento' => 'bonifico',
+        ]);
+
+        $this->get(route('pagamento.ricevuta', ['token' => $quota->payment_token]))
+            ->assertRedirect(route('pagamento.show', ['token' => $quota->payment_token]));
+
+        // La pagina mostra solo "link scaduto": niente ricevuta né stato della quota
+        $this->get(route('pagamento.show', ['token' => $quota->payment_token]))
+            ->assertOk()
+            ->assertSee('Link scaduto')
+            ->assertDontSee('Scarica ricevuta')
+            ->assertDontSee('Pagamento già effettuato');
+    }
+
+    public function test_dopo_il_pagamento_online_il_token_resta_valido_solo_per_la_finestra_di_grazia(): void
+    {
+        Notification::fake();
+        $quota = $this->quotaConToken(['payment_token_expires' => now()->addHours(72)]);
+
+        app(PaymentService::class)->onPaymentCompleted($quota->id, $this->associazione->id, 'stripe', 'pi_grazia');
+
+        $quota->refresh();
+        $this->assertTrue($quota->isPagata());
+        $this->assertNotNull($quota->payment_token);
+        $this->assertTrue($quota->payment_token_expires->isFuture());
+        $this->assertTrue($quota->payment_token_expires->lte(now()->addHours(PaymentService::TOKEN_GRACE_AFTER_PAYMENT_HOURS)));
+
+        // Subito dopo (ritorno dal gateway): ricevuta scaricabile dal link
+        $this->get(route('pagamento.ricevuta', ['token' => $quota->payment_token]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        // Passata la finestra di grazia: la ricevuta si scarica solo dall'area riservata
+        $this->travel(PaymentService::TOKEN_GRACE_AFTER_PAYMENT_HOURS + 1)->hours();
+
+        $this->get(route('pagamento.ricevuta', ['token' => $quota->payment_token]))
+            ->assertRedirect(route('pagamento.show', ['token' => $quota->payment_token]));
+        $this->get(route('pagamento.show', ['token' => $quota->payment_token]))
+            ->assertOk()
+            ->assertSee('Link scaduto')
+            ->assertDontSee('Scarica ricevuta');
+    }
+
+    public function test_il_pagamento_online_non_allunga_un_token_che_scade_prima_della_finestra_di_grazia(): void
+    {
+        Notification::fake();
+        $scadenza = now()->addMinutes(10);
+        $quota = $this->quotaConToken(['payment_token_expires' => $scadenza]);
+
+        app(PaymentService::class)->onPaymentCompleted($quota->id, $this->associazione->id, 'paypal', 'CAP-grazia');
+
+        $this->assertSame($scadenza->toDateTimeString(), $quota->fresh()->payment_token_expires->toDateTimeString());
     }
 }

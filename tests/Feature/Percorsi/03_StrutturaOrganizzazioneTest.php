@@ -401,18 +401,25 @@ class Percorso03_StrutturaOrganizzazioneTest extends TestCase
         $this->accedi('lorenzo.quarantotto@ilfaro.test', self::PASSWORD);
         $this->assertGuest();
 
-        // L'invito viene reinviato (il link precedente resta valido: è firmato per 7 giorni)
+        // L'invito viene reinviato: il nuovo link sostituisce il precedente, che
+        // non vale più anche se la firma è ancora dentro i 7 giorni
         $this->comeSuperAdmin()->post(route('amministratori.reinvia-invito', $lorenzo))
             ->assertRedirect(route('amministratori.index'))->assertSessionHas('success', 'Invito reinviato.');
         Mail::assertQueued(InvitoAmministratoreMail::class, 2);
+        $primoLink = (string) $urlInvito;
+        $urlInvito = Mail::queued(InvitoAmministratoreMail::class)->last()->urlInvito;
+        $this->assertNotSame($primoLink, $urlInvito);
 
-        // Il link manomesso viene rifiutato, quello vero apre la pagina di scelta password
+        // Il link manomesso e quello vecchio vengono rifiutati, quello nuovo apre la pagina di scelta password
         $this->esci();
         $this->get('/invito/'.$lorenzo->id.'?signature=falsa&expires=99999999999')->assertForbidden();
+        $this->get($primoLink)->assertForbidden();
         $this->get((string) $urlInvito)->assertOk()->assertSee('lorenzo.quarantotto@ilfaro.test');
         $this->post((string) $urlInvito, ['password' => 'password', 'password_confirmation' => 'password'])->assertSessionHasErrors('password');
         $this->post((string) $urlInvito, ['password' => 'Ciliegio-Nebbia-Remo-93', 'password_confirmation' => 'Ciliegio-Nebbia-Remo-93'])
             ->assertRedirect(route('login'))->assertSessionHas('status');
+        // Consumato: lo stesso link non reimposta la password una seconda volta
+        $this->post((string) $urlInvito, ['password' => 'Altra-Password-Remo-94', 'password_confirmation' => 'Altra-Password-Remo-94'])->assertForbidden();
 
         // Ora accede e lavora nella stessa associazione della collega
         $this->accedi('lorenzo.quarantotto@ilfaro.test', 'Ciliegio-Nebbia-Remo-93')->assertRedirect(route('dashboard'));

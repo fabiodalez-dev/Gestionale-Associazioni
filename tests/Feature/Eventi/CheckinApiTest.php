@@ -10,6 +10,7 @@ use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -69,28 +70,77 @@ class CheckinApiTest extends TestCase
     }
 
     // ---- Autenticazione ----
+    // L'API eventi usa AuthenticateApiV1 come il resto della v1 (hardening
+    // audit run-1): i codici errore sono quelli del modulo api-v1
+    // (auth_missing / auth_invalid / key_disabled / permission_denied) e non
+    // più quelli del vecchio AuthenticateApiKey.
 
     public function test_richiesta_senza_chiave_restituisce_401(): void
     {
         $this->getJson('/api/v1/eventi')->assertStatus(401)
             ->assertJsonPath('success', false)
-            ->assertJsonPath('code', 'missing_api_key');
+            ->assertJsonPath('code', 'auth_missing');
     }
 
     public function test_chiave_non_valida_restituisce_401(): void
     {
         $this->getJson('/api/v1/eventi', $this->headers('sk_inesistente'))
             ->assertStatus(401)
-            ->assertJsonPath('code', 'invalid_api_key');
+            ->assertJsonPath('code', 'auth_invalid');
     }
 
-    public function test_chiave_disattivata_restituisce_401(): void
+    public function test_chiave_disattivata_restituisce_403_key_disabled(): void
     {
-        ApiKey::query()->where('api_key', $this->chiaveScoped)->update(['attiva' => false]);
+        ApiKey::query()->perChiave($this->chiaveScoped)->update(['attiva' => false]);
 
         $this->getJson('/api/v1/eventi', $this->headers())
-            ->assertStatus(401)
-            ->assertJsonPath('code', 'invalid_api_key');
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'key_disabled');
+    }
+
+    public function test_la_chiave_e_salvata_come_hash_e_autentica_per_hash(): void
+    {
+        $this->assertDatabaseMissing('api_keys', ['api_key_hash' => $this->chiaveScoped]);
+        $this->assertDatabaseHas('api_keys', [
+            'api_key_hash' => hash('sha256', $this->chiaveScoped),
+            'api_key_prefix' => substr($this->chiaveScoped, 0, 8),
+        ]);
+
+        $this->getJson('/api/v1/eventi', $this->headers())->assertOk();
+    }
+
+    public function test_token_sanctum_con_ability_eventi_accede_all_api_eventi(): void
+    {
+        $admin = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
+        $token = $admin->createToken('checkin', ['eventi:read'])->plainTextToken;
+
+        $this->getJson('/api/v1/eventi?limit=100', $this->headers($token))
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('eventi.0.id', $this->evento->id);
+
+        $this->getJson('/api/v1/', $this->headers($token))
+            ->assertOk()
+            ->assertJsonPath('globale', false)
+            ->assertJsonPath('associazione', $this->associazione->nome);
+
+        // eventi:read non basta per il check-in
+        $this->postJson("/api/v1/eventi/{$this->evento->id}/checkin", ['numero_socio' => '1'], $this->headers($token))
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'permission_denied');
+    }
+
+    public function test_il_throttle_limita_anche_i_tentativi_non_autenticati(): void
+    {
+        // throttle:api-v1 gira PRIMA di AuthenticateApiV1: la stessa credenziale
+        // sbagliata presentata troppe volte viene bloccata con 429.
+        for ($i = 0; $i < 120; $i++) {
+            $this->getJson('/api/v1/eventi', $this->headers('sk_forza_bruta'))->assertStatus(401);
+        }
+
+        $this->getJson('/api/v1/eventi', $this->headers('sk_forza_bruta'))
+            ->assertStatus(429)
+            ->assertJsonPath('code', 'rate_limited');
     }
 
     public function test_permesso_mancante_restituisce_403(): void
@@ -107,7 +157,7 @@ class CheckinApiTest extends TestCase
             "/api/v1/eventi/{$this->evento->id}/checkin",
             ['numero_socio' => '001'],
             $this->headers('sk_solo_lettura_000000000000000000000000000000000000000')
-        )->assertStatus(403)->assertJsonPath('code', 'forbidden');
+        )->assertStatus(403)->assertJsonPath('code', 'permission_denied');
     }
 
     public function test_ping_verifica_la_chiave(): void
@@ -435,5 +485,50 @@ class CheckinApiTest extends TestCase
         $response->assertSee('Check-in Evento');
         // @json escapa gli slash: nell'HTML l'URL base API compare come "api\/v1"
         $response->assertSee('api\/v1', false);
+    }
+
+    public function test_pagina_checkin_conserva_la_chiave_solo_in_session_storage(): void
+    {
+        // La chiave API non deve sopravvivere alla chiusura della scheda
+        // (dispositivi condivisi): sessionStorage, mai localStorage.
+        $response = $this->get('/checkin')->assertOk();
+
+        $response->assertSee("sessionStorage.getItem('checkin_api_key')", false);
+        $response->assertSee("sessionStorage.setItem('checkin_api_key', key)", false);
+        $response->assertDontSee('localStorage', false);
+    }
+
+    /**
+     * L'API è Bearer-only e non ammette origini cross-site: nessun header
+     * Access-Control-Allow-* né sul preflight né sulla risposta reale.
+     */
+    public function test_l_api_non_emette_header_cors(): void
+    {
+        $preflight = $this->call('OPTIONS', '/api/v1/eventi', [], [], [], [
+            'HTTP_ORIGIN' => 'https://evil.test',
+            'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'GET',
+        ]);
+        $preflight->assertHeaderMissing('Access-Control-Allow-Origin');
+        $preflight->assertHeaderMissing('Access-Control-Allow-Methods');
+
+        $reale = $this->getJson('/api/v1/eventi', $this->headers() + ['Origin' => 'https://evil.test']);
+        $reale->assertOk();
+        $reale->assertHeaderMissing('Access-Control-Allow-Origin');
+        $reale->assertHeaderMissing('Access-Control-Allow-Credentials');
+    }
+
+    /**
+     * upgrade-insecure-requests dipende solo da Request::isSecure(): un
+     * X-Forwarded-Proto arbitrario (nessun proxy fidato) non lo attiva.
+     */
+    public function test_la_pagina_checkin_decide_la_csp_con_is_secure_e_non_con_x_forwarded_proto(): void
+    {
+        $spoof = $this->get('/checkin', ['X-Forwarded-Proto' => 'https']);
+        $spoof->assertOk();
+        $this->assertStringNotContainsString('upgrade-insecure-requests', (string) $spoof->headers->get('Content-Security-Policy'));
+
+        $https = $this->get('https://localhost/checkin');
+        $https->assertOk();
+        $this->assertStringStartsWith('upgrade-insecure-requests; ', (string) $https->headers->get('Content-Security-Policy'));
     }
 }

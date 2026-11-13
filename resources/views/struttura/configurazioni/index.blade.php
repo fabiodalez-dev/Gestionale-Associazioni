@@ -473,9 +473,11 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label" for="paypal_whid">Webhook ID</label>
-                                <input type="text" class="form-control" id="paypal_whid" name="paypal_webhook_id"
+                                <label class="form-label" for="paypal_whid">Webhook ID <span class="text-danger" title="Obbligatorio se PayPal è abilitato">*</span></label>
+                                <input type="text" class="form-control @error('paypal_webhook_id') is-invalid @enderror" id="paypal_whid" name="paypal_webhook_id"
                                        value="{{ old('paypal_webhook_id', $paymentSettings?->paypal_webhook_id) }}">
+                                @error('paypal_webhook_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Obbligatorio se PayPal è abilitato: serve a verificare la firma dei webhook.</div>
                             </div>
                         </div>
 

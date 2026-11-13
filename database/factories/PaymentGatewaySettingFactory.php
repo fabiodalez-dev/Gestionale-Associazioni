@@ -45,6 +45,8 @@ class PaymentGatewaySettingFactory extends Factory
             'paypal_client_id' => 'pp_client_'.fake()->lexify('????????????'),
             'paypal_client_secret_encrypted' => 'pp_secret_'.fake()->lexify('????????????'),
             'paypal_mode' => 'sandbox',
+            // Richiesto da isPayPalOperational(): senza non si verifica la firma dei webhook
+            'paypal_webhook_id' => 'WH-'.strtoupper(fake()->lexify('??????????')),
         ]);
     }
 }

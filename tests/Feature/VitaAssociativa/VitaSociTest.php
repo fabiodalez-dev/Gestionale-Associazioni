@@ -77,6 +77,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Activitylog\Models\Activity;
@@ -1733,7 +1734,7 @@ class VitaSociTest extends TestCase
         $this->esci();
         $this->get($link)->assertOk()->assertSee('Cena sociale');
         $feedback = FeedbackEvento::allTenants()->where('prenotazione_id', $prenotazione->id)->sole();
-        $this->post(route('feedback-eventi.store', ['token' => $feedback->token]), [
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $feedback->token]) /* POST sull'URL firmata del link (audit run-1) */, [
             'voto' => 5,
             'commento' => 'Cena ottima e compagnia splendida.',
         ])->assertOk();
@@ -2386,18 +2387,18 @@ class VitaSociTest extends TestCase
         // 25 giugno: Gino prova a usare i servizi riservati
         Carbon::setTestNow('2026-06-25 18:00:00');
         $this->esci();
-        // Comportamento reale: le credenziali dell'area soci restano valide
-        // (EnsureSocioValido esclude solo i soci cestinati o senza password)
-        $this->post(route('area-soci.login.attempt'), ['email' => 'gino.litigi@example.test', 'password' => self::PASSWORD])
-            ->assertRedirect(route('area-soci.dashboard'));
-        $this->get(route('area-soci.dashboard'))->assertOk();
+        // Un socio cessato (Radiato) non è più socio: le credenziali dell'area
+        // soci non valgono più (LoginSocioRequest e EnsureSocioValido guardano
+        // lo stato, non solo cestino e password)
+        $this->from(route('area-soci.login'))
+            ->post(route('area-soci.login.attempt'), ['email' => 'gino.litigi@example.test', 'password' => self::PASSWORD])
+            ->assertSessionHasErrors('email');
+        $this->assertGuest('socio');
 
-        $this->post(route('area-soci.sondaggi.vota', $sondaggio), ['opzione' => 0]);
-        $voti = RispostaSondaggio::allTenants()->where('sondaggio_id', $sondaggio->id)->count();
-        $this->attesoCheck(
-            $voti === 0,
-            'Test 17: un socio espulso (Radiato) entra nell\'area soci e vota un sondaggio riservato ai soci: SondaggiVotoService::vota (app/Services/Comunicazione/SondaggiVotoService.php:41) controlla solo che il votante sia un Socio, non che sia Attivo, e EnsureSocioValido (app/Http/Middleware/AreaSoci/EnsureSocioValido.php:23) non chiude l\'area ai soci cessati.'
-        );
+        // Anche una sessione rimasta aperta da prima dell'espulsione si chiude
+        $this->actingAs($gino->fresh(), 'socio')->get(route('area-soci.dashboard'))->assertRedirect(route('area-soci.login'));
+        $this->assertGuest('socio');
+        $this->assertSame(0, RispostaSondaggio::allTenants()->where('sondaggio_id', $sondaggio->id)->count());
 
         // Al banco della festa la sua tessera viene rifiutata
         $this->comeAdmin()
@@ -2947,7 +2948,7 @@ class VitaSociTest extends TestCase
         $this->assertCount(3, $feedback);
         foreach ($feedback->take(2) as $f) {
             $this->esci();
-            $this->post(route('feedback-eventi.store', ['token' => $f->token]), ['voto' => 4, 'commento' => 'Bella serata'])->assertOk();
+            $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $f->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 4, 'commento' => 'Bella serata'])->assertOk();
         }
 
         // Giugno: turno volontario alla festa, poi check-in con la tessera
@@ -3049,7 +3050,7 @@ class VitaSociTest extends TestCase
         $giorno('2026-03-15 10:00:00', 'eventi:invia-feedback');
         $feedback = FeedbackEvento::allTenants()->sole();
         $this->esci();
-        $this->post(route('feedback-eventi.store', ['token' => $feedback->token]), ['voto' => 5])->assertOk();
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $feedback->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 5])->assertOk();
 
         // Maggio: si candida a un turno di volontariato
         Carbon::setTestNow('2026-05-10 10:00:00');

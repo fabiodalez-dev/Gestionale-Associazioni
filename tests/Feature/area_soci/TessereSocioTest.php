@@ -5,6 +5,7 @@ namespace Tests\Feature\AreaSoci;
 use App\Models\Socio;
 use App\Models\Tessera;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class TessereSocioTest extends TestCase
@@ -110,5 +111,37 @@ class TessereSocioTest extends TestCase
     {
         $this->get(route('area-soci.tessere'))
             ->assertRedirect(route('area-soci.login'));
+    }
+
+    /**
+     * Il PDF pre-generato in storage privato è cercato con il tenant nel
+     * nome (tessera_{associazione_id}_{numero}_{anno}.pdf): lo stesso
+     * numero_socio in un'altra associazione non può servire il file sbagliato.
+     * Senza file archiviato il PDF viene generato al volo.
+     */
+    public function test_il_pdf_archiviato_e_cercato_con_il_tenant_nel_nome(): void
+    {
+        Storage::fake('local');
+
+        $socio = Socio::factory()->conAccessoAreaSoci()->create(['numero_socio' => '0042']);
+        $tessera = Tessera::factory()->create(['socio_id' => $socio->id, 'anno_validita' => 2026]);
+
+        // File con il solo nome legacy (potenzialmente di un altro tenant): ignorato
+        Storage::disk('local')->put('documents/tessera_0042_2026.pdf', '%PDF-legacy-altro-tenant');
+
+        $generato = $this->actingAs($socio, 'socio')
+            ->get(route('area-soci.tessere.pdf', ['tessera' => $tessera->id]));
+        $generato->assertOk();
+        $generato->assertDownload('tessera_0042_2026.pdf');
+        $this->assertNotSame('%PDF-legacy-altro-tenant', (string) $generato->getContent());
+
+        // File con il tenant nel nome: servito così com'è
+        Storage::disk('local')->put('documents/tessera_'.$socio->associazione_id.'_0042_2026.pdf', '%PDF-archivio-tenant');
+
+        $archiviato = $this->actingAs($socio, 'socio')
+            ->get(route('area-soci.tessere.pdf', ['tessera' => $tessera->id]));
+        $archiviato->assertOk();
+        $archiviato->assertDownload('tessera_0042_2026.pdf');
+        $this->assertSame('%PDF-archivio-tenant', $archiviato->streamedContent());
     }
 }

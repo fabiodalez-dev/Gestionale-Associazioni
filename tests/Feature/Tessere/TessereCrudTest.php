@@ -3,8 +3,12 @@
 namespace Tests\Feature\Tessere;
 
 use App\Models\Associazione;
+use App\Models\EmailQueue;
+use App\Models\EmailTemplate;
+use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\Tessere\TesseraIssuer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class TessereCrudTest extends TessereTestCase
@@ -268,5 +272,46 @@ class TessereCrudTest extends TessereTestCase
         $response = $this->actingAs($admin)->get('/tessere?stato=Scaduta&ajax=1');
         $this->assertSame(1, $response->json('count'));
         $this->assertStringContainsString('SCADUTA-1', $response->json('html'));
+    }
+
+    /**
+     * I dati del socio entrano nel body_html della coda: devono arrivare
+     * HTML-escaped (un nome con markup non può iniettare HTML nell'email).
+     */
+    public function test_email_di_rinnovo_in_coda_ha_i_dati_del_socio_escapati(): void
+    {
+        $assoc = Associazione::factory()->create();
+        SmtpSetting::create([
+            'associazione_id' => $assoc->id,
+            'smtp_host' => 'smtp.test',
+            'smtp_pass_encrypted' => 'x',
+            'auto_rinnovo_tessera' => true,
+        ]);
+        EmailTemplate::create([
+            'associazione_id' => $assoc->id,
+            'codice' => 'rinnovo_tessera',
+            'nome' => 'Rinnovo',
+            'oggetto' => 'Rinnovo tessera {NUMERO_TESSERA} per {NOME}',
+            'corpo_html' => '<p>Ciao {NOME} {COGNOME} ({NOME_COMPLETO}), tessera {NUMERO_TESSERA} di {ASSOCIAZIONE_NOME} valida fino al {DATA_SCADENZA}.</p>',
+            'attivo' => true,
+        ]);
+        $socio = Socio::factory()->create([
+            'associazione_id' => $assoc->id,
+            'nome' => '<b>Mario</b>',
+            'cognome' => 'Rossi<script>alert(1)</script>',
+            'email' => 'mario@example.test',
+        ]);
+
+        $tessera = app(TesseraIssuer::class)->emetti($socio, [], accodaEmail: true);
+
+        $email = EmailQueue::allTenants()->where('socio_id', $socio->id)->sole();
+        $this->assertStringContainsString('&lt;b&gt;Mario&lt;/b&gt;', $email->body_html);
+        $this->assertStringContainsString('Rossi&lt;script&gt;', $email->body_html);
+        $this->assertStringNotContainsString('<b>Mario</b>', $email->body_html);
+        $this->assertStringNotContainsString('<script>', $email->body_html);
+        $this->assertStringContainsString($tessera->numero_tessera, $email->body_html);
+        $this->assertStringContainsString($tessera->data_scadenza->format('d/m/Y'), $email->body_html);
+        // L'oggetto è testo semplice: niente entità HTML
+        $this->assertSame('Rinnovo tessera '.$tessera->numero_tessera.' per <b>Mario</b>', $email->subject);
     }
 }

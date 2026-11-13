@@ -33,10 +33,36 @@ class SetPasswordTest extends TestCase
         // TTL 1 ora come il legacy
         $this->assertTrue($socio->password_reset_expires->lte(now()->addHour()->addMinute()));
 
+        // Nel DB c'è solo l'impronta sha256: il link porta il token in chiaro (64 hex)
+        // e la sua impronta coincide con la colonna, che da sola non apre il form
         Mail::assertSent(ImpostaPasswordSocioMail::class, function (ImpostaPasswordSocioMail $mail) use ($socio) {
+            $tokenNelLink = basename((string) parse_url($mail->url, PHP_URL_PATH));
+
             return $mail->hasTo('socio@example.com')
-                && str_contains($mail->url, $socio->fresh()->password_reset_token);
+                && preg_match('/^[a-f0-9]{64}$/', $tokenNelLink) === 1
+                && ! str_contains($mail->url, (string) $socio->password_reset_token)
+                && hash('sha256', $tokenNelLink) === $socio->password_reset_token;
         });
+    }
+
+    public function test_il_valore_salvato_nel_db_non_apre_il_form(): void
+    {
+        // Chi legge la tabella soci trova solo l'impronta: usarla come token non funziona
+        $token = bin2hex(random_bytes(32));
+        Socio::factory()->create([
+            'password_reset_token' => Socio::hashTokenReset($token),
+            'password_reset_expires' => now()->addHour(),
+        ]);
+
+        $this->get(route('area-soci.set-password', ['token' => Socio::hashTokenReset($token)]))
+            ->assertOk()
+            ->assertSee('Token non valido o scaduto')
+            ->assertDontSee('Conferma password');
+
+        $this->post(route('area-soci.set-password.store', ['token' => Socio::hashTokenReset($token)]), [
+            'password' => 'nuova-password-123',
+            'password_confirmation' => 'nuova-password-123',
+        ])->assertSessionHasErrors('token');
     }
 
     public function test_richiesta_reset_per_email_inesistente_ha_risposta_neutra(): void
@@ -51,6 +77,23 @@ class SetPasswordTest extends TestCase
         $response->assertRedirect(route('area-soci.login'));
         $response->assertSessionHas('status');
         $response->assertSessionDoesntHaveErrors();
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_richiesta_reset_per_socio_in_attesa_o_cessato_non_genera_token(): void
+    {
+        Mail::fake();
+
+        foreach ([Socio::STATO_IN_ATTESA, Socio::STATO_RADIATO] as $stato) {
+            $socio = Socio::factory()->create(['stato' => $stato]);
+
+            $this->from(route('area-soci.login'))->post(route('area-soci.password.email'), [
+                'email' => $socio->email,
+            ])->assertRedirect(route('area-soci.login'))->assertSessionHas('status'); // risposta neutra
+
+            $this->assertNull($socio->fresh()->password_reset_token);
+        }
 
         Mail::assertNothingSent();
     }
@@ -74,7 +117,7 @@ class SetPasswordTest extends TestCase
     {
         $token = bin2hex(random_bytes(32));
         Socio::factory()->create([
-            'password_reset_token' => $token,
+            'password_reset_token' => Socio::hashTokenReset($token), // nel DB solo l'impronta
             'password_reset_expires' => now()->addHour(),
         ]);
 
@@ -88,7 +131,7 @@ class SetPasswordTest extends TestCase
     {
         $token = bin2hex(random_bytes(32));
         Socio::factory()->create([
-            'password_reset_token' => $token,
+            'password_reset_token' => Socio::hashTokenReset($token), // nel DB solo l'impronta
             'password_reset_expires' => now()->subMinute(),
         ]);
 
@@ -112,7 +155,7 @@ class SetPasswordTest extends TestCase
         $token = bin2hex(random_bytes(32));
         $socio = Socio::factory()->create([
             'password_hash' => null,
-            'password_reset_token' => $token,
+            'password_reset_token' => Socio::hashTokenReset($token), // nel DB solo l'impronta
             'password_reset_expires' => now()->addHour(),
         ]);
 
@@ -136,7 +179,7 @@ class SetPasswordTest extends TestCase
         $token = bin2hex(random_bytes(32));
         $socio = Socio::factory()->create([
             'password_hash' => null,
-            'password_reset_token' => $token,
+            'password_reset_token' => Socio::hashTokenReset($token), // nel DB solo l'impronta
             'password_reset_expires' => now()->addHour(),
         ]);
 
@@ -153,7 +196,7 @@ class SetPasswordTest extends TestCase
     {
         $token = bin2hex(random_bytes(32));
         Socio::factory()->create([
-            'password_reset_token' => $token,
+            'password_reset_token' => Socio::hashTokenReset($token), // nel DB solo l'impronta
             'password_reset_expires' => now()->addHour(),
         ]);
 
@@ -170,7 +213,7 @@ class SetPasswordTest extends TestCase
         $token = bin2hex(random_bytes(32));
         $socio = Socio::factory()->create([
             'password_hash' => null,
-            'password_reset_token' => $token,
+            'password_reset_token' => Socio::hashTokenReset($token), // nel DB solo l'impronta
             'password_reset_expires' => now()->subMinute(),
         ]);
 

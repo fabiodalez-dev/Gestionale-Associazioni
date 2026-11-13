@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Comunicazione;
 
+use App\Http\Requests\Comunicazione\VotoSondaggioRequest;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\RispostaSondaggio;
@@ -324,5 +325,27 @@ class SondaggiTest extends ComunicazioneTestCase
             ->assertSee('Sondaggio riservato ai soci attivi?')
             ->assertSee('Questo sondaggio è riservato ai soci attivi.')
             ->assertDontSee('name="opzione"', false);
+    }
+
+    // ── Autorizzazione della richiesta di voto ───────────────────────
+
+    public function test_la_richiesta_di_voto_autorizza_solo_soci_e_account_autenticati(): void
+    {
+        $socio = Socio::factory()->conAccessoAreaSoci()->create(['associazione_id' => $this->associazione->id]);
+        $account = Account::factory()->create(['associazione_id' => $this->associazione->id]);
+
+        $richiesta = fn (array $utenti) => (new VotoSondaggioRequest)
+            ->setUserResolver(fn (?string $guard = null) => $utenti[$guard] ?? null);
+
+        $this->assertFalse($richiesta([])->authorize(), 'Nessun utente autenticato');
+        $this->assertFalse($richiesta(['web' => $this->admin])->authorize(), 'Un utente admin non vota dai form dei soci');
+        $this->assertTrue($richiesta(['socio' => $socio])->authorize());
+        $this->assertTrue($richiesta(['account' => $account])->authorize());
+
+        // Dal vivo: senza sessione il voto non viene registrato
+        $sondaggio = Sondaggio::factory()->create(['associazione_id' => $this->associazione->id]);
+        $this->post(route('area-soci.sondaggi.vota', $sondaggio), ['opzione' => 0])->assertRedirect();
+        $this->post($this->urlTenant('account/sondaggi/'.$sondaggio->id.'/vota'), ['opzione' => 0])->assertRedirect();
+        $this->assertSame(0, RispostaSondaggio::allTenants()->count());
     }
 }

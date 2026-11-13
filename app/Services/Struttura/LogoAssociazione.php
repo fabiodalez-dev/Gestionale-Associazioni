@@ -79,20 +79,53 @@ class LogoAssociazione
     }
 
     /**
-     * Tag <img> per dompdf: file locale in data URI, URL remoto così com'è.
+     * Tag <img> per dompdf: sempre e solo un file locale in data URI (dompdf
+     * gira con isRemoteEnabled=false, quindi nessun fetch remoto). Un
+     * logo_url legacy http(s) viene usato solo se punta a un file di questa
+     * installazione (APP_URL o URL del disco public); altrimenti è ignorato.
      */
     public function imgPdf(Associazione $associazione, string $stile = 'height:48px; width:auto;'): string
     {
-        $percorso = $this->percorso($associazione);
-        if ($percorso !== null) {
-            $mime = mime_content_type($percorso) ?: 'image/png';
-
-            return '<img src="data:'.e($mime).';base64,'.base64_encode((string) file_get_contents($percorso)).'" style="'.e($stile).'">';
+        $percorso = $this->percorso($associazione) ?? $this->fileDaUrlLocale((string) $associazione->logo_url);
+        if ($percorso === null) {
+            return '';
         }
 
-        $url = (string) $associazione->logo_url;
+        $mime = mime_content_type($percorso) ?: 'image/png';
 
-        return preg_match('~^https?://~i', $url) ? '<img src="'.e($url).'" style="'.e($stile).'">' : '';
+        return '<img src="data:'.e($mime).';base64,'.base64_encode((string) file_get_contents($percorso)).'" style="'.e($stile).'">';
+    }
+
+    /**
+     * File locale corrispondente a un URL http(s) di questa installazione
+     * (prefisso APP_URL o URL del disco public), null se l'URL è esterno o
+     * il file non esiste.
+     */
+    public function fileDaUrlLocale(string $url): ?string
+    {
+        if (! preg_match('~^https?://~i', $url)) {
+            return null;
+        }
+
+        $radici = [
+            Storage::disk('public')->url(''),
+            (string) config('app.url'),
+        ];
+
+        foreach ($radici as $radice) {
+            $radice = rtrim($radice, '/').'/';
+            if ($radice === '/' || ! str_starts_with(strtolower($url), strtolower($radice))) {
+                continue;
+            }
+
+            $relativo = (string) parse_url(substr($url, strlen($radice)), PHP_URL_PATH);
+            $file = $this->fileLegacy(rawurldecode($relativo));
+            if ($file !== null) {
+                return $file;
+            }
+        }
+
+        return null;
     }
 
     private function haConversione(Media $media, string $conversione): bool

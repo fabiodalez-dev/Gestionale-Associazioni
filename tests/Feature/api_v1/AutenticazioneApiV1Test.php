@@ -53,7 +53,7 @@ class AutenticazioneApiV1Test extends TestCase
 
     public function test_chiave_disattivata_restituisce_403_key_disabled(): void
     {
-        ApiKey::query()->where('api_key', $this->chiave)->update(['attiva' => false]);
+        ApiKey::query()->perChiave($this->chiave)->update(['attiva' => false]);
 
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])
             ->assertStatus(403)
@@ -62,7 +62,7 @@ class AutenticazioneApiV1Test extends TestCase
 
     public function test_chiave_scaduta_restituisce_403_key_expired(): void
     {
-        ApiKey::query()->where('api_key', $this->chiave)->update(['scadenza' => now()->subDay()->toDateString()]);
+        ApiKey::query()->perChiave($this->chiave)->update(['scadenza' => now()->subDay()->toDateString()]);
 
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])
             ->assertStatus(403)
@@ -71,7 +71,7 @@ class AutenticazioneApiV1Test extends TestCase
 
     public function test_chiave_valida_il_giorno_stesso_della_scadenza(): void
     {
-        ApiKey::query()->where('api_key', $this->chiave)->update(['scadenza' => now()->toDateString()]);
+        ApiKey::query()->perChiave($this->chiave)->update(['scadenza' => now()->toDateString()]);
 
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])
             ->assertOk()
@@ -106,7 +106,65 @@ class AutenticazioneApiV1Test extends TestCase
     {
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])->assertOk();
 
-        $this->assertNotNull(ApiKey::query()->where('api_key', $this->chiave)->value('ultimo_utilizzo'));
+        $this->assertNotNull(ApiKey::query()->perChiave($this->chiave)->value('ultimo_utilizzo'));
+    }
+
+    // ---- Chiavi hashate (hardening audit run-1) ----
+
+    public function test_in_tabella_resta_solo_l_hash_della_chiave_con_il_prefisso(): void
+    {
+        $this->assertDatabaseHas('api_keys', [
+            'api_key_hash' => hash('sha256', $this->chiave),
+            'api_key_prefix' => substr($this->chiave, 0, 8),
+        ]);
+        $this->assertDatabaseMissing('api_keys', ['api_key_hash' => $this->chiave]);
+
+        // Un modello letto dal database non espone la chiave in chiaro
+        $letta = ApiKey::query()->perChiave($this->chiave)->firstOrFail();
+        $this->assertNull($letta->api_key);
+        $this->assertArrayNotHasKey('api_key_hash', $letta->toArray());
+    }
+
+    public function test_l_hash_della_chiave_non_autentica(): void
+    {
+        // Chi legge il database non ottiene una credenziale spendibile
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.hash('sha256', $this->chiave)])
+            ->assertStatus(401)
+            ->assertJsonPath('code', 'auth_invalid');
+    }
+
+    public function test_chiave_legacy_non_esadecimale_viene_cercata_per_hash(): void
+    {
+        // Il formato della chiave non è più un prerequisito: conta solo l'hash.
+        // Solo il separatore "|" dei token Sanctum devia sull'altro meccanismo.
+        ApiKey::create([
+            'associazione_id' => $this->associazione->id,
+            'api_key' => 'sk_formato_libero_0001',
+            'nome' => 'Chiave formato libero',
+            'permessi' => ['soci:read'],
+            'attiva' => true,
+        ]);
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer sk_formato_libero_0001'])->assertOk();
+        $this->getJson('/api/v1/soci', ['X-API-Key' => 'sk_formato_libero_0001'])->assertOk();
+    }
+
+    // ---- Throttle prima dell'autenticazione ----
+
+    public function test_i_tentativi_con_credenziale_errata_vengono_limitati(): void
+    {
+        $header = ['Authorization' => 'Bearer '.str_repeat('ff', 32)];
+
+        for ($i = 0; $i < 120; $i++) {
+            $this->getJson('/api/v1/soci', $header)->assertStatus(401);
+        }
+
+        $this->getJson('/api/v1/soci', $header)
+            ->assertStatus(429)
+            ->assertJsonPath('code', 'rate_limited');
+
+        // Un'altra credenziale (valida) dallo stesso IP non è bloccata dal limite per credenziale
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])->assertOk();
     }
 
     // ---- Token Sanctum (miglioramento 23) ----
@@ -168,6 +226,24 @@ class AutenticazioneApiV1Test extends TestCase
     {
         $utente = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
         $token = $utente->createToken('test', ['soci:read'], now()->subDay())->plainTextToken;
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token])
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'key_expired');
+    }
+
+    public function test_token_sanctum_senza_scadenza_scade_con_il_limite_di_sistema(): void
+    {
+        // config sanctum.expiration (365 giorni): anche un token creato senza
+        // expires_at non resta valido per sempre.
+        $this->assertSame(525600, config('sanctum.expiration'));
+
+        $utente = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
+        $token = $utente->createToken('eterno', ['soci:read'], null)->plainTextToken;
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token])->assertOk();
+
+        $this->travel(366)->days();
 
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token])
             ->assertStatus(403)

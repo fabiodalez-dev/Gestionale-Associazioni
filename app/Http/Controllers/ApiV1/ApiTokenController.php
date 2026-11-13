@@ -24,10 +24,16 @@ class ApiTokenController extends Controller
 
         $scadenza = $request->validated('scadenza');
 
+        // Nessun token senza scadenza: se non indicata vale la durata massima
+        // (la FormRequest rifiuta già date oltre il limite).
+        $scadenzaEffettiva = $scadenza
+            ? Carbon::parse($scadenza)->endOfDay()
+            : now()->addDays(StoreApiTokenRequest::SCADENZA_MASSIMA_GIORNI)->endOfDay();
+
         $token = $utente->createToken(
             $request->validated('nome'),
             array_values(array_unique($request->validated('abilities'))),
-            $scadenza ? Carbon::parse($scadenza)->endOfDay() : null
+            $scadenzaEffettiva
         );
 
         return redirect()

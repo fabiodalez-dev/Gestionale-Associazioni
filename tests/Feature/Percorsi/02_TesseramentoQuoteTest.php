@@ -21,6 +21,7 @@ use App\Notifications\Quote\RicevutaQuotaNotification;
 use App\Notifications\Rinnovi\PromemoriaRinnovoNotification;
 use App\Services\Economia\SollecitoQuoteService;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
+use App\Services\Tessere\TesseraQrService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -919,17 +920,19 @@ class Percorso02_TesseramentoQuoteTest extends TestCase
             ->assertSee('20270022')
             ->assertDontSee('20260021');
 
-        // Verifica pubblica del QR di Enzo: tessera scaduta
-        $this->get(route('tessere.verifica', $tesseraVecchia->id))
+        // Verifica pubblica del QR di Enzo: tessera scaduta (la firma dell'URL
+        // nel QR è obbligatoria: il solo UUID non basta più, audit run-1)
+        $qr = app(TesseraQrService::class);
+        $this->get($qr->verificationUrl($tesseraVecchia))
             ->assertOk()
             ->assertSee('Tessera Scaduta / Non Attiva')
             ->assertSee('Scaduto');
 
-        $this->get(route('tessere.verifica.json', $tesseraVecchia->id))
+        $this->get(route('tessere.verifica.json', ['tessera' => $tesseraVecchia->id, 'signature' => $qr->signature($tesseraVecchia)]))
             ->assertOk()
             ->assertJson(['stato' => 'scaduta', 'tessera' => ['numero_tessera' => '20260021']]);
 
-        $this->get(route('tessere.verifica.json', $tesseraNuova->id))
+        $this->get(route('tessere.verifica.json', ['tessera' => $tesseraNuova->id, 'signature' => $qr->signature($tesseraNuova)]))
             ->assertOk()
             ->assertJson(['stato' => 'valida']);
 
@@ -1055,8 +1058,8 @@ class Percorso02_TesseramentoQuoteTest extends TestCase
 
         $this->assertSame(1, Cessazione::query()->where('socio_id', $dimissionario->id)->count());
 
-        // La verifica pubblica della sua tessera la dà come non attiva
-        $this->get(route('tessere.verifica.json', $tesseraFranco->id))
+        // La verifica pubblica della sua tessera (URL firmato del QR) la dà come non attiva
+        $this->get(route('tessere.verifica.json', ['tessera' => $tesseraFranco->id, 'signature' => app(TesseraQrService::class)->signature($tesseraFranco)]))
             ->assertOk()
             ->assertJson(['stato' => 'scaduta']);
 

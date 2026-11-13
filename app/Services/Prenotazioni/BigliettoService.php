@@ -94,7 +94,7 @@ class BigliettoService
             'logoImg' => $this->logoImg($associazione),
         ])
             ->setPaper('a4', 'portrait')
-            ->setOption('isRemoteEnabled', true)
+            ->setOption('isRemoteEnabled', false)
             ->setOption('defaultFont', 'DejaVu Sans');
     }
 

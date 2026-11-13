@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Sistema;
 
+use App\Models\Socio;
 use App\Models\Utente;
 use App\Support\LimiteAccessi;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
@@ -30,6 +33,36 @@ class AzioniSicurezzaTest extends TestCase
             ->assertRedirect()->assertSessionHas('success');
 
         $this->assertNull($altro->fresh()->remember_token);
+    }
+
+    public function test_la_revoca_annulla_anche_i_link_di_invito_e_di_recupero_password(): void
+    {
+        $socio = Socio::factory()->create([
+            'password_reset_token' => Socio::hashTokenReset(str_repeat('a', 64)),
+            'password_reset_expires' => now()->addHour(),
+        ]);
+        $invitato = Utente::factory()->create([
+            'invito_token' => hash('sha256', 'nonce-invito'),
+            'invito_scade_at' => now()->addDay(),
+        ]);
+        $conRecupero = Utente::factory()->create(['email' => 'recupero@test.it']);
+        Password::broker('utenti')->createToken($conRecupero);
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'recupero@test.it']);
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('impostazioni-sistema.revoca-accessi'))
+            ->assertRedirect()->assertSessionHas('success');
+
+        $socio->refresh();
+        $this->assertNull($socio->password_reset_token);
+        $this->assertNull($socio->password_reset_expires);
+
+        $invitato->refresh();
+        $this->assertNull($invitato->invito_token);
+        $this->assertNull($invitato->invito_scade_at);
+
+        $this->assertSame(0, DB::table('password_reset_tokens')->count());
+        $this->assertStringContainsString('3 link di invito o recupero password annullati', (string) session('success'));
     }
 
     public function test_azzera_i_tentativi_di_accesso(): void

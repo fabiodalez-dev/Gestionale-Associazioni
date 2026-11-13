@@ -68,7 +68,17 @@ class GoogleCalendarSettings extends ImpostazioniAssociazione
     }
 
     /**
-     * Valida e cifra il JSON di un service account.
+     * Chiavi del JSON del service account che servono al client Google
+     * (autenticazione JWT): tutto il resto (token_uri, universe_domain,
+     * auth_provider_x509_cert_url, ...) non viene conservato.
+     *
+     * @var list<string>
+     */
+    public const CHIAVI_CREDENZIALI = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id'];
+
+    /**
+     * Valida e cifra il JSON di un service account, conservando solo le
+     * chiavi necessarie (CHIAVI_CREDENZIALI).
      *
      * @return array{0: string, 1: string} [credenziali cifrate, email del service account]
      *
@@ -83,7 +93,14 @@ class GoogleCalendarSettings extends ImpostazioniAssociazione
             throw new \InvalidArgumentException('Il file non è la chiave JSON di un service account Google.');
         }
 
-        return [Crypt::encryptString(json_encode($dati, JSON_UNESCAPED_SLASHES) ?: ''), (string) $dati['client_email']];
+        $essenziali = [];
+        foreach (self::CHIAVI_CREDENZIALI as $chiave) {
+            if (array_key_exists($chiave, $dati) && is_scalar($dati[$chiave])) {
+                $essenziali[$chiave] = (string) $dati[$chiave];
+            }
+        }
+
+        return [Crypt::encryptString(json_encode($essenziali, JSON_UNESCAPED_SLASHES) ?: ''), (string) $dati['client_email']];
     }
 
     protected static function normalizza(array $valori): array

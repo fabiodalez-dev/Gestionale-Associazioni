@@ -5,7 +5,7 @@ use App\Http\Controllers\Eventi\CheckinPageController;
 use App\Http\Controllers\Eventi\EventoController;
 use App\Http\Controllers\Eventi\PartecipanteController;
 use App\Http\Controllers\Eventi\PrenotazioneEventoController;
-use App\Http\Middleware\AuthenticateApiKey;
+use App\Http\Middleware\ApiV1\AuthenticateApiV1;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
@@ -19,9 +19,10 @@ use Spatie\Csp\AddCspHeaders;
 | 1. Area admin (auth + tenant): CRUD eventi, gestione partecipanti, export.
 | 2. Pagina pubblica /checkin: SPA mobile per il check-in QR (nessuna sessione,
 |    parla solo con l'API; header di sicurezza propri → esclusi quelli globali).
-| 3. API REST /api/v1: autenticazione con API key Bearer (chiavi scoped o
-|    globali), permessi granulari eventi:read / eventi:write. CSRF escluso
-|    (client senza sessione).
+| 3. API REST /api/v1: stessa autenticazione del modulo api-v1
+|    (AuthenticateApiV1: chiavi api_keys hashate o token Sanctum, scoped o
+|    globali), permessi granulari eventi:read / eventi:write, throttle
+|    api-v1 PRIMA dell'autenticazione. CSRF escluso (client senza sessione).
 |
 */
 
@@ -69,23 +70,23 @@ Route::get('/checkin', CheckinPageController::class)
     ->withoutMiddleware([SecurityHeaders::class, AddCspHeaders::class])
     ->name('eventi.checkin');
 
-// ---- API REST v1 (Bearer API key, niente CSRF/sessione) ----
+// ---- API REST v1 (Bearer API key o token Sanctum, niente CSRF/sessione) ----
 Route::prefix('api/v1')
     ->withoutMiddleware([ValidateCsrfToken::class, AddCspHeaders::class])
     ->group(function () {
         Route::get('/', [EventoApiController::class, 'ping'])
-            ->middleware(AuthenticateApiKey::class)
+            ->middleware(['throttle:api-v1', AuthenticateApiV1::class])
             ->name('api.v1.ping');
 
         Route::get('/eventi', [EventoApiController::class, 'index'])
-            ->middleware(AuthenticateApiKey::class.':eventi:read')
+            ->middleware(['throttle:api-v1', AuthenticateApiV1::class.':eventi:read'])
             ->name('api.v1.eventi.index');
 
         Route::get('/eventi/{id}', [EventoApiController::class, 'show'])
-            ->middleware(AuthenticateApiKey::class.':eventi:read')
+            ->middleware(['throttle:api-v1', AuthenticateApiV1::class.':eventi:read'])
             ->name('api.v1.eventi.show');
 
         Route::post('/eventi/{id}/checkin', [EventoApiController::class, 'checkin'])
-            ->middleware(AuthenticateApiKey::class.':eventi:write')
+            ->middleware(['throttle:api-v1', AuthenticateApiV1::class.':eventi:write'])
             ->name('api.v1.eventi.checkin');
     });

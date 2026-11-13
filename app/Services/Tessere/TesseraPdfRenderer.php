@@ -50,7 +50,7 @@ class TesseraPdfRenderer
             'validoFinoAl' => $tessera->data_scadenza->format('d/m/Y'),
         ])
             ->setPaper('a4', 'portrait')
-            ->setOption('isRemoteEnabled', true)
+            ->setOption('isRemoteEnabled', false)
             ->setOption('defaultFont', 'DejaVu Sans');
 
         return $pdf->stream('tessera_'.($socio->numero_socio ?: 'socio').'.pdf');

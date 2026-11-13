@@ -105,13 +105,17 @@ class PreiscrizioneController extends Controller
         }
 
         if ($esistente) {
-            $campo = strcasecmp($esistente->email, $dati['email']) === 0 ? 'email' : 'codice fiscale';
+            // Risposta NEUTRA, identica a una richiesta accettata: il modulo è
+            // pubblico e un messaggio diverso (per di più con il nome del
+            // socio) rivelerebbe a chiunque chi è iscritto all'associazione.
+            // Il duplicato resta tracciato nel log per la segreteria.
+            Log::info('Pre-iscrizione duplicata ignorata', [
+                'associazione_id' => $assoc->id,
+                'socio_id' => $esistente->id,
+                'campo' => strcasecmp($esistente->email, $dati['email']) === 0 ? 'email' : 'codice_fiscale',
+            ]);
 
-            return back()->withInput()->with(
-                'error',
-                "Esiste già un socio registrato con questo {$campo} ({$esistente->nome_completo}). ".
-                'Se hai bisogno di assistenza, contatta l\'associazione.'
-            );
+            return $this->rispostaInviata($assoc);
         }
 
         try {
@@ -162,6 +166,15 @@ class PreiscrizioneController extends Controller
             Log::warning('Notifica nuova preiscrizione non inviata: '.$e->getMessage());
         }
 
+        return $this->rispostaInviata($assoc);
+    }
+
+    /**
+     * Esito mostrato al richiedente anonimo: lo stesso per una richiesta
+     * registrata e per un duplicato (niente oracolo sull'elenco soci).
+     */
+    private function rispostaInviata(Associazione $assoc): RedirectResponse
+    {
         return redirect()
             ->route('preiscrizione.show', ['associazione' => $assoc->id])
             ->with('success', 'La tua richiesta di pre-iscrizione è stata inviata con successo! Riceverai una comunicazione quando sarà approvata.')

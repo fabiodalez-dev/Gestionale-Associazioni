@@ -27,9 +27,12 @@ use Spatie\Activitylog\Models\Activity;
  * modificati, paginazione. Permesso struttura.view.
  *
  * Isolamento tenant: la tabella activity_log non ha associazione_id, quindi
- * il perimetro è (utenti del tenant come causer) ∪ (subject appartenente al
- * tenant, per modello whitelisted) — copre sia le azioni degli admin del
- * tenant sia quelle del super_admin sui dati del tenant selezionato.
+ * il perimetro è "subject appartenente al tenant" per ciascun modello
+ * whitelisted (riga ancora presente nella tabella del modello, oppure
+ * associazione_id loggato in properties per le righe eliminate). Copre sia
+ * le azioni degli admin del tenant sia quelle del super_admin sui dati del
+ * tenant selezionato; il solo causer non basta mai (un utente spostato di
+ * tenant porterebbe con sé il log di un'altra associazione).
  */
 class RegistroModificheController extends Controller
 {
@@ -84,7 +87,7 @@ class RegistroModificheController extends Controller
 
         $attivita = Activity::query()
             ->with('causer')
-            ->when($tenantId !== null, fn ($q) => $this->scopeTenant($q, $tenantId, $utentiTenant->pluck('id')->all()))
+            ->when($tenantId !== null, fn ($q) => $this->scopeTenant($q, $tenantId))
             ->when($modello !== '', fn ($q) => $q->where('subject_type', self::MODELLI[$modello]))
             ->when($azione !== '', fn ($q) => $q->where('event', $azione))
             ->when($utenteId !== '', fn ($q) => $q->where('causer_type', Utente::class)->where('causer_id', $utenteId))
@@ -111,29 +114,33 @@ class RegistroModificheController extends Controller
     }
 
     /**
-     * Perimetro tenant del log: causer admin del tenant OPPURE subject del
-     * tenant (sub-query per ogni modello whitelisted).
+     * Perimetro tenant del log: subject del tenant per ogni modello
+     * whitelisted. La riga è del tenant se esiste (anche soft-deleted) nella
+     * tabella del modello con associazione_id = tenant, oppure — per le righe
+     * eliminate fisicamente — se l'associazione_id loggato nei cambiamenti
+     * dell'attività (attribute_changes.attributes su created,
+     * attribute_changes.old su deleted) è quello del tenant. Nessun ramo
+     * "solo causer": chi ha fatto la modifica non dice a quale tenant
+     * appartiene il dato.
      *
      * @param  Builder<Activity>  $query
-     * @param  list<string>  $utentiIds
      * @return Builder<Activity>
      */
-    private function scopeTenant(Builder $query, string $tenantId, array $utentiIds): Builder
+    private function scopeTenant(Builder $query, string $tenantId): Builder
     {
-        return $query->where(function (Builder $q) use ($tenantId, $utentiIds) {
-            $q->where(fn (Builder $w) => $w
-                ->where('causer_type', Utente::class)
-                ->whereIn('causer_id', $utentiIds));
-
+        return $query->where(function (Builder $q) use ($tenantId) {
             foreach (self::MODELLI as $classe) {
                 $tabella = (new $classe)->getTable();
 
-                // Query base (DB::table) per includere anche i soft-deleted
                 $q->orWhere(fn (Builder $w) => $w
                     ->where('subject_type', $classe)
-                    ->whereIn('subject_id', DB::table($tabella)
-                        ->where('associazione_id', $tenantId)
-                        ->select('id')));
+                    ->where(fn (Builder $s) => $s
+                        // Query base (DB::table) per includere anche i soft-deleted
+                        ->whereIn('subject_id', DB::table($tabella)
+                            ->where('associazione_id', $tenantId)
+                            ->select('id'))
+                        ->orWhere('attribute_changes->attributes->associazione_id', $tenantId)
+                        ->orWhere('attribute_changes->old->associazione_id', $tenantId)));
             }
         });
     }

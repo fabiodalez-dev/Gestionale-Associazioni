@@ -45,6 +45,20 @@ class TenancyTest extends TestCase
         $this->assertSame(1, Socio::count());
     }
 
+    public function test_admin_senza_associazione_non_vede_nulla_mai_la_vista_globale(): void
+    {
+        $assocA = Associazione::factory()->create();
+        Socio::factory()->create(['associazione_id' => $assocA->id]);
+
+        // Admin scollegato (es. dopo "rimuovi admin"): associazione_id NULL ma ruolo intatto
+        $orfano = Utente::factory()->adminAssociazione()->create(['associazione_id' => null]);
+        $this->actingAs($orfano);
+        session(['associazione_id' => $assocA->id]); // una sessione stantia non deve riaprire il tenant
+
+        $this->assertSame(0, Socio::count());
+        $this->assertSame(1, Socio::allTenants()->count());
+    }
+
     public function test_associazione_id_viene_autocompilata_alla_creazione(): void
     {
         $assoc = Associazione::factory()->create();

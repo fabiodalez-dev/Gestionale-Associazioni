@@ -35,8 +35,17 @@ interface PayPalGatewayInterface
     public function captureOrder(PaymentGatewaySetting $config, string $orderId): ?array;
 
     /**
+     * Legge i dettagli dell'ordine via API (fonte affidabile per il
+     * custom_id quando il capture non lo riporta).
+     *
+     * @return array<string, mixed>|null risposta dell'API (null su errore)
+     */
+    public function showOrderDetails(PaymentGatewaySetting $config, string $orderId): ?array;
+
+    /**
      * Verifica la firma del webhook via API ufficiale
      * /v1/notifications/verify-webhook-signature (fix sicurezza rispetto al legacy).
+     * Fail closed: senza paypal_webhook_id configurato restituisce false.
      *
      * @param  array<string, string|null>  $headers  header PAYPAL-* della richiesta
      * @param  array<string, mixed>  $event  payload JSON decodificato

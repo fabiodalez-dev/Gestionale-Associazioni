@@ -64,7 +64,7 @@ class StampaMassivaTessereService
             'dataOggi' => now()->format('d/m/Y'),
         ])
             ->setPaper('a4', 'portrait')
-            ->setOption('isRemoteEnabled', true)
+            ->setOption('isRemoteEnabled', false)
             ->setOption('defaultFont', 'DejaVu Sans');
 
         return $pdf->stream('tessere_'.now()->format('Ymd_His').'.pdf');

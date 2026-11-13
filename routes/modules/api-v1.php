@@ -18,10 +18,12 @@ use Spatie\Csp\AddCspHeaders;
 |--------------------------------------------------------------------------
 |
 | 1. REST API /api/v1 (soci, tessere, quote, associazioni): autenticazione
-|    doppia (chiavi legacy api_keys via Bearer 64-hex o X-API-Key, e token
-|    Sanctum con abilities), rate limiting per credenziale, scoping
-|    multi-tenant (chiavi scopate / globali super_admin), risposte JSON con
-|    parità legacy. Gli endpoint eventi sono registrati dal modulo eventi.
+|    doppia (chiavi legacy api_keys via Bearer o X-API-Key, salvate come hash,
+|    e token Sanctum con abilities), rate limiting per IP e per credenziale
+|    applicato PRIMA dell'autenticazione (anche i tentativi falliti contano),
+|    scoping multi-tenant (chiavi scopate / globali super_admin), risposte
+|    JSON con parità legacy. Gli endpoint eventi sono registrati dal modulo
+|    eventi con gli stessi middleware.
 | 2. /api/v1/tessere/verify: PUBBLICO (il QR sulla tessera contiene l'UUID),
 |    throttle severo per IP.
 | 3. Area admin: pagina "Chiavi API" (gestione api_keys + token Sanctum) e
@@ -46,9 +48,12 @@ Route::prefix('api/v1')
             ->name('api.v1.tessere.verify');
 
         // ---- Endpoint autenticati (chiave api_keys o token Sanctum) ----
+        // Ordine dei middleware: throttle PRIMA di AuthenticateApiV1, così
+        // anche le richieste respinte (401/403) consumano la quota per IP e
+        // per credenziale presentata.
 
         // Tessere (sola lettura)
-        Route::middleware([AuthenticateApiV1::class.':tessere:read', 'throttle:api-v1'])->group(function () use ($uuidPattern) {
+        Route::middleware(['throttle:api-v1', AuthenticateApiV1::class.':tessere:read'])->group(function () use ($uuidPattern) {
             Route::get('/tessere/search', [TesseraApiController::class, 'search'])->name('api.v1.tessere.search');
             Route::get('/tessere/{id}', [TesseraApiController::class, 'show'])
                 ->where('id', $uuidPattern)
@@ -57,7 +62,7 @@ Route::prefix('api/v1')
         });
 
         // Soci
-        Route::middleware([AuthenticateApiV1::class.':soci:read', 'throttle:api-v1'])->group(function () use ($uuidPattern) {
+        Route::middleware(['throttle:api-v1', AuthenticateApiV1::class.':soci:read'])->group(function () use ($uuidPattern) {
             Route::get('/soci/search', [SocioApiController::class, 'search'])->name('api.v1.soci.search');
             Route::get('/soci/{id}', [SocioApiController::class, 'show'])
                 ->where('id', $uuidPattern)
@@ -67,11 +72,11 @@ Route::prefix('api/v1')
 
         Route::put('/soci/{id}', [SocioApiController::class, 'update'])
             ->where('id', $uuidPattern)
-            ->middleware([AuthenticateApiV1::class.':soci:write', 'throttle:api-v1'])
+            ->middleware(['throttle:api-v1', AuthenticateApiV1::class.':soci:write'])
             ->name('api.v1.soci.update');
 
         // Quote (sola lettura)
-        Route::middleware([AuthenticateApiV1::class.':quote:read', 'throttle:api-v1'])->group(function () use ($uuidPattern) {
+        Route::middleware(['throttle:api-v1', AuthenticateApiV1::class.':quote:read'])->group(function () use ($uuidPattern) {
             Route::get('/quote/{socio_id}', [QuotaApiController::class, 'perSocio'])
                 ->where('socio_id', $uuidPattern)
                 ->name('api.v1.quote.perSocio');
@@ -80,7 +85,7 @@ Route::prefix('api/v1')
 
         // Associazioni: solo client globali (il controllo è nel controller → 403 global_only)
         Route::get('/associazioni', [AssociazioneApiController::class, 'index'])
-            ->middleware([AuthenticateApiV1::class, 'throttle:api-v1'])
+            ->middleware(['throttle:api-v1', AuthenticateApiV1::class])
             ->name('api.v1.associazioni.index');
 
         // Catch-all 405 per i soli prefissi di QUESTO modulo (gli eventi e la

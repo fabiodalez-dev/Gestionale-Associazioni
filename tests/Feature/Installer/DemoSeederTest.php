@@ -10,6 +10,7 @@ use App\Models\Socio;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -79,5 +80,22 @@ class DemoSeederTest extends TestCase
         $this->assertSame(Socio::STATO_IN_ATTESA, $socio->stato);
         $this->assertSame($account->email, $socio->email);
         $this->assertTrue($socio->valoriCampiPersonalizzati()->exists());
+    }
+
+    /**
+     * Gli account demo non devono avere credenziali note: password casuale,
+     * non verificati e disattivati (l'installer non mostra alcuna password).
+     */
+    public function test_gli_account_demo_non_hanno_credenziali_note(): void
+    {
+        $accounts = Account::allTenants()->whereIn('email', ['demo@account-demo.test', 'giulia@account-demo.test'])->get();
+
+        $this->assertCount(2, $accounts);
+        foreach ($accounts as $account) {
+            $this->assertFalse(Hash::check('demo1234', $account->password), $account->email);
+            $this->assertFalse((bool) $account->attivo, $account->email);
+            $this->assertNull($account->email_verified_at, $account->email);
+        }
+        $this->assertNotSame($accounts[0]->password, $accounts[1]->password);
     }
 }

@@ -30,6 +30,22 @@ class ImpostazioniSmtpTest extends EmailTestCase
             ->assertForbidden();
     }
 
+    public function test_host_smtp_di_rete_locale_o_privata_viene_rifiutato(): void
+    {
+        foreach (['127.0.0.1', '10.0.0.5', '192.168.1.20', '172.16.3.4', '169.254.169.254', '::1', '[::1]', 'fd00::1', 'localhost', 'mail.localhost', 'smtp.internal', 'posta.lan'] as $host) {
+            $this->actingAs($this->admin)->from(route('email-impostazioni.index'))->post(route('email-impostazioni.store'), [
+                'smtp_host' => $host,
+                'smtp_port' => 25,
+                'smtp_pass' => 'x',
+                'smtp_encryption' => 'tls',
+                'from_email' => 'noreply@example.com',
+                'max_per_hour' => 100,
+            ])->assertRedirect(route('email-impostazioni.index'))->assertSessionHasErrors('smtp_host');
+        }
+
+        $this->assertSame(0, SmtpSetting::allTenants()->count());
+    }
+
     public function test_primo_salvataggio_crea_le_impostazioni_e_seedda_i_template(): void
     {
         $response = $this->actingAs($this->admin)->post(route('email-impostazioni.store'), [

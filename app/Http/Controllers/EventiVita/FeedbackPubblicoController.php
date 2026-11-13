@@ -6,20 +6,22 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\EventiVita\FeedbackCompilaRequest;
 use App\Models\FeedbackEvento;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
  * Form pubblico di feedback post-evento (f.11).
  *
- * Il GET arriva dal link FIRMATO dell'email (middleware 'signed': link
- * non falsificabile né alterabile); il token di 64 hex unique è il
- * capability token che identifica il feedback. Il POST è protetto da
- * CSRF + throttle e dal token stesso (404 uniforme se non esiste).
- * Un solo feedback per prenotazione: ricompilazioni bloccate.
+ * GET e POST arrivano dal link FIRMATO con scadenza dell'email
+ * (middleware 'signed': link non falsificabile né alterabile); il token
+ * di 64 hex unique è il capability token che identifica il feedback. Il
+ * POST è protetto anche da CSRF + throttle (404 uniforme se il token non
+ * esiste). Un solo feedback per prenotazione: ricompilazioni bloccate
+ * con un update condizionale.
  */
 class FeedbackPubblicoController extends Controller
 {
-    public function show(string $token): View
+    public function show(Request $request, string $token): View
     {
         $feedback = $this->trovaFeedback($token);
 
@@ -28,6 +30,9 @@ class FeedbackPubblicoController extends Controller
             'evento' => $feedback->evento()->withoutGlobalScope('associazione')->first(),
             'associazione' => $feedback->associazione,
             'inviato' => false,
+            // La form rimanda alla stessa URL firmata (firma e scadenza incluse):
+            // la rotta POST ha il middleware 'signed' come la GET.
+            'urlInvio' => $request->fullUrl(),
         ]);
     }
 
@@ -35,15 +40,20 @@ class FeedbackPubblicoController extends Controller
     {
         $feedback = $this->trovaFeedback($token);
 
-        if ($feedback->isCompilato()) {
+        // Salvataggio atomico: l'update condizionale su compilato_at NULL
+        // garantisce un solo feedback anche con due invii concorrenti.
+        $salvato = FeedbackEvento::allTenants()
+            ->whereKey($feedback->id)
+            ->whereNull('compilato_at')
+            ->update([
+                'voto' => (int) $request->validated('voto'),
+                'commento' => $request->validated('commento'),
+                'compilato_at' => now(),
+            ]);
+
+        if ($salvato === 0) {
             return back()->withErrors(['voto' => 'Il feedback per questa prenotazione è già stato inviato.']);
         }
-
-        $feedback->forceFill([
-            'voto' => (int) $request->validated('voto'),
-            'commento' => $request->validated('commento'),
-            'compilato_at' => now(),
-        ])->save();
 
         return view('eventi-vita.pubblico.feedback', [
             'feedback' => $feedback->refresh(),

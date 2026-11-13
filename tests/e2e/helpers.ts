@@ -144,6 +144,7 @@ export type SocioConTessera = {
     socio_id: string;
     numero_socio: string;
     tessera_id: string | null;
+    tessera_verifica_url: string | null;
     numero_tessera: string | null;
     quota_id: string | null;
 };

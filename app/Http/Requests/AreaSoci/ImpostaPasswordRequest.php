@@ -32,11 +32,8 @@ class ImpostaPasswordRequest extends FormRequest
      */
     private function datiSocio(): array
     {
-        $token = (string) $this->route('token');
-        $socio = $token === '' ? null : Socio::allTenants()
-            ->where('password_reset_token', $token)
-            ->where('password_reset_expires', '>', now())
-            ->first();
+        // Nel DB c'è solo l'impronta del token: stessa ricerca del controller
+        $socio = Socio::perTokenReset((string) $this->route('token'));
 
         return $socio === null ? [] : [$socio->email, $socio->nome, $socio->cognome];
     }

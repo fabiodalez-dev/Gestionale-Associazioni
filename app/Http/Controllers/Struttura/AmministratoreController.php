@@ -109,17 +109,33 @@ class AmministratoreController extends Controller
                 : $dati['associazione_id'],
         ]);
 
+        $disattivato = false;
         if ($request->has('attivo')) {
+            $disattivato = $utente->attivo && ! $request->boolean('attivo');
             $utente->attivo = $request->boolean('attivo');
         }
 
         // Password opzionale: vuota = invariata (spec §3.4)
-        if (! empty($dati['password'])) {
+        $passwordImposta = ! empty($dati['password']);
+        if ($passwordImposta) {
             $utente->password_hash = $dati['password']; // hashed dal cast
+        }
+
+        if ($disattivato || $passwordImposta) {
+            // Un invito pendente non deve poter riaprire l'account né
+            // sovrascrivere la password appena imposta
+            $utente->invito_token = null;
+            $utente->invito_scade_at = null;
         }
 
         $utente->save();
         $utente->syncRoles($cariche !== [] ? $cariche : [Role::findOrCreate($dati['ruolo'], 'web')]);
+
+        if ($disattivato || $passwordImposta) {
+            // La revoca vale subito: sessioni aperte e remember-me non
+            // sopravvivono alla disattivazione o a una password imposta
+            $utente->revocaSessioni();
+        }
 
         return redirect()->route('amministratori.index')->with('success', 'Amministratore aggiornato con successo.');
     }
@@ -159,15 +175,25 @@ class AmministratoreController extends Controller
     }
 
     /**
-     * Invio invito best-effort: link firmato valido 7 giorni.
+     * Invio invito best-effort: link firmato valido 7 giorni, monouso.
      */
     private function inviaInvito(Utente $utente): bool
     {
         try {
+            // Nonce monouso: in tabella resta solo l'hash dell'ULTIMO invito,
+            // quindi un reinvio invalida i link precedenti
+            $nonce = Str::random(40);
+            $scadenza = now()->addDays(7);
+
+            $utente->forceFill([
+                'invito_token' => hash('sha256', $nonce),
+                'invito_scade_at' => $scadenza,
+            ])->save();
+
             $urlInvito = URL::temporarySignedRoute(
                 'invito.show',
-                now()->addDays(7),
-                ['utente' => $utente->id]
+                $scadenza,
+                ['utente' => $utente->id, 'nonce' => $nonce]
             );
 
             Mail::to($utente->email)->queue(new InvitoAmministratoreMail($utente, $urlInvito));

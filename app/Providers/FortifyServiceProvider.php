@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -114,6 +115,36 @@ class FortifyServiceProvider extends ServiceProvider
         // Rate limiting sulla challenge 2FA: 5 tentativi al minuto per sessione di login
         RateLimiter::for('two-factor', function (Request $request) {
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        });
+
+        $this->limitaRecuperoPassword();
+    }
+
+    /**
+     * Throttle per IP sulle rotte di recupero password registrate da Fortify
+     * (che non prevede un limiter dedicato): 5 richieste di link e 10 tentativi
+     * di reset al minuto, come sul frontend pubblico. Fortify registra le rotte
+     * nel boot del proprio provider, che gira DOPO questo: il middleware viene
+     * aggiunto a boot completato. Con la cache delle rotte il middleware finisce
+     * nella cache stessa (route:cache avvia l'app per intero prima di compilarla).
+     */
+    private function limitaRecuperoPassword(): void
+    {
+        $this->app->booted(function (): void {
+            $limiti = [
+                'password.email' => 'throttle:5,1',
+                'password.update' => 'throttle:10,1',
+            ];
+
+            // Scansione diretta: la mappa dei nomi (getByName) viene ricostruita
+            // dal RouteServiceProvider in un altro callback booted
+            foreach (Route::getRoutes()->getRoutes() as $rotta) {
+                $middleware = $limiti[(string) $rotta->getName()] ?? null;
+
+                if ($middleware !== null && ! in_array($middleware, $rotta->middleware(), true)) {
+                    $rotta->middleware($middleware);
+                }
+            }
         });
     }
 }

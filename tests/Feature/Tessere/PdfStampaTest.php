@@ -8,8 +8,11 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\TesseraTemplate;
 use App\Models\TipoSocio;
+use App\Services\Struttura\LogoAssociazione;
 use App\Services\Tessere\TesseraPdfRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class PdfStampaTest extends TessereTestCase
 {
@@ -167,5 +170,41 @@ class PdfStampaTest extends TessereTestCase
 
         $testo = $renderer->testoTessera($tessera->fresh(), $socio, $assoc, '', '');
         $this->assertStringContainsString('Testo specifico '.$tessera->numero_tessera, $testo);
+    }
+
+    /**
+     * dompdf gira senza fetch remoto (isRemoteEnabled=false): il logo entra
+     * nel PDF solo come data URI letto da un file locale. Un logo_url legacy
+     * http(s) è usato solo se punta a un file di questa installazione.
+     */
+    public function test_il_pdf_usa_solo_loghi_locali_senza_fetch_remoto(): void
+    {
+        $assoc = Associazione::factory()->create();
+        $admin = $this->creaAdmin($assoc);
+        $logo = app(LogoAssociazione::class);
+
+        Storage::disk('public')->put('uploads/logos/logo_pdf_test.png', UploadedFile::fake()->image('logo.png', 40, 40)->getContent());
+
+        // Percorso locale legacy → data URI e PDF generato
+        $assoc->update(['logo_url' => 'uploads/logos/logo_pdf_test.png']);
+        $this->assertStringStartsWith('<img src="data:image/png;base64,', $logo->imgPdf($assoc));
+
+        $tessera = Tessera::factory()->create([
+            'socio_id' => Socio::factory()->create(['associazione_id' => $assoc->id])->id,
+            'associazione_id' => $assoc->id,
+        ]);
+        $response = $this->actingAs($admin)->get('/tessere/'.$tessera->id.'/pdf');
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', (string) $response->getContent());
+
+        // URL http(s) di questa installazione → convertito nello stesso file locale
+        $assoc->update(['logo_url' => Storage::disk('public')->url('uploads/logos/logo_pdf_test.png')]);
+        $this->assertStringStartsWith('<img src="data:image/png;base64,', $logo->imgPdf($assoc->fresh()));
+
+        // URL esterno → nessun <img> remoto nel PDF
+        $assoc->update(['logo_url' => 'https://cdn.example.com/logo.png']);
+        $this->assertSame('', $logo->imgPdf($assoc->fresh()));
+
+        Storage::disk('public')->delete('uploads/logos/logo_pdf_test.png');
     }
 }

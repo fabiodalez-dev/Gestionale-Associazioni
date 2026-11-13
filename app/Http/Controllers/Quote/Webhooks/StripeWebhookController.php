@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Quote\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Services\Pagamenti\EsitoWebhook;
 use App\Services\Pagamenti\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,15 +43,26 @@ class StripeWebhookController extends Controller
                 return response()->json(['error' => 'Invalid associazione_id'], 400);
             }
 
-            $ok = $paymentService->handleStripeWebhook($payload, $signature, (string) $associazioneId);
+            $esito = $paymentService->handleStripeWebhook($payload, $signature, (string) $associazioneId);
 
-            return $ok
-                ? response()->json(['status' => 'ok'])
-                : response()->json(['error' => 'Webhook processing failed'], 400);
+            return $this->rispostaPerEsito($esito);
         } catch (\Throwable $e) {
             Log::error('StripeWebhookController', ['error' => $e->getMessage()]);
 
             return response()->json(['error' => 'Internal error'], 500);
         }
+    }
+
+    /**
+     * Ack 200 per OK e IGNORATO (evento firmato ma incoerente: un retry non
+     * servirebbe), 400 per FALLITO (Stripe ritenterà).
+     */
+    protected function rispostaPerEsito(EsitoWebhook $esito): JsonResponse
+    {
+        return match ($esito) {
+            EsitoWebhook::OK => response()->json(['status' => 'ok']),
+            EsitoWebhook::IGNORATO => response()->json(['status' => 'ignored', 'reason' => 'event inconsistent with payable']),
+            EsitoWebhook::FALLITO => response()->json(['error' => 'Webhook processing failed'], 400),
+        };
     }
 }

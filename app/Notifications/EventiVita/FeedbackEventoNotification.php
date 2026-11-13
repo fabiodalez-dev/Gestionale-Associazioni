@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\URL;
 /**
  * Richiesta di feedback post-evento (f.11): inviata il giorno dopo
  * l'evento ai partecipanti con check-in. Il link al form pubblico è
- * FIRMATO (APP_KEY) e porta il token del feedback (capability token,
- * unico per prenotazione).
+ * FIRMATO (APP_KEY) con scadenza e porta il token del feedback
+ * (capability token, unico per prenotazione).
  *
  * Pattern PrenotazioneNotification: ShouldQueue, database + mail,
  * SMTP del tenant quando configurato.
@@ -67,14 +67,21 @@ class FeedbackEventoNotification extends Notification implements ShouldQueue
         ];
     }
 
+    /** Giorni di validità del link firmato del form di feedback. */
+    public const GIORNI_VALIDITA_LINK = 30;
+
     /**
-     * URL pubblico FIRMATO del form di valutazione.
+     * URL pubblico FIRMATO del form di valutazione, valido per la sola
+     * finestra del feedback (GIORNI_VALIDITA_LINK): un link inoltrato o
+     * trapelato dopo la scadenza non apre più il form.
      */
     protected function urlForm(): string
     {
-        return URL::signedRoute('feedback-eventi.show', [
-            'token' => $this->feedback->token,
-        ]);
+        return URL::temporarySignedRoute(
+            'feedback-eventi.show',
+            now()->addDays(self::GIORNI_VALIDITA_LINK),
+            ['token' => $this->feedback->token],
+        );
     }
 
     protected function evento(): ?Evento

@@ -48,9 +48,12 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | Default applicativo: 365 giorni (525600 minuti). Nessun token API resta
+    | valido per sempre; AuthenticateApiV1 applica lo stesso limite.
+    |
     */
 
-    'expiration' => null,
+    'expiration' => (int) env('SANCTUM_TOKEN_EXPIRATION', 525600),
 
     /*
     |--------------------------------------------------------------------------

@@ -59,6 +59,7 @@ class LoginSocioRequest extends FormRequest
         $socio = Socio::query()
             ->withoutGlobalScope('associazione')
             ->whereNotNull('password_hash')
+            ->whereIn('stato', Socio::STATI_CON_ACCESSO_AREA_SOCI)
             ->where('email', $this->string('email')->toString())
             ->first();
 

@@ -169,6 +169,8 @@ class AssociazioniTest extends TestCase
         $admin->refresh();
         $this->assertNull($admin->associazione_id);
         $this->assertSame(Utente::RUOLO_ADMIN_ASSOCIAZIONE, $admin->ruolo);
+        $this->assertFalse($admin->attivo, 'senza associazione l\'utente resta disattivato');
+        $this->assertNull($admin->remember_token);
     }
 
     public function test_ricerca_utenti_solo_super_admin_ed_esclude_super_admin(): void

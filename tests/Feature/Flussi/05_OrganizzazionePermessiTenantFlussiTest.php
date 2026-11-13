@@ -1494,7 +1494,8 @@ class Flussi05_OrganizzazionePermessiTenantFlussiTest extends TestCase
         $oggi = $this->chiaveApi($this->a, ['*'], ['scadenza' => '2026-06-01']);
         $chiave = $this->chiaveApi($this->a, ['*']);
 
-        $this->api('GET', '/api/v1/', $scaduta->api_key)->assertUnauthorized()->assertJsonPath('code', 'invalid_api_key');
+        // Anche il ping passa dalla porta v1: chiave scaduta → 403 key_expired (audit run-1)
+        $this->api('GET', '/api/v1/', $scaduta->api_key)->assertForbidden()->assertJsonPath('code', 'key_expired');
         $this->api('GET', '/api/v1/soci', $scaduta->api_key)->assertForbidden()->assertJsonPath('code', 'key_expired');
         // Valida per tutto il giorno della scadenza
         $this->api('GET', '/api/v1/', $oggi->api_key)->assertOk();
@@ -1508,7 +1509,7 @@ class Flussi05_OrganizzazionePermessiTenantFlussiTest extends TestCase
         $this->assertDatabaseHas('api_keys', ['id' => $chiave->id, 'attiva' => false]);
 
         $this->esci();
-        $this->api('GET', '/api/v1/', $chiave->api_key)->assertUnauthorized()->assertJsonPath('code', 'invalid_api_key');
+        $this->api('GET', '/api/v1/', $chiave->api_key)->assertForbidden()->assertJsonPath('code', 'key_disabled');
         $this->api('GET', '/api/v1/soci', $chiave->api_key)->assertForbidden()->assertJsonPath('code', 'key_disabled');
 
         // L'admin di B non può riattivarla

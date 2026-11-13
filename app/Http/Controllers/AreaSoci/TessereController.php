@@ -49,8 +49,11 @@ class TessereController extends Controller
 
         $filename = $this->nomeFilePdf($socio, $tessera);
 
+        // Il file pre-generato è cercato con un nome che include il tenant:
+        // lo stesso numero_socio esiste in più associazioni e il nome legacy
+        // tessera_{numero}_{anno}.pdf avrebbe servito il PDF di un altro tenant.
         // basename() al punto d'uso: il path non può uscire da documents/
-        $percorso = 'documents/'.basename($filename);
+        $percorso = 'documents/'.basename($this->nomeFileArchivio($socio, $tessera));
 
         if (Storage::disk('local')->exists($percorso)) {
             return Storage::disk('local')->download($percorso, $filename);
@@ -68,7 +71,7 @@ class TessereController extends Controller
     }
 
     /**
-     * Convenzione legacy come chiave di lookup: tessera_{numero_socio}_{anno}.pdf.
+     * Nome del download (convenzione legacy): tessera_{numero_socio}_{anno}.pdf.
      * Il nome file è ricostruito SOLO da caratteri whitelistati ([A-Za-z0-9_-])
      * e dall'anno castato a intero: nessun input utente raggiunge il path e
      * basename() esclude per costruzione qualsiasi attraversamento di directory.
@@ -78,6 +81,19 @@ class TessereController extends Controller
         $numeroSocio = (string) preg_replace('/[^A-Za-z0-9_-]/', '', (string) $socio->numero_socio);
 
         return basename(sprintf('tessera_%s_%d.pdf', $numeroSocio, (int) $tessera->anno_validita));
+    }
+
+    /**
+     * Chiave di lookup del PDF pre-generato in storage privato, con il tenant
+     * nel nome: tessera_{associazione_id}_{numero_socio}_{anno}.pdf (stessa
+     * whitelist di caratteri di nomeFilePdf).
+     */
+    private function nomeFileArchivio(Socio $socio, Tessera $tessera): string
+    {
+        $tenant = (string) preg_replace('/[^A-Za-z0-9_-]/', '', (string) $socio->associazione_id);
+        $numeroSocio = (string) preg_replace('/[^A-Za-z0-9_-]/', '', (string) $socio->numero_socio);
+
+        return basename(sprintf('tessera_%s_%s_%d.pdf', $tenant, $numeroSocio, (int) $tessera->anno_validita));
     }
 
     /**

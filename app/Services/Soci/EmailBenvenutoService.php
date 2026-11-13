@@ -47,19 +47,22 @@ class EmailBenvenutoService
                 return false;
             }
 
-            // Placeholder legacy {{nome}} (compatibilità con template storici)
+            // Placeholder legacy {{nome}} (compatibilità con template storici):
+            // valori HTML-escaped come quelli di EmailPlaceholders, perché
+            // finiscono in body_html (nell'oggetto le entità vengono decodificate).
+            $escape = fn (?string $v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
             $placeholders = [
-                '{{nome}}' => (string) $socio->nome,
-                '{{cognome}}' => (string) $socio->cognome,
-                '{{nome_completo}}' => $socio->nome_completo,
-                '{{numero_socio}}' => (string) $socio->numero_socio,
-                '{{associazione}}' => (string) $associazione->nome,
-                '{{email}}' => (string) $socio->email,
+                '{{nome}}' => $escape($socio->nome),
+                '{{cognome}}' => $escape($socio->cognome),
+                '{{nome_completo}}' => $escape($socio->nome_completo),
+                '{{numero_socio}}' => $escape($socio->numero_socio),
+                '{{associazione}}' => $escape($associazione->nome),
+                '{{email}}' => $escape($socio->email),
             ];
 
             // Placeholder dell'editor template ({NOME}, {NOME_ASSOCIAZIONE}, ...):
             // stessa sintassi di EmailPlaceholders usata da comunicazioni e coda.
-            // L'oggetto è testo semplice: niente escape HTML.
+            // L'oggetto è testo semplice: le entità vengono decodificate.
             $valori = EmailPlaceholders::buildValues($associazione, $socio);
             $oggetto = html_entity_decode(
                 EmailPlaceholders::render(strtr((string) $template->oggetto, $placeholders), $valori),

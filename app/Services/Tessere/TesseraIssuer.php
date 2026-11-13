@@ -9,6 +9,7 @@ use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\TesseraCounter;
+use App\Services\Email\EmailPlaceholders;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -426,25 +427,31 @@ class TesseraIssuer
                 return;
             }
 
-            $placeholders = [
-                '{NOME}' => $socio->nome,
-                '{COGNOME}' => $socio->cognome,
-                '{NOME_COMPLETO}' => $socio->nome_completo,
-                '{NUMERO_SOCIO}' => (string) $socio->numero_socio,
-                '{EMAIL}' => (string) $socio->email,
-                '{ASSOCIAZIONE_NOME}' => (string) $associazione->nome,
-                '{NUMERO_TESSERA}' => (string) $tessera->numero_tessera,
-                '{ANNO_VALIDITA}' => (string) $tessera->anno_validita,
-                '{DATA_SCADENZA}' => $tessera->data_scadenza->format('d/m/Y'),
-            ];
+            // Stessa sintassi {CHIAVE} di EmailPlaceholders: i valori del socio
+            // sono HTML-escaped da buildValues (finiscono in body_html);
+            // l'oggetto è testo semplice, quindi le entità vengono decodificate.
+            $valori = EmailPlaceholders::buildValues($associazione, $socio, [
+                'NOME_COMPLETO' => $socio->nome_completo,
+                'ASSOCIAZIONE_NOME' => (string) $associazione->nome,
+                'NUMERO_TESSERA' => (string) $tessera->numero_tessera,
+                'ANNO_VALIDITA' => (string) $tessera->anno_validita,
+                'DATA_SCADENZA' => $tessera->data_scadenza->format('d/m/Y'),
+            ]);
 
+            // batch_id è NOT NULL in email_queue: senza, l'insert falliva in
+            // silenzio (best-effort) e l'email di rinnovo non partiva mai.
             EmailQueue::allTenants()->create([
                 'associazione_id' => $associazione->id,
+                'batch_id' => (string) Str::uuid(),
                 'socio_id' => $socio->id,
                 'to_email' => $socio->email,
                 'to_name' => $socio->nome_completo,
-                'subject' => strtr((string) $template->oggetto, $placeholders),
-                'body_html' => strtr((string) $template->corpo_html, $placeholders),
+                'subject' => html_entity_decode(
+                    EmailPlaceholders::render((string) $template->oggetto, $valori),
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                ),
+                'body_html' => EmailPlaceholders::render((string) $template->corpo_html, $valori),
                 'template_codice' => 'rinnovo_tessera',
                 'priority' => 3,
                 'status' => EmailQueue::STATUS_PENDING,

@@ -24,6 +24,7 @@
 /storage/*.key
 /storage/debugbar
 /storage/pail
+/database/*.sqlite*
 /vendor
 _ide_helper.php
 _ide_helper_models.php

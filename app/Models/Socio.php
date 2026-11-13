@@ -190,9 +190,65 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
         return trim($this->nome.' '.$this->cognome);
     }
 
+    /**
+     * Impronta (sha256) del token "imposta password": nel DB viene salvata
+     * solo questa, il token in chiaro vive soltanto nel link inviato via email.
+     * Chi legge la tabella soci non può quindi usare i token pendenti.
+     */
+    public static function hashTokenReset(string $token): string
+    {
+        return hash('sha256', $token);
+    }
+
+    /**
+     * Socio (di qualsiasi tenant) con un token "imposta password" pendente e
+     * non scaduto che corrisponde a quello del link; null se non esiste.
+     */
+    public static function perTokenReset(string $token): ?self
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        $hash = self::hashTokenReset($token);
+
+        /** @var self|null $socio */
+        $socio = self::allTenants()
+            ->where('password_reset_token', $hash)
+            ->where('password_reset_expires', '>', now())
+            ->first();
+
+        // Confronto a tempo costante oltre al match SQL
+        if ($socio === null || ! is_string($socio->password_reset_token) || ! hash_equals($socio->password_reset_token, $hash)) {
+            return null;
+        }
+
+        return $socio;
+    }
+
     public function isAttivo(): bool
     {
         return $this->stato === self::STATO_ATTIVO;
+    }
+
+    /**
+     * Stati che danno accesso self-service all'area soci: chi è ancora in
+     * attesa di approvazione o ha cessato di far parte dell'associazione
+     * non è un socio e non deve entrare, anche se ha una password.
+     * Sospeso e In Attesa di Pagamento restano dentro: devono poter
+     * regolarizzare (pagare, leggere le comunicazioni).
+     */
+    public const STATI_CON_ACCESSO_AREA_SOCI = [
+        self::STATO_ATTIVO,
+        self::STATO_SOSPESO,
+        self::STATO_IN_ATTESA_DI_PAGAMENTO,
+    ];
+
+    public function puoAccedereAreaSoci(): bool
+    {
+        return ! $this->trashed()
+            && $this->password_hash !== null
+            && in_array($this->stato, self::STATI_CON_ACCESSO_AREA_SOCI, true);
     }
 
     /**

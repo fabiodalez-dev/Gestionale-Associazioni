@@ -32,7 +32,7 @@
                     @elseif ($stato === 'not_found')
                         <i class="bi bi-exclamation-triangle status-icon text-warning"></i>
                         <h4 class="mt-3">Tessera Non Trovata</h4>
-                        <p class="text-muted">Il codice scansionato non corrisponde a nessuna tessera registrata.</p>
+                        <p class="text-muted">Il codice scansionato non corrisponde a nessuna tessera registrata. Inquadra il QR stampato sulla tessera: il link di verifica vale solo completo della sua firma.</p>
 
                     @elseif ($stato === 'valida')
                         <i class="bi bi-check-circle-fill status-icon text-success"></i>

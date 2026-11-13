@@ -20,18 +20,26 @@ class EnsureInstalled
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $rottaInstaller = $request->is('install', 'install/*');
+
         if (! config('installer.enabled')) {
+            // Installer disattivato via env: il wizard non esiste, qualunque
+            // sia lo stato del lock (il flag chiude, non apre)
+            abort_if($rottaInstaller, 404);
+
             return $next($request);
         }
 
         if (app()->environment('testing') && ! config('installer.enforce_in_tests')) {
+            abort_if($rottaInstaller && file_exists((string) config('installer.lock_file')), 404);
+
             return $next($request);
         }
 
         $installed = file_exists(config('installer.lock_file'));
 
         if ($installed) {
-            if ($request->is('install', 'install/*')) {
+            if ($rottaInstaller) {
                 return redirect('/login');
             }
 
@@ -51,7 +59,6 @@ class EnsureInstalled
         if ($request->is('up')) {
             return $next($request);
         }
-        $rottaInstaller = $request->is('install', 'install/*');
         $token = $request->cookies->get((string) config('installer.in_progress_cookie'));
         $token = is_string($token) ? $token : null;
 

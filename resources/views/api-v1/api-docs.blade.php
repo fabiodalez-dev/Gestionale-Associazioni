@@ -85,7 +85,7 @@
             <table class="table table-sm align-middle mb-0">
                 <thead><tr><th>Endpoint</th><th>Descrizione</th><th>Note</th></tr></thead>
                 <tbody>
-                    <tr><td><code>GET /tessere/verify?tessera_id={uuid}</code></td><td>Verifica tessera (QR)</td><td><span class="badge bg-success">Pubblico</span> <code>valid = stato Attiva e non scaduta</code></td></tr>
+                    <tr><td><code>GET /tessere/verify?tessera_id={uuid}&amp;signature={firma}</code></td><td>Verifica tessera (QR)</td><td><span class="badge bg-success">Pubblico</span> <code>valid = stato Attiva e non scaduta</code>; <code>signature</code> è la firma presente nell'URL del QR (senza o errata: 403 <code>invalid_signature</code>)</td></tr>
                     <tr><td><code>GET /tessere</code></td><td>Lista paginata</td><td><code>page</code>, <code>limit</code> (1-100), <code>anno</code>, <code>stato</code></td></tr>
                     <tr><td><code>GET /tessere/search?q=</code></td><td>Ricerca (max 50)</td><td>q min 1 carattere</td></tr>
                     <tr><td><code>GET /tessere/{id}</code></td><td>Dettaglio</td><td>404 se di altro tenant</td></tr>
@@ -156,8 +156,8 @@ $data = json_decode(curl_exec($ch), true);</code></pre>
                 della tessera. Il flusso dell'app di scansione è:
             </p>
             <ol>
-                <li>Scansiona il QR ed estrai il parametro <code>t</code> (UUID tessera).</li>
-                <li><strong>Verifica</strong> (senza autenticazione): <code>GET {{ $baseUrl }}/tessere/verify?tessera_id={t}</code> → campo <code>valid</code>.</li>
+                <li>Scansiona il QR: l'URL contiene l'UUID della tessera (ultimo segmento del percorso, <code>t</code>) e la firma (parametro <code>signature</code>).</li>
+                <li><strong>Verifica</strong> (senza autenticazione): <code>GET {{ $baseUrl }}/tessere/verify?tessera_id={t}&amp;signature={signature}</code> → campo <code>valid</code>. Il solo UUID non basta: senza firma valida la risposta è 403.</li>
                 <li><strong>Check-in evento</strong> (con API key, permesso <code>eventi:write</code>):
                     <code>POST {{ $baseUrl }}/eventi/{evento_id}/checkin</code> con body <code>{"tessera_id": "{t}"}</code>.
                     La risposta include <code>already_checked_in</code> (il check-in è idempotente).</li>

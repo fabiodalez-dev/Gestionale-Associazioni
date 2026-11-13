@@ -20,9 +20,9 @@ use Illuminate\Support\Facades\Route;
 |    export .ics del singolo evento.
 | 2. Mini-sito pubblico (/a/{slug}, RisolviTenantPubblico): calendario
 |    mensile dei pubblicati, feed calendario.ics, .ics del singolo evento.
-| 3. Form pubblico di feedback post-evento: GET dal link FIRMATO
-|    dell'email (middleware signed), POST con throttle; il token 64 hex
-|    è il capability token della prenotazione.
+| 3. Form pubblico di feedback post-evento: GET e POST dal link FIRMATO
+|    con scadenza dell'email (middleware signed), POST con throttle; il
+|    token 64 hex è il capability token della prenotazione.
 |
 */
 
@@ -79,7 +79,9 @@ Route::get('/feedback-eventi/{token}', [FeedbackPubblicoController::class, 'show
     ->where('token', '[a-f0-9]{64}')
     ->name('feedback-eventi.show');
 
+// Anche il POST è firmato: la form invia l'URL completo (firma + scadenza)
+// con cui è stata aperta, così un token noto non basta per compilare il feedback.
 Route::post('/feedback-eventi/{token}', [FeedbackPubblicoController::class, 'store'])
-    ->middleware('throttle:10,1')
+    ->middleware(['signed', 'throttle:10,1'])
     ->where('token', '[a-f0-9]{64}')
     ->name('feedback-eventi.store');

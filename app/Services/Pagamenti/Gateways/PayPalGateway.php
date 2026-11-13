@@ -9,8 +9,8 @@ use Srmklive\PayPal\Services\PayPal as PayPalClient;
 
 /**
  * Implementazione PayPal (srmklive/paypal, Orders API v2) sull'astrazione
- * Pagabile (Quota e Prenotazione), con verifica firma webhook
- * (fix sicurezza §8.4 della spec).
+ * Pagabile (Quota, Prenotazione e Donazione), con verifica firma webhook
+ * obbligatoria (fix sicurezza §8.4 della spec).
  */
 class PayPalGateway implements PayPalGatewayInterface
 {
@@ -110,16 +110,31 @@ class PayPalGateway implements PayPalGatewayInterface
         }
     }
 
+    public function showOrderDetails(PaymentGatewaySetting $config, string $orderId): ?array
+    {
+        try {
+            $provider = $this->provider($config);
+            $result = $provider->showOrderDetails($orderId);
+
+            return is_array($result) ? $result : null;
+        } catch (\Throwable $e) {
+            Log::error('PayPalGateway::showOrderDetails', ['order_id' => $orderId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
     public function verifyWebhookSignature(PaymentGatewaySetting $config, array $headers, array $event): bool
     {
         if (blank($config->paypal_webhook_id)) {
-            // Senza webhook_id configurato non è possibile verificare:
-            // mitigazione di fatto = il capture avviene server-side con le credenziali del tenant.
-            Log::warning('PayPalGateway: paypal_webhook_id non configurato, verifica firma saltata', [
+            // Fail closed: senza webhook_id non è possibile verificare la firma,
+            // quindi il webhook viene rifiutato (il capture server-side da solo
+            // non basta: un ordine può essere creato con il solo client_id pubblico)
+            Log::warning('PayPalGateway: paypal_webhook_id non configurato, webhook rifiutato', [
                 'associazione_id' => $config->associazione_id,
             ]);
 
-            return true;
+            return false;
         }
 
         try {

@@ -20,7 +20,9 @@ use App\Services\Pagamenti\Gateways\PayPalGatewayInterface;
 use App\Services\Pagamenti\Gateways\StripeGatewayInterface;
 use App\Services\Prenotazioni\Contracts\GestiscePagamentoPrenotazione;
 use App\Services\Tessere\TesseraIssuer;
+use Carbon\CarbonInterface;
 use Illuminate\Database\DetectsConcurrencyErrors;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -36,6 +38,17 @@ class PaymentService
     use DetectsConcurrencyErrors;
 
     public const TOKEN_EXPIRY_HOURS = 72;
+
+    /**
+     * Dopo un pagamento online il token del link pubblico resta valido al
+     * massimo per questa finestra: il tempo di tornare dal gateway e
+     * scaricare la ricevuta. Poi la ricevuta è disponibile solo dall'area
+     * riservata (e via email), non più da un link che gira in chiaro.
+     */
+    public const TOKEN_GRACE_AFTER_PAYMENT_HOURS = 1;
+
+    /** Durata della deduplica per id evento dei webhook Stripe. */
+    public const WEBHOOK_DEDUP_TTL_HOURS = 24;
 
     public function __construct(
         protected StripeGatewayInterface $stripe,
@@ -218,27 +231,95 @@ class PaymentService
 
     /**
      * Gestisce il webhook Stripe per il tenant indicato.
-     * Verifica firma obbligatoria con il webhook secret per-tenant.
+     * Verifica firma obbligatoria con il webhook secret per-tenant; poi,
+     * sull'evento firmato: deduplica per id evento (cache 24h), controllo
+     * della modalità live/test rispetto alla chiave configurata (quando
+     * ricavabile dal prefisso sk_/rk_), e confronto di stato del pagamento,
+     * importo e valuta della sessione con il pagabile prima di accreditare.
      */
-    public function handleStripeWebhook(string $payload, string $signatureHeader, string $associazioneId): bool
+    public function handleStripeWebhook(string $payload, string $signatureHeader, string $associazioneId): EsitoWebhook
     {
         $config = PaymentGatewaySetting::forTenant($associazioneId);
 
         if ($config === null || blank($config->stripe_webhook_secret)) {
-            return false;
+            return EsitoWebhook::FALLITO;
         }
 
         $event = $this->stripe->constructWebhookEvent($payload, $signatureHeader, $config->stripe_webhook_secret);
 
         if ($event === null) {
-            return false;
+            return EsitoWebhook::FALLITO;
         }
 
         if (($event['type'] ?? null) !== 'checkout.session.completed') {
             // Eventi diversi: ack senza azione (evita retry inutili da Stripe)
-            return true;
+            return EsitoWebhook::OK;
         }
 
+        // Modalità live/test dell'evento coerente con la chiave del tenant
+        // (solo quando il prefisso della chiave la rende ricavabile)
+        $livemodeAttesa = $config->stripeLivemodeAttesa();
+
+        if ($livemodeAttesa !== null && array_key_exists('livemode', $event)
+            && (bool) $event['livemode'] !== $livemodeAttesa) {
+            Log::warning('PaymentService: webhook Stripe con livemode incoerente con la chiave configurata', [
+                'associazione_id' => $associazioneId,
+                'event_id' => $event['id'] ?? null,
+                'livemode_evento' => (bool) $event['livemode'],
+                'livemode_atteso' => $livemodeAttesa,
+            ]);
+
+            return EsitoWebhook::IGNORATO;
+        }
+
+        // Deduplica per id evento: Stripe può consegnare lo stesso evento più
+        // volte; la chiave va presa SOLO dopo la verifica della firma, così
+        // una richiesta non firmata non può "bruciare" l'id di un evento vero
+        $chiaveDedup = $this->chiaveDedupStripe($associazioneId, $event);
+
+        if ($chiaveDedup !== null && ! Cache::add($chiaveDedup, true, now()->addHours(self::WEBHOOK_DEDUP_TTL_HOURS))) {
+            Log::info('PaymentService: webhook Stripe già elaborato, replay ignorato', [
+                'associazione_id' => $associazioneId,
+                'event_id' => $event['id'],
+            ]);
+
+            return EsitoWebhook::OK;
+        }
+
+        $esito = $this->elaboraSessioneStripe($event, $config, $associazioneId);
+
+        if ($esito === EsitoWebhook::FALLITO && $chiaveDedup !== null) {
+            // Elaborazione non riuscita: libera la chiave perché il retry di
+            // Stripe venga elaborato davvero
+            Cache::forget($chiaveDedup);
+        }
+
+        return $esito;
+    }
+
+    /**
+     * Chiave di deduplica dell'evento Stripe (null se l'evento non porta un id).
+     *
+     * @param  array<string, mixed>  $event
+     */
+    protected function chiaveDedupStripe(string $associazioneId, array $event): ?string
+    {
+        $eventId = $event['id'] ?? null;
+
+        if (! is_string($eventId) || $eventId === '') {
+            return null;
+        }
+
+        return 'webhook-stripe:'.$associazioneId.':'.$eventId;
+    }
+
+    /**
+     * Elabora una checkout.session.completed già verificata e deduplicata.
+     *
+     * @param  array<string, mixed>  $event
+     */
+    protected function elaboraSessioneStripe(array $event, PaymentGatewaySetting $config, string $associazioneId): EsitoWebhook
+    {
         $session = (array) data_get($event, 'data.object', []);
         $transactionId = (string) (data_get($session, 'payment_intent') ?: data_get($session, 'id', ''));
 
@@ -246,107 +327,246 @@ class PaymentService
         // con le sessioni checkout legacy in volo (senza metadata.tipo)
         $tipo = (string) (data_get($session, 'metadata.tipo') ?: Pagabile::TIPO_QUOTA);
 
-        if ($tipo === Pagabile::TIPO_PRENOTAZIONE) {
-            $prenotazioneId = data_get($session, 'metadata.pagabile_id');
+        $pagabileId = $tipo === Pagabile::TIPO_QUOTA
+            ? (data_get($session, 'metadata.quota_id') ?: data_get($session, 'metadata.pagabile_id'))
+            : data_get($session, 'metadata.pagabile_id');
 
-            if (blank($prenotazioneId)) {
-                Log::warning('PaymentService: webhook Stripe prenotazione senza pagabile_id nei metadata');
+        if (blank($pagabileId)) {
+            Log::warning('PaymentService: webhook Stripe senza id del pagabile nei metadata', ['tipo' => $tipo]);
 
-                return false;
-            }
-
-            return $this->onPagamentoPrenotazioneCompletato((string) $prenotazioneId, $associazioneId, 'stripe', $transactionId);
+            return EsitoWebhook::FALLITO;
         }
 
-        if ($tipo === Pagabile::TIPO_DONAZIONE) {
-            $donazioneId = data_get($session, 'metadata.pagabile_id');
+        $pagabileId = (string) $pagabileId;
 
-            if (blank($donazioneId)) {
-                Log::warning('PaymentService: webhook Stripe donazione senza pagabile_id nei metadata');
+        // Stato, importo e valuta della sessione devono corrispondere al
+        // pagabile: altrimenti nessun accredito (ack "ignorato", un retry
+        // non cambierebbe nulla)
+        $pagabile = $this->trovaPagabile($tipo, $pagabileId, $associazioneId);
 
-                return false;
-            }
-
-            return $this->onPagamentoDonazioneCompletato((string) $donazioneId, $associazioneId, 'stripe', $transactionId);
+        if ($pagabile !== null && ! $this->sessioneStripeCoerente($session, $pagabile, $config, $event['id'] ?? null)) {
+            return EsitoWebhook::IGNORATO;
         }
 
-        $quotaId = data_get($session, 'metadata.quota_id') ?: data_get($session, 'metadata.pagabile_id');
+        $ok = match ($tipo) {
+            Pagabile::TIPO_PRENOTAZIONE => $this->onPagamentoPrenotazioneCompletato($pagabileId, $associazioneId, 'stripe', $transactionId),
+            Pagabile::TIPO_DONAZIONE => $this->onPagamentoDonazioneCompletato($pagabileId, $associazioneId, 'stripe', $transactionId),
+            default => $this->onPaymentCompleted($pagabileId, $associazioneId, 'stripe', $transactionId),
+        };
 
-        if (blank($quotaId)) {
-            Log::warning('PaymentService: webhook Stripe senza quota_id nei metadata');
+        return $ok ? EsitoWebhook::OK : EsitoWebhook::FALLITO;
+    }
+
+    /**
+     * Confronta payment_status, amount_total e currency della Checkout
+     * Session con il pagabile e la valuta del tenant. I campi assenti
+     * (mai in un evento reale di Stripe) vengono saltati con un warning.
+     *
+     * @param  array<string, mixed>  $session
+     */
+    protected function sessioneStripeCoerente(array $session, Pagabile $pagabile, PaymentGatewaySetting $config, mixed $eventId): bool
+    {
+        $contesto = [
+            'event_id' => $eventId,
+            'tipo' => $pagabile->getPagabileTipo(),
+            'pagabile_id' => $pagabile->getPagabileId(),
+        ];
+
+        if (array_key_exists('payment_status', $session) && $session['payment_status'] !== 'paid') {
+            Log::warning('PaymentService: sessione Stripe completata ma non pagata, nessun accredito', $contesto + [
+                'payment_status' => $session['payment_status'],
+            ]);
 
             return false;
         }
 
-        return $this->onPaymentCompleted((string) $quotaId, $associazioneId, 'stripe', $transactionId);
+        if (array_key_exists('amount_total', $session)) {
+            $atteso = (int) round($pagabile->getImporto() * 100);
+
+            if ((int) $session['amount_total'] !== $atteso) {
+                Log::warning('PaymentService: importo Stripe diverso da quello del pagabile, nessun accredito', $contesto + [
+                    'amount_total' => $session['amount_total'],
+                    'atteso' => $atteso,
+                ]);
+
+                return false;
+            }
+        } else {
+            Log::warning('PaymentService: amount_total assente nella sessione Stripe, confronto importo saltato', $contesto);
+        }
+
+        if (array_key_exists('currency', $session)) {
+            $attesa = strtolower($config->valuta ?: 'eur');
+
+            if (strtolower((string) $session['currency']) !== $attesa) {
+                Log::warning('PaymentService: valuta Stripe diversa da quella del tenant, nessun accredito', $contesto + [
+                    'currency' => $session['currency'],
+                    'attesa' => $attesa,
+                ]);
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
-     * Gestisce il webhook PayPal per il tenant indicato:
-     * verifica firma (se paypal_webhook_id configurato) + CAPTURE dell'ordine approvato.
+     * Gestisce il webhook PayPal per il tenant indicato: verifica firma
+     * obbligatoria (paypal_webhook_id richiesto) + CAPTURE dell'ordine
+     * approvato. La fonte di verità per custom_id e importo è SOLO la
+     * risposta del capture (o i dettagli dell'ordine letti via API se il
+     * capture non riporta il custom_id), mai l'evento ricevuto.
      *
      * @param  array<string, mixed>  $event
      * @param  array<string, string|null>  $headers
      */
-    public function handlePayPalWebhook(array $event, array $headers, string $associazioneId): bool
+    public function handlePayPalWebhook(array $event, array $headers, string $associazioneId): EsitoWebhook
     {
         $config = PaymentGatewaySetting::forTenant($associazioneId);
 
         if ($config === null || ! $config->isPayPalOperational()) {
-            return false;
+            return EsitoWebhook::FALLITO;
         }
 
         // Fix sicurezza rispetto al legacy: verifica firma ufficiale
         if (! $this->paypal->verifyWebhookSignature($config, $headers, $event)) {
             Log::warning('PaymentService: firma webhook PayPal non valida', ['associazione_id' => $associazioneId]);
 
-            return false;
+            return EsitoWebhook::FALLITO;
         }
 
         if (($event['event_type'] ?? null) !== 'CHECKOUT.ORDER.APPROVED') {
             // Altri eventi: ack senza azione
-            return true;
+            return EsitoWebhook::OK;
         }
 
         $orderId = data_get($event, 'resource.id');
 
         if (blank($orderId)) {
-            return false;
+            return EsitoWebhook::FALLITO;
         }
 
+        $orderId = (string) $orderId;
+
         // È il webhook a completare l'incasso (capture server-side)
-        $capture = $this->paypal->captureOrder($config, (string) $orderId);
+        $capture = $this->paypal->captureOrder($config, $orderId);
 
         if ($capture === null || ($capture['status'] ?? null) !== 'COMPLETED') {
             Log::warning('PaymentService: capture PayPal non completato', ['order_id' => $orderId]);
 
-            return false;
+            return EsitoWebhook::FALLITO;
         }
 
         $customId = data_get($capture, 'purchase_units.0.payments.captures.0.custom_id')
-            ?: data_get($capture, 'purchase_units.0.custom_id')
-            ?: data_get($event, 'resource.purchase_units.0.custom_id');
+            ?: data_get($capture, 'purchase_units.0.custom_id');
 
         if (blank($customId)) {
-            return false;
+            // Il capture non riporta il custom_id: lo si legge dall'ordine via
+            // API, mai dall'evento (che non è una fonte affidabile)
+            $dettagli = $this->paypal->showOrderDetails($config, $orderId);
+
+            $customId = data_get($dettagli, 'purchase_units.0.custom_id')
+                ?: data_get($dettagli, 'purchase_units.0.payments.captures.0.custom_id');
+        }
+
+        if (blank($customId)) {
+            Log::warning('PaymentService: custom_id assente nel capture e nei dettagli ordine PayPal', ['order_id' => $orderId]);
+
+            return EsitoWebhook::FALLITO;
         }
 
         $captureId = data_get($capture, 'purchase_units.0.payments.captures.0.id');
         $transactionId = (string) ($captureId ?: $orderId);
 
-        // custom_id "prenotazione:{uuid}" → prenotazione;
+        // custom_id "prenotazione:{uuid}" / "donazione:{uuid}" → tipo esplicito;
         // UUID nudo → quota (retrocompatibilità con gli ordini legacy in volo)
         [$tipo, $pagabileId] = $this->parseCustomId((string) $customId);
 
-        if ($tipo === Pagabile::TIPO_PRENOTAZIONE) {
-            return $this->onPagamentoPrenotazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId);
+        // Importo e valuta catturati devono corrispondere al pagabile:
+        // altrimenti nessun accredito (ack "ignorato" a PayPal)
+        $pagabile = $this->trovaPagabile($tipo, $pagabileId, $associazioneId);
+
+        if ($pagabile !== null && ! $this->captureCoerente($capture, $pagabile, $config, $orderId)) {
+            return EsitoWebhook::IGNORATO;
         }
 
-        if ($tipo === Pagabile::TIPO_DONAZIONE) {
-            return $this->onPagamentoDonazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId);
+        $ok = match ($tipo) {
+            Pagabile::TIPO_PRENOTAZIONE => $this->onPagamentoPrenotazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId),
+            Pagabile::TIPO_DONAZIONE => $this->onPagamentoDonazioneCompletato($pagabileId, $associazioneId, 'paypal', $transactionId),
+            default => $this->onPaymentCompleted($pagabileId, $associazioneId, 'paypal', $transactionId),
+        };
+
+        return $ok ? EsitoWebhook::OK : EsitoWebhook::FALLITO;
+    }
+
+    /**
+     * Confronta importo e valuta del capture PayPal con il pagabile e la
+     * valuta del tenant. Un capture senza importo (mai in una risposta
+     * reale dell'API) viene accettato con un warning.
+     *
+     * @param  array<string, mixed>  $capture
+     */
+    protected function captureCoerente(array $capture, Pagabile $pagabile, PaymentGatewaySetting $config, string $orderId): bool
+    {
+        $contesto = [
+            'order_id' => $orderId,
+            'tipo' => $pagabile->getPagabileTipo(),
+            'pagabile_id' => $pagabile->getPagabileId(),
+        ];
+
+        $amount = data_get($capture, 'purchase_units.0.payments.captures.0.amount');
+
+        if (! is_array($amount) || ! array_key_exists('value', $amount)) {
+            Log::warning('PaymentService: importo assente nel capture PayPal, confronto importo saltato', $contesto);
+
+            return true;
         }
 
-        return $this->onPaymentCompleted($pagabileId, $associazioneId, 'paypal', $transactionId);
+        $catturato = round((float) $amount['value'], 2);
+        $atteso = round($pagabile->getImporto(), 2);
+
+        if (abs($catturato - $atteso) >= 0.005) {
+            Log::warning('PaymentService: importo PayPal diverso da quello del pagabile, nessun accredito', $contesto + [
+                'catturato' => $amount['value'],
+                'atteso' => number_format($atteso, 2, '.', ''),
+            ]);
+
+            return false;
+        }
+
+        if (array_key_exists('currency_code', $amount)) {
+            $attesa = strtoupper($config->valuta ?: 'EUR');
+
+            if (strtoupper((string) $amount['currency_code']) !== $attesa) {
+                Log::warning('PaymentService: valuta PayPal diversa da quella del tenant, nessun accredito', $contesto + [
+                    'currency_code' => $amount['currency_code'],
+                    'attesa' => $attesa,
+                ]);
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Carica il pagabile del tenant per il confronto importi (null se non
+     * esiste: in quel caso decidono i gestori post-pagamento, che ack-ano).
+     */
+    protected function trovaPagabile(string $tipo, string $pagabileId, string $associazioneId): ?Pagabile
+    {
+        $query = match ($tipo) {
+            Pagabile::TIPO_PRENOTAZIONE => Prenotazione::allTenants(),
+            Pagabile::TIPO_DONAZIONE => Donazione::allTenants(),
+            default => Quota::allTenants(),
+        };
+
+        /** @var Pagabile|null $pagabile */
+        $pagabile = $query->where('associazione_id', $associazioneId)->find($pagabileId);
+
+        return $pagabile;
     }
 
     /**
@@ -430,6 +650,23 @@ class PaymentService
 
             // Idempotenza: già pagata o transazione già registrata → ack senza ripetere
             if ($quota->data_pagamento !== null || filled($quota->gateway_transaction_id)) {
+                if ($quota->gateway_transaction_id !== $transactionId) {
+                    // Non è il replay dello stesso evento: è un SECONDO incasso
+                    // sulla stessa quota (es. due checkout aperti in parallelo o
+                    // quota già registrata offline). Nessun accredito doppio, ma
+                    // il denaro è stato incassato: warning con la transazione da
+                    // rimborsare
+                    Log::warning('PaymentService: pagamento online su quota già pagata, transazione da rimborsare', [
+                        'quota_id' => $quota->id,
+                        'associazione_id' => $associazioneId,
+                        'gateway' => $gateway,
+                        'transaction_id_duplicato' => $transactionId,
+                        'transaction_id_registrato' => $quota->gateway_transaction_id,
+                        'metodo_registrato' => $quota->metodo_pagamento,
+                        'data_pagamento' => $quota->data_pagamento?->toDateString(),
+                    ]);
+                }
+
                 return true;
             }
 
@@ -448,6 +685,9 @@ class PaymentService
                 'gateway' => $gateway,
                 'gateway_transaction_id' => $transactionId,
                 'metodo_pagamento' => $gateway,
+                // Il link pubblico ha fatto il suo lavoro: resta valido solo per
+                // la finestra di grazia (ritorno dal gateway + ricevuta)
+                'payment_token_expires' => $this->scadenzaTokenDopoPagamento($quota),
             ])->save();
 
             if ($socio === null) {
@@ -624,6 +864,22 @@ class PaymentService
     // ------------------------------------------------------------------
     // Interni
     // ------------------------------------------------------------------
+
+    /**
+     * Scadenza del token di pagamento dopo l'incasso online: la più vicina
+     * tra quella attuale e ora + finestra di grazia (null resta null).
+     */
+    protected function scadenzaTokenDopoPagamento(Quota $quota): ?CarbonInterface
+    {
+        if (blank($quota->payment_token)) {
+            return $quota->payment_token_expires;
+        }
+
+        $grazia = now()->addHours(self::TOKEN_GRACE_AFTER_PAYMENT_HOURS);
+        $attuale = $quota->payment_token_expires;
+
+        return $attuale !== null && $attuale->lt($grazia) ? $attuale : $grazia;
+    }
 
     /**
      * Log attività socio — append-only, fail-safe (mai bloccante, parità legacy).

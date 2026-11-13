@@ -6,6 +6,7 @@ use App\Data\ApiV1\TesseraListItemData;
 use App\Http\Controllers\Api\V1\Concerns\ApiV1Responses;
 use App\Http\Controllers\Controller;
 use App\Models\Tessera;
+use App\Services\Tessere\TesseraQrService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,25 +19,33 @@ use Spatie\QueryBuilder\QueryBuilder;
 /**
  * REST API v1 — tessere (sola lettura, permesso tessere:read).
  *
- * /tessere/verify è PUBBLICO (nessuna autenticazione): l'UUID della tessera,
- * stampato nel QR code, è esso stesso il segreto. La lookup è volutamente
- * cross-tenant e la risposta non espone associazione_id né dati sensibili.
+ * /tessere/verify è PUBBLICO (nessuna autenticazione): il segreto è la
+ * firma (APP_KEY) dell'URL stampato nel QR code, da passare come parametro
+ * `signature` insieme all'UUID; il solo UUID non basta. La lookup è
+ * volutamente cross-tenant e la risposta non espone associazione_id né dati
+ * sensibili.
  */
 class TesseraApiController extends Controller
 {
     use ApiV1Responses;
 
     /**
-     * GET /api/v1/tessere/verify?tessera_id={uuid} — verifica pubblica (QR code).
+     * GET /api/v1/tessere/verify?tessera_id={uuid}&signature={firma} — verifica
+     * pubblica (QR code). `signature` è il parametro omonimo dell'URL nel QR.
      *
      * @unauthenticated
      */
-    public function verify(Request $request): JsonResponse
+    public function verify(Request $request, TesseraQrService $qr): JsonResponse
     {
         $tesseraId = (string) $request->query('tessera_id', '');
 
         if ($tesseraId === '' || ! $this->isUuid($tesseraId)) {
             return $this->apiError(400, 'invalid_tessera_id', 'Parametro tessera_id mancante o non valido (UUID richiesto).');
+        }
+
+        // Controllo prima della lookup: la risposta non dice se l'UUID esiste
+        if (! $qr->firmaValida($tesseraId, $request->query('signature'))) {
+            return $this->apiError(403, 'invalid_signature', 'Parametro signature mancante o non valido: usa la firma contenuta nell\'URL del QR code della tessera.');
         }
 
         /** @var Tessera|null $tessera */

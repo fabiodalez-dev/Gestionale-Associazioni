@@ -185,6 +185,70 @@ class UpdateServiceFlussoTest extends TestCase
         $this->assertSame('0.5.0', trim((string) file_get_contents($this->root.'/VERSION')));
     }
 
+    public function test_release_github_con_versione_piu_vecchia_viene_rifiutata_prima_di_scaricare(): void
+    {
+        config(['update.github.owner' => 'o', 'update.github.repo' => 'gestionale-associazioni', 'update.github.token' => null]);
+        Http::fake();
+        File::put($this->root.'/VERSION', "0.5.0\n");
+        $updater = new UpdateServiceDiProva($this->root);
+
+        $esito = $updater->applicaAggiornamento('v0.2.0');
+
+        $this->assertFalse($esito['success']);
+        $this->assertStringContainsString('non si torna indietro', (string) $esito['error']);
+        Http::assertNothingSent();
+        $this->assertSame('0.5.0', trim((string) file_get_contents($this->root.'/VERSION')));
+        $this->assertFileExists($this->root.'/app/vecchio.php');
+        $this->assertDatabaseHas('update_logs', ['from_version' => '0.5.0', 'to_version' => '0.2.0', 'stato' => 'fallito']);
+        $this->assertFalse($updater->inCorso());
+    }
+
+    public function test_pacchetto_con_collegamento_simbolico_viene_rifiutato(): void
+    {
+        $zip = sys_get_temp_dir().'/updater_link_'.uniqid().'.zip';
+        $z = new ZipArchive;
+        $z->open($zip, ZipArchive::CREATE);
+        $p = 'gestionale-associazioni/';
+        foreach (['VERSION' => "0.2.0\n", 'artisan' => '<?php', 'bootstrap/app.php' => '<?php', 'public/index.php' => '<?php', 'vendor/autoload.php' => '<?php'] as $nome => $contenuto) {
+            $z->addFromString($p.$nome, $contenuto);
+        }
+        // Voce dichiarata come symlink (S_IFLNK negli attributi esterni UNIX)
+        // che punta fuori dal pacchetto
+        $z->addFromString($p.'storage/app/link', '../../../../.env');
+        $z->setExternalAttributesIndex((int) $z->locateName($p.'storage/app/link'), ZipArchive::OPSYS_UNIX, (0120777 << 16));
+        $z->close();
+
+        try {
+            $esito = (new UpdateServiceDiProva($this->root))->applicaAggiornamento('0.0.0', null, $zip);
+            $this->assertFalse($esito['success']);
+            $this->assertStringContainsString('collegamento simbolico', (string) $esito['error']);
+            $this->assertStringContainsString('storage/app/link', (string) $esito['error']);
+            $this->assertFileExists($this->root.'/app/vecchio.php');
+            $this->assertSame('0.1.0', trim((string) file_get_contents($this->root.'/VERSION')));
+            $this->assertSame([], File::directories($this->root.'/storage/app/updates'), 'Nessuna estrazione lasciata sul disco');
+        } finally {
+            @unlink($zip);
+        }
+    }
+
+    public function test_la_scansione_dopo_l_estrazione_trova_un_collegamento_simbolico_reale(): void
+    {
+        $dir = sys_get_temp_dir().'/updater_scan_'.uniqid();
+        File::ensureDirectoryExists($dir.'/pacchetto/vendor/lib');
+        File::put($dir.'/pacchetto/vendor/lib/a.php', '<?php');
+        File::put($dir.'/fuori.txt', 'segreto');
+
+        try {
+            $updater = new UpdateServiceDiProva($this->root);
+            $this->assertNull($updater->primoLinkSimbolico($dir.'/pacchetto'));
+
+            symlink($dir.'/fuori.txt', $dir.'/pacchetto/vendor/lib/link.txt');
+            $this->assertSame('vendor/lib/link.txt', $updater->primoLinkSimbolico($dir.'/pacchetto'));
+        } finally {
+            File::deleteDirectory($dir);
+        }
+    }
+
     public function test_nome_file_con_due_punti_consecutivi_e_ammesso_ma_il_segmento_padre_no(): void
     {
         // "..": solo come segmento di percorso è pericoloso; dentro un nome di file è legittimo

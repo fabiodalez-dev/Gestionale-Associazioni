@@ -16,10 +16,21 @@ class DatabaseSeeder extends Seeder
 {
     /**
      * Seed: ruoli/permessi + dati dimostrativi minimi.
+     *
+     * Gli utenti demo hanno la password fissa della factory ('password'):
+     * fuori da local/testing si seminano SOLO ruoli e permessi, altrimenti
+     * un `migrate --seed` su un'installazione reale lascerebbe un super
+     * admin con credenziali pubbliche.
      */
     public function run(): void
     {
         $this->call(RolesSeeder::class);
+
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('Dati dimostrativi saltati: hanno credenziali note e sono disponibili solo in APP_ENV=local o testing. Crea il super admin dal wizard /install oppure con "php artisan admin:recupera-accesso".');
+
+            return;
+        }
 
         // Super admin di piattaforma (nessuna associazione)
         $superAdmin = Utente::factory()->superAdmin()->create([

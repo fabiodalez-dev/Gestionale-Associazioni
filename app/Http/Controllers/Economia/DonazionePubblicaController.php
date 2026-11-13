@@ -10,6 +10,8 @@ use App\Models\PaymentGatewaySetting;
 use App\Services\Pagamenti\PaymentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Donazioni online dal mini-sito pubblico /a/{slug}/dona (f.15 del
@@ -17,6 +19,10 @@ use Illuminate\Http\RedirectResponse;
  * (per la ricevuta), anonimato opzionale, checkout Stripe/PayPal via
  * interfaccia Pagabile. La conferma reale arriva SEMPRE dal webhook
  * (dispatch tipo 'donazione'), mai dal redirect di ritorno.
+ *
+ * La pagina di esito mostra importo ed email del donatore: è raggiungibile
+ * solo con l'URL firmato (APP_KEY) consegnato al gateway come URL di
+ * ritorno, non con il solo UUID della donazione.
  */
 class DonazionePubblicaController extends Controller
 {
@@ -61,12 +67,14 @@ class DonazionePubblicaController extends Controller
             'associazione_id' => $associazione->id,
         ]);
 
-        $returnUrl = route('pubblico.dona.esito', [
+        // URL di ritorno firmati: la firma copre anche l'esito, così la pagina
+        // non è indovinabile dall'UUID e l'esito non è alterabile
+        $returnUrl = URL::signedRoute('pubblico.dona.esito', [
             'associazione' => $associazione->slug,
             'donazione' => $donazione->id,
             'esito' => 'success',
         ]);
-        $cancelUrl = route('pubblico.dona.esito', [
+        $cancelUrl = URL::signedRoute('pubblico.dona.esito', [
             'associazione' => $associazione->slug,
             'donazione' => $donazione->id,
             'esito' => 'cancel',
@@ -89,11 +97,21 @@ class DonazionePubblicaController extends Controller
     }
 
     /**
-     * GET /a/{slug}/dona/{donazione}/esito — esito con stato live
-     * (lo stato reale lo decide il webhook).
+     * Parametri che i gateway aggiungono all'URL di ritorno (PayPal: token e
+     * PayerID; Stripe: session_id se usato il placeholder): esclusi dalla
+     * verifica della firma.
      */
-    public function esito(Associazione $associazione, string $donazione): View
+    private const PARAMETRI_GATEWAY = ['token', 'PayerID', 'session_id'];
+
+    /**
+     * GET /a/{slug}/dona/{donazione}/esito — esito con stato live
+     * (lo stato reale lo decide il webhook). Solo con URL firmato.
+     */
+    public function esito(Request $request, Associazione $associazione, string $donazione): View
     {
+        // Firma mancante o manomessa → 403, prima della lookup
+        abort_unless($request->hasValidSignatureWhileIgnoring(self::PARAMETRI_GATEWAY), 403);
+
         // Lookup tenant-scoped (global scope via tenant.pubblico):
         // 404 uniforme cross-tenant
         /** @var Donazione $donazione */
@@ -102,7 +120,7 @@ class DonazionePubblicaController extends Controller
         return view('pubblico.dona.esito', [
             'associazione' => $associazione,
             'donazione' => $donazione,
-            'annullata' => request()->query('esito') === 'cancel',
+            'annullata' => $request->query('esito') === 'cancel',
         ]);
     }
 }

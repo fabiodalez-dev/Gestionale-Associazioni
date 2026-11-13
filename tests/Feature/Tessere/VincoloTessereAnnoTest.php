@@ -124,7 +124,9 @@ class VincoloTessereAnnoTest extends TessereTestCase
             ->assertSee('20260001-B');
 
         // Correzione fuori dal modello (es. riga cancellata da un'altra
-        // installazione o da SQL): la pagina stessa attiva il vincolo
+        // installazione o da SQL): la pagina non elenca più il doppione ma
+        // non applica il vincolo (hardening audit run-1: niente DDL né update
+        // cross-tenant a ogni richiesta dello staff); lo fa il comando notturno
         Tessera::allTenants()->whereKey($this->doppione->id)->toBase()->delete();
 
         $this->actingAs($admin)
@@ -132,11 +134,49 @@ class VincoloTessereAnnoTest extends TessereTestCase
             ->get(route('tessere.index'))
             ->assertOk()
             ->assertDontSee('Tessere doppie da sistemare');
+        $this->assertFalse($this->indicePresente());
+
+        $this->artisan('tessere:applica-vincolo-anno')->assertSuccessful();
         $this->assertTrue($this->indicePresente());
     }
 
-    public function test_la_pagina_tessere_non_mostra_i_nomi_dei_soci_di_altre_associazioni(): void
+    /**
+     * Hardening (audit run-1): la pagina Tessere legge soltanto. Prima a ogni
+     * apertura eseguiva sistema(): ALTER TABLE e UPDATE su tutta la tabella,
+     * cross-tenant, da parte di un admin di associazione.
+     */
+    public function test_la_pagina_tessere_non_esegue_ddl_ne_update_sulle_tessere(): void
     {
+        $admin = $this->creaAdmin($this->associazione);
+        // Doppione tolto da SQL: con il vecchio comportamento la pagina
+        // applicherebbe subito il vincolo
+        $this->eliminaDoppioneIniziale();
+        DB::table('tessere')->where('id', $this->prima->id)->update(['anno_non_annullata' => null]);
+
+        $scritture = [];
+        DB::listen(function ($query) use (&$scritture): void {
+            $sql = self::sqlNormalizzato($query->sql);
+            if (str_contains($sql, 'tessere') && ! str_starts_with($sql, 'select') && ! str_starts_with($sql, 'pragma')) {
+                $scritture[] = $sql;
+            }
+        });
+
+        $this->actingAs($admin)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->get(route('tessere.index'))
+            ->assertOk()
+            ->assertDontSee('Tessere doppie da sistemare');
+
+        $this->assertSame([], $scritture);
+        $this->assertFalse($this->indicePresente());
+        $this->assertNull(Tessera::allTenants()->find($this->prima->id)->getAttribute('anno_non_annullata'));
+    }
+
+    public function test_la_pagina_tessere_non_mostra_i_doppioni_dei_soci_di_altre_associazioni(): void
+    {
+        // Hardening (audit run-1): l'elenco è limitato ai soci dell'associazione
+        // corrente; prima la pagina contava anche i casi degli altri tenant
+        // ("Altri N casi riguardano soci che non vedi da qui")
         $altra = Associazione::factory()->create();
         $admin = $this->creaAdmin($altra);
 
@@ -144,9 +184,8 @@ class VincoloTessereAnnoTest extends TessereTestCase
             ->withSession(['associazione_id' => $altra->id])
             ->get(route('tessere.index'))
             ->assertOk()
-            ->assertSee('Tessere doppie da sistemare')
-            ->assertDontSee('Bianchi Anna')
-            ->assertSee('Altri 1 casi riguardano soci che non vedi da qui');
+            ->assertDontSee('Tessere doppie da sistemare')
+            ->assertDontSee('Bianchi Anna');
     }
 
     public function test_la_pagina_aggiornamenti_avvisa_il_super_admin(): void
@@ -333,6 +372,11 @@ class VincoloTessereAnnoTest extends TessereTestCase
         $this->assertCount(1, $this->vincolo()->doppioni());
         $this->assertFalse($this->vincolo()->applicaSePossibile());
         $this->assertFalse($this->indicePresente());
+
+        // Il filtro per associazione segue il socio (chiave dell'indice), non
+        // la riga incoerente: lo vede chi gestisce Bianchi, non l'altra
+        $this->assertCount(1, $this->vincolo()->doppioni($this->associazione->id));
+        $this->assertCount(0, $this->vincolo()->doppioni($altra->id));
     }
 
     public function test_la_pagina_non_mostra_i_numeri_delle_tessere_di_un_altra_associazione(): void
@@ -388,7 +432,7 @@ class VincoloTessereAnnoTest extends TessereTestCase
             $this->assertStringContainsString('socio_id in', $ricerca);
         }
 
-        // La pagina Tessere (scansione completa) riporta dentro anche l'altra
+        // Il comando notturno (scansione completa) riporta dentro anche l'altra
         $this->vincolo()->sistema();
         $this->assertSame(2026, Tessera::allTenants()->find($fuori->id)->getAttribute('anno_non_annullata'));
     }

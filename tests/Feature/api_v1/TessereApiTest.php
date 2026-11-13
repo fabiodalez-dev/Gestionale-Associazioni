@@ -6,6 +6,7 @@ use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\Tessere\TesseraQrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -69,11 +70,19 @@ class TessereApiTest extends TestCase
 
     // ---- Verifica pubblica (QR) ----
 
+    /** Query string di verify con la firma dell'URL stampato nel QR. */
+    private function queryVerify(Tessera|string $tessera): string
+    {
+        $id = $tessera instanceof Tessera ? $tessera->id : $tessera;
+
+        return http_build_query(['tessera_id' => $id, 'signature' => app(TesseraQrService::class)->signature($id)]);
+    }
+
     public function test_verify_e_pubblico_e_riconosce_tessera_valida(): void
     {
         $tessera = $this->creaTessera();
 
-        $this->getJson('/api/v1/tessere/verify?tessera_id='.$tessera->id)
+        $this->getJson('/api/v1/tessere/verify?'.$this->queryVerify($tessera))
             ->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('valid', true)
@@ -87,7 +96,7 @@ class TessereApiTest extends TestCase
     {
         $tessera = $this->creaTessera(['data_scadenza' => now()->subDay()->toDateString()]);
 
-        $this->getJson('/api/v1/tessere/verify?tessera_id='.$tessera->id)
+        $this->getJson('/api/v1/tessere/verify?'.$this->queryVerify($tessera))
             ->assertOk()
             ->assertJsonPath('valid', false);
     }
@@ -101,9 +110,48 @@ class TessereApiTest extends TestCase
 
     public function test_verify_tessera_inesistente_restituisce_404(): void
     {
-        $this->getJson('/api/v1/tessere/verify?tessera_id=00000000-0000-0000-0000-000000000000')
+        $this->getJson('/api/v1/tessere/verify?'.$this->queryVerify('00000000-0000-0000-0000-000000000000'))
             ->assertStatus(404)
             ->assertJsonPath('code', 'tessera_not_found');
+    }
+
+    /**
+     * Hardening (audit run-1): prima bastava l'UUID; ora serve la firma
+     * dell'URL del QR, controllata prima della lookup (403 sia per una
+     * tessera esistente sia per una inesistente: non rivela nulla).
+     */
+    public function test_verify_senza_firma_valida_restituisce_403_senza_rivelare_la_tessera(): void
+    {
+        $tessera = $this->creaTessera();
+
+        $this->getJson('/api/v1/tessere/verify?tessera_id='.$tessera->id)
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'invalid_signature')
+            ->assertJsonMissingPath('tessera');
+
+        $this->getJson('/api/v1/tessere/verify?tessera_id='.$tessera->id.'&signature=manomessa')
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'invalid_signature');
+
+        $this->getJson('/api/v1/tessere/verify?tessera_id=00000000-0000-0000-0000-000000000000')
+            ->assertStatus(403)
+            ->assertJsonPath('code', 'invalid_signature');
+
+        // La firma di un'altra tessera non vale
+        $altra = $this->creaTessera();
+        $this->getJson('/api/v1/tessere/verify?tessera_id='.$tessera->id.'&signature='.app(TesseraQrService::class)->signature($altra))
+            ->assertStatus(403);
+    }
+
+    public function test_verify_accetta_la_firma_ricavata_dall_url_del_qr(): void
+    {
+        $tessera = $this->creaTessera();
+
+        parse_str((string) parse_url(app(TesseraQrService::class)->verificationUrl($tessera), PHP_URL_QUERY), $query);
+
+        $this->getJson('/api/v1/tessere/verify?tessera_id='.$tessera->id.'&signature='.$query['signature'])
+            ->assertOk()
+            ->assertJsonPath('valid', true);
     }
 
     // ---- Lista ----

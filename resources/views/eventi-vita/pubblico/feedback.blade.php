@@ -45,7 +45,8 @@
                     <div class="alert alert-danger">{{ $errors->first() }}</div>
                 @endif
 
-                <form method="POST" action="{{ route('feedback-eventi.store', $feedback->token) }}">
+                {{-- Stessa URL firmata del GET: la rotta POST richiede la firma --}}
+                <form method="POST" action="{{ $urlInvio }}">
                     @csrf
                     <div class="stelle mb-3" role="radiogroup" aria-label="Voto da 1 a 5">
                         @for ($i = \App\Models\FeedbackEvento::VOTO_MAX; $i >= \App\Models\FeedbackEvento::VOTO_MIN; $i--)

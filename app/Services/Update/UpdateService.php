@@ -314,6 +314,14 @@ class UpdateService
         $copiaIniziata = false;
 
         try {
+            // 0. Mai un downgrade: le migration non sono reversibili. Il
+            // pacchetto locale si controlla dopo l'estrazione (dichiara lui la
+            // versione); per la release GitHub la versione richiesta si
+            // conosce già, quindi si rifiuta prima di backup e download
+            if ($pacchettoLocale === null && version_compare(ltrim($versione, 'v'), $this->versioneCorrente(), '<')) {
+                throw new RuntimeException('La versione richiesta '.ltrim($versione, 'v').' è più vecchia di quella installata ('.$this->versioneCorrente().'): non si torna indietro con l\'aggiornamento (le migration non sono reversibili). Ripristina da un backup se serve.');
+            }
+
             // 1. Backup database
             $backupDb = $this->backupDatabase();
             $log->update(['backup_path' => $backupDb]);
@@ -587,6 +595,13 @@ class UpdateService
                 $zip->close();
                 throw new RuntimeException('Percorso non valido nel pacchetto: '.$entry);
             }
+            // Un collegamento simbolico nel pacchetto (attributi esterni UNIX
+            // con tipo S_IFLNK) potrebbe puntare fuori dalla radice (.env,
+            // storage) e farci copiare o sovrascrivere file arbitrari
+            if ($this->vocePerLinkSimbolico($zip, $i)) {
+                $zip->close();
+                throw new RuntimeException('Il pacchetto contiene un collegamento simbolico, non ammesso: '.$entry);
+            }
             $byteDecompressi += (int) ($zip->statIndex($i)['size'] ?? 0);
         }
         $this->verificaSpazio($byteDecompressi + 50 * 1024 * 1024);
@@ -598,12 +613,57 @@ class UpdateService
         }
         $zip->close();
 
+        // Seconda rete: qualunque cosa l'estrazione abbia prodotto sul disco
+        // come link (attributi non riconosciuti, altre implementazioni di
+        // zip) viene rifiutata prima di toccare la radice
+        $link = $this->primoLinkSimbolico($destinazione);
+        if ($link !== null) {
+            File::deleteDirectory($destinazione);
+            throw new RuntimeException('Il pacchetto estratto contiene un collegamento simbolico, non ammesso: '.$link);
+        }
+
         $sorgente = $this->trovaSorgente($destinazione);
         if ($sorgente === null) {
             throw new RuntimeException('Pacchetto non valido: manca uno tra '.implode(', ', self::FILE_PACCHETTO).'.');
         }
 
         return $sorgente;
+    }
+
+    /**
+     * La voce dello zip è dichiarata come collegamento simbolico: attributi
+     * esterni di tipo UNIX con i bit di tipo file (st_mode nei 16 bit alti)
+     * pari a S_IFLNK.
+     */
+    private function vocePerLinkSimbolico(ZipArchive $zip, int $indice): bool
+    {
+        $opsys = 0;
+        $attr = 0;
+        if (! $zip->getExternalAttributesIndex($indice, $opsys, $attr)) {
+            return false;
+        }
+
+        return $opsys === ZipArchive::OPSYS_UNIX && (($attr >> 16) & 0170000) === 0120000;
+    }
+
+    /**
+     * Percorso (relativo a $dir) del primo collegamento simbolico trovato
+     * nella cartella, oppure null. Non segue i link nelle sottocartelle.
+     */
+    public function primoLinkSimbolico(string $dir): ?string
+    {
+        $iteratore = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iteratore as $voce) {
+            /** @var \SplFileInfo $voce */
+            if ($voce->isLink()) {
+                return ltrim(str_replace([$dir, '\\'], ['', '/'], $voce->getPathname()), '/');
+            }
+        }
+
+        return null;
     }
 
     /** La radice dell'app dentro l'estrazione: la cartella stessa o la sua unica sottocartella. */

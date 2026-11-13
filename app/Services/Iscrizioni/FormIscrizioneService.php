@@ -113,7 +113,7 @@ class FormIscrizioneService
         }
 
         // Pulizia delle conferme scadute (anche senza scheduler attivo)
-        IscrizioneDaConfermare::query()->where('scade_at', '<', now())->delete();
+        IscrizioneDaConfermare::query()->withoutGlobalScopes()->where('scade_at', '<', now())->delete();
 
         $email = (string) ($dati['email'] ?? '');
 
@@ -166,14 +166,17 @@ class FormIscrizioneService
     public function confermaOspite(string $id, Associazione $associazione): RichiestaIscrizione
     {
         return DB::transaction(function () use ($id, $associazione): RichiestaIscrizione {
+            // forAssociazione toglie lo scope di tenant e filtra per l'associazione
+            // dello slug: chi apre il link può essere loggato nel back office di
+            // un'altra associazione nello stesso browser
             $pendente = IscrizioneDaConfermare::query()
-                ->where('associazione_id', $associazione->id)
+                ->forAssociazione($associazione->id)
                 ->whereKey($id)
                 ->lockForUpdate()
                 ->first();
 
             if ($pendente === null || $pendente->isScaduta()
-                || IscrizioneDaConfermare::query()->whereKey($pendente->id)->delete() === 0) {
+                || IscrizioneDaConfermare::query()->withoutGlobalScopes()->whereKey($pendente->id)->delete() === 0) {
                 throw IscrizioneException::confermaNonValida();
             }
 

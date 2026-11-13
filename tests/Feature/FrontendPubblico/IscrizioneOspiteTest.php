@@ -254,6 +254,20 @@ class IscrizioneOspiteTest extends TestCase
         $this->assertSame(0, IscrizioneDaConfermare::query()->whereKey($pendente->id)->count());
     }
 
+    public function test_conferma_funziona_anche_se_nel_browser_e_loggato_lo_staff_di_un_altra_associazione(): void
+    {
+        $this->post('/a/ospiti/iscriviti', $this->payloadOspite());
+        $link = $this->linkConferma('giulia.neri@example.com');
+
+        // Lo scope di tenant dello staff loggato non deve nascondere l'iscrizione in sospeso
+        $altra = Associazione::factory()->create();
+        $staff = Utente::factory()->adminAssociazione()->create(['associazione_id' => $altra->id]);
+
+        $this->actingAs($staff)->get($link)->assertRedirect('/a/ospiti')->assertSessionHas('success');
+        $this->assertSame(1, RichiestaIscrizione::withoutGlobalScopes()->where('associazione_id', $this->associazione->id)->count());
+        $this->assertSame(0, IscrizioneDaConfermare::query()->withoutGlobalScopes()->count());
+    }
+
     public function test_il_modulo_non_serve_a_inondare_una_casella_email(): void
     {
         $this->withoutMiddleware(ThrottleRequests::class);

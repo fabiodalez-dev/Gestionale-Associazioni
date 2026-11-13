@@ -131,6 +131,12 @@ class FortifyServiceProvider extends ServiceProvider
     private function limitaRecuperoPassword(): void
     {
         $this->app->booted(function (): void {
+            // Con le rotte in cache il middleware è già nella cache stessa:
+            // la scansione istanzierebbe ogni rotta a ogni richiesta
+            if ($this->app->routesAreCached()) {
+                return;
+            }
+
             $limiti = [
                 'password.email' => 'throttle:5,1',
                 'password.update' => 'throttle:10,1',

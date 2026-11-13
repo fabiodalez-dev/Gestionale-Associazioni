@@ -3,8 +3,10 @@
 namespace App\Services\Email;
 
 use App\Models\SmtpSetting;
+use App\Rules\HostSmtpPubblico;
 use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Mail;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -67,6 +69,13 @@ class TenantMailer
      */
     public static function mailerConfig(SmtpSetting $settings): array
     {
+        // Ricontrollo a ogni connessione, non solo al salvataggio: copre le
+        // impostazioni salvate prima della regola e i nomi che cambiano
+        // indirizzo dopo la validazione (DNS a TTL basso verso la rete interna)
+        if (! HostSmtpPubblico::ammesso((string) $settings->smtp_host)) {
+            throw new InvalidArgumentException(HostSmtpPubblico::MESSAGGIO.' Correggi l\'host nelle impostazioni email.');
+        }
+
         $config = [
             'transport' => 'smtp',
             'host' => $settings->smtp_host,

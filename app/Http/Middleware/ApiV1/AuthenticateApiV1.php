@@ -136,11 +136,14 @@ class AuthenticateApiV1
             return $this->error(403, 'key_expired', 'Token scaduto.');
         }
 
-        // Scadenza massima di sistema (config sanctum.expiration, in minuti):
-        // vale anche per i token creati senza expires_at, come fa la guard Sanctum.
+        // Scadenza massima di sistema (config sanctum.expiration, in minuti)
+        // per i token senza expires_at: chi ha una scadenza propria (tutti i
+        // token creati dal pannello, e quelli preesistenti dopo il backfill
+        // della migration) segue quella.
         $scadenzaMinuti = config('sanctum.expiration');
 
-        if (is_numeric($scadenzaMinuti) && (int) $scadenzaMinuti > 0
+        if ($accessToken->expires_at === null
+            && is_numeric($scadenzaMinuti) && (int) $scadenzaMinuti > 0
             && $accessToken->created_at !== null
             && $accessToken->created_at->copy()->addMinutes((int) $scadenzaMinuti)->isPast()) {
             return $this->error(403, 'key_expired', 'Token scaduto.');

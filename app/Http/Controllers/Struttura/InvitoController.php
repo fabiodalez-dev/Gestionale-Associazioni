@@ -35,8 +35,7 @@ class InvitoController extends Controller
 
         $utente->forceFill([
             'password_hash' => $request->validated('password'), // hashed dal cast
-            'invito_token' => null,
-            'invito_scade_at' => null,
+            ...Utente::invitoChiuso(),
             'remember_token' => Str::random(60),
         ])->save();
 

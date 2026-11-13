@@ -199,6 +199,19 @@ class VerificaPubblicaTest extends TestCase
         $this->getJson('/api/v1/tessere/verify?tessera_id='.$moderna->id)->assertForbidden();
     }
 
+    public function test_la_ristampa_di_una_tessera_legacy_usa_l_url_firmato(): void
+    {
+        $legacy = $this->creaTessera();
+        $legacy->forceFill(['qr_code_url' => url('/verifica-tessera/'.$legacy->id)])->save();
+
+        $qr = app(TesseraQrService::class);
+        $this->assertSame($qr->verificationUrl($legacy), $qr->urlPerStampa($legacy));
+
+        $moderna = $this->creaTessera();
+        $moderna->forceFill(['qr_code_url' => $qr->verificationUrl($moderna)])->save();
+        $this->assertSame($moderna->qr_code_url, $qr->urlPerStampa($moderna));
+    }
+
     public function test_il_comando_tessere_firma_qr_chiude_la_finestra_legacy(): void
     {
         $legacy = $this->creaTessera();

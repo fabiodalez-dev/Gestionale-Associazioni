@@ -6,6 +6,7 @@ use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
 
 /**
@@ -232,14 +233,22 @@ class AutenticazioneApiV1Test extends TestCase
             ->assertJsonPath('code', 'key_expired');
     }
 
+    public function test_token_con_scadenza_propria_oltre_il_limite_di_sistema_resta_valido(): void
+    {
+        // Un token con expires_at esplicito (es. preesistente, backfillato a +365
+        // giorni dalla migration) non viene tagliato dal limite calcolato su created_at
+        $utente = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
+        $token = $utente->createToken('vecchio', ['soci:read'], now()->addDays(400))->plainTextToken;
+        PersonalAccessToken::query()->update(['created_at' => now()->subDays(370)]);
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token])->assertOk();
+    }
+
     public function test_token_sanctum_senza_scadenza_scade_con_il_limite_di_sistema(): void
     {
-        // Per compatibilità con le installazioni esistenti il limite di sistema
-        // è spento (null): i token vecchi senza expires_at restano validi.
-        // Se l'operatore lo imposta (SANCTUM_TOKEN_EXPIRATION), vale anche per
-        // i token creati senza expires_at.
-        $this->assertNull(config('sanctum.expiration'));
-        config(['sanctum.expiration' => 525600]);
+        // Limite di sistema 365 giorni per i token senza expires_at (quelli
+        // preesistenti ricevono expires_at dalla migration di backfill).
+        $this->assertSame(525600, config('sanctum.expiration'));
 
         $utente = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
         $token = $utente->createToken('eterno', ['soci:read'], null)->plainTextToken;

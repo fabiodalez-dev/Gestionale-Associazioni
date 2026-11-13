@@ -124,8 +124,7 @@ class AmministratoreController extends Controller
         if ($disattivato || $passwordImposta) {
             // Un invito pendente non deve poter riaprire l'account né
             // sovrascrivere la password appena imposta
-            $utente->invito_token = null;
-            $utente->invito_scade_at = null;
+            $utente->forceFill(Utente::invitoChiuso());
         }
 
         $utente->save();
@@ -163,6 +162,14 @@ class AmministratoreController extends Controller
     public function reinviaInvito(Request $request, Utente $utente): RedirectResponse
     {
         Gate::authorize('update', $utente);
+
+        // Un invito accettato non riattiva l'utente: inviarlo a un disattivato
+        // produrrebbe solo un link che risponde 403
+        if (! $utente->attivo) {
+            return redirect()
+                ->route('amministratori.index')
+                ->with('error', 'L\'utente è disattivato: riattivalo prima di reinviare l\'invito.');
+        }
 
         $inviato = $this->inviaInvito($utente);
 

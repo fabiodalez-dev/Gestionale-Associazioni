@@ -29,7 +29,7 @@ class TesseraPdfRenderer
         /** @var Associazione $associazione */
         $associazione = $tessera->associazione()->firstOrFail();
 
-        $qrUrl = $tessera->qr_code_url ?: $this->qr->verificationUrl($tessera);
+        $qrUrl = $this->qr->urlPerStampa($tessera);
         $qrSvg = $this->qr->generateSvg($qrUrl, 3);
 
         $costo = $socio->tipoSocio->costo_tessera ?? $associazione->costo_tessera;

@@ -342,7 +342,7 @@ class TesseraController extends Controller
         $associazione = $tessera->associazione;
 
         $qrDataUri = $this->qr->generateDataUri(
-            $tessera->qr_code_url ?: $this->qr->verificationUrl($tessera),
+            $this->qr->urlPerStampa($tessera),
             3
         );
 

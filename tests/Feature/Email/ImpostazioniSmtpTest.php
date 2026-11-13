@@ -46,6 +46,22 @@ class ImpostazioniSmtpTest extends EmailTestCase
         $this->assertSame(0, SmtpSetting::allTenants()->count());
     }
 
+    public function test_impostazioni_salvate_con_host_privato_non_aprono_connessioni_al_test(): void
+    {
+        // Riga salvata prima della regola (o nome DNS cambiato dopo il salvataggio):
+        // il controllo vale alla connessione, non solo alla validazione del form
+        $settings = $this->configuraSmtp();
+        $settings->forceFill(['smtp_host' => '10.0.0.5'])->save(); // nessuna validazione: come una riga pre-esistente
+
+        $this->actingAs($this->admin)->postJson(route('email-impostazioni.test'), ['test_email' => 'a@example.com'])
+            ->assertOk()
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('error', fn (string $e) => str_contains($e, 'server di posta pubblico'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        TenantMailer::mailerConfig($settings);
+    }
+
     public function test_primo_salvataggio_crea_le_impostazioni_e_seedda_i_template(): void
     {
         $response = $this->actingAs($this->admin)->post(route('email-impostazioni.store'), [

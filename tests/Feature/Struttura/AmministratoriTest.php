@@ -184,13 +184,34 @@ class AmministratoriTest extends TestCase
             ->assertRedirect(route('login'));
         $this->assertTrue(auth()->guard('web')->attempt(['email' => $utente->email, 'password' => 'Password-Di-Transizione-1']));
 
-        // Dopo il primo accesso la via di transizione si chiude
-        $utente->forceFill(['last_login' => now()])->save();
+        // Consumato: lo stesso link vecchio non vale una seconda volta
         $this->get($vecchioLink)->assertForbidden();
+        $this->post($vecchioLink, ['password' => 'Altra-Password-Transizione-2', 'password_confirmation' => 'Altra-Password-Transizione-2'])->assertForbidden();
+
+        // Un utente mai entrato ma creato da più di 7 giorni: link legacy scaduto
+        $vecchio = Utente::factory()->adminAssociazione()->create(['last_login' => null, 'created_at' => now()->subDays(8)]);
+        $this->get(URL::temporarySignedRoute('invito.show', now()->addDays(7), ['utente' => $vecchio->id]))->assertForbidden();
+
+        // Dopo il primo accesso la via di transizione è chiusa anche senza consumo
+        $entrato = Utente::factory()->adminAssociazione()->create(['last_login' => now()]);
+        $this->get(URL::temporarySignedRoute('invito.show', now()->addDays(7), ['utente' => $entrato->id]))->assertForbidden();
 
         // E non riattiva mai un utente disattivato
         $altro = Utente::factory()->adminAssociazione()->create(['last_login' => null, 'attivo' => false]);
         $this->get(URL::temporarySignedRoute('invito.show', now()->addDays(7), ['utente' => $altro->id]))->assertForbidden();
+    }
+
+    public function test_reinvio_invito_a_utente_disattivato_viene_rifiutato(): void
+    {
+        Mail::fake();
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $utente = Utente::factory()->adminAssociazione()->create(['attivo' => false]);
+
+        $this->actingAs($superAdmin)->post(route('amministratori.reinvia-invito', $utente))
+            ->assertRedirect(route('amministratori.index'))
+            ->assertSessionHas('error');
+        Mail::assertNothingQueued();
+        $this->assertNull($utente->fresh()->invito_token);
     }
 
     public function test_invito_dal_pannello_salva_il_nonce_e_lo_mette_nel_link(): void

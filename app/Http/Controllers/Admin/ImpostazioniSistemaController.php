@@ -149,7 +149,7 @@ class ImpostazioniSistemaController extends Controller
             ->update(['password_reset_token' => null, 'password_reset_expires' => null]);
         $inviti = Utente::query()
             ->where(fn ($q) => $q->whereNotNull('invito_token')->orWhereNotNull('invito_scade_at'))
-            ->update(['invito_token' => null, 'invito_scade_at' => null]);
+            ->update(Utente::invitoChiuso());
         $tokenBroker = DB::table((string) config('auth.passwords.utenti.table', 'password_reset_tokens'))->delete();
 
         activity('sicurezza')->causedBy($request->user())->withProperties([

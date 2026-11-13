@@ -59,7 +59,12 @@ class AzioniSicurezzaTest extends TestCase
 
         $invitato->refresh();
         $this->assertNull($invitato->invito_token);
-        $this->assertNull($invitato->invito_scade_at);
+        // Marker di invito chiuso: scadenza nel passato (non null, così la via
+        // di transizione senza nonce non si riapre) e link non più valido
+        $this->assertNotNull($invitato->invito_scade_at);
+        $this->assertTrue($invitato->invito_scade_at->isPast());
+        $this->assertFalse($invitato->invitoValido('nonce-invito'));
+        $this->assertFalse($invitato->invitoValido(null));
 
         $this->assertSame(0, DB::table('password_reset_tokens')->count());
         $this->assertStringContainsString('3 link di invito o recupero password annullati', (string) session('success'));

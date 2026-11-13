@@ -16,31 +16,48 @@ class HostSmtpPubblico implements ValidationRule
 {
     private const SUFFISSI_LOCALI = ['localhost', '.localhost', '.local', '.internal', '.lan', '.home.arpa', '.intranet'];
 
+    public const MESSAGGIO = 'L\'host SMTP deve essere un server di posta pubblico.';
+
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (! is_string($value) || $value === '') {
             return; // ci pensano required|string
         }
 
-        $host = strtolower(trim($value, "[] \t"));
+        if (! self::ammesso($value)) {
+            $fail(self::MESSAGGIO);
+        }
+    }
+
+    /**
+     * Vero se l'host (nome o IP) non è locale né privato, risolvendolo ORA.
+     * Va richiamato anche subito prima di ogni connessione (TenantMailer):
+     * la validazione al salvataggio non basta, perché un nome con TTL basso
+     * può cambiare indirizzo dopo, e le impostazioni salvate prima della
+     * regola non sono mai passate di qui.
+     */
+    public static function ammesso(string $valore): bool
+    {
+        $host = strtolower(trim($valore, "[] \t"));
+        if ($host === '') {
+            return false;
+        }
 
         foreach (self::SUFFISSI_LOCALI as $suffisso) {
             if ($host === ltrim($suffisso, '.') || str_ends_with($host, $suffisso)) {
-                $fail('L\'host SMTP deve essere un server di posta pubblico.');
-
-                return;
+                return false;
             }
         }
 
-        $indirizzi = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->risolvi($host);
+        $indirizzi = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : self::risolvi($host);
 
         foreach ($indirizzi as $ip) {
             if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                $fail('L\'host SMTP deve essere un server di posta pubblico.');
-
-                return;
+                return false;
             }
         }
+
+        return true;
     }
 
     /**
@@ -49,7 +66,7 @@ class HostSmtpPubblico implements ValidationRule
      *
      * @return list<string>
      */
-    private function risolvi(string $host): array
+    private static function risolvi(string $host): array
     {
         if (app()->runningUnitTests()) {
             return [];

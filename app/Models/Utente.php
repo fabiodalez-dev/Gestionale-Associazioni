@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -109,17 +110,34 @@ class Utente extends Authenticatable
         }
 
         // Transizione: link firmati inviati prima dell'introduzione del nonce
-        // (nessun invito registrato in tabella) restano accettati finché
-        // l'utente non ha mai effettuato un accesso; al primo login o al primo
-        // reinvio dell'invito questa via si chiude da sola.
+        // (nessun invito mai registrato: entrambe le colonne null) restano
+        // accettati solo se l'utente non è mai entrato, una sola volta, e al
+        // massimo per 7 giorni dalla creazione dell'account (la durata di un
+        // invito). Il consumo lascia invito_scade_at valorizzato nel passato,
+        // quindi la via si chiude al primo uso; un reinvio la chiude comunque.
         if ($this->invito_token === null && $this->invito_scade_at === null) {
-            return ($nonce === null || $nonce === '') && $this->last_login === null;
+            return ($nonce === null || $nonce === '')
+                && $this->last_login === null
+                && $this->created_at !== null
+                && $this->created_at->copy()->addDays(7)->isFuture();
         }
 
         return is_string($nonce) && $nonce !== ''
             && is_string($this->invito_token)
             && $this->invito_scade_at !== null && $this->invito_scade_at->isFuture()
             && hash_equals($this->invito_token, hash('sha256', $nonce));
+    }
+
+    /**
+     * Attributi che chiudono qualsiasi invito pendente o legacy: nessun nonce
+     * valido e scadenza nel passato (non null, così la via di transizione
+     * senza nonce non si riapre).
+     *
+     * @return array{invito_token: null, invito_scade_at: Carbon}
+     */
+    public static function invitoChiuso(): array
+    {
+        return ['invito_token' => null, 'invito_scade_at' => now()];
     }
 
     /**

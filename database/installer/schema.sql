@@ -2509,6 +2509,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_11_05_120000_add_snapshot_intestatario_to_ricevute_table', 1),
 ('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1),
 ('2026_11_13_100000_add_invito_to_utenti_table', 1),
-('2026_11_13_110000_hash_api_keys_table', 1);
+('2026_11_13_110000_hash_api_keys_table', 1),
+('2026_11_13_120000_backfill_expires_at_personal_access_tokens', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

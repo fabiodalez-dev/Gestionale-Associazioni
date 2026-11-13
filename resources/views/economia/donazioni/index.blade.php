@@ -33,7 +33,7 @@
 <form method="GET" action="{{ route('donazioni.index') }}" class="row g-2 mb-3">
     <div class="col-auto">
         <label for="filtroStato" class="form-label mb-0 small text-muted">Stato</label>
-        <select name="stato" id="filtroStato" class="form-select" onchange="this.form.submit()">
+        <select name="stato" id="filtroStato" class="form-select" data-invio-automatico>
             <option value="">Tutte</option>
             @foreach (\App\Models\Donazione::STATI as $stato)
                 <option value="{{ $stato }}" @selected($filtroStato === $stato)>{{ ucfirst(str_replace('_', ' ', $stato)) }}</option>

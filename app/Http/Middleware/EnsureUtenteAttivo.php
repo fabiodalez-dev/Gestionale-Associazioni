@@ -23,6 +23,8 @@ class EnsureUtenteAttivo
 
         if ($utente instanceof Utente && ! $utente->attivo) {
             Auth::guard('web')->logout();
+            // Il tenant selezionato non sopravvive al logout forzato
+            $request->session()->forget(['associazione_id', 'associazione_nome']);
             // regenerate (non invalidate): le altre guard nello stesso browser sopravvivono
             $request->session()->regenerate();
             $request->session()->regenerateToken();

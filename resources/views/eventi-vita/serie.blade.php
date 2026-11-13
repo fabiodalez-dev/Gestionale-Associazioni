@@ -55,7 +55,7 @@
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
                                                 <form method="POST" action="{{ route('eventi.destroy', $occorrenza) }}" class="d-inline"
-                                                      onsubmit="return confirm('Annullare SOLO questa occorrenza?');">
+                                                      data-conferma="Annullare SOLO questa occorrenza?">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-outline-danger btn-sm" title="Annulla occorrenza"
@@ -73,7 +73,7 @@
                 </div>
                 <div class="card-footer bg-white">
                     <form method="POST" action="{{ route('eventi.serie.destroy', $evento) }}"
-                          onsubmit="return confirm('Annullare TUTTA la serie ({{ $occorrenze->count() }} eventi)?');">
+                          data-conferma="Annullare TUTTA la serie ({{ $occorrenze->count() }} eventi)?">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-outline-danger">

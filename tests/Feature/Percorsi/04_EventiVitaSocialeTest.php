@@ -1013,7 +1013,9 @@ class Percorso04_EventiVitaSocialeTest extends TestCase
 
         $rimaste = $evento->fresh()->getMedia(Evento::COLLEZIONE_GALLERIA);
         $this->assertCount(1, $rimaste);
-        $this->assertSame('torta.png', $rimaste[0]->file_name);
+        // Su disco il nome è casuale (NomeFileSicuro); quello originale resta come etichetta
+        $this->assertSame('torta', $rimaste[0]->name);
+        $this->assertStringEndsWith('.png', $rimaste[0]->file_name);
     }
 
     // ------------------------------------------------------------------

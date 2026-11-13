@@ -19,7 +19,7 @@
             <form method="GET" action="{{ route('volontari.index') }}" class="row g-2 align-items-end">
                 <div class="col-6 col-md-4">
                     <label class="form-label small mb-1" for="filtro_mansione">Mansione</label>
-                    <select class="form-select form-select-sm" id="filtro_mansione" name="mansione" onchange="this.form.submit()">
+                    <select class="form-select form-select-sm" id="filtro_mansione" name="mansione" data-invio-automatico>
                         <option value="">Tutte le mansioni</option>
                         @foreach ($mansioni as $m)
                             <option value="{{ $m->id }}" @selected($mansioneId === $m->id)>{{ $m->nome }}</option>
@@ -30,7 +30,7 @@
                     <div class="form-check mt-4">
                         <input type="hidden" name="attivi" value="0">
                         <input type="checkbox" class="form-check-input" id="filtro_attivi" name="attivi" value="1"
-                               @checked($soloAttivi) onchange="this.form.submit()">
+                               @checked($soloAttivi) data-invio-automatico>
                         <label class="form-check-label" for="filtro_attivi">Solo volontari attivi</label>
                     </div>
                 </div>

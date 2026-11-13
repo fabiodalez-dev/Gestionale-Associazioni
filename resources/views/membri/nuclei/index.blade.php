@@ -70,7 +70,7 @@
                         @can('delete', $nucleo)
                             <div class="card-footer bg-white text-end">
                                 <form method="POST" action="{{ route('nuclei.destroy', $nucleo) }}" class="d-inline"
-                                      onsubmit="return confirm('Sciogliere il nucleo «{{ $nucleo->nome }}»? I soci non verranno modificati.');">
+                                      data-conferma="Sciogliere il nucleo «{{ $nucleo->nome }}»? I soci non verranno modificati.">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger">

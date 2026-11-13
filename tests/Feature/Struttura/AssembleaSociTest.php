@@ -637,4 +637,40 @@ class AssembleaSociTest extends TestCase
         $modifica([['punto' => 'Bilancio consuntivo'], ['punto' => 'Statuto', 'maggioranza' => 'due_terzi'], ['punto' => 'Varie']])->assertSessionHasNoErrors();
         $this->assertCount(3, $riunione->fresh()->odg);
     }
+
+    public function test_appello_rifiutato_su_assemblea_svolta(): void
+    {
+        $riunione = $this->assemblea();
+        $socio = $this->socio(['numero_socio' => 'A-1']);
+        $this->actAsAdmin()->post(route('riunioni.aventi-diritto', $riunione));
+        $riunione->update(['stato' => Riunione::STATO_SVOLTA]);
+
+        $this->actAsAdmin()
+            ->post(route('riunioni.appello.codice', $riunione), ['codice' => 'A-1'])
+            ->assertSessionHas('error', fn (string $m) => str_contains($m, 'già svolta'));
+
+        $this->assertFalse(RiunionePartecipante::query()->where('socio_id', $socio->id)->firstOrFail()->isPresente());
+    }
+
+    public function test_codice_di_socio_cessato_o_cestinato_non_registra_la_presenza(): void
+    {
+        $riunione = $this->assemblea();
+        $radiato = $this->socio(['numero_socio' => 'R-1']);
+        $cestinato = $this->socio(['numero_socio' => 'C-1']);
+        $tesseraRadiato = Tessera::factory()->create(['socio_id' => $radiato->id]);
+        $tesseraCestinato = Tessera::factory()->create(['socio_id' => $cestinato->id]);
+        $this->actAsAdmin()->post(route('riunioni.aventi-diritto', $riunione));
+
+        // Dopo il calcolo dell'elenco: uno radiato, l'altro nel cestino
+        $radiato->update(['stato' => Socio::STATO_RADIATO]);
+        $cestinato->delete();
+
+        foreach (['R-1', route('tessere.verifica', $tesseraRadiato->id), $tesseraRadiato->numero_tessera, 'C-1', $tesseraCestinato->numero_tessera] as $codice) {
+            $this->actAsAdmin()
+                ->post(route('riunioni.appello.codice', $riunione), ['codice' => $codice])
+                ->assertSessionHas('error');
+        }
+
+        $this->assertSame(0, RiunionePartecipante::query()->where('riunione_id', $riunione->id)->where('stato', RiunionePartecipante::STATO_CONFERMATO)->count());
+    }
 }

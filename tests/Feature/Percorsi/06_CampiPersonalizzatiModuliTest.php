@@ -17,6 +17,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -33,6 +34,7 @@ use ZipArchive;
  */
 class Percorso06_CampiPersonalizzatiModuliTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     private const URL_CAMPI = '/config-campi';
@@ -946,8 +948,8 @@ class Percorso06_CampiPersonalizzatiModuliTest extends TestCase
         ])->assertSessionHasErrors(['custom_field.'.$strumento->id]);
         $this->assertDatabaseMissing('soci', ['email' => 'giulia.verdi@example.com']);
 
-        // Invio corretto (il codice fiscale nascosto, se inviato, viene ignorato; il campo fuori modulo pure)
-        $this->post($this->urlTenant('iscriviti'), $datiBase + [
+        // Invio corretto e conferma dell'email (il codice fiscale nascosto, se inviato, viene ignorato; il campo fuori modulo pure)
+        $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), $datiBase + [
             'codice_fiscale' => 'VRDGLI90E44F205Z',
             'custom_field' => [
                 $strumento->id => 'Violino',

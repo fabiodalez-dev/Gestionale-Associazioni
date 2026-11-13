@@ -13,10 +13,12 @@ use App\Models\Socio;
 use App\Models\Utente;
 use App\Models\Verbale;
 use App\Models\VotanteElezione;
+use App\Notifications\Struttura\CaricheElezioneDaConfermareNotification;
 use App\Services\Struttura\ElezioneNonValidaException;
 use App\Services\Struttura\ElezioniService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
@@ -407,5 +409,147 @@ class ElezioniTest extends TestCase
         ]);
 
         $this->actAsAdmin()->get(route('elezioni.show', $elezione))->assertNotFound();
+    }
+
+    /**
+     * Utente con il solo permesso sulle riunioni (segretario, presidente...):
+     * può proclamare, ma non gestisce le cariche (CaricaPolicy::create).
+     */
+    private function gestoreRiunioni(): Utente
+    {
+        $permessi = [Permission::findOrCreate('riunioni.view', 'web'), Permission::findOrCreate('riunioni.update', 'web')];
+        $utente = Utente::factory()->operatore()->create(['associazione_id' => $this->associazione->id]);
+        $utente->givePermissionTo($permessi);
+        // Con i permessi definiti non vale più il fallback per ruolo: l'admin li riceve come da RolesSeeder
+        $this->admin->givePermissionTo($permessi);
+
+        return $utente;
+    }
+
+    /**
+     * @return array{0: Elezione, 1: list<Candidatura>}
+     */
+    private function elezioneScrutinata(): array
+    {
+        [$elezione, $candidature] = $this->elezioneAlVoto();
+        $this->service->vota($elezione, $candidature[0]->socio, [$candidature[0]->socio_id => [$candidature[0]->id, $candidature[1]->id]]);
+        $this->service->scrutina($elezione, [], 0, 0, 0);
+
+        return [$elezione->fresh(), $candidature];
+    }
+
+    public function test_proclamazione_di_chi_non_gestisce_le_cariche_resta_da_confermare_dall_admin(): void
+    {
+        $uscente = Socio::factory()->create(['associazione_id' => $this->associazione->id]);
+        $presidente = Carica::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'socio_id' => $uscente->id,
+            'ruolo' => 'Presidente',
+            'inizio' => now()->subYears(3)->toDateString(),
+        ]);
+        [$elezione, $candidature] = $this->elezioneScrutinata();
+        $segretario = $this->gestoreRiunioni();
+
+        // Il segretario proclama: eletti registrati, cariche invariate
+        $this->actingAs($segretario)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('elezioni.proclama', $elezione))
+            ->assertSessionHas('success', fn (string $m) => str_contains($m, 'va confermato da un amministratore'));
+
+        $elezione->refresh();
+        $this->assertSame(Elezione::STATO_PROCLAMATA, $elezione->stato);
+        $this->assertNull($elezione->cariche_confermate_at);
+        $this->assertNull($presidente->fresh()->fine);
+        $this->assertSame(0, Carica::query()->where('ruolo', 'Consigliere')->count());
+        Notification::assertSentTo($this->admin, CaricheElezioneDaConfermareNotification::class);
+
+        // Il segretario non può confermare le cariche
+        $this->actingAs($segretario)->withSession(['associazione_id' => $this->associazione->id])
+            ->post(route('elezioni.conferma-cariche', $elezione))
+            ->assertForbidden();
+
+        // L'admin vede il pulsante e conferma
+        $this->actAsAdmin()->get(route('elezioni.show', $elezione))->assertOk()->assertSee('Conferma le cariche');
+        $this->actAsAdmin()->post(route('elezioni.conferma-cariche', $elezione))->assertSessionHas('success');
+
+        $this->assertNotNull($elezione->fresh()->cariche_confermate_at);
+        $this->assertNotNull($presidente->fresh()->fine);
+        $this->assertEqualsCanonicalizing(
+            [$candidature[0]->socio_id, $candidature[1]->socio_id],
+            Carica::query()->where('ruolo', 'Consigliere')->pluck('socio_id')->all(),
+        );
+
+        // Seconda conferma: nessuna carica doppia
+        $this->actAsAdmin()->post(route('elezioni.conferma-cariche', $elezione))->assertSessionHas('error');
+        $this->assertSame(2, Carica::query()->where('ruolo', 'Consigliere')->count());
+    }
+
+    public function test_proclamazione_dell_admin_aggiorna_subito_le_cariche(): void
+    {
+        [$elezione] = $this->elezioneScrutinata();
+
+        $this->actAsAdmin()->post(route('elezioni.proclama', $elezione))->assertSessionHas('success');
+
+        $this->assertNotNull($elezione->fresh()->cariche_confermate_at);
+        $this->assertSame(2, Carica::query()->where('ruolo', 'Consigliere')->count());
+        Notification::assertNotSentTo($this->admin, CaricheElezioneDaConfermareNotification::class);
+        $this->actAsAdmin()->get(route('elezioni.show', $elezione))->assertOk()->assertDontSee('Conferma le cariche');
+    }
+
+    public function test_doppia_proclamazione_con_istanza_vecchia_non_duplica_le_cariche(): void
+    {
+        [$elezione] = $this->elezioneScrutinata();
+        $copiaVecchia = $elezione->fresh();
+
+        $this->service->proclama($elezione);
+
+        try {
+            // Secondo invio con l'elezione letta prima della proclamazione
+            $this->service->proclama($copiaVecchia);
+            $this->fail('Seconda proclamazione accettata');
+        } catch (ElezioneNonValidaException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(2, Carica::query()->where('ruolo', 'Consigliere')->count());
+    }
+
+    public function test_scrutinio_rifiuta_preferenze_di_un_candidato_oltre_le_schede_valide(): void
+    {
+        [$elezione, $candidature] = $this->elezioneAlVoto();
+
+        // 2 schede valide × 2 preferenze = 4: il totale (3) sta nel limite,
+        // ma un candidato non può avere più preferenze delle schede valide
+        $this->actAsAdmin()->post(route('elezioni.scrutinio', $elezione), [
+            'schede_valide' => 2,
+            'preferenze' => [$candidature[0]->id => 3],
+        ])->assertSessionHas('error', fn (string $m) => str_contains($m, 'più delle schede valide'));
+
+        $this->assertSame(Elezione::STATO_VOTO, $elezione->fresh()->stato);
+    }
+
+    public function test_riunione_con_elezione_proclamata_non_si_elimina(): void
+    {
+        [$elezione] = $this->elezioneScrutinata();
+        $this->service->proclama($elezione);
+
+        $this->actAsAdmin()->delete(route('riunioni.destroy', $this->riunione))
+            ->assertRedirect(route('riunioni.show', $this->riunione))
+            ->assertSessionHas('error');
+
+        $this->assertNotNull(Riunione::query()->find($this->riunione->id));
+    }
+
+    public function test_la_migration_segna_come_confermate_le_elezioni_gia_proclamate(): void
+    {
+        [$proclamata] = $this->elezioneScrutinata();
+        $this->service->proclama($proclamata);
+        $inCorso = $this->elezione();
+
+        $migration = require database_path('migrations/2026_11_13_130000_add_cariche_confermate_at_to_elezioni_table.php');
+        $migration->down();
+        $migration->up();
+
+        $this->assertNotNull($proclamata->fresh()->cariche_confermate_at, 'Le elezioni già proclamate restano come sono');
+        $this->assertNull($inCorso->fresh()->cariche_confermate_at);
     }
 }

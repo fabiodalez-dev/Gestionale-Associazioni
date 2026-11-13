@@ -110,11 +110,18 @@ class DelegheService
 
     /**
      * Deleghe valide in assemblea: delegato presente, delegante assente.
+     * Contano solo se la riunione ammette deleghe: deleghe rimaste registrate
+     * dopo aver portato il limite a zero (o in una riunione che non è più
+     * un'assemblea) non pesano su quorum e voti.
      *
      * @return Builder<DelegaRiunione>
      */
     public static function queryValide(Riunione $riunione): Builder
     {
+        if (! self::ammetteDeleghe($riunione)) {
+            return DelegaRiunione::query()->whereRaw('1 = 0');
+        }
+
         $presente = fn (string $colonna, bool $presente) => function ($q) use ($riunione, $colonna, $presente) {
             $q->selectRaw('1')
                 ->from('riunioni_partecipanti')
@@ -128,6 +135,23 @@ class DelegheService
             ->where('deleghe_riunione.riunione_id', $riunione->id)
             ->whereExists($presente('delegato_socio_id', true))
             ->whereExists($presente('delegante_socio_id', false));
+    }
+
+    /**
+     * Riunione::ammetteDeleghe(), ma con il limite letto dal database quando
+     * il modello appena creato non ha l'attributo (default della colonna).
+     */
+    private static function ammetteDeleghe(Riunione $riunione): bool
+    {
+        if ($riunione->getAttribute('max_deleghe_per_socio') === null && $riunione->exists) {
+            $riunione->setAttribute('max_deleghe_per_socio', Riunione::query()
+                ->withoutGlobalScopes()
+                ->whereKey($riunione->getKey())
+                ->value('max_deleghe_per_socio'));
+            $riunione->syncOriginalAttribute('max_deleghe_per_socio');
+        }
+
+        return $riunione->ammetteDeleghe();
     }
 
     private function verificaAperta(Riunione $riunione, string $origine): void

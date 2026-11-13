@@ -41,7 +41,7 @@
                                 </button>
                             </form>
                             <form method="POST" action="{{ route('documenti.elimina-definitivamente', $documento->id) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare definitivamente questo documento? Il file sarà rimosso e l\'operazione non è reversibile.');">
+                                  data-conferma="Eliminare definitivamente questo documento? Il file sarà rimosso e l'operazione non è reversibile.">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina definitivamente">

@@ -186,7 +186,7 @@
     </div>
 </template>
 
-<script>
+<script @cspNonce>
 (function () {
     const rows = document.getElementById('odgRows');
     const tpl = document.getElementById('odgTemplate');

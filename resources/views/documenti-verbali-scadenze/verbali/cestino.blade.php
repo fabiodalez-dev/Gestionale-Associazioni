@@ -38,7 +38,7 @@
                                 </button>
                             </form>
                             <form method="POST" action="{{ route('verbali.elimina-definitivamente', $verbale->id) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare definitivamente questo verbale? L\'operazione non è reversibile.');">
+                                  data-conferma="Eliminare definitivamente questo verbale? L'operazione non è reversibile.">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger">

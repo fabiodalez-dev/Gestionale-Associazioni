@@ -3,6 +3,7 @@
 namespace Tests\Feature\Flussi;
 
 use App\Mail\Piattaforma\NuovaRichiestaRegistrazioneMail;
+use App\Mail\Piattaforma\TentativoRegistrazioneMail;
 use App\Mail\Piattaforma\VerificaEmailRegistrazioneMail;
 use App\Models\Annuncio;
 use App\Models\ApiKey;
@@ -181,6 +182,8 @@ class Flussi05_OrganizzazionePermessiTenantFlussiTest extends TestCase
     {
         return ApiKey::query()->create(array_merge([
             'associazione_id' => $associazione?->id,
+            // Senza associazione = globale solo con il flag esplicito (audit run-2)
+            'globale' => $associazione === null,
             'api_key' => bin2hex(random_bytes(32)),
             'nome' => 'Chiave '.($associazione->nome ?? 'globale'),
             'permessi' => $permessi,
@@ -1582,11 +1585,14 @@ class Flussi05_OrganizzazionePermessiTenantFlussiTest extends TestCase
         Mail::fake();
         config(['piattaforma.registrazione_associazioni' => 'automatica', 'piattaforma.registrazione_notifica_email' => null]);
 
-        // L'email dell'amministratore è già un utente della piattaforma: rifiutata subito
+        // L'email dell'amministratore è già un utente della piattaforma: nessuna richiesta,
+        // stessa risposta di un invio riuscito (niente oracolo) e avviso al titolare
         $this->from(route('registrazione.create'))
             ->post(route('registrazione.store'), $this->moduloRegistrazione(['admin_email' => 'giovanna@ilfaro.test']))
-            ->assertSessionHasErrors('admin_email');
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('registrazione.inviata'));
         $this->assertSame(0, RichiestaRegistrazione::query()->count());
+        Mail::assertSent(TentativoRegistrazioneMail::class, fn ($m) => $m->hasTo('giovanna@ilfaro.test'));
 
         // Dati liberi: dopo la conferma dell'email l'associazione nasce da sola
         $this->post(route('registrazione.store'), $this->moduloRegistrazione())->assertRedirect(route('registrazione.inviata'));

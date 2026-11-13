@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Services\ApiV1\ApiClientContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -12,8 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Chiavi API REST v1.
  *
  * Nota multi-tenancy: NON usa il global scope BelongsToAssociazione perché
- * associazione_id NULL identifica le chiavi GLOBALI dei super_admin
- * (lo scope le nasconderebbe e l'auto-fill ne impedirebbe la creazione).
+ * le chiavi GLOBALI dei super_admin hanno associazione_id NULL (lo scope le
+ * nasconderebbe e l'auto-fill ne impedirebbe la creazione). Una chiave è
+ * globale solo con il flag esplicito `globale`: associazione_id NULL senza
+ * flag è una chiave orfana e non autentica (audit run-2: prima una chiave
+ * di un'associazione eliminata diventava globale per via della FK
+ * nullOnDelete).
  *
  * Nota sicurezza: la chiave in chiaro NON viene mai persistita. In tabella
  * restano solo `api_key_hash` (sha256) e `api_key_prefix` (8 caratteri per
@@ -34,6 +39,7 @@ class ApiKey extends Model
 
     protected $fillable = [
         'associazione_id',
+        'globale',
         'api_key',
         'api_key_hash',
         'api_key_prefix',
@@ -62,6 +68,7 @@ class ApiKey extends Model
         return [
             'permessi' => 'array',
             'attiva' => 'boolean',
+            'globale' => 'boolean',
             'ultimo_utilizzo' => 'datetime',
             'scadenza' => 'date',
         ];
@@ -116,9 +123,13 @@ class ApiKey extends Model
         return $this->belongsTo(Associazione::class, 'associazione_id');
     }
 
+    /**
+     * Globale = creata come tale da un super admin (flag esplicito) e non
+     * vincolata ad alcuna associazione.
+     */
     public function isGlobale(): bool
     {
-        return $this->associazione_id === null;
+        return (bool) $this->globale && $this->associazione_id === null;
     }
 
     public function isValida(): bool
@@ -132,15 +143,7 @@ class ApiKey extends Model
      */
     public function hasPermesso(string $permesso): bool
     {
-        $permessi = $this->permessi ?? [];
-
-        if (in_array('*', $permessi, true) || in_array($permesso, $permessi, true)) {
-            return true;
-        }
-
-        $modulo = explode(':', $permesso)[0];
-
-        return in_array($modulo.':*', $permessi, true);
+        return ApiClientContext::permessoConcesso($this->permessi ?? [], $permesso);
     }
 
     public function scopeAttive(Builder $query): Builder

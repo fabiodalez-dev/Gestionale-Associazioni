@@ -83,6 +83,8 @@ class ApiKeyController extends Controller
 
         ApiKey::create([
             'associazione_id' => $isGlobale ? null : $tenant,
+            // Flag esplicito: associazione_id NULL da solo non rende globale
+            'globale' => $isGlobale,
             'api_key' => $chiave,
             'nome' => $request->validated('nome'),
             'permessi' => $permessi,
@@ -118,12 +120,18 @@ class ApiKeyController extends Controller
             ->with('success', 'Chiave API eliminata.');
     }
 
+    /**
+     * Tenant su cui opera la pagina: per il super admin l'associazione
+     * selezionata in sessione; per gli altri SOLO la propria associazione
+     * (niente fallback alla sessione, che potrebbe essere rimasta da un
+     * collegamento precedente: senza associazione → null, accesso negato).
+     */
     private function tenantCorrente(Utente $utente): ?string
     {
         if ($utente->isSuperAdmin()) {
             return session('associazione_id');
         }
 
-        return $utente->associazione_id ?: session('associazione_id');
+        return $utente->associazione_id ?: null;
     }
 }

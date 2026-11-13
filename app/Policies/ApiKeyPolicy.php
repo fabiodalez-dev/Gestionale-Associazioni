@@ -35,7 +35,8 @@ class ApiKeyPolicy
             return true;
         }
 
-        return (! empty($utente->associazione_id) || session('associazione_id') !== null)
+        // Solo la propria associazione: la sessione non vale per i non super admin
+        return ! empty($utente->associazione_id)
             && $this->allowed($utente, 'api.create', ['admin_associazione']);
     }
 
@@ -65,7 +66,8 @@ class ApiKeyPolicy
             return true;
         }
 
-        $tenant = $utente->associazione_id ?: session('associazione_id');
+        // Solo la propria associazione (mai il tenant in sessione)
+        $tenant = $utente->associazione_id ?: null;
 
         return $apiKey->associazione_id !== null
             && $tenant !== null

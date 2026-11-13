@@ -68,7 +68,7 @@
             @csrf
             <input type="hidden" name="token" value="{{ $token }}">
             <button type="submit" class="btn btn-primary"
-                    onclick="return confirm('Applicare le modifiche a {{ count($report['modifiche']) }} soci?');">
+                    data-conferma="Applicare le modifiche a {{ count($report['modifiche']) }} soci?">
                 <i class="bi bi-check-lg me-1"></i>Applica {{ count($report['modifiche']) }} aggiornamenti
             </button>
             <a href="{{ route('export-import.index') }}" class="btn btn-outline-secondary ms-2">Annulla</a>

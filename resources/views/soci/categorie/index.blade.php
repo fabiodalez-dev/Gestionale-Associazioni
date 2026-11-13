@@ -51,7 +51,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" action="{{ route('categorie-socio.destroy', $categoria) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare la categoria «{{ $categoria->nome }}»? I soci associati resteranno senza categoria.');">
+                                              data-conferma="Eliminare la categoria «{{ $categoria->nome }}»? I soci associati resteranno senza categoria.">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

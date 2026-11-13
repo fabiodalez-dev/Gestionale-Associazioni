@@ -74,7 +74,7 @@
                                      alt="Foto galleria" class="card-img-top" style="aspect-ratio: 4/3; object-fit: cover;">
                                 <div class="card-body p-2 text-end">
                                     <form method="POST" action="{{ route('eventi.galleria.destroy', ['evento' => $evento, 'media' => $immagine->id]) }}"
-                                          onsubmit="return confirm('Eliminare questa foto?');">
+                                          data-conferma="Eliminare questa foto?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

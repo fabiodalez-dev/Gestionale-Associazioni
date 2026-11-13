@@ -112,6 +112,7 @@ class Elezione extends Model
             'schede_bianche_sala' => 'integer',
             'schede_nulle_sala' => 'integer',
             'proclamata_at' => 'datetime',
+            'cariche_confermate_at' => 'datetime',
         ];
     }
 

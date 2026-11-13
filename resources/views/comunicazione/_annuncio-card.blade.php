@@ -1,6 +1,7 @@
 {{-- Card di un annuncio in bacheca (f.7): usata dalla pagina Novità pubblica,
      dalla sezione Novità della home e dalla bacheca dell'area soci.
-     corpo_html è purificato al salvataggio (EmailHtmlSanitizer).
+     corpo_html è purificato al salvataggio (EmailHtmlSanitizer); qui senza
+     i blocchi <style>, che varrebbero per tutta la pagina.
      Per le convocazioni (addendum) mostra data/luogo assemblea, ordine del
      giorno e il bottone di conferma presenza verso la pagina pubblica
      dell'evento collegato (solo se pubblicato). --}}
@@ -25,7 +26,7 @@
                 <i class="bi bi-calendar3 me-1"></i>{{ $annuncio->pubblicato_dal->format('d/m/Y') }}
             </p>
         @endif
-        <div class="annuncio-corpo">{!! $annuncio->corpo_html !!}</div>
+        <div class="annuncio-corpo">{!! $annuncio->corpoHtmlPerPagina() !!}</div>
 
         @if ($annuncio->isConvocazione())
             <div class="border rounded p-3 mt-3">

@@ -40,7 +40,7 @@
         ];
     @endphp
     <title>@yield('title', 'Area riservata - '.($socioLayout?->nome_completo ?? 'Socio'))</title>
-    <script>
+    <script @cspNonce>
         (function () {
             var t = localStorage.getItem('theme');
             if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-bs-theme', t);
@@ -155,6 +155,8 @@
     </div>
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+    <script src="{{ asset('assets/js/azioni-dichiarative.js') }}"></script>
     <script src="{{ asset('assets/js/main.js') }}"></script>
     @stack('scripts')
 </body>

@@ -20,7 +20,7 @@
 <form method="GET" action="{{ route('solleciti-quote.index') }}" class="row g-2 mb-3">
     <div class="col-auto">
         <label for="filtroAnno" class="form-label mb-0 small text-muted">Anno</label>
-        <select name="anno" id="filtroAnno" class="form-select" onchange="this.form.submit()">
+        <select name="anno" id="filtroAnno" class="form-select" data-invio-automatico>
             <option value="Tutti">Tutti</option>
             @foreach ($anni as $anno)
                 <option value="{{ $anno }}" @selected((string) $filtroAnno === (string) $anno)>{{ $anno }}</option>
@@ -30,7 +30,7 @@
 </form>
 
 <form method="POST" action="{{ route('solleciti-quote.bulk') }}" id="formBulk"
-      onsubmit="return confirm('Inviare il sollecito alle quote selezionate?');">
+      data-conferma="Inviare il sollecito alle quote selezionate?">
     @csrf
 
     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -104,7 +104,7 @@
 {{-- Form singoli fuori dal form bulk (no form annidati) --}}
 @foreach ($quote as $quota)
     <form method="POST" action="{{ route('solleciti-quote.invia', $quota) }}" id="formSingolo{{ $quota->id }}"
-          onsubmit="return confirm('Inviare il sollecito a questo socio?');">
+          data-conferma="Inviare il sollecito a questo socio?">
         @csrf
     </form>
 @endforeach
@@ -113,7 +113,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function () {
     var tutte = document.getElementById('selezionaTutte');
     var btnBulk = document.getElementById('btnBulk');

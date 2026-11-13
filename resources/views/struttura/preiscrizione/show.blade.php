@@ -154,7 +154,7 @@
 
     <footer class="text-center pb-4">{{ $associazione->nome }}@if ($associazione->email) · <a href="mailto:{{ $associazione->email }}">{{ $associazione->email }}</a>@endif</footer>
 
-    <script>
+    <script @cspNonce>
         // Anti doppio-invio: spinner + disable (spec §6.8)
         document.getElementById('formPreiscrizione')?.addEventListener('submit', function () {
             var btn = document.getElementById('btnInvia');

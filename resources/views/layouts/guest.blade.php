@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', config('app.name', 'Gestione Associazioni'))</title>
-    <script>
+    <script @cspNonce>
         (function () {
             var t = localStorage.getItem('theme');
             if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-bs-theme', t);
@@ -120,7 +120,9 @@
     </div>
 
     <script src="{{ asset('assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script>
+
+    <script src="{{ asset('assets/js/azioni-dichiarative.js') }}"></script>
+    <script @cspNonce>
         document.getElementById('themeToggle').addEventListener('click', function () {
             var html = document.documentElement;
             var next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';

@@ -36,6 +36,8 @@ class ApiKeysUiTest extends TestCase
     {
         return ApiKey::create([
             'associazione_id' => $associazioneId,
+            // Senza associazione = chiave globale del super admin (flag esplicito)
+            'globale' => $associazioneId === null,
             'api_key' => bin2hex(random_bytes(32)),
             'nome' => $nome,
             'permessi' => ['tessere:read'],
@@ -170,6 +172,73 @@ class ApiKeysUiTest extends TestCase
         $this->assertNull(ApiKey::find($chiave->id));
     }
 
+    // ---- Chiavi globali esplicite e tenant senza fallback di sessione (audit run-2) ----
+
+    public function test_la_chiave_globale_del_super_admin_ha_il_flag_esplicito(): void
+    {
+        $this->actingAs($this->admin)->post('/api-keys', ['nome' => 'Finta globale', 'globale' => '1']);
+        $this->assertFalse(ApiKey::query()->where('nome', 'Finta globale')->sole()->globale);
+
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $this->actingAs($superAdmin)->post('/api-keys', ['nome' => 'Vera globale', 'globale' => '1']);
+        $vera = ApiKey::query()->where('nome', 'Vera globale')->sole();
+        $this->assertTrue($vera->globale);
+        $this->assertTrue($vera->isGlobale());
+
+        // Super admin con tenant selezionato e senza opzione globale: chiave scopata
+        $this->actingAs($superAdmin)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->post('/api-keys', ['nome' => 'Scopata dal super admin']);
+        $scopata = ApiKey::query()->where('nome', 'Scopata dal super admin')->sole();
+        $this->assertSame($this->associazione->id, $scopata->associazione_id);
+        $this->assertFalse($scopata->globale);
+    }
+
+    public function test_utente_senza_associazione_non_usa_il_tenant_rimasto_in_sessione(): void
+    {
+        // Admin scollegato: associazione_id NULL ma sessione con un tenant
+        $scollegato = Utente::factory()->adminAssociazione()->create(['associazione_id' => null]);
+        $chiave = $this->creaChiave($this->associazione->id, 'Chiave Del Vecchio Tenant');
+
+        $this->actingAs($scollegato)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->get('/api-keys')
+            ->assertOk()
+            ->assertDontSee('Chiave Del Vecchio Tenant');
+
+        $this->actingAs($scollegato)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->post('/api-keys', ['nome' => 'Via sessione'])
+            ->assertForbidden();
+        $this->assertNull(ApiKey::query()->where('nome', 'Via sessione')->first());
+
+        $this->actingAs($scollegato)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->patch('/api-keys/'.$chiave->id.'/toggle')
+            ->assertForbidden();
+        $this->actingAs($scollegato)
+            ->withSession(['associazione_id' => $this->associazione->id])
+            ->delete('/api-keys/'.$chiave->id)
+            ->assertForbidden();
+        $this->assertTrue($chiave->fresh()->attiva);
+    }
+
+    public function test_la_lista_segnala_le_chiavi_senza_associazione_e_non_globali(): void
+    {
+        ApiKey::create([
+            'associazione_id' => null,
+            'api_key' => bin2hex(random_bytes(32)),
+            'nome' => 'Chiave Orfana',
+            'permessi' => ['*'],
+            'attiva' => true,
+        ]);
+
+        $this->actingAs(Utente::factory()->superAdmin()->create())->get('/api-keys')
+            ->assertOk()
+            ->assertSee('Chiave Orfana')
+            ->assertSee('Senza associazione (non valida)');
+    }
+
     // ---- Token personali Sanctum ----
 
     public function test_creazione_token_sanctum_mostra_il_token_una_volta(): void
@@ -227,14 +296,130 @@ class ApiKeysUiTest extends TestCase
 
     public function test_revoca_token_elimina_solo_i_propri(): void
     {
+        // Prima l'admin non poteva revocare nessun token altrui (redirect
+        // silenzioso). Ora l'admin_associazione gestisce i token degli utenti
+        // della propria associazione (PersonalAccessTokenPolicy): il limite
+        // che resta è il tenant, quindi il test usa un utente di un'altra
+        // associazione e si aspetta un 403 esplicito.
         $altroUtente = Utente::factory()->adminAssociazione()->create([
-            'associazione_id' => $this->associazione->id,
+            'associazione_id' => $this->altraAssociazione->id,
         ]);
         $tokenAltrui = $altroUtente->createToken('altrui', ['soci:read']);
 
-        $this->actingAs($this->admin)->delete('/api-tokens/'.$tokenAltrui->accessToken->id);
+        $this->actingAs($this->admin)->delete('/api-tokens/'.$tokenAltrui->accessToken->id)->assertForbidden();
 
         $this->assertSame(1, $altroUtente->tokens()->count());
+    }
+
+    // ------------------------------------------------------------------
+    // Revoca dei token altrui da parte degli amministratori
+    // ------------------------------------------------------------------
+
+    public function test_utente_revoca_i_propri_token_e_torna_alla_pagina_chiavi(): void
+    {
+        $token = $this->admin->createToken('mio', ['soci:read']);
+
+        $this->actingAs($this->admin)->delete(route('api-tokens.destroy', $token->accessToken->id))
+            ->assertRedirect(route('api-keys.index'))
+            ->assertSessionHas('success', 'Token revocato.');
+
+        $this->assertSame(0, $this->admin->tokens()->count());
+    }
+
+    public function test_token_inesistente_redirect_come_prima(): void
+    {
+        $this->actingAs($this->admin)->delete(route('api-tokens.destroy', 999999))
+            ->assertRedirect(route('api-keys.index'));
+    }
+
+    public function test_super_admin_vede_e_revoca_i_token_di_qualsiasi_utente(): void
+    {
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $altroSuper = Utente::factory()->superAdmin()->create();
+        $utenteB = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->altraAssociazione->id]);
+        $tokenB = $utenteB->createToken('Token tenant B', ['soci:read']);
+        $tokenSuper = $altroSuper->createToken('Token altro super', ['*']);
+        $this->admin->createToken('Token tenant A', ['soci:read']);
+
+        $this->actingAs($superAdmin)->get(route('api-tokens.index'))
+            ->assertOk()
+            ->assertViewIs('api-v1.api-tokens')
+            ->assertSee('Token tenant A')
+            ->assertSee('Token tenant B')
+            ->assertSee('Token altro super');
+
+        $this->actingAs($superAdmin)->delete(route('api-tokens.destroy', $tokenB->accessToken->id))
+            ->assertRedirect(route('api-tokens.index'))
+            ->assertSessionHas('success', 'Token revocato.');
+        $this->actingAs($superAdmin)->delete(route('api-tokens.destroy', $tokenSuper->accessToken->id))
+            ->assertRedirect(route('api-tokens.index'));
+
+        $this->assertSame(0, $utenteB->tokens()->count());
+        $this->assertSame(0, $altroSuper->tokens()->count());
+    }
+
+    public function test_admin_associazione_vede_e_revoca_solo_token_della_propria_associazione(): void
+    {
+        $collega = Utente::factory()->create([
+            'ruolo' => Utente::RUOLO_OPERATORE,
+            'associazione_id' => $this->associazione->id,
+        ]);
+        $utenteB = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->altraAssociazione->id]);
+        // Super admin agganciato alla stessa associazione: resta intoccabile
+        $superAdmin = Utente::factory()->superAdmin()->create(['associazione_id' => $this->associazione->id]);
+
+        $tokenCollega = $collega->createToken('Token collega', ['soci:read']);
+        $tokenB = $utenteB->createToken('Token altro tenant', ['soci:read']);
+        $tokenSuper = $superAdmin->createToken('Token del super admin', ['*']);
+
+        $this->actingAs($this->admin)->get(route('api-tokens.index'))
+            ->assertOk()
+            ->assertSee('Token collega')
+            ->assertDontSee('Token altro tenant')
+            ->assertDontSee('Token del super admin');
+
+        $this->actingAs($this->admin)->delete(route('api-tokens.destroy', $tokenB->accessToken->id))->assertForbidden();
+        $this->actingAs($this->admin)->delete(route('api-tokens.destroy', $tokenSuper->accessToken->id))->assertForbidden();
+        $this->assertSame(1, $utenteB->tokens()->count());
+        $this->assertSame(1, $superAdmin->tokens()->count());
+
+        $this->actingAs($this->admin)->delete(route('api-tokens.destroy', $tokenCollega->accessToken->id))
+            ->assertRedirect(route('api-tokens.index'));
+        $this->assertSame(0, $collega->tokens()->count());
+    }
+
+    public function test_utente_non_admin_non_vede_ne_revoca_token_altrui(): void
+    {
+        $operatore = Utente::factory()->create([
+            'ruolo' => Utente::RUOLO_OPERATORE,
+            'associazione_id' => $this->associazione->id,
+        ]);
+        $tokenAdmin = $this->admin->createToken('Token admin', ['soci:read']);
+
+        $this->actingAs($operatore)->get(route('api-tokens.index'))->assertForbidden();
+        $this->actingAs($operatore)->delete(route('api-tokens.destroy', $tokenAdmin->accessToken->id))->assertForbidden();
+
+        $this->assertSame(1, $this->admin->tokens()->count());
+    }
+
+    public function test_token_revocato_dall_admin_smette_di_funzionare_sull_api(): void
+    {
+        $collega = Utente::factory()->adminAssociazione()->create(['associazione_id' => $this->associazione->id]);
+        $token = $collega->createToken('Scanner', ['soci:read']);
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token->plainTextToken])->assertOk();
+
+        $this->actingAs($this->admin)->delete(route('api-tokens.destroy', $token->accessToken->id));
+
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token->plainTextToken])
+            ->assertUnauthorized()
+            ->assertJsonPath('code', 'auth_invalid');
+    }
+
+    public function test_link_alla_pagina_token_solo_per_chi_puo_gestirli(): void
+    {
+        $this->actingAs($this->admin)->get('/api-keys')->assertOk()->assertSee(route('api-tokens.index'));
     }
 
     public function test_pagina_documentazione_api_visibile_agli_admin(): void

@@ -162,7 +162,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" action="{{ route('sedi.destroy', $sede->id) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare questa sede?');">
+                                              data-conferma="Eliminare questa sede?">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
@@ -299,7 +299,7 @@
                             </button>
                         </div>
                     </form>
-                    <script>
+                    <script @cspNonce>
                         document.getElementById('btnInformativaPredefinita')?.addEventListener('click', function () {
                             var area = document.getElementById('privacy_policy_html');
                             if (area.value.trim() !== '' && ! confirm('Sostituire il testo attuale con il modello predefinito?')) return;
@@ -387,7 +387,7 @@
                     <form method="GET" action="{{ route('configurazioni.index') }}" class="mb-3">
                         <input type="hidden" name="section" value="tessera-template">
                         <label class="form-label" for="tipo_id_sel">Tipo socio</label>
-                        <select class="form-select" id="tipo_id_sel" name="tipo_id" onchange="this.form.submit()">
+                        <select class="form-select" id="tipo_id_sel" name="tipo_id" data-invio-automatico>
                             <option value="">Template default (tutti i tipi)</option>
                             @foreach ($tipiSocio as $tipo)
                                 <option value="{{ $tipo->id }}" @selected($tipoSelezionato === $tipo->id)>{{ $tipo->nome }}</option>
@@ -537,7 +537,7 @@
                     <div class="input-group mb-3">
                         <input type="text" class="form-control" id="link_invito" readonly value="{{ $linkIscrizione }}">
                         <button class="btn btn-outline-primary" type="button" id="btnCopiaInvito"
-                                onclick="navigator.clipboard.writeText(document.getElementById('link_invito').value).then(() => { this.innerHTML = '<i class=&quot;bi bi-check-lg me-1&quot;></i>Copiato!'; setTimeout(() => { this.innerHTML = '<i class=&quot;bi bi-clipboard me-1&quot;></i>Copia link'; }, 2000); });">
+                                data-copia-da="link_invito" data-copia-icona="bi bi-check-lg me-1" data-copia-feedback="Copiato!" data-copia-ripristina="2000">
                             <i class="bi bi-clipboard me-1"></i>Copia link
                         </button>
                     </div>
@@ -569,7 +569,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 document.addEventListener('DOMContentLoaded', function () {
     // Modale sede: precompila in modifica, pulisce in creazione
     var modalSede = document.getElementById('modalSede');

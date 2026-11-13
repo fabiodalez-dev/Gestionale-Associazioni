@@ -123,7 +123,7 @@
                                     <td class="text-end">
                                         @can('update', $evento)
                                             <form method="POST" action="{{ route('eventi.economia.spese.destroy', $spesa) }}" class="d-inline"
-                                                  onsubmit="return confirm('Eliminare questa spesa?');">
+                                                  data-conferma="Eliminare questa spesa?">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Csp\CspNonce;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -10,6 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Security headers per le pagine con scanner QR (scanner tessere, check-in):
  * come SecurityHeaders ma con camera consentita (self) e CSP che ammette
  * blob: per il flusso video di html5-qrcode (replica della CSP legacy).
+ * Gli script inline delle view sono ammessi tramite nonce (CspNonce).
  *
  * Le rotte che lo usano escludono SecurityHeaders e AddCspHeaders globali
  * (che bloccherebbero la fotocamera con camera=()).
@@ -22,7 +24,7 @@ class ScannerSecurityHeaders
 
         $csp = "default-src 'self'; "
             ."style-src 'self' 'unsafe-inline'; "
-            ."script-src 'self' 'unsafe-inline'; "
+            .'script-src '.CspNonce::scriptSrc().'; '
             ."img-src 'self' data: blob:; "
             ."media-src 'self' blob:; "
             ."connect-src 'self'; "

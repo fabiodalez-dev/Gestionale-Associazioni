@@ -25,7 +25,7 @@
         <div class="input-group input-group-sm">
             <input type="text" class="form-control" id="linkTemporaneoInput" value="{{ session('link_temporaneo') }}" readonly>
             <button class="btn btn-outline-secondary" type="button"
-                    onclick="navigator.clipboard.writeText(document.getElementById('linkTemporaneoInput').value)">
+                    data-copia-da="linkTemporaneoInput">
                 <i class="bi bi-clipboard me-1"></i>Copia
             </button>
         </div>
@@ -35,7 +35,7 @@
 
 <form method="GET" action="{{ route('documenti-socio.index') }}" class="row g-2 mb-3">
     <div class="col-md-4">
-        <select class="form-select" name="socio_id" onchange="this.form.submit()">
+        <select class="form-select" name="socio_id" data-invio-automatico>
             <option value="all" @selected($socioId === 'all' || $socioId === '')>Tutti i soci</option>
             @foreach ($soci as $socio)
                 <option value="{{ $socio->id }}" @selected($socioId === $socio->id)>
@@ -109,7 +109,7 @@
                             </form>
                             @can('delete', $documento)
                             <form method="POST" action="{{ route('documenti-socio.destroy', $documento) }}" class="d-inline"
-                                  onsubmit="return confirm('Sei sicuro di voler eliminare questo documento?');">
+                                  data-conferma="Sei sicuro di voler eliminare questo documento?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -192,7 +192,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         @if ($errors->any())
             new bootstrap.Modal(document.getElementById('uploadSocioModal')).show();

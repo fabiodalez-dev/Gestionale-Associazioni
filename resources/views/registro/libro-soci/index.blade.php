@@ -22,7 +22,7 @@
 
 <form method="GET" action="{{ route('libro-soci.index') }}" class="row g-2 mb-3">
     <div class="col-md-3">
-        <select class="form-select" name="anno" onchange="this.form.submit()">
+        <select class="form-select" name="anno" data-invio-automatico>
             <option value="">Tutti gli anni</option>
             @foreach ($anni as $a)
                 <option value="{{ $a }}" @selected($anno === $a)>{{ $a }}</option>

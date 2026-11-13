@@ -18,7 +18,7 @@
             <a href="{{ route('manuale.edit', $pagina) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Modifica</a>
         @endcan
         @can('delete', $pagina)
-            <form method="POST" action="{{ route('manuale.destroy', $pagina) }}" onsubmit="return confirm('Eliminare la pagina?');">
+            <form method="POST" action="{{ route('manuale.destroy', $pagina) }}" data-conferma="Eliminare la pagina?">
                 @csrf @method('DELETE')
                 <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash3"></i></button>
             </form>

@@ -233,6 +233,10 @@ class RiunioneController extends Controller
             'codice' => ['required', 'string', 'max:255'],
         ])['codice']);
 
+        if (($motivo = $this->assemblea->motivoPresenzeBloccate($riunione)) !== null) {
+            return redirect()->route('riunioni.appello', $riunione)->with('error', $motivo);
+        }
+
         $partecipante = $this->assemblea->partecipanteDaCodice($riunione, $codice);
 
         if ($partecipante === null) {
@@ -283,6 +287,18 @@ class RiunioneController extends Controller
     public function destroy(Riunione $riunione): RedirectResponse
     {
         $this->authorize('delete', $riunione);
+
+        // Una riunione con risultati definitivi (eletti proclamati, votazioni
+        // concluse) è documentazione dell'ente: non si elimina
+        $proclamate = $riunione->elezioni()->where('stato', Elezione::STATO_PROCLAMATA)->exists();
+
+        if ($proclamate || $this->assemblea->haVotazioniChiuse($riunione)) {
+            return redirect()
+                ->route('riunioni.show', $riunione)
+                ->with('error', $proclamate
+                    ? 'La riunione ha elezioni con eletti già proclamati: non si può eliminare. Se non si è tenuta, impostala come annullata.'
+                    : 'La riunione ha votazioni già concluse: non si può eliminare. Se non si è tenuta, impostala come annullata.');
+        }
 
         $riunione->delete();
 
@@ -471,6 +487,14 @@ class RiunioneController extends Controller
         $validated = $request->validate([
             'stato' => ['required', 'in:'.implode(',', RiunionePartecipante::STATI)],
         ]);
+
+        if (($motivo = $this->assemblea->motivoPresenzeBloccate($riunione)) !== null) {
+            $ritorno = $request->input('ritorno') === 'appello' && $riunione->isAssemblea()
+                ? route('riunioni.appello', array_merge(['riunione' => $riunione], $request->only(['search', 'filtro', 'page'])))
+                : route('riunioni.show', $riunione);
+
+            return redirect($ritorno)->with('error', $motivo);
+        }
 
         $presente = $validated['stato'] === RiunionePartecipante::STATO_CONFERMATO;
 

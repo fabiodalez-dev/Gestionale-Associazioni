@@ -69,7 +69,7 @@
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <form method="POST" action="{{ route('tessere.templates.destroy', $template) }}" class="d-inline"
-                                          onsubmit="return confirm('Eliminare questo template?');">
+                                          data-conferma="Eliminare questo template?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
@@ -129,7 +129,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function() {
     'use strict';
 

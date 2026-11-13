@@ -1687,7 +1687,8 @@ class Flussi03_EventiPrenotazioniFlussiTest extends TestCase
         $this->assertCount(20, $media);
         $this->assertSame(20, Media::query()
             ->where('model_id', $evento->id)->where('collection_name', 'galleria')->count());
-        $this->assertSame(1, $media->filter(fn ($m) => str_starts_with($m->file_name, 'extra-'))->count());
+        // Il nome originale resta come etichetta (name); su disco il nome è casuale (NomeFileSicuro)
+        $this->assertSame(1, $media->filter(fn ($m) => str_starts_with($m->name, 'extra-'))->count());
 
         // Galleria piena: nuovo caricamento rifiutato
         $this->post(route('eventi.galleria.store', $evento), ['foto' => $foto(1, 'oltre')])

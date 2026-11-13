@@ -26,8 +26,12 @@ class ImpostaPasswordSocioMail extends Mailable
 
     public function envelope(): Envelope
     {
+        // Con la stessa email in più associazioni arrivano più email: il nome
+        // nell'oggetto dice a quale iscrizione si riferisce ciascun link
+        $associazione = $this->socio->associazione?->nome;
+
         return new Envelope(
-            subject: 'Imposta la tua password — Area Soci',
+            subject: 'Imposta la tua password — Area Soci'.(filled($associazione) ? ' di '.$associazione : ''),
         );
     }
 

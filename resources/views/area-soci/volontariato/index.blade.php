@@ -72,7 +72,7 @@
                                         @endif
                                     </span>
                                     <form method="POST" action="{{ route('area-soci.volontariato.rinuncia', $a) }}"
-                                          onsubmit="return confirm('Rinunciare a questo turno?');">
+                                          data-conferma="Rinunciare a questo turno?">
                                         @csrf
                                         <input type="text" name="motivo" class="form-control form-control-sm d-inline-block mb-1" style="max-width:9rem" placeholder="Motivo (facolt.)" maxlength="500">
                                         <button class="btn btn-sm btn-outline-danger" title="Rinuncia"><i class="bi bi-x-circle"></i></button>

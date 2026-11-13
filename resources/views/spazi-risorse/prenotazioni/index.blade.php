@@ -28,7 +28,7 @@
         <form method="GET" action="{{ route('spazi.prenotazioni.index') }}" class="row g-2 mb-3 align-items-end">
             <div class="col-12 col-md-4">
                 <label for="spazioSelect" class="form-label">Spazio</label>
-                <select name="spazio" id="spazioSelect" class="form-select" onchange="this.form.submit()">
+                <select name="spazio" id="spazioSelect" class="form-select" data-invio-automatico>
                     @foreach ($spazi as $sp)
                         <option value="{{ $sp->id }}" @selected($spazioSelezionato && $spazioSelezionato->id === $sp->id)>{{ $sp->nome }}</option>
                     @endforeach
@@ -37,7 +37,7 @@
             <div class="col-auto">
                 <label for="settimanaInput" class="form-label">Settimana</label>
                 <input type="date" name="settimana" id="settimanaInput" class="form-control"
-                       value="{{ $inizioSettimana->format('Y-m-d') }}" onchange="this.form.submit()">
+                       value="{{ $inizioSettimana->format('Y-m-d') }}" data-invio-automatico>
             </div>
             <div class="col-auto">
                 @php
@@ -129,7 +129,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form method="POST" action="{{ route('spazi.prenotazioni.destroy', $p) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questa prenotazione?');">
+                                      data-conferma="Eliminare questa prenotazione?">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
@@ -205,7 +205,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('prenotazioneForm');
         const titolo = document.getElementById('prenotazioneModalTitolo');

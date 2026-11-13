@@ -18,7 +18,7 @@
                 <div class="input-group">
                     <input type="text" class="form-control" id="referralLink" value="{{ $linkInvito }}" readonly aria-label="Link di invito">
                     <button class="btn btn-outline-primary" type="button"
-                            onclick="navigator.clipboard?.writeText(document.getElementById('referralLink').value); this.innerHTML='<i class=&quot;bi bi-check-lg&quot;></i> Copiato';">
+                            data-copia-da="referralLink" data-copia-icona="bi bi-check-lg" data-copia-feedback=" Copiato">
                         <i class="bi bi-clipboard me-1"></i>Copia
                     </button>
                 </div>

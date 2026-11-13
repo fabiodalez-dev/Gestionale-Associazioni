@@ -8,6 +8,7 @@ use App\Http\Requests\Piattaforma\RegistrazioneAssociazioneRequest;
 use App\Models\RichiestaRegistrazione;
 use App\Services\Piattaforma\RegistrazioneAssociazioni;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -31,11 +32,15 @@ class RegistrazioneAssociazioneController extends Controller
     {
         abort_if(RichiestaRegistrazione::modalita() === 'disattivata', 404);
 
-        $richiesta = $registrazioni->registra($request->validated(), $request->ip());
+        $dati = $request->validated();
+
+        // Risposta identica anche quando la richiesta non viene creata (email
+        // dell'amministratore già in uso): niente oracolo sugli account esistenti
+        $registrazioni->registra($dati, $request->ip());
 
         return redirect()->route('registrazione.inviata')
-            ->with('registrazione_nome', $richiesta->nome)
-            ->with('registrazione_email', $richiesta->admin_email);
+            ->with('registrazione_nome', $dati['nome'])
+            ->with('registrazione_email', Str::lower($dati['admin_email']));
     }
 
     public function inviata(): View

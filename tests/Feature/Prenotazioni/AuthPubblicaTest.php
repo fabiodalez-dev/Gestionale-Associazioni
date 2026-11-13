@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Prenotazioni;
 
+use App\Http\Controllers\FrontendPubblico\RegistrazioneController;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Notifications\Accounts\ResetPasswordAccount;
+use App\Notifications\Accounts\TentativoRegistrazioneAccount;
 use App\Notifications\Accounts\VerificaEmailAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -70,13 +73,15 @@ class AuthPubblicaTest extends TestCase
 
     // ── Registrazione ────────────────────────────────────────────────
 
-    public function test_registrazione_felice_crea_account_invia_verifica_e_logga(): void
+    public function test_registrazione_felice_crea_account_invia_verifica_e_rimanda_all_accesso(): void
     {
         Notification::fake();
 
         $response = $this->post($this->urlTenant('registrati'), $this->datiRegistrazione());
 
-        $response->assertRedirect($this->urlTenant('verifica-email'));
+        // Niente login automatico: la risposta deve essere identica a quella per
+        // un'email già registrata (vedi test_email_gia_registrata_risposta_neutra...)
+        $response->assertRedirect($this->urlTenant('login'))->assertSessionHas('success');
 
         /** @var Account $account */
         $account = Account::allTenants()->where('email', 'giulia.verdi@example.com')->first();
@@ -89,7 +94,7 @@ class AuthPubblicaTest extends TestCase
         $this->assertTrue($account->attivo);
         $this->assertTrue(Hash::check('Lampione-Viola-Treno-42', $account->password));
 
-        $this->assertAuthenticatedAs($account, 'account');
+        $this->assertGuest('account');
 
         Notification::assertSentTo($account, VerificaEmailAccount::class);
     }
@@ -121,22 +126,73 @@ class AuthPubblicaTest extends TestCase
             'email' => 'giulia.verdi@example.com',
         ]);
 
-        // Stesso tenant: rifiutata
+        // Stesso tenant: nessun nuovo account, ma risposta identica al successo
         $this->from($this->urlTenant('registrati'))
             ->post($this->urlTenant('registrati'), $this->datiRegistrazione())
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasNoErrors()
+            ->assertRedirect($this->urlTenant('login'));
+        $this->assertSame(1, Account::allTenants()->where('email', 'giulia.verdi@example.com')->count());
 
         // Altro tenant: accettata
         $altra = Associazione::factory()->create(['frontend_pubblico_attivo' => true]);
 
         $this->post($this->urlTenant('registrati', $altra), $this->datiRegistrazione())
-            ->assertRedirect($this->urlTenant('verifica-email', $altra));
+            ->assertRedirect($this->urlTenant('login', $altra));
 
         $this->assertSame(
             1,
             Account::allTenants()->where('associazione_id', $altra->id)
                 ->where('email', 'giulia.verdi@example.com')->count()
         );
+    }
+
+    public function test_email_gia_registrata_risposta_neutra_e_avviso_al_titolare(): void
+    {
+        Notification::fake();
+        // Il throttle 5/m della rotta ha il suo test: qui servono più invii di fila
+        $this->withoutMiddleware(ThrottleRequests::class);
+
+        // Risposta di riferimento: email nuova
+        $nuova = $this->post($this->urlTenant('registrati'), $this->datiRegistrazione(['email' => 'nuova@example.com']));
+        $this->flushSession();
+
+        $esistente = Account::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'email' => 'giulia.verdi@example.com',
+            'nome' => 'Giulia',
+        ]);
+
+        $doppia = $this->from($this->urlTenant('registrati'))
+            ->post($this->urlTenant('registrati'), $this->datiRegistrazione(['nome' => 'Impostore']));
+
+        // Stessa destinazione e stesso messaggio della registrazione riuscita
+        $doppia->assertSessionHasNoErrors()->assertRedirect($nuova->headers->get('Location'));
+        $doppia->assertSessionHas('success', RegistrazioneController::MESSAGGIO_INVIATA);
+        $this->assertGuest('account');
+
+        // Nessun duplicato, dati del titolare intatti, avviso con il link al recupero password
+        $this->assertSame(1, Account::allTenants()->where('email', 'giulia.verdi@example.com')->count());
+        $this->assertSame('Giulia', $esistente->fresh()->nome);
+        Notification::assertNotSentTo($esistente, VerificaEmailAccount::class);
+        Notification::assertSentTo($esistente, TentativoRegistrazioneAccount::class, function (TentativoRegistrazioneAccount $n) use ($esistente): bool {
+            $mail = $n->toMail($esistente);
+
+            return $mail->actionUrl === route('pubblico.password.richiesta', $this->associazione->slug)
+                && ! str_contains(implode(' ', $mail->introLines), 'Impostore');
+        });
+
+        // Avvisi limitati: la casella del titolare non si inonda
+        for ($i = 0; $i < 4; $i++) {
+            $this->post($this->urlTenant('registrati'), $this->datiRegistrazione());
+        }
+        Notification::assertSentToTimes($esistente, TentativoRegistrazioneAccount::class, RegistrazioneController::AVVISI_PER_ACCOUNT);
+
+        // Account nel cestino con la stessa email: niente 500 né avvisi, stessa risposta
+        $cestinato = Account::factory()->create(['associazione_id' => $this->associazione->id, 'email' => 'cestino@example.com']);
+        $cestinato->delete();
+        $this->post($this->urlTenant('registrati'), $this->datiRegistrazione(['email' => 'cestino@example.com']))
+            ->assertRedirect($this->urlTenant('login'))->assertSessionHasNoErrors();
+        Notification::assertNotSentTo($cestinato, TentativoRegistrazioneAccount::class);
     }
 
     public function test_registrazione_throttle_5_al_minuto(): void

@@ -61,7 +61,7 @@
 
                     <div class="d-flex gap-2 flex-wrap">
                         <form method="POST" action="{{ route('richieste-modifica-dati.approva', $richiesta) }}"
-                              onsubmit="return confirm('Applicare le modifiche proposte alla scheda del socio?');">
+                              data-conferma="Applicare le modifiche proposte alla scheda del socio?">
                             @csrf
                             <button type="submit" class="btn btn-success">
                                 <i class="bi bi-check-lg me-1"></i>Approva e applica

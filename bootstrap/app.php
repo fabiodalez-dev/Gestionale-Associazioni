@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\EnsureSuperAdmin2fa;
 use App\Http\Middleware\EnsureTenantSelected;
 use App\Http\Middleware\EnsureUtenteAttivo;
 use App\Http\Middleware\SecurityHeaders;
@@ -43,6 +44,8 @@ return Application::configure(basePath: dirname(__DIR__))
         //   StartSession/AuthenticateSession del gruppo web)
         $middleware->web(append: [
             EnsureUtenteAttivo::class,
+            // 2FA obbligatoria per il super admin (SUPER_ADMIN_2FA_OBBLIGATORIA)
+            EnsureSuperAdmin2fa::class,
             SecurityHeaders::class,
             AddCspHeaders::class,
         ]);

@@ -17,6 +17,13 @@
                 Crealo con <code>php artisan storage:link</code> oppure chiedi al tuo hosting di abilitare i link simbolici.
             </div>
         @endif
+        @if (($passwordBackup ?? null) !== null)
+            <div class="alert alert-info text-start mb-3" style="font-size: 0.8125rem;" id="password-backup">
+                <p class="mb-2"><strong>Password dei backup.</strong> Gli archivi di backup (che contengono anche il file <code>.env</code> con le credenziali) vengono cifrati con questa password:</p>
+                <pre class="mb-2 p-2 bg-white border rounded user-select-all" style="font-size: 0.875rem; white-space: pre-wrap; word-break: break-all;">{{ $passwordBackup }}</pre>
+                <p class="mb-0">Copiala e conservala in un posto sicuro, fuori da questo server: senza non potrai aprire i backup per un ripristino. Non verrà mostrata di nuovo; resta salvata nel <code>.env</code> come <code>BACKUP_ARCHIVE_PASSWORD</code>.</p>
+            </div>
+        @endif
         <a href="{{ route('login') }}" class="btn btn-primary w-100">
             <i class="bi bi-box-arrow-in-right me-2"></i>Vai al login
         </a>

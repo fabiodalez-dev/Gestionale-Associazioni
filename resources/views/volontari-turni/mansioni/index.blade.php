@@ -58,7 +58,7 @@
                                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse"
                                         data-bs-target="#edit-{{ $mansione->id }}" title="Modifica"><i class="bi bi-pencil"></i></button>
                                 <form method="POST" action="{{ route('mansioni.destroy', $mansione) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questa mansione?');">
+                                      data-conferma="Eliminare questa mansione?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>
                                 </form>

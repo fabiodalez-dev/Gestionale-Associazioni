@@ -72,7 +72,7 @@
                         <tr>
                             <th style="width: 40px;">
                                 <input type="checkbox" class="form-check-input" id="seleziona-tutti"
-                                       onclick="document.querySelectorAll('input[name=\'prenotazioni[]\']:not(:disabled)').forEach(c => c.checked = this.checked)">
+                                       data-seleziona-tutti="input[name='prenotazioni[]']:not(:disabled)">
                             </th>
                             <th>Partecipante</th>
                             <th>Codice</th>

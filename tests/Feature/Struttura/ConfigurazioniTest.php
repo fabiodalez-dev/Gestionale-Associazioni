@@ -262,4 +262,15 @@ class ConfigurazioniTest extends TestCase
 
         $this->assertSame('sk_test_nuovo_segreto', $settings->fresh()->stripe_secret_key_encrypted);
     }
+
+    public function test_upload_logo_oltre_8000_pixel_rifiutato(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->admin)->post('/configurazioni/logo', [
+            'logo_file' => UploadedFile::fake()->image('logo.png', 8001, 10),
+        ])->assertSessionHasErrors('logo_file');
+
+        $this->assertNull($this->associazione->fresh()->logo_url);
+    }
 }

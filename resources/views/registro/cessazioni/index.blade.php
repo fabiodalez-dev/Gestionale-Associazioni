@@ -143,7 +143,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
                     <button type="submit" class="btn btn-danger"
-                            onclick="return confirm('Confermi la registrazione della cessazione? Lo stato del socio sarà aggiornato e le tessere attive annullate.');">
+                            data-conferma="Confermi la registrazione della cessazione? Lo stato del socio sarà aggiornato e le tessere attive annullate.">
                         <i class="bi bi-person-dash me-1"></i>Registra cessazione
                     </button>
                 </div>
@@ -155,7 +155,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         @if ($errors->any())
             const modalEl = document.getElementById('cessazioneModal');

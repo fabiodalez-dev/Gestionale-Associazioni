@@ -23,7 +23,7 @@
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#riunioneEditModal">
             <i class="bi bi-pencil me-1"></i>Modifica
         </button>
-        <form method="POST" action="{{ route('riunioni.destroy', $riunione) }}" onsubmit="return confirm('Eliminare la riunione?');">
+        <form method="POST" action="{{ route('riunioni.destroy', $riunione) }}" data-conferma="Eliminare la riunione?">
             @csrf @method('DELETE')
             <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash3 me-1"></i>Elimina</button>
         </form>
@@ -123,7 +123,7 @@
                                     <span><strong>Voto {{ $votazione->segreta ? 'segreto' : 'palese' }} aperto</strong> dalle {{ $votazione->aperta_at->format('H:i') }} — <span class="tabular">{{ $votazione->votanti_count }}</span> voti ricevuti online</span>
                                 </div>
                                 <form method="POST" action="{{ route('riunioni.voto-online.chiudi', [$riunione, $votazione]) }}" class="row g-2 align-items-end"
-                                      onsubmit="return confirm('Chiudere il voto e calcolare l\'esito?');">
+                                      data-conferma="Chiudere il voto e calcolare l'esito?">
                                     @csrf
                                     <div class="col-12 small">Voti espressi in sala da aggiungere (facoltativo):</div>
                                     <div class="col-4 col-md-3"><input type="number" name="favorevoli" class="form-control form-control-sm" min="0" placeholder="Favorevoli" aria-label="Favorevoli in sala"></div>
@@ -199,7 +199,7 @@
                                 <small class="text-muted">{{ $delega->origine === 'area_soci' ? 'Dall\'area soci' : 'Registrata dalla segreteria' }} il {{ $delega->created_at?->format('d/m/Y H:i') }}</small>
                             </div>
                             @if ($riunione->stato === 'pianificata')
-                                <form method="POST" action="{{ route('riunioni.deleghe.destroy', [$riunione, $delega]) }}" onsubmit="return confirm('Revocare la delega?');">
+                                <form method="POST" action="{{ route('riunioni.deleghe.destroy', [$riunione, $delega]) }}" data-conferma="Revocare la delega?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Revoca"><i class="bi bi-x-lg"></i></button>
                                 </form>
@@ -357,7 +357,7 @@
                         @endif
                         @unless ($riunione->stato === 'annullata')
                             <form method="POST" action="{{ route('riunioni.convoca', $riunione) }}"
-                                  onsubmit="return confirm('Inviare la convocazione via email a tutti gli aventi diritto?');">
+                                  data-conferma="Inviare la convocazione via email a tutti gli aventi diritto?">
                                 @csrf
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-envelope me-1"></i>{{ $riunione->convocazione_inviata_at ? 'Reinvia convocazione' : 'Convoca' }}
@@ -392,7 +392,7 @@
                         </div>
                         <form method="POST" action="{{ route('riunioni.partecipanti.presenza', [$riunione, $p]) }}">
                             @csrf @method('PUT')
-                            <select name="stato" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto">
+                            <select name="stato" class="form-select form-select-sm" data-invio-automatico style="width:auto">
                                 <option value="invitato" @selected($p->stato === 'invitato')>Invitato</option>
                                 <option value="confermato" @selected($p->stato === 'confermato')>Presente</option>
                                 <option value="assente" @selected($p->stato === 'assente')>Assente</option>
@@ -487,7 +487,7 @@
         </div>
     </div>
 </div>
-<script>
+<script @cspNonce>
 document.getElementById('votazioneModal')?.addEventListener('show.bs.modal', (e) => {
     const b = e.relatedTarget; if (!b) return;
     document.getElementById('vot_punto').value = b.dataset.punto ?? '';

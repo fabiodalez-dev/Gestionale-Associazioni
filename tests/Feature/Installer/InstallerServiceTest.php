@@ -110,4 +110,42 @@ class InstallerServiceTest extends TestCase
         unlink($file);
         $this->assertFalse($servizio->wizardRivendicato());
     }
+
+    public function test_genera_password_backup_solo_se_vuota(): void
+    {
+        file_put_contents($this->env, "APP_NAME=Demo\nBACKUP_ARCHIVE_PASSWORD=\n");
+        $installer = app(InstallerService::class);
+
+        $password = $installer->generaPasswordBackup();
+
+        $this->assertNotNull($password);
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{32}$/', $password);
+        $this->assertSame($password, Dotenv::parse((string) file_get_contents($this->env))['BACKUP_ARCHIVE_PASSWORD']);
+        $this->assertSame($password, config('backup.backup.password'));
+
+        // Una password già presente non si tocca mai: i backup esistenti restano apribili
+        $this->assertNull($installer->generaPasswordBackup());
+        $this->assertSame($password, Dotenv::parse((string) file_get_contents($this->env))['BACKUP_ARCHIVE_PASSWORD']);
+    }
+
+    public function test_password_backup_impostata_a_mano_resta_invariata(): void
+    {
+        file_put_contents($this->env, "BACKUP_ARCHIVE_PASSWORD=scelta-da-me\n");
+
+        $this->assertNull(app(InstallerService::class)->generaPasswordBackup());
+        $this->assertSame('scelta-da-me', Dotenv::parse((string) file_get_contents($this->env))['BACKUP_ARCHIVE_PASSWORD']);
+    }
+
+    public function test_password_backup_da_mostrare_una_sola_volta(): void
+    {
+        file_put_contents($this->env, "BACKUP_ARCHIVE_PASSWORD=Backup-Prova-Generata-42\n");
+        $installer = app(InstallerService::class);
+
+        // Senza il segnale del wizard non si mostra nulla (installazioni esistenti)
+        $this->assertNull($installer->passwordBackupDaMostrare());
+
+        session()->put(InstallerService::SESSIONE_PASSWORD_BACKUP, true);
+        $this->assertSame('Backup-Prova-Generata-42', $installer->passwordBackupDaMostrare());
+        $this->assertNull($installer->passwordBackupDaMostrare());
+    }
 }

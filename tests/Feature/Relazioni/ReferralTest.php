@@ -7,6 +7,7 @@ use App\Models\RichiestaIscrizione;
 use App\Models\Socio;
 use App\Models\Utente;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 
 /**
@@ -16,6 +17,7 @@ use Tests\TestCase;
  */
 class ReferralTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     private const CF_VALIDO = 'RSSMRA85T10A562S';
@@ -74,7 +76,7 @@ class ReferralTest extends TestCase
             ->assertSee($ambasciatore->codice_referral, false);
 
         // POST come ospite con il referral nel campo nascosto
-        $this->post($this->urlTenant('iscriviti'), [
+        $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), [
             'nome' => 'Mario',
             'cognome' => 'Verdi',
             'email' => 'mario.verdi@example.com',
@@ -93,7 +95,7 @@ class ReferralTest extends TestCase
 
     public function test_un_ref_inesistente_non_viene_salvato(): void
     {
-        $this->post($this->urlTenant('iscriviti'), [
+        $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), [
             'nome' => 'Anna',
             'cognome' => 'Bianchi',
             'email' => 'anna.bianchi@example.com',
@@ -113,7 +115,7 @@ class ReferralTest extends TestCase
     public function test_iscrizione_senza_ref_funziona_normalmente(): void
     {
         // Garanzia anti-regressione: il referral non deve mai rompere il form
-        $this->post($this->urlTenant('iscriviti'), [
+        $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), [
             'nome' => 'Luca',
             'cognome' => 'Neri',
             'email' => 'luca.neri@example.com',

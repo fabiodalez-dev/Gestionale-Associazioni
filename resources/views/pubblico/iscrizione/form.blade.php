@@ -226,7 +226,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
 (function () {
     // f.22: mostra il blocco tutore e marca i campi required quando
     // la data di nascita indica un'età < 18 (il vincolo vero è server-side)

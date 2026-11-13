@@ -106,7 +106,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form method="POST" action="{{ route('attrezzature.destroy', $a) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questa attrezzatura?');">
+                                      data-conferma="Eliminare questa attrezzatura?">
                                     @csrf
                                     @method('DELETE')
                                     <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
@@ -202,7 +202,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('attrezzaturaForm');
         const titolo = document.getElementById('attrezzaturaModalTitolo');

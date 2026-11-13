@@ -10,8 +10,13 @@ namespace App\Services\ApiV1;
  * - personal access token Sanctum con abilities (le abilities usano la stessa
  *   sintassi dei permessi legacy: `soci:read`, `soci:*`, `*`).
  *
- * Una chiave/token è "globale" quando non è vincolata ad alcuna associazione
- * (api_keys.associazione_id NULL, oppure token di un super_admin senza tenant).
+ * Una chiave/token è "globale" solo se dichiarata tale in modo esplicito
+ * (api_keys.globale, oppure token di un super_admin senza tenant) e non è
+ * vincolata ad alcuna associazione. Un associazione_id NULL da solo non basta:
+ * una chiave rimasta senza associazione (per esempio dopo l'eliminazione del
+ * tenant) non deve mai diventare cross-tenant. Il costruttore rifiuta un
+ * contesto non globale senza associazione, così nessun controller può
+ * interpretare il tenant NULL come "tutte le associazioni".
  *
  * Il rate limiting non passa da qui: il limiter api-v1 gira prima
  * dell'autenticazione, per IP e per hash della credenziale presentata.
@@ -24,11 +29,16 @@ class ApiClientContext
     public function __construct(
         public readonly ?string $associazioneId,
         public readonly array $permessi,
-    ) {}
+        public readonly bool $globale = false,
+    ) {
+        if ($associazioneId === null && ! $globale) {
+            throw new \InvalidArgumentException('Contesto API senza associazione e non globale.');
+        }
+    }
 
     public function isGlobale(): bool
     {
-        return $this->associazioneId === null;
+        return $this->globale && $this->associazioneId === null;
     }
 
     /**
@@ -37,13 +47,23 @@ class ApiClientContext
      */
     public function hasPermesso(string $permesso): bool
     {
-        if (in_array('*', $this->permessi, true) || in_array($permesso, $this->permessi, true)) {
+        return self::permessoConcesso($this->permessi, $permesso);
+    }
+
+    /**
+     * Regola unica dei permessi API (usata anche da ApiKey::hasPermesso).
+     *
+     * @param  array<int, mixed>  $permessi
+     */
+    public static function permessoConcesso(array $permessi, string $permesso): bool
+    {
+        if (in_array('*', $permessi, true) || in_array($permesso, $permessi, true)) {
             return true;
         }
 
         $categoria = explode(':', $permesso)[0];
 
-        return in_array($categoria.':*', $this->permessi, true);
+        return in_array($categoria.':*', $permessi, true);
     }
 
     /**

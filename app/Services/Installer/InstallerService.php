@@ -19,6 +19,9 @@ use RuntimeException;
 
 class InstallerService
 {
+    /** Segnale in sessione: password dei backup generata dal wizard, da mostrare a fine installazione. */
+    public const SESSIONE_PASSWORD_BACKUP = 'installer.password_backup_generata';
+
     public function markInstalled(): void
     {
         $lockFile = config('installer.lock_file');
@@ -463,7 +466,7 @@ class InstallerService
      */
     public function createAdmin(array $dati): Utente
     {
-        return DB::transaction(function () use ($dati) {
+        $admin = DB::transaction(function () use ($dati) {
             $associazione = Associazione::create([
                 'nome' => $dati['associazione_nome'],
                 'email' => $dati['associazione_email'],
@@ -484,5 +487,69 @@ class InstallerService
 
             return $admin;
         });
+
+        // Solo il wizard crea il primo super admin: è un'installazione nuova,
+        // quindi i backup nascono cifrati. Le installazioni esistenti non
+        // passano di qui e restano come sono
+        if ($this->generaPasswordBackup() !== null && app()->bound('session')) {
+            session()->put(self::SESSIONE_PASSWORD_BACKUP, true);
+        }
+
+        return $admin;
+    }
+
+    /**
+     * Genera la password degli archivi di backup (BACKUP_ARCHIVE_PASSWORD) se
+     * nel .env è vuota e il file è scrivibile. Gli zip includono il .env (serve
+     * al ripristino), quindi senza password conterrebbero in chiaro le
+     * credenziali del database e la APP_KEY. Una password già presente non
+     * viene mai toccata: i backup esistenti restano apribili.
+     *
+     * @return string|null la password generata, null se non è stata generata
+     */
+    public function generaPasswordBackup(): ?string
+    {
+        $editor = app(EnvEditor::class);
+        if (filled($editor->get('BACKUP_ARCHIVE_PASSWORD')) || ! $editor->isWritable()) {
+            return null;
+        }
+
+        $password = self::nuovaPasswordBackup();
+
+        try {
+            $this->writeEnv(['BACKUP_ARCHIVE_PASSWORD' => $password]);
+        } catch (\InvalidArgumentException|RuntimeException $e) {
+            report($e);
+
+            return null;
+        }
+        config(['backup.backup.password' => $password]);
+
+        return $password;
+    }
+
+    /**
+     * Password del wizard da mostrare una sola volta nella pagina finale:
+     * la sessione conserva solo il segnale "generata adesso", il valore si
+     * rilegge dal .env. Dopo la lettura il segnale sparisce.
+     */
+    public function passwordBackupDaMostrare(): ?string
+    {
+        if (! app()->bound('session') || ! session()->pull(self::SESSIONE_PASSWORD_BACKUP, false)) {
+            return null;
+        }
+
+        $password = app(EnvEditor::class)->get('BACKUP_ARCHIVE_PASSWORD');
+
+        return $password !== '' ? $password : null;
+    }
+
+    /**
+     * Password casuale per gli archivi: solo lettere e cifre (niente simboli
+     * da quotare nel .env o da digitare male aprendo lo zip), 32 caratteri.
+     */
+    public static function nuovaPasswordBackup(): string
+    {
+        return Str::password(32, letters: true, numbers: true, symbols: false, spaces: false);
     }
 }

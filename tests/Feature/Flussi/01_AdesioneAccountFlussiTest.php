@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -48,6 +49,7 @@ use ZipArchive;
  */
 class Flussi01_AdesioneAccountFlussiTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     private const PASSWORD = 'Lampione-Viola-Treno-42';
@@ -204,11 +206,15 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         ], $override);
     }
 
+    /**
+     * Invio del modulo da ospite e clic sul link di conferma ricevuto via email
+     * (la richiesta nasce solo dopo la conferma dell'indirizzo).
+     */
     private function inviaIscrizioneOspite(array $override = []): TestResponse
     {
         $this->comeOspite();
 
-        return $this->post($this->url('iscriviti'), $this->datiOspite($override));
+        return $this->inviaEConfermaIscrizioneOspite($this->url('iscriviti'), $this->datiOspite($override));
     }
 
     private function richiestaPerEmail(string $email): RichiestaIscrizione
@@ -316,7 +322,8 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
             ],
         ]);
 
-        $this->post($this->url('iscriviti'), $inviati + ['referral_codice' => $ambasciatore->codice_referral])
+        // Invio e clic sul link di conferma ricevuto via email
+        $this->inviaEConfermaIscrizioneOspite($this->url('iscriviti'), $inviati + ['referral_codice' => $ambasciatore->codice_referral])
             ->assertSessionHasNoErrors()
             ->assertRedirect($this->url())
             ->assertSessionHas('success');
@@ -560,12 +567,14 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         $this->inviaIscrizioneOspite(['custom_field' => [$professione->id => 'Medico']])
             ->assertSessionHas('success');
 
-        // Ci riprova con la stessa email: errore chiaro, nessun duplicato
+        // Ci riprova con la stessa email: da ospite la risposta è neutra (identica a un
+        // invio riuscito, niente oracolo sulle iscrizioni in corso), nessun duplicato
         $this->comeOspite();
         $this->from($this->url('iscriviti'))
             ->post($this->url('iscriviti'), $this->datiOspite(['nome' => 'Giulietta']))
-            ->assertRedirect($this->url('iscriviti'))
-            ->assertSessionHasErrors('iscrizione');
+            ->assertRedirect($this->url())
+            ->assertSessionDoesntHaveErrors()
+            ->assertSessionHas('success');
 
         $this->assertSame(1, RichiestaIscrizione::withoutGlobalScopes()->count());
         $this->assertSame(1, Socio::withoutGlobalScopes()->withTrashed()->count());
@@ -1016,7 +1025,8 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
             'privacy' => '1',
         ])
             ->assertSessionHasNoErrors()
-            ->assertRedirect($this->url('verifica-email'));
+            // Risposta neutra: niente login automatico, si torna all'accesso
+            ->assertRedirect($this->url('login'));
 
         /** @var Account $account */
         $account = Account::withoutGlobalScopes()->where('associazione_id', $this->associazione->id)->sole();
@@ -1040,8 +1050,7 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         });
         $this->assertIsString($link);
 
-        // Chiude il browser; apre un link con la firma manomessa
-        $this->post($this->url('logout'));
+        // Chiude il browser (dopo la registrazione non è loggata); apre un link con la firma manomessa
         $this->comeOspite();
 
         $manomesso = preg_replace('/signature=([0-9a-f]+)/', 'signature=deadbeef', $link);

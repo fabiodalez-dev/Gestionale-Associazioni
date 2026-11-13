@@ -12,15 +12,15 @@
             @foreach ($allegati as $allegato)
                 <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
                     <a href="{{ route('allegati.download', [$tipo, $modello->getKey(), $allegato->id]) }}" class="text-break">
-                        <i class="bi bi-file-earmark me-1"></i>{{ $allegato->file_name }}
+                        <i class="bi bi-file-earmark me-1"></i>{{ \App\Http\Controllers\AllegatiController::nomeAllegato($allegato) }}
                     </a>
                     <span class="d-flex align-items-center gap-2 text-nowrap">
                         <span class="small text-muted">{{ $allegato->human_readable_size }} · {{ $allegato->created_at?->format('d/m/Y') }}</span>
                         @can('update', $modello)
-                            <form method="POST" action="{{ route('allegati.destroy', [$tipo, $modello->getKey(), $allegato->id]) }}" onsubmit="return confirm('Eliminare questo allegato?')">
+                            <form method="POST" action="{{ route('allegati.destroy', [$tipo, $modello->getKey(), $allegato->id]) }}" data-conferma="Eliminare questo allegato?">
                                 @csrf
                                 @method('DELETE')
-                                <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i><span class="visually-hidden">Elimina {{ $allegato->file_name }}</span></button>
+                                <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i><span class="visually-hidden">Elimina {{ \App\Http\Controllers\AllegatiController::nomeAllegato($allegato) }}</span></button>
                             </form>
                         @endcan
                     </span>

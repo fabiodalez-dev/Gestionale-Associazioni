@@ -5,6 +5,7 @@ namespace App\Services\Piattaforma;
 use App\Http\Requests\Piattaforma\RegistrazioneAssociazioneRequest;
 use App\Mail\Piattaforma\EsitoRegistrazioneMail;
 use App\Mail\Piattaforma\NuovaRichiestaRegistrazioneMail;
+use App\Mail\Piattaforma\TentativoRegistrazioneMail;
 use App\Mail\Piattaforma\VerificaEmailRegistrazioneMail;
 use App\Models\Associazione;
 use App\Models\RichiestaRegistrazione;
@@ -12,6 +13,7 @@ use App\Models\Sede;
 use App\Models\Utente;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -35,10 +37,30 @@ class RegistrazioneAssociazioni
     /**
      * Salva la richiesta e invia il link di conferma all'amministratore.
      *
+     * Se l'email dell'amministratore è già di un account della piattaforma (o di
+     * una richiesta confermata ancora in attesa) la richiesta NON viene creata:
+     * il titolare dell'indirizzo riceve un avviso e chi ha compilato il modulo
+     * vede la stessa pagina di una richiesta accettata (null come ritorno).
+     *
      * @param  array<string, mixed>  $dati  dati validati del modulo pubblico
      */
-    public function registra(array $dati, ?string $ip): RichiestaRegistrazione
+    public function registra(array $dati, ?string $ip): ?RichiestaRegistrazione
     {
+        $adminEmail = Str::lower($dati['admin_email']);
+
+        if ($this->emailAdminOccupata($adminEmail)) {
+            // Stesso costo di una richiesta vera (hash della password), così i tempi
+            // di risposta non distinguono i due casi
+            Hash::make((string) $dati['admin_password']);
+
+            if (RateLimiter::hit(RegistrazioneAssociazioneRequest::chiaveLimite($adminEmail), 86400) <= RegistrazioneAssociazioneRequest::INVII_PER_INDIRIZZO) {
+                $this->invia($adminEmail, new TentativoRegistrazioneMail);
+            }
+            Log::info('Registrazione associazione: email dell\'amministratore già in uso, nessuna richiesta creata', ['ip' => $ip]);
+
+            return null;
+        }
+
         $richiesta = RichiestaRegistrazione::create([
             'stato' => RichiestaRegistrazione::STATO_IN_ATTESA,
             'nome' => $dati['nome'],
@@ -67,6 +89,20 @@ class RegistrazioneAssociazioni
         }
 
         return $richiesta;
+    }
+
+    /**
+     * L'email dell'amministratore appartiene già a un utente o a una richiesta
+     * confermata in attesa? (le richieste mai confermate non occupano l'email)
+     */
+    public function emailAdminOccupata(string $email): bool
+    {
+        return Utente::query()->withoutGlobalScopes()->where('email', $email)->exists()
+            || RichiestaRegistrazione::query()
+                ->where('stato', RichiestaRegistrazione::STATO_IN_ATTESA)
+                ->whereNotNull('email_verificata_at')
+                ->where('admin_email', $email)
+                ->exists();
     }
 
     public function linkVerifica(RichiestaRegistrazione $richiesta): string

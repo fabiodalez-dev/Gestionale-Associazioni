@@ -124,7 +124,7 @@
 <div id="result-overlay" class="result-overlay d-none" role="alert"></div>
 
 <script src="{{ asset('assets/vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
-<script>
+<script @cspNonce>
 (function() {
     'use strict';
 

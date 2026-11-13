@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Struttura\StoreAssociazioneRequest;
 use App\Http\Requests\Struttura\UpdateAssociazioneRequest;
 use App\Models\Accesso;
+use App\Models\ApiKey;
 use App\Models\Associazione;
 use App\Models\Prenotazione;
 use App\Models\Quota;
@@ -265,10 +266,23 @@ class AssociazioneController extends Controller
 
         $request->validate(['utente_id' => ['required', 'uuid']]);
 
-        $aggiornati = Utente::query()
-            ->where('id', $request->input('utente_id'))
-            ->where('associazione_id', $associazione->id) // scoping difensivo
-            ->update(['associazione_id' => null, 'attivo' => false, 'remember_token' => null]);
+        $aggiornati = DB::transaction(function () use ($request, $associazione): int {
+            $utente = Utente::query()
+                ->where('id', $request->input('utente_id'))
+                ->where('associazione_id', $associazione->id) // scoping difensivo
+                ->first();
+
+            if (! $utente) {
+                return 0;
+            }
+
+            // I token Sanctum dell'utente scollegato vanno revocati: non
+            // devono restare spendibili se l'utente viene poi riattivato
+            $utente->tokens()->delete();
+
+            return Utente::query()->whereKey($utente->id)
+                ->update(['associazione_id' => null, 'attivo' => false, 'remember_token' => null]);
+        });
 
         return redirect()
             ->route('associazioni.index', ['edit' => $associazione->id])
@@ -281,7 +295,8 @@ class AssociazioneController extends Controller
     /**
      * Eliminazione con conferma forte (digitare il nome — spec §9.16):
      * i dati figli vengono rimossi per cascade FK, gli utenti restano scollegati
-     * e disattivati.
+     * e disattivati (con i token Sanctum revocati), le chiavi API del tenant
+     * vengono eliminate.
      * Le prenotazioni si eliminano prima: prenotazioni.account_id è RESTRICT
      * (voluto per la cancellazione GDPR del singolo account) e su InnoDB
      * bloccherebbe la cascade associazione → accounts.
@@ -300,9 +315,17 @@ class AssociazioneController extends Controller
         DB::transaction(function () use ($associazione): void {
             // Gli utenti collegati vengono scollegati (il cascade DB li
             // eliminerebbe) e disattivati: senza associazione non hanno un
-            // contesto in cui operare
-            Utente::query()->where('associazione_id', $associazione->id)
+            // contesto in cui operare. I loro token Sanctum vengono revocati.
+            $utenti = Utente::query()->where('associazione_id', $associazione->id)->get();
+            foreach ($utenti as $utente) {
+                $utente->tokens()->delete();
+            }
+            Utente::query()->whereKey($utenti->modelKeys())
                 ->update(['associazione_id' => null, 'attivo' => false, 'remember_token' => null]);
+
+            // Chiavi API del tenant eliminate esplicitamente (oltre al cascade
+            // della FK): una chiave senza associazione non deve sopravvivere
+            ApiKey::query()->where('associazione_id', $associazione->id)->delete();
 
             // Dipendenze delle prenotazioni (feedback, ...) già in cascade
             Prenotazione::allTenants()->where('associazione_id', $associazione->id)->delete();
@@ -364,6 +387,15 @@ class AssociazioneController extends Controller
             $utente->syncRoles([Role::findOrCreate(Utente::RUOLO_ADMIN_ASSOCIAZIONE, 'web')]);
         }
         $utente->save();
+
+        // Lo scollegamento disattiva l'utente, ma un utente disattivato per
+        // altri motivi (es. sospeso dal super admin) non è distinguibile:
+        // nessuna riattivazione automatica, che ridarebbe accesso in modo
+        // silenzioso. Il super admin viene avvisato e lo riattiva in modo
+        // consapevole dalla pagina Amministratori.
+        if (! $utente->attivo) {
+            $warnings[] = '(L\'utente '.trim($utente->nome.' '.$utente->cognome).' è collegato ma risulta disattivato: riattivalo dalla pagina Amministratori se deve poter accedere)';
+        }
 
         return true;
     }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\IscrizioneDaConfermare;
 use App\Models\RichiestaRegistrazione;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -77,7 +78,8 @@ Schedule::command('queue:prune-batches', ['--hours' => 168])
     ->withoutOverlapping();
 
 // Richieste di iscrizione delle associazioni mai confermate via email (7 giorni)
-Schedule::command('model:prune', ['--model' => [RichiestaRegistrazione::class]])
+// e iscrizioni da ospite non confermate (48 ore)
+Schedule::command('model:prune', ['--model' => [RichiestaRegistrazione::class, IscrizioneDaConfermare::class]])
     ->daily()
     ->withoutOverlapping();
 

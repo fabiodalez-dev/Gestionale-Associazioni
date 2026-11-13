@@ -75,7 +75,7 @@
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <form method="POST" action="{{ route('tessere.destroy', $tessera) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare definitivamente la tessera {{ $tessera->numero_tessera }}?');">
+                                  data-conferma="Eliminare definitivamente la tessera {{ $tessera->numero_tessera }}?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">

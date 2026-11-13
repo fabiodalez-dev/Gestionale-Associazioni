@@ -81,6 +81,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Activitylog\Models\Activity;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 
 /**
@@ -102,6 +103,7 @@ use Tests\TestCase;
  */
 class VitaSociTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     private const PASSWORD = 'Lampione-Viola-Treno-42';
@@ -279,13 +281,14 @@ class VitaSociTest extends TestCase
             'privacy' => '1',
         ], $dati);
 
+        // Dopo la registrazione si torna all'accesso (risposta neutra, niente login automatico)
         $this->post($this->urlTenant('registrati'), $dati)
-            ->assertRedirect($this->urlTenant('verifica-email'));
+            ->assertRedirect($this->urlTenant('login'));
 
         /** @var Account $account */
         $account = Account::allTenants()->where('email', $dati['email'])->firstOrFail();
 
-        $this->post($this->urlTenant('logout'));
+        // Dopo la registrazione non è loggato: nessun logout da fare
         $this->assertGuest('account');
 
         $this->get($this->linkDiVerifica($account))
@@ -1043,8 +1046,8 @@ class VitaSociTest extends TestCase
 
         $this->assertSame(0, RichiestaIscrizione::allTenants()->count());
 
-        // Riprova con i dati del tutore
-        $this->post($this->urlTenant('iscriviti'), $datiSara + [
+        // Riprova con i dati del tutore e conferma l'email dal link ricevuto
+        $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), $datiSara + [
             'tutore_nome' => 'Franco Giovani',
             'tutore_telefono' => '3479998877',
             'tutore_email' => 'franco.giovani@example.test',
@@ -2112,7 +2115,7 @@ class VitaSociTest extends TestCase
         foreach ($amici as [$nome, $cognome, $email, $ref]) {
             $this->esci();
             $this->get($this->urlTenant('iscriviti').'?ref='.urlencode($ref))->assertOk();
-            $this->post($this->urlTenant('iscriviti'), [
+            $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), [
                 'nome' => $nome, 'cognome' => $cognome, 'email' => $email, 'privacy' => '1',
                 'telefono' => '3331234567', 'data_nascita' => '1990-01-15', 'referral_codice' => $ref,
             ])->assertRedirect($this->urlTenant())->assertSessionHas('success');
@@ -2833,7 +2836,7 @@ class VitaSociTest extends TestCase
         Carbon::setTestNow('2026-01-20 18:00:00');
         $this->configuraStripe();
 
-        $this->post($this->urlTenant('iscriviti'), [
+        $this->inviaEConfermaIscrizioneOspite($this->urlTenant('iscriviti'), [
             'nome' => 'Omar', 'cognome' => 'Indecisi', 'email' => 'omar.indecisi@example.test', 'privacy' => '1',
             'telefono' => '3337778899', 'data_nascita' => '1995-02-02',
         ])->assertSessionHas('success');

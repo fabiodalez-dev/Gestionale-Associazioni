@@ -131,7 +131,7 @@
 <link href="{{ asset('assets/css/grapes-theme.css') }}" rel="stylesheet">
 <script src="{{ asset('assets/vendor/grapesjs/grapes.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/grapesjs/grapesjs-preset-newsletter.min.js') }}"></script>
-<script>
+<script @cspNonce>
 const filterOptions = {
     category: @json($categorie->map(fn ($c) => ['id' => $c->id, 'label' => $c->nome])->values()),
     section: @json($sedi->map(fn ($s) => ['id' => $s->id, 'label' => $s->nome])->values()),
@@ -158,8 +158,9 @@ const editor = grapesjs.init({
     height: '420px',
     storageManager: false,
     canvasCss: emailCanvasCss,
-    plugins: ['gjs-preset-newsletter'],
-    pluginsOpts: { 'gjs-preset-newsletter': {} },
+    // Il preset si registra come window['grapesjs-preset-newsletter']: con il
+    // nome 'gjs-preset-newsletter' GrapesJS non lo trovava e lo saltava
+    plugins: [window['grapesjs-preset-newsletter']].filter(Boolean),
     assetManager: { upload: false }
 });
 

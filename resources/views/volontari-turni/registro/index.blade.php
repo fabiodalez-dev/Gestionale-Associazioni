@@ -58,7 +58,7 @@
                     <span class="fw-semibold"><i class="bi bi-list-ul me-1"></i>Ore registrate {{ $anno }}</span>
                     <form method="GET" action="{{ route('registro-ore.index') }}" class="d-flex align-items-center gap-2">
                         <input type="number" class="form-control form-control-sm" style="width:6rem" name="anno" value="{{ $anno }}"
-                               min="2000" max="{{ now()->year + 1 }}" onchange="this.form.submit()">
+                               min="2000" max="{{ now()->year + 1 }}" data-invio-automatico>
                         <span class="badge bg-success">Totale: {{ rtrim(rtrim(number_format($totale, 2, ',', '.'), '0'), ',') }} h</span>
                     </form>
                 </div>
@@ -79,7 +79,7 @@
                                             <td>{{ $v->turno?->titolo }}</td>
                                             <td class="text-end">{{ $v->ore_effettive }}</td>
                                             <td class="text-end">
-                                                <form method="POST" action="{{ route('registro-ore.destroy', $v) }}" onsubmit="return confirm('Rimuovere questa voce?');">
+                                                <form method="POST" action="{{ route('registro-ore.destroy', $v) }}" data-conferma="Rimuovere questa voce?">
                                                     @csrf @method('DELETE')
                                                     <button class="btn btn-sm btn-outline-danger" title="Rimuovi"><i class="bi bi-trash"></i></button>
                                                 </form>

@@ -55,7 +55,7 @@
                 </div>
                 <div class="col-8 col-md-4">
                     <label class="form-label small mb-1" for="tipo">Tipo</label>
-                    <select class="form-select form-select-sm" id="tipo" name="tipo" onchange="this.form.submit()">
+                    <select class="form-select form-select-sm" id="tipo" name="tipo" data-invio-automatico>
                         <option value="tutti" @selected($tipo === 'tutti')>Tutti i tipi</option>
                         @foreach ($tipiLabel as $valore => $label)
                             <option value="{{ $valore }}" @selected($tipo === $valore)>{{ $label }}</option>
@@ -111,7 +111,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <form method="POST" action="{{ route('contatti-esterni.destroy', $contatto) }}" class="d-inline"
-                                      onsubmit="return confirm('Eliminare questo contatto?');">
+                                      data-conferma="Eliminare questo contatto?">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i></button>

@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\api_v1;
 
+use App\Http\Middleware\ApiV1\AuthenticateApiV1;
 use App\Models\ApiKey;
 use App\Models\Associazione;
+use App\Models\Socio;
 use App\Models\Utente;
+use App\Services\ApiV1\ApiClientContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
 use Tests\TestCase;
@@ -108,6 +111,124 @@ class AutenticazioneApiV1Test extends TestCase
         $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])->assertOk();
 
         $this->assertNotNull(ApiKey::query()->perChiave($this->chiave)->value('ultimo_utilizzo'));
+    }
+
+    // ---- Chiavi globali esplicite (audit run-2) ----
+
+    /**
+     * Regressione principale: una chiave '*' del tenant T1 non deve diventare
+     * globale quando il super admin elimina T1 (prima la FK nullOnDelete la
+     * trasformava in una chiave cross-tenant).
+     */
+    public function test_eliminare_l_associazione_non_trasforma_le_sue_chiavi_in_chiavi_globali(): void
+    {
+        $t1 = Associazione::factory()->create(['attiva' => true, 'nome' => 'Tenant Uno']);
+        $t2 = Associazione::factory()->create(['attiva' => true]);
+        $socioT2 = Socio::factory()->create(['associazione_id' => $t2->id, 'cognome' => 'AltroTenant']);
+        $chiaveT1 = str_repeat('7e', 32);
+        ApiKey::create([
+            'associazione_id' => $t1->id,
+            'api_key' => $chiaveT1,
+            'nome' => 'Tutto T1',
+            'permessi' => ['*'],
+            'attiva' => true,
+        ]);
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$chiaveT1])->assertOk();
+
+        $this->actingAs(Utente::factory()->superAdmin()->create())
+            ->delete('/associazioni/'.$t1->id, ['conferma_nome' => 'Tenant Uno'])
+            ->assertRedirect(route('associazioni.index'));
+        $this->app['auth']->forgetGuards();
+
+        $this->assertDatabaseMissing('api_keys', ['api_key_hash' => ApiKey::hashChiave($chiaveT1)]);
+        foreach (['/api/v1/soci', '/api/v1/soci/'.$socioT2->id, '/api/v1/associazioni'] as $url) {
+            $this->getJson($url, ['Authorization' => 'Bearer '.$chiaveT1])
+                ->assertStatus(401)
+                ->assertJsonPath('code', 'auth_invalid')
+                ->assertDontSee('AltroTenant');
+        }
+    }
+
+    public function test_chiave_senza_associazione_e_senza_flag_globale_viene_rifiutata(): void
+    {
+        // Chiave orfana (es. sopravvissuta a un'associazione eliminata)
+        $t2 = Associazione::factory()->create(['attiva' => true]);
+        Socio::factory()->create(['associazione_id' => $t2->id, 'cognome' => 'AltroTenant']);
+        $orfana = str_repeat('0f', 32);
+        ApiKey::create([
+            'associazione_id' => null,
+            'api_key' => $orfana,
+            'nome' => 'Orfana',
+            'permessi' => ['*'],
+            'attiva' => true,
+        ]);
+
+        foreach (['/api/v1/soci', '/api/v1/associazioni'] as $url) {
+            $this->getJson($url, ['Authorization' => 'Bearer '.$orfana])
+                ->assertStatus(403)
+                ->assertJsonPath('code', 'association_disabled')
+                ->assertDontSee('AltroTenant');
+        }
+    }
+
+    public function test_chiave_con_flag_globale_resta_cross_tenant(): void
+    {
+        $t2 = Associazione::factory()->create(['attiva' => true]);
+        Socio::factory()->create(['associazione_id' => $t2->id, 'cognome' => 'AltroTenant']);
+        $globale = str_repeat('9a', 32);
+        ApiKey::create([
+            'associazione_id' => null,
+            'globale' => true,
+            'api_key' => $globale,
+            'nome' => 'Globale',
+            'permessi' => ['*'],
+            'attiva' => true,
+        ]);
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$globale])
+            ->assertOk()
+            ->assertSee('AltroTenant');
+    }
+
+    public function test_il_flag_globale_su_una_chiave_scopata_non_la_rende_globale(): void
+    {
+        $chiave = ApiKey::query()->perChiave($this->chiave)->firstOrFail();
+        $chiave->update(['globale' => true]);
+
+        $this->assertFalse($chiave->fresh()->isGlobale());
+        $this->assertTrue($chiave->fresh()->hasPermesso('soci:read'));
+        $this->assertFalse($chiave->fresh()->hasPermesso('soci:write'));
+    }
+
+    public function test_contesto_api_senza_associazione_e_non_globale_non_si_costruisce(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new ApiClientContext(associazioneId: null, permessi: ['*']);
+    }
+
+    public function test_permessi_della_chiave_e_del_contesto_seguono_la_stessa_regola(): void
+    {
+        $chiave = new ApiKey(['permessi' => ['soci:*', 'tessere:read']]);
+        $contesto = new ApiClientContext(associazioneId: 'x', permessi: ['soci:*', 'tessere:read']);
+
+        foreach (['soci:read', 'soci:write', 'tessere:read', 'tessere:write', 'quote:read'] as $permesso) {
+            $this->assertSame($contesto->hasPermesso($permesso), $chiave->hasPermesso($permesso), $permesso);
+        }
+        $this->assertTrue((new ApiKey(['permessi' => ['*']]))->hasPermesso('quote:write'));
+    }
+
+    public function test_token_sanctum_di_super_admin_senza_associazione_resta_globale(): void
+    {
+        $t2 = Associazione::factory()->create(['attiva' => true]);
+        Socio::factory()->create(['associazione_id' => $t2->id, 'cognome' => 'AltroTenant']);
+        $token = Utente::factory()->superAdmin()->create(['associazione_id' => null])
+            ->createToken('globale', ['soci:read'])->plainTextToken;
+
+        $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$token])
+            ->assertOk()
+            ->assertSee('AltroTenant');
     }
 
     // ---- Chiavi hashate (hardening audit run-1) ----
@@ -286,5 +407,112 @@ class AutenticazioneApiV1Test extends TestCase
         $this->deleteJson('/api/v1/soci', [], ['Authorization' => 'Bearer '.$this->chiave])
             ->assertStatus(405)
             ->assertJsonPath('code', 'method_not_allowed');
+    }
+
+    // ------------------------------------------------------------------
+    // API fuori dal gruppo web: niente sessione né cookie
+    // ------------------------------------------------------------------
+
+    public function test_risposte_api_v1_senza_set_cookie_e_senza_sessione(): void
+    {
+        $risposte = [
+            $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])->assertOk(),
+            $this->getJson('/api/v1/soci')->assertStatus(401),
+            $this->deleteJson('/api/v1/soci', [], ['Authorization' => 'Bearer '.$this->chiave])->assertStatus(405),
+            $this->getJson('/api/v1/tessere/verify?uuid=x'),
+        ];
+
+        // Controprova: una pagina web imposta i cookie di sessione e XSRF
+        $this->assertNotSame([], $this->get('/login')->headers->getCookies());
+
+        foreach ($risposte as $risposta) {
+            $this->assertSame([], $risposta->headers->getCookies(), 'Le risposte /api/v1 non devono impostare cookie.');
+            $this->assertFalse($risposta->headers->has('Set-Cookie'));
+            // StartSession (gruppo web) aggancerebbe la sessione alla richiesta
+            $this->assertFalse($risposta->baseRequest->hasSession(), 'Nessuna sessione per le richieste API.');
+            // Header di sicurezza conservati, CSP assente come prima
+            $risposta->assertHeader('X-Content-Type-Options', 'nosniff');
+            $risposta->assertHeaderMissing('Content-Security-Policy');
+        }
+
+    }
+
+    public function test_rotte_api_v1_nel_gruppo_api_con_url_e_nomi_invariati(): void
+    {
+        $attese = [
+            'api.v1.ping' => 'api/v1',
+            'api.v1.tessere.verify' => 'api/v1/tessere/verify',
+            'api.v1.tessere.search' => 'api/v1/tessere/search',
+            'api.v1.tessere.show' => 'api/v1/tessere/{id}',
+            'api.v1.tessere.index' => 'api/v1/tessere',
+            'api.v1.soci.search' => 'api/v1/soci/search',
+            'api.v1.soci.show' => 'api/v1/soci/{id}',
+            'api.v1.soci.index' => 'api/v1/soci',
+            'api.v1.soci.update' => 'api/v1/soci/{id}',
+            'api.v1.quote.perSocio' => 'api/v1/quote/{socio_id}',
+            'api.v1.quote.index' => 'api/v1/quote',
+            'api.v1.associazioni.index' => 'api/v1/associazioni',
+            'api.v1.method-not-allowed' => 'api/v1/{path}',
+            'api.v1.eventi.index' => 'api/v1/eventi',
+            'api.v1.eventi.show' => 'api/v1/eventi/{id}',
+            'api.v1.eventi.checkin' => 'api/v1/eventi/{id}/checkin',
+        ];
+
+        foreach ($attese as $nome => $uri) {
+            $rotta = app('router')->getRoutes()->getByName($nome);
+            $this->assertNotNull($rotta, "Rotta {$nome} mancante.");
+            $this->assertSame($uri, $rotta->uri(), "URI di {$nome} cambiato.");
+
+            $middleware = $rotta->gatherMiddleware();
+            $this->assertContains('api', $middleware, "{$nome} deve stare nel gruppo api.");
+            $this->assertNotContains('web', $middleware, "{$nome} non deve stare nel gruppo web.");
+
+            // Throttle prima dell'autenticazione (anche i tentativi falliti contano)
+            $throttle = collect($middleware)->search(fn ($m) => is_string($m) && str_starts_with($m, 'throttle:'));
+            $auth = collect($middleware)->search(fn ($m) => is_string($m) && str_starts_with($m, AuthenticateApiV1::class));
+            // Il catch-all 405 non ha mai avuto throttle né autenticazione
+            if ($nome !== 'api.v1.method-not-allowed') {
+                $this->assertNotFalse($throttle, "{$nome} senza throttle.");
+            }
+            if ($auth !== false) {
+                $this->assertLessThan($auth, $throttle, "{$nome}: il throttle deve precedere AuthenticateApiV1.");
+            }
+        }
+
+        // Le pagine amministrative restano nel gruppo web
+        foreach (['api-keys.index', 'api-tokens.index', 'api-tokens.destroy', 'api-docs.index', 'eventi.checkin'] as $nome) {
+            $this->assertContains('web', app('router')->getRoutes()->getByName($nome)->gatherMiddleware(), "{$nome} deve restare nel gruppo web.");
+        }
+    }
+
+    public function test_api_con_app_non_installata_risponde_503_json_e_non_reindirizza(): void
+    {
+        $dir = sys_get_temp_dir().'/api-v1-installer-'.bin2hex(random_bytes(4));
+        mkdir($dir);
+        config([
+            'installer.enabled' => true,
+            'installer.enforce_in_tests' => true,
+            'installer.lock_file' => $dir.'/installed.lock',
+            'installer.in_progress_file' => $dir.'/installer-in-corso',
+        ]);
+
+        try {
+            $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])
+                ->assertStatus(503)
+                ->assertJsonPath('success', false)
+                ->assertJsonPath('code', 'not_installed');
+
+            $this->assertFileDoesNotExist($dir.'/installed.lock');
+
+            // Database già installato ma lock perso (deploy, installazione da
+            // CLI): come EnsureInstalled riscrive il lock e l'API risponde
+            Utente::factory()->superAdmin()->create();
+
+            $this->getJson('/api/v1/soci', ['Authorization' => 'Bearer '.$this->chiave])->assertOk();
+            $this->assertFileExists($dir.'/installed.lock');
+        } finally {
+            @unlink($dir.'/installed.lock');
+            @rmdir($dir);
+        }
     }
 }

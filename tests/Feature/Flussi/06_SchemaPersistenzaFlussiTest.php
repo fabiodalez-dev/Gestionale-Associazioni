@@ -79,6 +79,7 @@ use Illuminate\Testing\TestResponse;
 use PDO;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Spatie\Health\ResultStores\EloquentHealthResultStore;
+use Tests\Concerns\ConfermaIscrizioneOspite;
 use Tests\TestCase;
 
 /**
@@ -98,6 +99,7 @@ use Tests\TestCase;
  */
 class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
 {
+    use ConfermaIscrizioneOspite;
     use RefreshDatabase;
 
     /** Database di prova: migration, schema.sql e reimport del backup. */
@@ -1811,7 +1813,8 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
         // Obbligatorietà applicata davvero lato server; modalità diretta → socio attivo
         $this->post('/a/circolo-radici/iscriviti', ['nome' => 'Ivo', 'cognome' => 'Iscritto', 'email' => 'ivo@ospite.test', 'privacy' => '1'])
             ->assertSessionHasErrors(['citta', 'telefono']);
-        $this->post('/a/circolo-radici/iscriviti', [
+        // L'ospite conferma l'email prima che il socio nasca (audit run-2)
+        $this->inviaEConfermaIscrizioneOspite('/a/circolo-radici/iscriviti', [
             'nome' => 'Ivo', 'cognome' => 'Iscritto', 'email' => 'ivo@ospite.test', 'privacy' => '1',
             'citta' => 'Pisa', 'telefono' => '+39 333 7654321', 'codice_fiscale' => self::CF_GIULIA,
             'custom_field' => [$campoTaglia->id => 'M'],

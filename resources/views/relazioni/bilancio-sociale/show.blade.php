@@ -18,7 +18,7 @@
                 <form method="POST" action="{{ route('bilancio-sociale.rigenera', $bilancio) }}">@csrf<button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Aggiorna i dati</button></form>
             @elseif ($bilancio->stato === 'approvato')
                 <form method="POST" action="{{ route('bilancio-sociale.riapri', $bilancio) }}">@csrf<button type="submit" class="btn btn-sm btn-outline-secondary">Riporta in bozza</button></form>
-                <form method="POST" action="{{ route('bilancio-sociale.pubblica', $bilancio) }}" onsubmit="return confirm('Pubblicare il PDF nella sezione Trasparenza del mini-sito?');">@csrf<button type="submit" class="btn btn-sm btn-success"><i class="bi bi-globe me-1"></i>Pubblica in Trasparenza</button></form>
+                <form method="POST" action="{{ route('bilancio-sociale.pubblica', $bilancio) }}" data-conferma="Pubblicare il PDF nella sezione Trasparenza del mini-sito?">@csrf<button type="submit" class="btn btn-sm btn-success"><i class="bi bi-globe me-1"></i>Pubblica in Trasparenza</button></form>
             @endif
         @endcan
     </div>
@@ -72,7 +72,7 @@
                     <option value="{{ $verbale->id }}">n. {{ $verbale->numero_completo }} del {{ $verbale->data_riunione?->format('d/m/Y') }} — {{ $verbale->titolo }}</option>
                 @endforeach
             </select>
-            <div><button type="submit" class="btn btn-outline-success" onclick="return confirm('Approvare il bilancio sociale? I testi non saranno più modificabili.');">Segna come approvato</button></div>
+            <div><button type="submit" class="btn btn-outline-success" data-conferma="Approvare il bilancio sociale? I testi non saranno più modificabili.">Segna come approvato</button></div>
         </form>
     @endcan
 @endif

@@ -14,6 +14,13 @@
         <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ $avviso }}</div>
     @endforeach
 
+    @foreach ((array) session('segreti_generati', []) as $generato)
+        <div class="alert alert-info" id="segreto-generato-{{ $generato['chiave'] }}">
+            <p class="mb-2"><i class="bi bi-key me-1"></i><strong>{{ $generato['label'] }} generata.</strong> Copiala e conservala fuori da questo server: non verrà mostrata di nuovo.</p>
+            <pre class="mb-0 p-2 bg-body border rounded user-select-all" style="white-space: pre-wrap; word-break: break-all;">{{ $generato['valore'] }}</pre>
+        </div>
+    @endforeach
+
     @unless ($scrivibile)
         <div class="alert alert-danger"><i class="bi bi-lock me-1"></i>Il file <code>.env</code> non è scrivibile dal server web: le impostazioni sono in sola lettura.</div>
     @endunless
@@ -40,7 +47,7 @@
         <div class="row g-4">
             <div class="col-lg-8">
                 <form method="POST" action="{{ route('impostazioni-sistema.update', ['sezione' => $attiva]) }}" class="card" id="formImpostazioni"
-                      @if ($attiva === 'database') onsubmit="return event.submitter && event.submitter.formAction && event.submitter.formAction.indexOf('/test') !== -1 ? true : confirm('Salvare la nuova configurazione del database? La connessione viene verificata prima del salvataggio.');" @endif>
+                      @if ($attiva === 'database') data-conferma="Salvare la nuova configurazione del database? La connessione viene verificata prima del salvataggio." data-conferma-salta-action="/test" @endif>
                     @csrf
                     @method('PUT')
                     <div class="card-header">
@@ -73,6 +80,12 @@
                                                        placeholder="{{ $impostata ? '•••••••• impostata (lascia vuoto per non modificare)' : 'Non impostata' }}" @disabled(! $scrivibile)>
                                                 <button class="btn btn-outline-secondary" type="button" data-toggle-password="{{ $chiave }}" aria-label="Mostra {{ $campo['label'] }}"><i class="bi bi-eye"></i></button>
                                             </div>
+                                            @if (! $impostata && ! empty($campo['generabile']))
+                                                <div class="form-check mt-1">
+                                                    <input class="form-check-input" type="checkbox" id="{{ $chiave }}_genera" name="{{ $chiave }}_genera" value="1" @disabled(! $scrivibile)>
+                                                    <label class="form-check-label small" for="{{ $chiave }}_genera">Genera una password casuale (verrà mostrata una volta dopo il salvataggio)</label>
+                                                </div>
+                                            @endif
                                             @if ($impostata)
                                                 <div class="form-check mt-1">
                                                     <input class="form-check-input" type="checkbox" id="{{ $chiave }}_rimuovi" name="{{ $chiave }}_rimuovi" value="1" @disabled(! $scrivibile)>
@@ -120,7 +133,7 @@
                     <div class="card mb-4">
                         <div class="card-header"><h5 class="card-title mb-0"><i class="bi bi-shield-exclamation me-1"></i>Azioni di sicurezza</h5></div>
                         <div class="card-body d-flex flex-column gap-3">
-                            <form method="POST" action="{{ route('impostazioni-sistema.revoca-accessi') }}" class="m-0" onsubmit="return confirm('Disconnettere tutti gli utenti da tutti i dispositivi?');">
+                            <form method="POST" action="{{ route('impostazioni-sistema.revoca-accessi') }}" class="m-0" data-conferma="Disconnettere tutti gli utenti da tutti i dispositivi?">
                                 @csrf
                                 <p class="small text-muted mb-2">Annulla tutti i "Ricordami" e chiude le sessioni aperte: utile se un dispositivo è stato perso o una password è stata compromessa.</p>
                                 <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-box-arrow-right"></i>Revoca tutti gli accessi</button>
@@ -145,7 +158,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script @cspNonce>
         document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var input = document.getElementById(btn.getAttribute('data-toggle-password'));

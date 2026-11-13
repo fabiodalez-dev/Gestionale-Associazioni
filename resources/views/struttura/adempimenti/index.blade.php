@@ -65,7 +65,7 @@
                     </td>
                     <td class="text-end">
                         <a href="{{ route('adempimenti.index', ['edit' => $adempimento->id]) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-                        <form method="POST" action="{{ route('adempimenti.destroy', $adempimento) }}" class="d-inline" onsubmit="return confirm('Eliminare l\'adempimento?');">
+                        <form method="POST" action="{{ route('adempimenti.destroy', $adempimento) }}" class="d-inline" data-conferma="Eliminare l'adempimento?">
                             @csrf @method('DELETE')
                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i></button>
                         </form>
@@ -136,6 +136,6 @@
 </div>
 
 @if (($adempimentoInModifica) || ($errors->any() && old('titolo')))
-<script>document.addEventListener('DOMContentLoaded',()=>new bootstrap.Modal(document.getElementById('adempimentoModal')).show());</script>
+<script @cspNonce>document.addEventListener('DOMContentLoaded',()=>new bootstrap.Modal(document.getElementById('adempimentoModal')).show());</script>
 @endif
 @endsection

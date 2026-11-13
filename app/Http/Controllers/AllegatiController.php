@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Progetto;
 use App\Models\Riunione;
 use App\Models\Verbale;
+use App\Support\Media\NomeFileSicuro;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,10 +57,16 @@ class AllegatiController extends Controller
             'file.max' => 'Il file supera i 20 MB.',
         ]);
 
+        // Su disco un nome casuale con l'estensione ricavata dal contenuto; il
+        // nome scelto dal client resta solo come etichetta (elenco e download)
         $file = $request->file('file');
         $modello->addMedia($file)
             ->usingName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
-            ->withCustomProperties(['caricato_da' => $request->user()?->getAuthIdentifier()])
+            ->usingFileName(NomeFileSicuro::per($file, '', explode(',', self::ESTENSIONI)))
+            ->withCustomProperties([
+                'caricato_da' => $request->user()?->getAuthIdentifier(),
+                'nome_originale' => self::etichetta($file->getClientOriginalName()),
+            ])
             ->toMediaCollection(Verbale::COLLEZIONE_ALLEGATI);
 
         return back()->with('success', 'Allegato caricato.');
@@ -76,7 +83,26 @@ class AllegatiController extends Controller
             $stream = $allegato->stream();
             fpassthru($stream);
             fclose($stream);
-        }, $allegato->file_name, ['Content-Type' => $allegato->mime_type ?: 'application/octet-stream']);
+        }, self::nomeAllegato($allegato), ['Content-Type' => $allegato->mime_type ?: 'application/octet-stream']);
+    }
+
+    /**
+     * Nome mostrato e proposto al download: quello originale (solo
+     * etichetta); per gli allegati caricati prima, il nome del file su disco.
+     */
+    public static function nomeAllegato(Media $allegato): string
+    {
+        $nome = $allegato->getCustomProperty('nome_originale');
+
+        return is_string($nome) && $nome !== '' ? $nome : self::etichetta((string) $allegato->file_name);
+    }
+
+    /** Nome originale ripulito da separatori di percorso e caratteri di controllo. */
+    private static function etichetta(string $nome): string
+    {
+        $nome = trim((string) preg_replace('/[\x00-\x1F\x7F\/\\\\]+/u', '-', $nome));
+
+        return $nome !== '' ? mb_substr($nome, 0, 200) : 'allegato';
     }
 
     public function destroy(string $tipo, string $id, int $media): RedirectResponse

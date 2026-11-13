@@ -10,11 +10,11 @@
         </div>
         @if ($job->total() > 0)
             <div class="d-flex gap-2">
-                <form method="POST" action="{{ route('job-falliti.retry-all') }}" onsubmit="return confirm('Rimettere in coda tutti i job falliti?')">
+                <form method="POST" action="{{ route('job-falliti.retry-all') }}" data-conferma="Rimettere in coda tutti i job falliti?">
                     @csrf
                     <button class="btn btn-outline-primary"><i class="bi bi-arrow-repeat me-1"></i>Riprova tutti</button>
                 </form>
-                <form method="POST" action="{{ route('job-falliti.destroy-all') }}" onsubmit="return confirm('Eliminare definitivamente tutti i job falliti?')">
+                <form method="POST" action="{{ route('job-falliti.destroy-all') }}" data-conferma="Eliminare definitivamente tutti i job falliti?">
                     @csrf
                     @method('DELETE')
                     <button class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Elimina tutti</button>
@@ -55,7 +55,7 @@
             <span class="fw-semibold">{{ $job->total() }} job falliti</span>
             @if ($code->count() > 1)
                 <form method="GET" class="d-flex gap-2">
-                    <select name="coda" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Filtra per coda">
+                    <select name="coda" class="form-select form-select-sm" data-invio-automatico aria-label="Filtra per coda">
                         <option value="">Tutte le code</option>
                         @foreach ($code as $c)
                             <option value="{{ $c }}" @selected($coda === $c)>{{ $c }}</option>
@@ -82,7 +82,7 @@
                                         @csrf
                                         <button class="btn btn-sm btn-outline-primary" title="Riprova"><i class="bi bi-arrow-repeat"></i><span class="visually-hidden">Riprova</span></button>
                                     </form>
-                                    <form method="POST" action="{{ route('job-falliti.destroy', $j['uuid']) }}" class="d-inline" onsubmit="return confirm('Eliminare questo job fallito?')">
+                                    <form method="POST" action="{{ route('job-falliti.destroy', $j['uuid']) }}" class="d-inline" data-conferma="Eliminare questo job fallito?">
                                         @csrf
                                         @method('DELETE')
                                         <button class="btn btn-sm btn-outline-danger" title="Elimina"><i class="bi bi-trash"></i><span class="visually-hidden">Elimina</span></button>

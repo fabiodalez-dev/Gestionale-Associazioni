@@ -180,6 +180,14 @@ class ImportLegacy extends Command
             $columns[] = 'api_key';
         }
 
+        // api_keys: il legacy non ha il flag `globale` e tratta come globali le
+        // chiavi senza associazione; qui il flag va valorizzato esplicitamente
+        // (stessa regola di compatibilità della migration 2026_11_13_140500)
+        $impostaGlobale = $table === 'api_keys'
+            && ! in_array('globale', $columns, true)
+            && in_array('associazione_id', $columns, true)
+            && Schema::hasColumn($table, 'globale');
+
         if ($columns === []) {
             $this->warn("[{$table}] nessuna colonna in comune: saltata.");
 
@@ -204,7 +212,7 @@ class ImportLegacy extends Command
         $buffer = [];
         $copied = 0;
 
-        DB::transaction(function () use ($table, $columns, $chunk, $trasformaChiaveApi, &$buffer, &$copied): void {
+        DB::transaction(function () use ($table, $columns, $chunk, $trasformaChiaveApi, $impostaGlobale, &$buffer, &$copied): void {
             $rows = DB::connection('legacy')->table($table)->select($columns)->cursor();
 
             foreach ($rows as $row) {
@@ -214,6 +222,9 @@ class ImportLegacy extends Command
                     unset($riga['api_key']);
                     $riga['api_key_hash'] = $chiave !== '' ? ApiKey::hashChiave($chiave) : null;
                     $riga['api_key_prefix'] = $chiave !== '' ? ApiKey::prefissoChiave($chiave) : null;
+                }
+                if ($impostaGlobale) {
+                    $riga['globale'] = ($riga['associazione_id'] ?? null) === null;
                 }
                 $buffer[] = $riga;
 

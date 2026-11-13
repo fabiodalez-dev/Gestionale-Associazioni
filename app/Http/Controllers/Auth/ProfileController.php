@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureSuperAdmin2fa;
 use App\Models\Utente;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,6 +28,7 @@ class ProfileController extends Controller
             'twoFactorQrCodeSvg' => $twoFactorPending ? $utente->twoFactorQrCodeSvg() : null,
             'twoFactorSetupKey' => $twoFactorPending ? decrypt($utente->two_factor_secret) : null,
             'recoveryCodes' => $twoFactorEnabled ? $utente->recoveryCodes() : [],
+            'twoFactorObbligatoria' => EnsureSuperAdmin2fa::richiesta($utente),
         ]);
     }
 }

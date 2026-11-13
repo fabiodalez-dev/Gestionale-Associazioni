@@ -116,7 +116,7 @@
 </div>
 
 @if ($pagabile && $prenotazione->scadenza_pagamento_at !== null)
-<script>
+<script @cspNonce>
     (function () {
         var el = document.getElementById('countdown');
         if (!el) return;

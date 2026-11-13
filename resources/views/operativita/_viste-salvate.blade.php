@@ -38,7 +38,7 @@
 
         @if ($vistaCorrente)
             <form method="POST" action="{{ route('viste-salvate.destroy', $vistaCorrente) }}"
-                  onsubmit="return confirm('Eliminare la vista «{{ $vistaCorrente->name }}»?');">
+                  data-conferma="Eliminare la vista «{{ $vistaCorrente->name }}»?">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina vista">

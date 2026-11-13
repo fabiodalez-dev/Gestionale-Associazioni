@@ -96,7 +96,7 @@
 <link href="{{ asset('assets/css/grapes-theme.css') }}" rel="stylesheet">
 <script src="{{ asset('assets/vendor/grapesjs/grapes.min.js') }}"></script>
 <script src="{{ asset('assets/vendor/grapesjs/grapesjs-preset-newsletter.min.js') }}"></script>
-<script>
+<script @cspNonce>
 const corpoJson = @json($current?->corpo_json);
 const corpoHtml = @json(old('corpo_html', $current?->corpo_html ?? ''));
 
@@ -119,8 +119,9 @@ const editor = grapesjs.init({
     height: '560px',
     storageManager: false,
     canvasCss: emailCanvasCss,
-    plugins: ['gjs-preset-newsletter'],
-    pluginsOpts: { 'gjs-preset-newsletter': {} },
+    // Il preset si registra come window['grapesjs-preset-newsletter']: con il
+    // nome 'gjs-preset-newsletter' GrapesJS non lo trovava e lo saltava
+    plugins: [window['grapesjs-preset-newsletter']].filter(Boolean),
     assetManager: { upload: false }
 });
 

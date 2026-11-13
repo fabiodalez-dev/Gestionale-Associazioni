@@ -23,6 +23,8 @@ class SetPasswordController extends Controller
             'tokenValido' => $socio !== null,
             // Per l'indicatore di robustezza: la password non deve contenere i dati del socio
             'datiSocio' => $socio === null ? [] : [$socio->email, $socio->nome, $socio->cognome],
+            // Con la stessa email in più associazioni ogni link vale per una sola iscrizione
+            'nomeAssociazione' => $socio?->associazione?->nome,
         ]);
     }
 

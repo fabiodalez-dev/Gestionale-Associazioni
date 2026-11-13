@@ -22,7 +22,7 @@
                 <div class="col-md-2">
                     <label class="form-label" for="tipo_campo">Tipo *</label>
                     <select class="form-select" id="tipo_campo" name="tipo_campo" required
-                            onchange="document.getElementById('opzioniWrap').style.display = this.value === 'select' ? '' : 'none'">
+                            data-mostra-se-valore="select" data-mostra-target="opzioniWrap">
                         @foreach ($tipiCampo as $tipo)
                             <option value="{{ $tipo }}" @selected(old('tipo_campo') === $tipo)>{{ $tipo }}</option>
                         @endforeach
@@ -70,7 +70,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" action="{{ route('config-campi.destroy', $campo) }}" class="d-inline"
-                                              onsubmit="return confirm('Eliminare il campo «{{ $campo->nome_campo }}»? Verranno persi tutti i dati associati.');">
+                                              data-conferma="Eliminare il campo «{{ $campo->nome_campo }}»? Verranno persi tutti i dati associati.">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>

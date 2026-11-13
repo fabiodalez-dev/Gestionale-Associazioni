@@ -73,7 +73,7 @@
                             @endcan
                             @can('delete', $carica)
                             <form method="POST" action="{{ route('organi-sociali.destroy', $carica) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare questa carica?');">
+                                  data-conferma="Eliminare questa carica?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -120,7 +120,7 @@
                         <td class="text-end">
                             @can('delete', $carica)
                             <form method="POST" action="{{ route('organi-sociali.destroy', $carica) }}" class="d-inline"
-                                  onsubmit="return confirm('Eliminare questa carica dallo storico?');">
+                                  data-conferma="Eliminare questa carica dallo storico?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -228,7 +228,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         @if ($caricaInModifica || $errors->any())
             const modalEl = document.getElementById('caricaModal');

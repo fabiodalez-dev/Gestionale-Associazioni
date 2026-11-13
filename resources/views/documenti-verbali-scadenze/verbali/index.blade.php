@@ -33,7 +33,7 @@
         </div>
     </div>
     <div class="col-md-3">
-        <select class="form-select" name="type" onchange="this.form.submit()">
+        <select class="form-select" name="type" data-invio-automatico>
             <option value="all" @selected($type === 'all' || $type === '')>Tutti i tipi</option>
             @foreach ($tipiRiunione as $tipo)
                 <option value="{{ $tipo }}" @selected($type === $tipo)>{{ $tipo }}</option>
@@ -41,7 +41,7 @@
         </select>
     </div>
     <div class="col-md-2">
-        <select class="form-select" name="anno" onchange="this.form.submit()">
+        <select class="form-select" name="anno" data-invio-automatico>
             <option value="">Tutti gli anni</option>
             @foreach ($anni as $a)
                 <option value="{{ $a }}" @selected($annoFiltro === $a)>{{ $a }}</option>
@@ -129,7 +129,7 @@
                             @if (! $verbale->approvato)
                                 @can('approve', $verbale)
                                 <form method="POST" action="{{ route('verbali.approva', $verbale) }}" class="d-inline"
-                                      onsubmit="return confirm('Approvare questo verbale?');">
+                                      data-conferma="Approvare questo verbale?">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-outline-success" title="Approva">
                                         <i class="bi bi-check-lg"></i>
@@ -139,7 +139,7 @@
                             @endif
                             @can('delete', $verbale)
                             <form method="POST" action="{{ route('verbali.destroy', $verbale) }}" class="d-inline"
-                                  onsubmit="return confirm('Sei sicuro di voler eliminare questo verbale?');">
+                                  data-conferma="Sei sicuro di voler eliminare questo verbale?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
@@ -228,7 +228,7 @@
                                     </form>
                                     @endif
                                     <form method="POST" action="{{ route('verbali.firmatari.destroy', [$verbale, $firmatario]) }}" class="d-inline"
-                                          onsubmit="return confirm('Rimuovere questo firmatario?');">
+                                          data-conferma="Rimuovere questo firmatario?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Rimuovi">
@@ -269,7 +269,7 @@
                 <a href="{{ route('verbali.pdf', $verbale) }}" class="btn btn-outline-primary">
                     <i class="bi bi-file-pdf me-1"></i>Esporta PDF
                 </a>
-                <button type="button" class="btn btn-secondary" onclick="window.print()">
+                <button type="button" class="btn btn-secondary" data-stampa>
                     <i class="bi bi-printer me-1"></i>Stampa
                 </button>
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Chiudi</button>
@@ -371,7 +371,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script @cspNonce>
     document.addEventListener('DOMContentLoaded', function () {
         // Edit flow legacy: il modal si auto-apre con il form precompilato
         @if ($verbaleInModifica || $errors->any())

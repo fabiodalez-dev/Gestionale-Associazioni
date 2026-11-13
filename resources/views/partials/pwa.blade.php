@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="{{ asset('assets/icons/icon-192.png') }}">
-<script>
+<script @cspNonce>
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
             navigator.serviceWorker.register('{{ asset('service-worker.js') }}').catch(function () {});

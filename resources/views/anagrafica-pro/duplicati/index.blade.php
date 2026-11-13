@@ -76,7 +76,7 @@
                         </table>
                     </div>
                     <button type="submit" class="btn btn-primary"
-                            onclick="return confirm('Unire il duplicato nel socio principale? Il duplicato finirà nel cestino.');">
+                            data-conferma="Unire il duplicato nel socio principale? Il duplicato finirà nel cestino.">
                         <i class="bi bi-union me-1"></i>Unisci nel principale
                     </button>
                 </form>

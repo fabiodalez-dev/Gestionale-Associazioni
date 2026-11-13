@@ -12,6 +12,25 @@ use RuntimeException;
  */
 class IscrizioneException extends RuntimeException
 {
+    /**
+     * Vero quando l'esito NON va mostrato all'utente: il controller risponde
+     * come per una richiesta accettata (modulo pubblico, niente oracolo).
+     */
+    public bool $rispostaNeutra = false;
+
+    /**
+     * Ospite anonimo con email già di un socio: la richiesta non viene creata
+     * ma la risposta è identica al successo. Il messaggio esplicito resta
+     * riservato agli account autenticati, titolari di quell'email.
+     */
+    public static function emailGiaSocioOspite(): self
+    {
+        $e = new self('Risulta già un socio con questa email.');
+        $e->rispostaNeutra = true;
+
+        return $e;
+    }
+
     public static function iscrizioniChiuse(): self
     {
         return new self('Le iscrizioni a questa associazione non sono aperte.');

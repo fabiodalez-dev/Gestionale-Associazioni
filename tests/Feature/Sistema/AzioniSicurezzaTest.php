@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Sistema;
 
+use App\Models\Socio;
 use App\Models\Utente;
 use App\Support\LimiteAccessi;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
@@ -30,6 +33,58 @@ class AzioniSicurezzaTest extends TestCase
             ->assertRedirect()->assertSessionHas('success');
 
         $this->assertNull($altro->fresh()->remember_token);
+    }
+
+    public function test_la_revoca_chiude_anche_gli_inviti_legacy_e_non_riconta_quelli_gia_chiusi(): void
+    {
+        // Invito legacy aperto (nessun invito registrato, mai entrato): dopo la revoca il link senza nonce non vale più
+        $legacy = Utente::factory()->create(['invito_token' => null, 'invito_scade_at' => null, 'last_login' => null]);
+        $this->assertTrue($legacy->invitoValido(null));
+        // Già chiuso: non deve essere ricontato
+        Utente::factory()->create(['invito_token' => null, 'invito_scade_at' => now()->subDay(), 'last_login' => null]);
+
+        $this->actingAs($this->superAdmin())->post(route('impostazioni-sistema.revoca-accessi'))->assertRedirect();
+
+        $this->assertFalse($legacy->fresh()->invitoValido(null));
+        // superAdmin() e $legacy sono i due utenti mai entrati e senza invito registrato: 2 inviti chiusi
+        $this->assertStringContainsString('2 link di invito o recupero password annullati', (string) session('success'));
+    }
+
+    public function test_la_revoca_annulla_anche_i_link_di_invito_e_di_recupero_password(): void
+    {
+        $socio = Socio::factory()->create([
+            'password_reset_token' => Socio::hashTokenReset(str_repeat('a', 64)),
+            'password_reset_expires' => now()->addHour(),
+        ]);
+        $invitato = Utente::factory()->create([
+            'invito_token' => hash('sha256', 'nonce-invito'),
+            'invito_scade_at' => now()->addDay(),
+        ]);
+        $conRecupero = Utente::factory()->create(['email' => 'recupero@test.it']);
+        Password::broker('utenti')->createToken($conRecupero);
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'recupero@test.it']);
+
+        $this->actingAs($this->superAdmin())
+            ->post(route('impostazioni-sistema.revoca-accessi'))
+            ->assertRedirect()->assertSessionHas('success');
+
+        $socio->refresh();
+        $this->assertNull($socio->password_reset_token);
+        $this->assertNull($socio->password_reset_expires);
+
+        $invitato->refresh();
+        $this->assertNull($invitato->invito_token);
+        // Marker di invito chiuso: scadenza nel passato (non null, così la via
+        // di transizione senza nonce non si riapre) e link non più valido
+        $this->assertNotNull($invitato->invito_scade_at);
+        $this->assertTrue($invitato->invito_scade_at->isPast());
+        $this->assertFalse($invitato->invitoValido('nonce-invito'));
+        $this->assertFalse($invitato->invitoValido(null));
+
+        $this->assertSame(0, DB::table('password_reset_tokens')->count());
+        // 5: token socio, invito con nonce, token del broker, più gli inviti legacy
+        // "aperti" di super admin e $conRecupero (mai entrati, nessun invito registrato)
+        $this->assertStringContainsString('5 link di invito o recupero password annullati', (string) session('success'));
     }
 
     public function test_azzera_i_tentativi_di_accesso(): void

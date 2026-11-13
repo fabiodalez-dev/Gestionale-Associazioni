@@ -38,6 +38,7 @@ use App\Services\Piattaforma\RegistrazioneAssociazioni;
 use App\Services\Prenotazioni\BigliettoService;
 use App\Services\Prenotazioni\PrenotazioneService;
 use App\Services\Soci\NumeroProgressivoService;
+use App\Services\Tessere\TesseraQrService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
@@ -512,6 +513,8 @@ class E2eFixtureCommand extends Command
             'numero_socio' => $socio->numero_socio,
             'tessera_id' => $tessera?->id,
             'numero_tessera' => $tessera?->numero_tessera,
+            // URL firmato: dalla verifica pubblica il solo UUID non basta più
+            'tessera_verifica_url' => $tessera !== null ? app(TesseraQrService::class)->verificationUrl($tessera) : null,
             'quota_id' => $quota?->id,
         ];
     }
@@ -529,7 +532,7 @@ class E2eFixtureCommand extends Command
             return ['error' => 'serve --tessera'];
         }
 
-        return ['url' => route('tessere.verifica', ['tessera' => $tesseraId])];
+        return ['url' => app(TesseraQrService::class)->verificationUrl($tesseraId)];
     }
 
     /**

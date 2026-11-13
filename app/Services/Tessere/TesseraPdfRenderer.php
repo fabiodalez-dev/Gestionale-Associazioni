@@ -29,7 +29,7 @@ class TesseraPdfRenderer
         /** @var Associazione $associazione */
         $associazione = $tessera->associazione()->firstOrFail();
 
-        $qrUrl = $tessera->qr_code_url ?: $this->qr->verificationUrl($tessera);
+        $qrUrl = $this->qr->urlPerStampa($tessera);
         $qrSvg = $this->qr->generateSvg($qrUrl, 3);
 
         $costo = $socio->tipoSocio->costo_tessera ?? $associazione->costo_tessera;
@@ -50,7 +50,7 @@ class TesseraPdfRenderer
             'validoFinoAl' => $tessera->data_scadenza->format('d/m/Y'),
         ])
             ->setPaper('a4', 'portrait')
-            ->setOption('isRemoteEnabled', true)
+            ->setOption('isRemoteEnabled', false)
             ->setOption('defaultFont', 'DejaVu Sans');
 
         return $pdf->stream('tessera_'.($socio->numero_socio ?: 'socio').'.pdf');

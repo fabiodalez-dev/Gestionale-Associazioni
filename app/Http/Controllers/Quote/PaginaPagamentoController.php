@@ -14,7 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Pagina pubblica di pagamento (ex pagamento.php): nessuna autenticazione,
- * l'autorizzazione è il token stesso (64 char hex, scadenza 72h).
+ * l'autorizzazione è il token stesso (64 char hex, scadenza 72h, ridotta
+ * a una breve finestra di grazia dopo il pagamento online).
  * Il tenant deriva dalla quota: lookup senza global scope.
  */
 class PaginaPagamentoController extends Controller
@@ -26,6 +27,7 @@ class PaginaPagamentoController extends Controller
         $quota = $this->resolveQuota($token);
 
         $config = PaymentGatewaySetting::forTenant($quota->associazione_id);
+        $tokenExpired = $this->tokenScaduto($quota);
 
         return view('pagamento.show', [
             'quota' => $quota,
@@ -35,8 +37,11 @@ class PaginaPagamentoController extends Controller
             'hasStripe' => $config !== null && $config->isStripeOperational(),
             'hasPayPal' => $config !== null && $config->isPayPalOperational(),
             'valuta' => strtoupper($config->valuta ?? 'EUR'),
-            'tokenExpired' => $quota->payment_token_expires !== null && $quota->payment_token_expires->isPast(),
-            'alreadyPaid' => $quota->isPagata(),
+            'tokenExpired' => $tokenExpired,
+            // A token scaduto la pagina mostra solo "link scaduto": non rivela
+            // lo stato della quota né offre la ricevuta (che resta disponibile
+            // dall'area riservata e via email)
+            'alreadyPaid' => ! $tokenExpired && $quota->isPagata(),
             // result=success è puramente informativo: la conferma reale arriva dal webhook
             'result' => $request->query('result'),
             'token' => $token,
@@ -55,9 +60,7 @@ class PaginaPagamentoController extends Controller
         ]);
 
         // Doppio guard server-side (parità legacy §6.3)
-        $tokenExpired = $quota->payment_token_expires !== null && $quota->payment_token_expires->isPast();
-
-        if ($tokenExpired || $quota->isPagata()) {
+        if ($this->tokenScaduto($quota) || $quota->isPagata()) {
             return redirect()->route('pagamento.show', ['token' => $token]);
         }
 
@@ -86,15 +89,17 @@ class PaginaPagamentoController extends Controller
     }
 
     /**
-     * Ricevuta PDF pubblica (disponibile solo a pagamento avvenuto).
-     * È la stessa ricevuta NUMERATA dell'area soci e dell'area
+     * Ricevuta PDF pubblica (disponibile solo a pagamento avvenuto e con
+     * token ancora valido: dopo la finestra di grazia post-pagamento la
+     * ricevuta, che contiene dati personali, si scarica solo dall'area
+     * riservata). È la stessa ricevuta NUMERATA dell'area soci e dell'area
      * amministrativa (f.21): emessa on demand se manca, idempotente.
      */
     public function ricevuta(string $token, RicevutaService $ricevute): Response|RedirectResponse
     {
         $quota = $this->resolveQuota($token);
 
-        if (! $quota->isPagata()) {
+        if ($this->tokenScaduto($quota) || ! $quota->isPagata()) {
             return redirect()->route('pagamento.show', ['token' => $token]);
         }
 
@@ -108,6 +113,11 @@ class PaginaPagamentoController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$ricevute->nomeFile($ricevuta).'"',
         ]);
+    }
+
+    protected function tokenScaduto(Quota $quota): bool
+    {
+        return $quota->payment_token_expires !== null && $quota->payment_token_expires->isPast();
     }
 
     /**

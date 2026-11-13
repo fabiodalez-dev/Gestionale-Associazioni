@@ -6,14 +6,33 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Installer\AdminRequest;
 use App\Http\Requests\Installer\DatabaseRequest;
 use App\Http\Requests\Installer\EmailRequest;
+use App\Rules\HostnameOIp;
 use App\Services\Installer\InstallerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 class InstallerController extends Controller
 {
-    public function __construct(private readonly InstallerService $installer) {}
+    public function __construct(private readonly InstallerService $installer)
+    {
+        // Difesa in profondità rispetto a EnsureInstalled: con l'installer
+        // disattivato il wizard non deve esistere, qualunque sia l'ordine
+        // dei middleware
+        abort_unless(config('installer.enabled'), 404);
+    }
+
+    /**
+     * Gli step che scrivono (.env, schema, super admin) non girano MAI su
+     * un'applicazione già installata, anche se il middleware venisse
+     * aggirato: il lock è autorevole.
+     */
+    private function rifiutaSeInstallata(): void
+    {
+        abort_if(file_exists((string) config('installer.lock_file')), 404);
+    }
 
     /** Step 1 — requisiti di sistema */
     public function requirements(): View
@@ -46,6 +65,8 @@ class InstallerController extends Controller
 
     public function databaseStore(DatabaseRequest $request): RedirectResponse
     {
+        $this->rifiutaSeInstallata();
+
         $cfg = $request->validated();
 
         $esito = $this->installer->testDatabase($cfg, $request->boolean('crea_database'));
@@ -91,17 +112,33 @@ class InstallerController extends Controller
                 ->withErrors(['database' => 'Installazione dello schema fallita: '.$e->getMessage()]);
         }
 
-        $this->installer->writeEnv([
+        $valori = [
             'DB_CONNECTION' => 'mysql',
             'DB_HOST' => $cfg['host'],
             'DB_PORT' => (string) $cfg['port'],
             'DB_DATABASE' => $cfg['database'],
             'DB_USERNAME' => $cfg['username'],
             'DB_PASSWORD' => (string) ($cfg['password'] ?? ''),
-            // root() include l'eventuale sottocartella (es. /public o
-            // /gestionale/public): gli URL generati devono partire da lì
-            'APP_URL' => rtrim($request->root(), '/'),
-        ]);
+        ];
+
+        // root() include l'eventuale sottocartella (es. /public o
+        // /gestionale/public): gli URL generati devono partire da lì. Deriva
+        // dall'header Host della richiesta, quindi si scrive nel .env solo se
+        // è un URL http(s) con un host plausibile (stessa regola della pagina
+        // Impostazioni di sistema); altrimenti resta l'APP_URL già presente
+        $appUrl = rtrim($request->root(), '/');
+        if ($this->appUrlValido($appUrl)) {
+            $valori['APP_URL'] = $appUrl;
+            if (parse_url($appUrl, PHP_URL_SCHEME) === 'https') {
+                // Il sito è servito in https: il cookie di sessione non deve
+                // mai viaggiare in chiaro
+                $valori['SESSION_SECURE_COOKIE'] = 'true';
+            }
+        } else {
+            Log::warning('Installer: APP_URL non scritto perché l\'URL della richiesta non è valido', ['url' => $appUrl]);
+        }
+
+        $this->installer->writeEnv($valori);
 
         // Token in cookie HttpOnly (non cifrato: il middleware EnsureInstalled
         // gira prima di EncryptCookies), valido quanto il marcatore
@@ -121,6 +158,21 @@ class InstallerController extends Controller
             ->with('success', "Database configurato: schema installato ({$risultato['tabelle']} tabelle).");
     }
 
+    /**
+     * URL http(s) assoluto (max 255, come il campo APP_URL delle Impostazioni
+     * di sistema) con un host che sia un nome host o un indirizzo IP.
+     */
+    private function appUrlValido(string $url): bool
+    {
+        if (Validator::make(['url' => $url], ['url' => ['required', 'string', 'max:255', 'url:http,https']])->fails()) {
+            return false;
+        }
+
+        $host = (string) parse_url($url, PHP_URL_HOST);
+
+        return HostnameOIp::valido(trim($host, '[]'));
+    }
+
     /** Step 3 — super amministratore e prima associazione */
     public function admin(): View|RedirectResponse
     {
@@ -138,6 +190,8 @@ class InstallerController extends Controller
 
     public function adminStore(AdminRequest $request): RedirectResponse
     {
+        $this->rifiutaSeInstallata();
+
         if (! $this->installer->databaseReady()) {
             return redirect()->route('installer.database');
         }
@@ -165,6 +219,8 @@ class InstallerController extends Controller
 
     public function emailStore(EmailRequest $request): RedirectResponse
     {
+        $this->rifiutaSeInstallata();
+
         $dati = $request->validated();
 
         if (($dati['driver'] ?? 'log') === 'smtp') {

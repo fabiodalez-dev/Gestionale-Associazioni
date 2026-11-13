@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ApiKey;
 use App\Models\Tessera;
 use App\Models\Utente;
 use Illuminate\Console\Command;
@@ -170,6 +171,15 @@ class ImportLegacy extends Command
             Schema::getColumnListing($table),
         ));
 
+        // api_keys: il legacy conserva la chiave in chiaro (api_key), qui solo
+        // hash e prefisso; la colonna in chiaro va letta e trasformata
+        $trasformaChiaveApi = $table === 'api_keys'
+            && in_array('api_key', $legacySchema->getColumnListing($table), true)
+            && Schema::hasColumn($table, 'api_key_hash');
+        if ($trasformaChiaveApi) {
+            $columns[] = 'api_key';
+        }
+
         if ($columns === []) {
             $this->warn("[{$table}] nessuna colonna in comune: saltata.");
 
@@ -194,11 +204,18 @@ class ImportLegacy extends Command
         $buffer = [];
         $copied = 0;
 
-        DB::transaction(function () use ($table, $columns, $chunk, &$buffer, &$copied): void {
+        DB::transaction(function () use ($table, $columns, $chunk, $trasformaChiaveApi, &$buffer, &$copied): void {
             $rows = DB::connection('legacy')->table($table)->select($columns)->cursor();
 
             foreach ($rows as $row) {
-                $buffer[] = (array) $row;
+                $riga = (array) $row;
+                if ($trasformaChiaveApi) {
+                    $chiave = (string) ($riga['api_key'] ?? '');
+                    unset($riga['api_key']);
+                    $riga['api_key_hash'] = $chiave !== '' ? ApiKey::hashChiave($chiave) : null;
+                    $riga['api_key_prefix'] = $chiave !== '' ? ApiKey::prefissoChiave($chiave) : null;
+                }
+                $buffer[] = $riga;
 
                 if (count($buffer) >= $chunk) {
                     DB::table($table)->insertOrIgnore($buffer);

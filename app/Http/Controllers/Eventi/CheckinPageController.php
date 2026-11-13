@@ -30,7 +30,9 @@ class CheckinPageController extends Controller
             ."connect-src 'self'; "
             ."font-src 'self';";
 
-        if ($request->isSecure() || $request->header('X-Forwarded-Proto') === 'https') {
+        // isSecure() tiene conto di X-Forwarded-Proto solo se il proxy è tra
+        // quelli fidati (TrustProxies): l'header letto a mano era falsificabile.
+        if ($request->isSecure()) {
             $csp = 'upgrade-insecure-requests; '.$csp;
         }
 

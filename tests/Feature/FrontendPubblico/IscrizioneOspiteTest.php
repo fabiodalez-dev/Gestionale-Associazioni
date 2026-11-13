@@ -89,15 +89,21 @@ class IscrizioneOspiteTest extends TestCase
             ->assertSessionHasErrors(['nome', 'email']);
     }
 
-    public function test_email_gia_di_un_socio_viene_rifiutata_con_messaggio_amichevole(): void
+    public function test_email_gia_di_un_socio_da_ospite_ha_risposta_neutra_senza_creare_richieste(): void
     {
         Socio::factory()->create([
             'associazione_id' => $this->associazione->id,
             'email' => 'giulia.neri@example.com',
         ]);
 
+        // Stessa risposta di una richiesta inviata: un anonimo non deve poter
+        // scoprire dal modulo pubblico che l'email appartiene a un socio
         $this->post('/a/ospiti/iscriviti', $this->payloadOspite())
-            ->assertSessionHasErrors('iscrizione');
+            ->assertRedirect('/a/ospiti')
+            ->assertSessionHas('success')
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseCount('richieste_iscrizione', 0);
     }
 
     public function test_doppia_richiesta_ospite_con_stessa_email_viene_bloccata(): void

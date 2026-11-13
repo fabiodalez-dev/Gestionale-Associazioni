@@ -11,6 +11,7 @@ use App\Services\Calendario\GoogleCalendarSpatie;
 use App\Settings\GoogleCalendarSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use RuntimeException;
@@ -233,5 +234,36 @@ class GoogleCalendarTest extends TestCase
         $this->expectException(RuntimeException::class);
 
         app(GoogleCalendarSpatie::class)->verifica(GoogleCalendarSettings::per($this->associazione));
+    }
+
+    public function test_le_credenziali_cifrate_conservano_solo_le_chiavi_necessarie(): void
+    {
+        $json = json_encode([
+            'type' => 'service_account',
+            'project_id' => 'progetto',
+            'private_key_id' => 'kid',
+            'private_key' => "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n",
+            'client_email' => 'sync@progetto.iam.gserviceaccount.com',
+            'client_id' => '1',
+            'auth_uri' => 'https://accounts.google.com/o/oauth2/auth',
+            'token_uri' => 'https://oauth2.googleapis.com/token',
+            'auth_provider_x509_cert_url' => 'https://www.googleapis.com/oauth2/v1/certs',
+            'client_x509_cert_url' => 'https://www.googleapis.com/robot/v1/metadata/x509/sync',
+            'universe_domain' => 'googleapis.com',
+        ]);
+
+        [$cifrate, $email] = GoogleCalendarSettings::cifraCredenziali((string) $json);
+        $salvate = json_decode(Crypt::decryptString($cifrate), true);
+
+        $this->assertSame('sync@progetto.iam.gserviceaccount.com', $email);
+        $this->assertSame(GoogleCalendarSettings::CHIAVI_CREDENZIALI, array_keys($salvate));
+        $this->assertSame('progetto', $salvate['project_id']);
+        $this->assertArrayNotHasKey('token_uri', $salvate);
+        $this->assertArrayNotHasKey('universe_domain', $salvate);
+
+        // Il round-trip tramite le impostazioni restituisce le stesse chiavi
+        $this->attiva();
+        $credenziali = GoogleCalendarSettings::per($this->associazione)->credenziali();
+        $this->assertSame(['type', 'private_key', 'client_email', 'client_id'], array_keys($credenziali));
     }
 }

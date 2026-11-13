@@ -911,7 +911,7 @@ class Percorso04_EventiVitaSocialeTest extends TestCase
             ->assertSee('Serata di poesia')
             ->assertSee('Invia il feedback');
 
-        $this->post(route('feedback-eventi.store', ['token' => $feedbackIrene->token]), [
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $feedbackIrene->token]) /* POST sull'URL firmata del link (audit run-1) */, [
             'voto' => 5,
             'commento' => 'Letture bellissime, sala un po\' fredda.',
         ])->assertOk()->assertSee('registrato');
@@ -921,14 +921,14 @@ class Percorso04_EventiVitaSocialeTest extends TestCase
         $this->assertNotNull($feedbackIrene->compilato_at);
 
         // Ci riprova per cambiare voto: bloccata
-        $this->post(route('feedback-eventi.store', ['token' => $feedbackIrene->token]), ['voto' => 1])
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => $feedbackIrene->token]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 1])
             ->assertSessionHasErrors('voto');
         $this->assertSame(5, $feedbackIrene->fresh()->voto);
 
         // Filippo non ha un link: senza firma è rifiutato, con un token inventato non esiste nulla
         $this->get('/feedback-eventi/'.$feedbackIrene->token)->assertForbidden();
         $this->get(URL::signedRoute('feedback-eventi.show', ['token' => str_repeat('f', 64)]))->assertNotFound();
-        $this->post(route('feedback-eventi.store', ['token' => str_repeat('f', 64)]), ['voto' => 4])->assertNotFound();
+        $this->post(URL::signedRoute('feedback-eventi.show', ['token' => str_repeat('f', 64)]) /* POST sull'URL firmata del link (audit run-1) */, ['voto' => 4])->assertNotFound();
 
         // L'admin legge il report
         $report = $this->comeAdmin()->get(route('eventi.feedback.index', $evento))

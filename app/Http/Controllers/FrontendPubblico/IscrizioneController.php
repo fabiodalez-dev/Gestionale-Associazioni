@@ -81,6 +81,19 @@ class IscrizioneController extends Controller
         try {
             $richiesta = $this->form->salva($account, $request->validated(), $associazione);
         } catch (IscrizioneException $e) {
+            if ($e->rispostaNeutra) {
+                // Ospite con email già di un socio: stessa risposta di una
+                // richiesta inviata (niente oracolo sull'elenco soci), traccia nel log
+                Log::info('Iscrizione ospite duplicata ignorata', [
+                    'associazione_id' => $associazione->id,
+                    'motivo' => $e->getMessage(),
+                ]);
+
+                return redirect()
+                    ->route('pubblico.home.show', ['associazione' => $associazione->slug])
+                    ->with('success', 'Richiesta di iscrizione inviata! L\'associazione la valuterà e riceverai una risposta via email.');
+            }
+
             // Errore di dominio (chiuse / già socio / doppia richiesta):
             // messaggio in italiano pensato per l'utente, niente stack trace
             return redirect()

@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -69,6 +72,7 @@ class Utente extends Authenticatable
     protected array $activityLogExcept = [
         'password_hash',
         'last_login',
+        'invito_token',
     ];
 
     protected function casts(): array
@@ -79,6 +83,7 @@ class Utente extends Authenticatable
             'last_login' => 'datetime',
             'password_hash' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'invito_scade_at' => 'datetime',
         ];
     }
 
@@ -93,6 +98,61 @@ class Utente extends Authenticatable
     public function getAuthPassword(): string
     {
         return (string) $this->password_hash;
+    }
+
+    /**
+     * Vero se il nonce dell'invito corrisponde a quello pendente e non scaduto.
+     */
+    public function invitoValido(?string $nonce): bool
+    {
+        if (! $this->attivo) {
+            return false;
+        }
+
+        // Transizione: link firmati inviati prima dell'introduzione del nonce
+        // (nessun invito mai registrato: entrambe le colonne null) restano
+        // accettati solo se l'utente non è mai entrato, una sola volta, e al
+        // massimo per 7 giorni dalla creazione dell'account (la durata di un
+        // invito). Il consumo lascia invito_scade_at valorizzato nel passato,
+        // quindi la via si chiude al primo uso; un reinvio la chiude comunque.
+        if ($this->invito_token === null && $this->invito_scade_at === null) {
+            return ($nonce === null || $nonce === '')
+                && $this->last_login === null
+                && $this->created_at !== null
+                && $this->created_at->copy()->addDays(7)->isFuture();
+        }
+
+        return is_string($nonce) && $nonce !== ''
+            && is_string($this->invito_token)
+            && $this->invito_scade_at !== null && $this->invito_scade_at->isFuture()
+            && hash_equals($this->invito_token, hash('sha256', $nonce));
+    }
+
+    /**
+     * Attributi che chiudono qualsiasi invito pendente o legacy: nessun nonce
+     * valido e scadenza nel passato (non null, così la via di transizione
+     * senza nonce non si riapre).
+     *
+     * @return array{invito_token: null, invito_scade_at: Carbon}
+     */
+    public static function invitoChiuso(): array
+    {
+        return ['invito_token' => null, 'invito_scade_at' => now()];
+    }
+
+    /**
+     * Revoca le credenziali vive dell'utente: remember-me e sessioni server
+     * (solo con SESSION_DRIVER=database). Usato alla disattivazione e quando
+     * un super admin impone una nuova password.
+     */
+    public function revocaSessioni(): void
+    {
+        $this->forceFill(['remember_token' => Str::random(60)])->save();
+
+        $tabella = (string) config('session.table', 'sessions');
+        if (config('session.driver') === 'database' && Schema::hasTable($tabella)) {
+            DB::table($tabella)->where('user_id', $this->getKey())->delete();
+        }
     }
 
     /**

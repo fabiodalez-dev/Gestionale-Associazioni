@@ -155,17 +155,20 @@ npm install && npm run build
 
 Apri `/install` nel browser (in sviluppo con `php artisan serve --no-reload`: il wizard scrive il `.env` e senza quell'opzione il server di sviluppo si riavvierebbe a metà richiesta).
 
-In alternativa, installazione manuale da terminale:
+In alternativa, installazione manuale da terminale (solo ruoli e permessi: il super amministratore si crea poi dal wizard `/install` oppure con `php artisan admin:recupera-accesso`):
 
 ```bash
-composer install
+composer install --no-dev
 cp .env.example .env
 php artisan key:generate
-# configura DB_* nel .env
-php artisan migrate --seed
+# configura APP_ENV=production, APP_DEBUG=false, APP_URL e DB_* nel .env
+php artisan migrate --force
+php artisan db:seed --class=RolesSeeder --force
 npm install && npm run build
 php artisan storage:link
 ```
+
+Per un ambiente di sviluppo `php artisan migrate --seed` aggiunge anche utenti e dati dimostrativi con password `password` (`superadmin@example.com`, `admin@associazione-demo.test`): il seeder li crea solo con `APP_ENV=local` o `testing`.
 
 ### Avvio e attività in background
 

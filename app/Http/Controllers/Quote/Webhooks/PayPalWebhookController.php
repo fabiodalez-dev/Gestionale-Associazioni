@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Quote\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Models\Donazione;
 use App\Models\Prenotazione;
 use App\Models\Quota;
+use App\Services\Pagamenti\EsitoWebhook;
 use App\Services\Pagamenti\Pagabile;
 use App\Services\Pagamenti\PaymentService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,8 +17,11 @@ use Illuminate\Support\Facades\Log;
 /**
  * Webhook PayPal (ex api/webhooks/paypal.php).
  * Pubblico, senza CSRF; il tenant è risalito dall'entità nel custom_id
- * (UUID nudo = quota per retrocompatibilità, "prenotazione:{uuid}" = prenotazione);
- * sicurezza = verifica firma (se paypal_webhook_id configurato) + capture server-side.
+ * (UUID nudo = quota per retrocompatibilità, "prenotazione:{uuid}" =
+ * prenotazione, "donazione:{uuid}" = donazione); il custom_id dell'evento
+ * serve SOLO a individuare il tenant: sicurezza = verifica firma con il
+ * webhook id del tenant + capture server-side, da cui vengono letti
+ * custom_id e importo effettivi.
  */
 class PayPalWebhookController extends Controller
 {
@@ -55,11 +61,13 @@ class PayPalWebhookController extends Controller
                 'paypal-transmission-time' => $request->header('PAYPAL-TRANSMISSION-TIME'),
             ];
 
-            $ok = $paymentService->handlePayPalWebhook($event, $headers, $associazioneId);
+            $esito = $paymentService->handlePayPalWebhook($event, $headers, $associazioneId);
 
-            return $ok
-                ? response()->json(['status' => 'ok'])
-                : response()->json(['error' => 'Webhook processing failed'], 400);
+            return match ($esito) {
+                EsitoWebhook::OK => response()->json(['status' => 'ok']),
+                EsitoWebhook::IGNORATO => response()->json(['status' => 'ignored', 'reason' => 'capture inconsistent with payable']),
+                EsitoWebhook::FALLITO => response()->json(['error' => 'Webhook processing failed'], 400),
+            };
         } catch (\Throwable $e) {
             Log::error('PayPalWebhookController', ['error' => $e->getMessage()]);
 
@@ -73,23 +81,32 @@ class PayPalWebhookController extends Controller
      */
     protected function resolveAssociazioneId(string $customId): string|JsonResponse
     {
-        $prefisso = Pagabile::TIPO_PRENOTAZIONE.':';
+        $modelli = [
+            Pagabile::TIPO_PRENOTAZIONE => Prenotazione::class,
+            Pagabile::TIPO_DONAZIONE => Donazione::class,
+        ];
 
-        if (str_starts_with($customId, $prefisso)) {
-            $prenotazioneId = substr($customId, strlen($prefisso));
+        foreach ($modelli as $tipo => $modello) {
+            $prefisso = $tipo.':';
 
-            if (! preg_match('/^[a-f0-9\-]{36}$/i', $prenotazioneId)) {
-                return response()->json(['error' => 'Invalid prenotazione id'], 400);
+            if (! str_starts_with($customId, $prefisso)) {
+                continue;
             }
 
-            /** @var Prenotazione|null $prenotazione */
-            $prenotazione = Prenotazione::allTenants()->find($prenotazioneId);
+            $id = substr($customId, strlen($prefisso));
 
-            if ($prenotazione === null) {
-                return response()->json(['error' => 'Prenotazione not found'], 404);
+            if (! preg_match('/^[a-f0-9\-]{36}$/i', $id)) {
+                return response()->json(['error' => "Invalid {$tipo} id"], 400);
             }
 
-            return $prenotazione->associazione_id;
+            /** @var Model|null $entita */
+            $entita = $modello::allTenants()->find($id);
+
+            if ($entita === null) {
+                return response()->json(['error' => ucfirst($tipo).' not found'], 404);
+            }
+
+            return (string) $entita->getAttribute('associazione_id');
         }
 
         // UUID nudo = quota (retrocompatibilità con gli ordini legacy in volo)

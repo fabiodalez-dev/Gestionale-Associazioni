@@ -100,14 +100,36 @@ class PaymentGatewaySetting extends Model
     }
 
     /**
-     * Check forte (parità con PaymentService::isPayPalEnabled legacy):
-     * abilitato + client_id + client_secret.
+     * Check forte: abilitato + client_id + client_secret + webhook_id.
+     * Il webhook id è richiesto perché senza non si può verificare la firma
+     * dei webhook e l'incasso non potrebbe mai essere confermato in sicurezza.
      */
     public function isPayPalOperational(): bool
     {
         return $this->paypal_enabled
             && filled($this->paypal_client_id)
-            && filled($this->paypal_client_secret);
+            && filled($this->paypal_client_secret)
+            && filled($this->paypal_webhook_id);
+    }
+
+    /**
+     * Modalità attesa degli eventi Stripe (true = live, false = test),
+     * ricavata dal prefisso della chiave segreta (sk_live_/rk_live_ oppure
+     * sk_test_/rk_test_); null se il prefisso non è riconoscibile.
+     */
+    public function stripeLivemodeAttesa(): ?bool
+    {
+        $chiave = $this->stripe_secret_key;
+
+        if (preg_match('/^(sk|rk)_live_/', $chiave) === 1) {
+            return true;
+        }
+
+        if (preg_match('/^(sk|rk)_test_/', $chiave) === 1) {
+            return false;
+        }
+
+        return null;
     }
 
     public function hasOperationalGateway(): bool

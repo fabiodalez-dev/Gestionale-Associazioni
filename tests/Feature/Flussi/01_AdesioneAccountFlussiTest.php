@@ -956,12 +956,15 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
             ->assertRedirect(route('soci.index'));
         $this->assertSoftDeleted('soci', ['id' => $vecchio->id]);
 
-        // L'ospite prova a iscriversi con la stessa email
+        // L'ospite prova a iscriversi con la stessa email: risposta NEUTRA
+        // (identica a una richiesta inviata), così il modulo pubblico non
+        // rivela a un anonimo che l'email appartiene a un socio
         $this->comeOspite();
         $this->from($this->url('iscriviti'))
             ->post($this->url('iscriviti'), $this->datiOspite(['email' => 'm@x.it']))
-            ->assertRedirect($this->url('iscriviti'))
-            ->assertSessionHasErrors(['iscrizione' => "Risulta già un socio con questa email: se sei tu, contatta l'associazione oppure accedi al tuo account."]);
+            ->assertRedirect($this->url(''))
+            ->assertSessionHas('success')
+            ->assertSessionDoesntHaveErrors();
 
         $this->assertSame(1, Socio::withoutGlobalScopes()->withTrashed()->count());
         $this->assertSame(0, RichiestaIscrizione::withoutGlobalScopes()->count());

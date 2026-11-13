@@ -20,6 +20,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 trait BelongsToAssociazione
 {
+    /**
+     * Tenant impossibile: usato come scope "fail closed" per un utente staff
+     * privo di associazione, così ogni query restituisce zero righe.
+     */
+    public const NESSUN_TENANT = '00000000-0000-0000-0000-000000000000';
+
     public static function bootBelongsToAssociazione(): void
     {
         static::addGlobalScope('associazione', function (Builder $builder) {
@@ -53,7 +59,9 @@ trait BelongsToAssociazione
                 return static::sessionAssociazioneId();
             }
 
-            return $user->associazione_id ?: static::sessionAssociazioneId();
+            // Utente staff senza associazione (rimosso o associazione eliminata):
+            // nessun dato visibile, mai la vista globale riservata ai super admin
+            return $user->associazione_id ?: self::NESSUN_TENANT;
         }
 
         // Guard 'socio' (area soci) / 'account' (frontend pubblico):

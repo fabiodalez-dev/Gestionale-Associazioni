@@ -3,10 +3,14 @@
 namespace Tests\Feature\Soci;
 
 use App\Models\Associazione;
+use App\Models\EmailQueue;
+use App\Models\EmailTemplate;
+use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Models\Tag;
 use App\Models\Tessera;
 use App\Models\Utente;
+use App\Services\Soci\EmailBenvenutoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -267,5 +271,41 @@ class SociCrudTest extends TestCase
             ->assertSee('Quote e Tessere')
             ->assertSee('Documenti')
             ->assertSee('Storico');
+    }
+
+    /**
+     * Anche i placeholder legacy {{nome}} dell'email di benvenuto finiscono
+     * in body_html: i valori del socio devono arrivare HTML-escaped.
+     */
+    public function test_email_di_benvenuto_in_coda_ha_i_dati_del_socio_escapati(): void
+    {
+        SmtpSetting::create([
+            'associazione_id' => $this->associazione->id,
+            'smtp_host' => 'smtp.test',
+            'smtp_pass_encrypted' => 'x',
+            'auto_benvenuto' => true,
+        ]);
+        EmailTemplate::create([
+            'associazione_id' => $this->associazione->id,
+            'codice' => 'benvenuto',
+            'nome' => 'Benvenuto',
+            'oggetto' => 'Benvenuto {{nome}} in {{associazione}}',
+            'corpo_html' => '<p>Ciao {{nome}} {{cognome}} ({{nome_completo}}), numero {{numero_socio}}, {NOME}.</p>',
+            'attivo' => true,
+        ]);
+        $socio = Socio::factory()->create([
+            'associazione_id' => $this->associazione->id,
+            'nome' => '<img src=x onerror=alert(1)>',
+            'cognome' => 'Rossi',
+            'email' => 'xss@example.test',
+        ]);
+
+        $this->assertTrue(app(EmailBenvenutoService::class)->accoda($socio));
+
+        $email = EmailQueue::allTenants()->where('socio_id', $socio->id)->sole();
+        $this->assertStringNotContainsString('<img src=x', $email->body_html);
+        $this->assertStringContainsString('&lt;img src=x onerror=alert(1)&gt;', $email->body_html);
+        // L'oggetto è testo semplice: le entità vengono decodificate
+        $this->assertSame('Benvenuto <img src=x onerror=alert(1)> in '.$this->associazione->nome, $email->subject);
     }
 }

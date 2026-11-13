@@ -215,7 +215,12 @@ class FormIscrizioneService
             ->exists();
 
         if ($emailOccupata) {
-            throw IscrizioneException::emailGiaSocio();
+            // L'account autenticato è titolare dell'email: messaggio esplicito.
+            // L'ospite anonimo no: risposta neutra, altrimenti il modulo pubblico
+            // direbbe a chiunque chi è socio
+            throw $account !== null
+                ? IscrizioneException::emailGiaSocio()
+                : IscrizioneException::emailGiaSocioOspite();
         }
 
         $schema = $this->schema($associazione);

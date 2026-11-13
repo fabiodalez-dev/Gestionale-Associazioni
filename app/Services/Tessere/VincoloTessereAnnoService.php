@@ -21,13 +21,14 @@ use Illuminate\Support\Facades\Schema;
  * lascia fuori dal vincolo (colonna vuota) i doppioni che importa anche
  * quando l'indice c'è già. Questo servizio
  * aggiunge l'indice, o riporta dentro le tessere rimaste fuori, senza
- * terminale appena i doppioni sono stati sistemati
- * dal backoffice: dopo il salvataggio o l'eliminazione di una tessera, ogni
- * notte (tessere:applica-vincolo-anno) e dalla pagina Tessere, che intanto
- * elenca i doppioni da sistemare. Dopo un ALTER TABLE fallito per un motivo
- * diverso da un doppione (permessi, lock sulla tabella) aspetta qualche
- * minuto prima di riprovare, così una pagina molto aperta non ripete il DDL
- * a ogni visita.
+ * terminale appena i doppioni sono stati sistemati dal backoffice: dopo il
+ * salvataggio o l'eliminazione di una tessera (solo per quel socio) e ogni
+ * notte (tessere:applica-vincolo-anno). La pagina Tessere si limita a
+ * elencare i doppioni dell'associazione (doppioni(), sola lettura): il DDL e
+ * gli update su tutta la tabella, cross-tenant, non vanno eseguiti a ogni
+ * richiesta dello staff. Dopo un ALTER TABLE fallito per un motivo diverso da
+ * un doppione (permessi, lock sulla tabella) aspetta qualche minuto prima di
+ * riprovare.
  */
 #[Singleton]
 class VincoloTessereAnnoService
@@ -63,7 +64,10 @@ class VincoloTessereAnnoService
 
     /**
      * Coppie socio/anno con più tessere non annullate, con i numeri tessera
-     * e il nominativo del socio; facoltativamente di una sola associazione.
+     * e il nominativo del socio; facoltativamente solo dei soci di una
+     * associazione (il filtro è sul socio, non sulla tessera: una riga legacy
+     * registrata sotto un'altra associazione conta comunque per l'indice
+     * socio/anno e va vista da chi gestisce quel socio). Sola lettura.
      *
      * Ogni riga ha socio_id, associazione_id, anno, totale, numeri (numeri
      * tessera separati da virgola) e nominativo.
@@ -77,7 +81,7 @@ class VincoloTessereAnnoService
         return DB::table('tessere')
             ->join('soci', 'soci.id', '=', 'tessere.socio_id')
             ->where('tessere.stato', '<>', 'Annullata')
-            ->when($associazioneId !== null, fn ($q) => $q->where('tessere.associazione_id', $associazioneId))
+            ->when($associazioneId !== null, fn ($q) => $q->where('soci.associazione_id', $associazioneId))
             // Stessa chiave dell'indice (socio, anno): una tessera legacy con
             // associazione diversa da quella del socio conta comunque
             ->groupBy('tessere.socio_id', 'tessere.anno_validita', 'soci.cognome', 'soci.nome')

@@ -51,6 +51,12 @@
         {{-- PayPal --}}
         <div class="col-lg-6 mb-4">
             <div class="card h-100">
+                @if ($settings?->paypal_enabled && blank($settings?->paypal_webhook_id))
+                    <div class="alert alert-warning rounded-0 mb-0 small">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        PayPal è abilitato ma manca il <strong>Webhook ID</strong>: i webhook non possono essere verificati, quindi PayPal non viene proposto ai paganti finché non lo inserisci (lo trovi nella dashboard PayPal Developer, sezione Webhooks).
+                    </div>
+                @endif
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-paypal me-2"></i><strong>PayPal</strong></span>
                     <div class="form-check form-switch mb-0">
@@ -79,10 +85,11 @@
                             </select>
                         </div>
                         <div class="col-6 mb-3">
-                            <label class="form-label" for="paypalWebhookId">Webhook ID</label>
-                            <input type="text" class="form-control" id="paypalWebhookId" name="paypal_webhook_id"
+                            <label class="form-label" for="paypalWebhookId">Webhook ID <span class="text-danger" title="Obbligatorio se PayPal è abilitato">*</span></label>
+                            <input type="text" class="form-control @error('paypal_webhook_id') is-invalid @enderror" id="paypalWebhookId" name="paypal_webhook_id"
                                    value="{{ old('paypal_webhook_id', $settings?->paypal_webhook_id) }}">
-                            <div class="form-text">Necessario per la verifica firma dei webhook.</div>
+                            @error('paypal_webhook_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <div class="form-text">Obbligatorio se PayPal è abilitato: senza Webhook ID la firma dei webhook non è verificabile e i pagamenti PayPal vengono rifiutati.</div>
                         </div>
                     </div>
                     <p class="small text-muted mb-0">

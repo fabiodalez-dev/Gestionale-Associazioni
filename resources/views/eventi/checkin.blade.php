@@ -139,8 +139,9 @@
 
     var API_BASE = @json($apiBaseUrl);
 
-    // Stato
-    var apiKey = localStorage.getItem('checkin_api_key') || '';
+    // Stato. La chiave API vive in sessionStorage (mai nello storage persistente):
+    // sparisce alla chiusura della scheda e non resta su un dispositivo condiviso.
+    var apiKey = sessionStorage.getItem('checkin_api_key') || '';
     var currentEventId = null;
     var currentEventName = '';
     var checkinCount = 0;
@@ -197,7 +198,7 @@
             .then(function(data) {
                 if (data.success) {
                     apiKey = key;
-                    localStorage.setItem('checkin_api_key', key);
+                    sessionStorage.setItem('checkin_api_key', key);
                     loadEvents();
                 } else {
                     showSetupError(data.error || 'Chiave API non valida.');
@@ -231,7 +232,7 @@
 
     // ---- Logout ----
     document.getElementById('btnLogout').addEventListener('click', function() {
-        localStorage.removeItem('checkin_api_key');
+        sessionStorage.removeItem('checkin_api_key');
         apiKey = '';
         apiKeyInput.value = '';
         showScreen('setup');

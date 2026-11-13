@@ -53,6 +53,39 @@ class LoginSocioTest extends TestCase
         $this->assertGuest('socio');
     }
 
+    public function test_socio_in_attesa_o_cessato_non_puo_accedere_ne_restare_loggato(): void
+    {
+        foreach ([Socio::STATO_IN_ATTESA, Socio::STATO_RADIATO, Socio::STATO_DECEDUTO, Socio::STATO_TRASFERITO] as $stato) {
+            $socio = Socio::factory()->conAccessoAreaSoci('password123')->create(['stato' => $stato]);
+
+            $this->from(route('area-soci.login'))->post(route('area-soci.login.attempt'), [
+                'email' => $socio->email,
+                'password' => 'password123',
+            ])->assertSessionHasErrors(['email' => 'Credenziali non valide.']);
+            $this->assertGuest('socio');
+
+            // Sessione già aperta (es. stato cambiato dopo il login): logout forzato
+            $this->actingAs($socio, 'socio')
+                ->get(route('area-soci.dashboard'))
+                ->assertRedirect(route('area-soci.login'));
+            $this->assertGuest('socio');
+        }
+    }
+
+    public function test_socio_sospeso_o_in_attesa_di_pagamento_accede(): void
+    {
+        foreach ([Socio::STATO_SOSPESO, Socio::STATO_IN_ATTESA_DI_PAGAMENTO] as $stato) {
+            $socio = Socio::factory()->conAccessoAreaSoci('password123')->create(['stato' => $stato]);
+
+            $this->post(route('area-soci.login.attempt'), [
+                'email' => $socio->email,
+                'password' => 'password123',
+            ])->assertRedirect(route('area-soci.dashboard'));
+            $this->assertAuthenticatedAs($socio, 'socio');
+            auth()->guard('socio')->logout();
+        }
+    }
+
     public function test_socio_senza_password_impostata_non_puo_accedere(): void
     {
         Socio::factory()->create([

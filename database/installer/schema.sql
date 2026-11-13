@@ -163,7 +163,8 @@ DROP TABLE IF EXISTS `api_keys`;
 CREATE TABLE `api_keys` (
   `id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `associazione_id` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `api_key` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `api_key_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `api_key_prefix` varchar(8) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `nome` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `permessi` json NOT NULL,
   `attiva` tinyint(1) NOT NULL DEFAULT '1',
@@ -172,7 +173,7 @@ CREATE TABLE `api_keys` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `api_keys_api_key_unique` (`api_key`),
+  UNIQUE KEY `api_keys_api_key_hash_unique` (`api_key_hash`),
   KEY `api_keys_associazione_id_index` (`associazione_id`),
   CONSTRAINT `api_keys_associazione_id_foreign` FOREIGN KEY (`associazione_id`) REFERENCES `associazioni` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -2262,6 +2263,8 @@ CREATE TABLE `utenti` (
   `ruolo` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
   `limitato_sedi` tinyint(1) NOT NULL DEFAULT '0',
   `attivo` tinyint(1) NOT NULL DEFAULT '1',
+  `invito_token` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `invito_scade_at` timestamp NULL DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `remember_token` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `two_factor_secret` text COLLATE utf8mb4_unicode_ci,
@@ -2504,6 +2507,9 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_10_27_190000_create_bilanci_sociali_table', 1),
 ('2026_11_05_100100_add_checkin_posti_origine_to_prenotazioni', 1),
 ('2026_11_05_120000_add_snapshot_intestatario_to_ricevute_table', 1),
-('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1);
+('2026_11_05_120100_add_unique_socio_anno_to_tessere_table', 1),
+('2026_11_13_100000_add_invito_to_utenti_table', 1),
+('2026_11_13_110000_hash_api_keys_table', 1),
+('2026_11_13_120000_backfill_expires_at_personal_access_tokens', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

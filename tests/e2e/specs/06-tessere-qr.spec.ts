@@ -17,7 +17,7 @@ test.describe('Tessere e QR', () => {
     test('verifica pubblica: tessera valida con dati del socio', async ({ page }) => {
         const socio = creaSocioConTessera(emailUnica('tessera-valida'));
 
-        await page.goto(`/verifica-tessera/${socio.tessera_id}`);
+        await page.goto(socio.tessera_verifica_url!); // URL firmato: il solo UUID non è più una capability
 
         await expect(page.getByRole('heading', { name: 'Tessera Valida' })).toBeVisible();
         await expect(page.getByText('Associazione E2E')).toBeVisible();
@@ -28,7 +28,7 @@ test.describe('Tessere e QR', () => {
     test('verifica pubblica: tessera scaduta segnalata come non attiva', async ({ page }) => {
         const socio = creaSocioConTessera(emailUnica('tessera-scaduta'), { scaduta: 1 });
 
-        await page.goto(`/verifica-tessera/${socio.tessera_id}`);
+        await page.goto(socio.tessera_verifica_url!); // URL firmato: il solo UUID non è più una capability
 
         await expect(page.getByRole('heading', { name: 'Tessera Scaduta / Non Attiva' })).toBeVisible();
         await expect(page.getByText(`N. Tessera: ${socio.numero_tessera}`)).toBeVisible();
@@ -36,6 +36,11 @@ test.describe('Tessere e QR', () => {
 
     test('verifica pubblica: UUID inesistente → tessera non trovata; senza parametro → invito alla scansione', async ({ page }) => {
         await page.goto('/verifica-tessera/00000000-0000-7000-8000-000000000000');
+        await expect(page.getByRole('heading', { name: 'Tessera Non Trovata' })).toBeVisible();
+
+        // UUID reale ma senza firma: stessa risposta neutra
+        const socio = creaSocioConTessera(emailUnica('tessera-senza-firma'));
+        await page.goto(`/verifica-tessera/${socio.tessera_id}`);
         await expect(page.getByRole('heading', { name: 'Tessera Non Trovata' })).toBeVisible();
 
         await page.goto('/verifica-tessera');

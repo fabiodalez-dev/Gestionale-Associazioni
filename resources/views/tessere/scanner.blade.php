@@ -47,7 +47,7 @@
 
         <!-- Input manuale -->
         <form id="manualForm" class="d-flex gap-2 mb-3" style="max-width:400px;margin:0 auto">
-            <input type="text" id="manualInput" class="form-control" placeholder="UUID tessera..." style="min-height:44px;font-size:16px">
+            <input type="text" id="manualInput" class="form-control" placeholder="Link di verifica del QR..." style="min-height:44px;font-size:16px">
             <button type="submit" class="btn" style="background:var(--brand);color:#fff;white-space:nowrap;min-height:44px">
                 <i class="bi bi-search"></i> Verifica
             </button>
@@ -62,7 +62,9 @@
 (function() {
     'use strict';
 
-    // Base dell'endpoint JSON di verifica: VERIFY_URL_BASE + '/' + uuid
+    // Base dell'endpoint JSON di verifica: VERIFY_URL_BASE + '/' + uuid + '?signature=' + firma.
+    // La firma è quella dell'URL nel QR: senza, il server risponde not_found
+    // (il solo UUID non è una credenziale sufficiente)
     var VERIFY_URL_BASE = @json(url('/api/verifica-tessera'));
     var scanner = null;
     var scanCooldown = false;
@@ -95,13 +97,11 @@
         });
     }
 
-    function onQrScanned(text) {
-        if (scanCooldown) return;
-        scanCooldown = true;
-        setTimeout(function() { scanCooldown = false; }, 3000);
-
-        // Estrae l'UUID dall'URL (path /verifica-tessera/{uuid} o query ?t=) o usa il testo grezzo
+    // Estrae UUID e firma dall'URL di verifica (path /verifica-tessera/{uuid}
+    // o query ?t=, più ?signature=); un testo che non è un URL è preso come UUID
+    function parseTessera(text) {
         var uuid = '';
+        var signature = '';
         try {
             var url = new URL(text);
             uuid = url.searchParams.get('t') || '';
@@ -109,22 +109,33 @@
                 var m = url.pathname.match(/verifica-tessera\/([a-f0-9-]{36})/i);
                 if (m) uuid = m[1];
             }
+            signature = url.searchParams.get('signature') || '';
         } catch (e) {
             uuid = text;
         }
-
-        if (uuid) verifyTessera(uuid);
+        return { uuid: uuid, signature: signature };
     }
 
-    // Input manuale
+    function onQrScanned(text) {
+        if (scanCooldown) return;
+        scanCooldown = true;
+        setTimeout(function() { scanCooldown = false; }, 3000);
+
+        var t = parseTessera(text);
+        if (t.uuid) verifyTessera(t.uuid, t.signature);
+    }
+
+    // Input manuale: si incolla il link di verifica stampato nel QR
     document.getElementById('manualForm').addEventListener('submit', function(e) {
         e.preventDefault();
         var val = document.getElementById('manualInput').value.trim();
-        if (val) verifyTessera(val);
+        if (!val) return;
+        var t = parseTessera(val);
+        if (t.uuid) verifyTessera(t.uuid, t.signature);
     });
 
     // Verifica tramite endpoint JSON
-    function verifyTessera(uuid) {
+    function verifyTessera(uuid, signature) {
         resultArea.textContent = '';
         var loading = document.createElement('div');
         loading.className = 'text-center py-3';
@@ -135,7 +146,7 @@
         loading.appendChild(spinner);
         resultArea.appendChild(loading);
 
-        fetch(VERIFY_URL_BASE + '/' + encodeURIComponent(uuid), { headers: { 'Accept': 'application/json' } })
+        fetch(VERIFY_URL_BASE + '/' + encodeURIComponent(uuid) + '?signature=' + encodeURIComponent(signature || ''), { headers: { 'Accept': 'application/json' } })
             .then(function(r) { return r.json(); })
             .then(function(data) { showResult(data); })
             .catch(function() {
@@ -211,7 +222,7 @@
 
             var msg = document.createElement('p');
             msg.className = 'text-muted';
-            msg.textContent = 'Il codice scansionato non corrisponde a nessuna tessera registrata.';
+            msg.textContent = 'Il codice scansionato non corrisponde a nessuna tessera registrata. Inquadra il QR stampato sulla tessera o incolla il suo link completo.';
 
             body3.appendChild(header3);
             body3.appendChild(title3);

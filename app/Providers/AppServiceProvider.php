@@ -8,7 +8,9 @@ use App\Models\Evento;
 use App\Observers\EventoGoogleCalendarObserver;
 use App\Services\Calendario\CalendarioEsterno;
 use App\Services\Calendario\GoogleCalendarSpatie;
+use App\Services\Email\SmtpPinnedTransport;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -33,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // SMTP dei tenant: connessione all'IP validato con SNI del nome originale
+        Mail::extend('smtp-pinned', fn (array $config) => SmtpPinnedTransport::crea($config));
+
         $this->registerHealthChecks();
         $this->forzaUrlApplicazione();
 

@@ -12,19 +12,16 @@ namespace App\Services\ApiV1;
  *
  * Una chiave/token è "globale" quando non è vincolata ad alcuna associazione
  * (api_keys.associazione_id NULL, oppure token di un super_admin senza tenant).
+ *
+ * Il rate limiting non passa da qui: il limiter api-v1 gira prima
+ * dell'autenticazione, per IP e per hash della credenziale presentata.
  */
 class ApiClientContext
 {
-    public const TIPO_API_KEY = 'api_key';
-
-    public const TIPO_SANCTUM = 'sanctum';
-
     /**
      * @param  list<string>  $permessi
      */
     public function __construct(
-        public readonly string $tipo,
-        public readonly string $identificatore,
         public readonly ?string $associazioneId,
         public readonly array $permessi,
     ) {}
@@ -66,13 +63,5 @@ class ApiClientContext
         }
 
         return null;
-    }
-
-    /**
-     * Chiave per il rate limiting per-credenziale.
-     */
-    public function rateLimitKey(): string
-    {
-        return 'api-v1|'.$this->tipo.'|'.$this->identificatore;
     }
 }

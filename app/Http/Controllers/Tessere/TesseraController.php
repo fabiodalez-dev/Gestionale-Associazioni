@@ -342,7 +342,7 @@ class TesseraController extends Controller
         $associazione = $tessera->associazione;
 
         $qrDataUri = $this->qr->generateDataUri(
-            $tessera->qr_code_url ?: $this->qr->verificationUrl($tessera),
+            $this->qr->urlPerStampa($tessera),
             3
         );
 
@@ -390,11 +390,15 @@ class TesseraController extends Controller
 
     /**
      * Tessere doppie (stesso socio e anno, non annullate) rimaste fuori dal
-     * vincolo socio/anno (da prima del vincolo o dall'import legacy): prima
-     * applica il vincolo o vi riporta le tessere sistemate, poi elenca quelle
-     * dei soci visibili all'utente (associazione e perimetro sedi), il
+     * vincolo socio/anno (da prima del vincolo o dall'import legacy): elenca
+     * quelle dei soci visibili all'utente (associazione e perimetro sedi), il
      * numero di quelle dei soci nel cestino (da ripristinare per correggerle)
-     * e quello delle altre fuori vista, che lo bloccano comunque.
+     * e quello delle altre fuori vista (altre sedi), che lo bloccano comunque.
+     *
+     * Sola lettura, limitata ai soci dell'associazione corrente: applicare il
+     * vincolo (DDL) e riallineare la colonna (update su tutta la tabella,
+     * cross-tenant) spetta al comando notturno tessere:applica-vincolo-anno e
+     * al salvataggio della singola tessera, non a ogni apertura della pagina.
      *
      * @return array{visibili: Collection<int, \stdClass>, cestino: int, altri: int}|null
      */
@@ -402,9 +406,7 @@ class TesseraController extends Controller
     {
         // Anche con il vincolo attivo possono esserci doppioni rimasti fuori
         // (import legacy): l'elenco si basa sulle tessere, non sull'indice
-        $vincolo = app(VincoloTessereAnnoService::class);
-        $vincolo->sistema();
-        $tutti = $vincolo->doppioni();
+        $tutti = app(VincoloTessereAnnoService::class)->doppioni($associazione?->id);
         if ($tutti->isEmpty()) {
             return null;
         }

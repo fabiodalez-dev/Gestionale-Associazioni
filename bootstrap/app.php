@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureInstalled;
 use App\Http\Middleware\EnsureTenantSelected;
+use App\Http\Middleware\EnsureUtenteAttivo;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -38,7 +39,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->encryptCookies(except: ['installer_token']);
 
         // Security headers + Content-Security-Policy su tutte le risposte web (miglioramento 5)
+        // + revoca immediata per gli utenti staff disattivati (gira dopo
+        //   StartSession/AuthenticateSession del gruppo web)
         $middleware->web(append: [
+            EnsureUtenteAttivo::class,
             SecurityHeaders::class,
             AddCspHeaders::class,
         ]);

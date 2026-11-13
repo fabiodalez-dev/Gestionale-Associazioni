@@ -1873,7 +1873,9 @@ class Flussi06_SchemaPersistenzaFlussiTest extends TestCase
             $this->assertEqualsCanonicalizing(array_keys($colonne), $colonneSqlite, "Colonne di {$tabella}: migration e schema.sql divergono");
 
             foreach ($modello->getFillable() as $attributo) {
-                if (! in_array($attributo, $colonneSqlite, true)) {
+                // Un attributo virtuale con mutator (es. ApiKey::api_key, che
+                // scrive api_key_hash/api_key_prefix) non ha una colonna propria
+                if (! in_array($attributo, $colonneSqlite, true) && ! $modello->hasSetMutator($attributo) && ! $modello->hasAttributeSetMutator($attributo)) {
                     $problemi[] = "{$classe}: fillable '{$attributo}' senza colonna in {$tabella}";
                 }
             }

@@ -93,6 +93,25 @@ class ApiKeysUiTest extends TestCase
         $this->assertSame($this->associazione->id, $chiave->associazione_id);
         $this->assertSame(['soci:read', 'soci:write'], $chiave->permessi);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', session('nuova_chiave'));
+
+        // In tabella solo hash e prefisso: la chiave in chiaro non è persistita
+        $this->assertSame(hash('sha256', session('nuova_chiave')), $chiave->api_key_hash);
+        $this->assertSame(substr(session('nuova_chiave'), 0, 8), $chiave->api_key_prefix);
+        $this->assertDatabaseMissing('api_keys', ['api_key_hash' => session('nuova_chiave')]);
+        $this->assertNull($chiave->api_key);
+    }
+
+    public function test_la_lista_mostra_solo_il_prefisso_della_chiave(): void
+    {
+        $chiave = $this->creaChiave($this->associazione->id, 'Chiave Prefisso');
+        $inChiaro = $chiave->api_key;
+        $this->assertNotNull($inChiaro);
+
+        $this->actingAs($this->admin)->get('/api-keys')
+            ->assertOk()
+            ->assertSee(substr($inChiaro, 0, 8))
+            ->assertDontSee($inChiaro)
+            ->assertDontSee(hash('sha256', $inChiaro));
     }
 
     public function test_creazione_senza_permessi_usa_il_default_tessere_read(): void
@@ -166,6 +185,46 @@ class ApiKeysUiTest extends TestCase
         $this->assertSame(['soci:read'], $this->admin->tokens()->first()->abilities);
     }
 
+    public function test_token_senza_scadenza_riceve_la_scadenza_massima_di_365_giorni(): void
+    {
+        $this->freezeTime();
+
+        $this->actingAs($this->admin)->post('/api-tokens', [
+            'nome' => 'Token senza scadenza',
+            'abilities' => ['soci:read'],
+        ])->assertSessionHas('nuovo_token');
+
+        $token = $this->admin->tokens()->first();
+        $this->assertNotNull($token->expires_at);
+        $this->assertSame(
+            now()->addDays(365)->endOfDay()->format('Y-m-d H:i:s'),
+            $token->expires_at->format('Y-m-d H:i:s')
+        );
+    }
+
+    public function test_token_con_scadenza_oltre_365_giorni_viene_rifiutato(): void
+    {
+        $this->actingAs($this->admin)
+            ->from('/api-keys')
+            ->post('/api-tokens', [
+                'nome' => 'Token troppo lungo',
+                'abilities' => ['soci:read'],
+                'scadenza' => now()->addDays(366)->toDateString(),
+            ])
+            ->assertRedirect('/api-keys')
+            ->assertSessionHasErrors('scadenza');
+
+        $this->assertSame(0, $this->admin->tokens()->count());
+
+        $this->actingAs($this->admin)->post('/api-tokens', [
+            'nome' => 'Token un anno',
+            'abilities' => ['soci:read'],
+            'scadenza' => now()->addDays(365)->toDateString(),
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(1, $this->admin->tokens()->count());
+    }
+
     public function test_revoca_token_elimina_solo_i_propri(): void
     {
         $altroUtente = Utente::factory()->adminAssociazione()->create([
@@ -188,9 +247,28 @@ class ApiKeysUiTest extends TestCase
 
     public function test_reference_scramble_accessibile_agli_admin_e_negata_agli_ospiti(): void
     {
-        // Gate viewApiDocs (miglioramento 22): solo utenti amministrativi loggati
+        // Gate viewApiDocs: stessa regola della pagina Chiavi API (ApiKeyPolicy::viewAny)
         $this->get('/docs/api')->assertForbidden();
 
         $this->actingAs($this->admin)->get('/docs/api')->assertOk();
+
+        $superAdmin = Utente::factory()->superAdmin()->create();
+        $this->actingAs($superAdmin)->get('/docs/api')->assertOk();
+    }
+
+    public function test_reference_scramble_negata_all_operatore(): void
+    {
+        // Hardening: il gate non si accontenta più di un utente loggato qualsiasi
+        $operatore = Utente::factory()->operatore()->create([
+            'associazione_id' => $this->associazione->id,
+        ]);
+
+        $this->actingAs($operatore)->get('/docs/api')->assertForbidden();
+    }
+
+    public function test_la_rotta_di_default_api_user_non_esiste(): void
+    {
+        // routes/api.php non espone più /api/user (restituiva l'intero record utente)
+        $this->actingAs($this->admin)->getJson('/api/user')->assertNotFound();
     }
 }

@@ -48,16 +48,12 @@ class SetPasswordController extends Controller
             ->with('status', 'Password impostata correttamente. Ora puoi accedere all\'area soci.');
     }
 
+    /**
+     * Il DB conserva solo l'impronta sha256 del token: la ricerca avviene
+     * per impronta (Socio::perTokenReset, confronto a tempo costante).
+     */
     private function socioByToken(string $token): ?Socio
     {
-        if ($token === '') {
-            return null;
-        }
-
-        /** @var Socio|null */
-        return Socio::allTenants()
-            ->where('password_reset_token', $token)
-            ->where('password_reset_expires', '>', now())
-            ->first();
+        return Socio::perTokenReset($token);
     }
 }

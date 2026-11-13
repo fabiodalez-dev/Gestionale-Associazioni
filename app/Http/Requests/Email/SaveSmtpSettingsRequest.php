@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Email;
 
 use App\Models\SmtpSetting;
+use App\Rules\HostSmtpPubblico;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ class SaveSmtpSettingsRequest extends FormRequest
         $hasSettings = SmtpSetting::query()->exists();
 
         return [
-            'smtp_host' => ['required', 'string', 'max:255'],
+            'smtp_host' => ['required', 'string', 'max:255', new HostSmtpPubblico],
             'smtp_port' => ['required', 'integer', 'between:1,65535'],
             'smtp_user' => ['nullable', 'string', 'max:255'],
             'smtp_pass' => [$hasSettings ? 'nullable' : 'required', 'string', 'max:255'],

@@ -28,9 +28,20 @@ class ImpostazioniPagamentiRequest extends FormRequest
             'paypal_client_id' => ['nullable', 'string', 'max:255'],
             'paypal_client_secret' => ['nullable', 'string', 'max:255'],
             'paypal_mode' => ['required', Rule::in(PaymentGatewaySetting::PAYPAL_MODES)],
-            'paypal_webhook_id' => ['nullable', 'string', 'max:255'],
+            // Senza webhook id la firma dei webhook non è verificabile: obbligatorio se PayPal è abilitato
+            'paypal_webhook_id' => [Rule::requiredIf(fn () => $this->boolean('paypal_enabled')), 'nullable', 'string', 'max:255'],
             'auto_attivazione_pagamento' => ['sometimes', 'boolean'],
             'valuta' => ['required', 'string', 'size:3', 'alpha'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'paypal_webhook_id.required' => 'Il Webhook ID di PayPal è obbligatorio quando PayPal è abilitato: senza non è possibile verificare la firma dei webhook.',
         ];
     }
 

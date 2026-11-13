@@ -12,9 +12,12 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class VotoSondaggioRequest extends FormRequest
 {
+    /**
+     * Solo chi è autenticato come socio o come account del mini-sito può votare.
+     */
     public function authorize(): bool
     {
-        return true;
+        return $this->user('socio') !== null || $this->user('account') !== null;
     }
 
     /**

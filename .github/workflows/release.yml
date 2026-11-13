@@ -99,7 +99,12 @@ jobs:
           extra=""
           case "$TAG" in *-*) extra="--prerelease" ;; esac
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" releases/*.zip releases/*.sha256 --clobber
+            # Release già esistente (es. creata a mano senza asset): si
+            # caricano gli asset, ma senza --clobber. Un pacchetto già
+            # pubblicato per quel tag non va mai rimpiazzato: le installazioni
+            # ne hanno già verificato il digest, e un asset sostituito sarebbe
+            # indistinguibile da una manomissione. In quel caso il job fallisce.
+            gh release upload "$TAG" releases/*.zip releases/*.sha256
           else
             # --target crea il tag sul commit costruito se non esiste ancora
             # (avvio manuale); con il push del tag è già quello

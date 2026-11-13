@@ -76,9 +76,10 @@ class ApiKeyController extends Controller
             $permessi = ['tessere:read'];
         }
 
-        // 256 bit esadecimali; salvata in chiaro per parità con i client legacy
-        // (il mascheramento primi 8 + ultimi 4 è solo in UI).
-        $chiave = bin2hex(random_bytes(32));
+        // 256 bit esadecimali. In tabella finiscono solo hash sha256 e prefisso
+        // (mutator di ApiKey): la chiave in chiaro si mostra una volta sola,
+        // via flash, nella pagina di arrivo.
+        $chiave = ApiKey::generaChiave();
 
         ApiKey::create([
             'associazione_id' => $isGlobale ? null : $tenant,

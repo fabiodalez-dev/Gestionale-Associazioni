@@ -258,8 +258,10 @@ Schedule::command('personal-data-export:clean')
 |--------------------------------------------------------------------------
 |
 | Se la migration l'ha rinviato per tessere doppie già presenti, viene
-| aggiunto appena i doppioni sono stati sistemati: anche qui ogni notte, oltre
-| che al salvataggio delle tessere e all'apertura della pagina Tessere.
+| aggiunto appena i doppioni sono stati sistemati: qui ogni notte (DDL e
+| riallineamento della colonna su tutta la tabella) e, per il solo socio
+| toccato, al salvataggio di una tessera. La pagina Tessere elenca soltanto
+| i doppioni, in sola lettura.
 |
 */
 Schedule::command('tessere:applica-vincolo-anno')

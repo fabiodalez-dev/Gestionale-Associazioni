@@ -53,11 +53,14 @@ Route::get('/pagamento/{token}/ricevuta', [PaginaPagamentoController::class, 'ri
     ->where('token', '[a-fA-F0-9]{64}')
     ->name('pagamento.ricevuta');
 
-// Webhook gateway: pubblici, senza CSRF (sicurezza = verifica firma / capture server-side)
+// Webhook gateway: pubblici, senza CSRF (sicurezza = verifica firma / capture
+// server-side) e con rate limit per IP contro il flooding dell'endpoint
 Route::post('/webhooks/stripe', StripeWebhookController::class)
     ->withoutMiddleware([ValidateCsrfToken::class])
+    ->middleware('throttle:60,1')
     ->name('webhooks.stripe');
 
 Route::post('/webhooks/paypal', PayPalWebhookController::class)
     ->withoutMiddleware([ValidateCsrfToken::class])
+    ->middleware('throttle:60,1')
     ->name('webhooks.paypal');

@@ -15,16 +15,20 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Autenticazione REST API v1 con doppio meccanismo (miglioramento 23):
  *
- * 1. Chiave legacy `api_keys`: token esadecimale di 64 caratteri passato come
- *    `Authorization: Bearer {key}` oppure come header `X-API-Key: {key}`.
+ * 1. Chiave legacy `api_keys` (generata dalla pagina Chiavi API, 64 caratteri
+ *    esadecimali) passata come `Authorization: Bearer {key}` oppure come header
+ *    `X-API-Key: {key}`. In tabella c'è solo l'hash sha256: il lookup confronta
+ *    l'hash della chiave presentata, mai il valore in chiaro.
  *    Chiave scopata (associazione_id valorizzato) o globale (NULL, super_admin).
  * 2. Personal access token Sanctum (`Authorization: Bearer {id}|{token}`) con
  *    abilities nella stessa sintassi dei permessi legacy (`soci:read`, `*`, …).
+ *    Il separatore `|` del formato Sanctum distingue i due meccanismi.
  *
  * Codici errore con parità legacy: auth_missing, auth_invalid, key_disabled,
  * association_disabled, key_expired, permission_denied.
  *
- * Uso: ->middleware(AuthenticateApiV1::class.':soci:read')
+ * Uso: ->middleware(['throttle:api-v1', AuthenticateApiV1::class.':soci:read'])
+ * (il throttle va PRIMA, così anche i tentativi falliti sono limitati).
  * Il contesto autenticato è in $request->attributes->get('api_client').
  */
 class AuthenticateApiV1
@@ -54,32 +58,27 @@ class AuthenticateApiV1
             );
         }
 
-        // Chiave legacy: esattamente 64 caratteri esadecimali (256 bit)
-        $legacyKey = null;
-
-        if (is_string($bearer) && preg_match('/^[a-fA-F0-9]{64}$/', $bearer)) {
-            $legacyKey = $bearer;
-        } elseif (is_string($headerKey) && preg_match('/^[a-fA-F0-9]{64}$/', $headerKey)) {
-            $legacyKey = $headerKey;
-        }
-
-        if ($legacyKey !== null) {
-            return $this->autenticaApiKey($request, $next, $legacyKey, $permesso);
-        }
-
-        // Bearer non 64-hex: tentativo con token Sanctum
-        if (is_string($bearer) && $bearer !== '') {
+        // Bearer nel formato Sanctum ({id}|{token}): personal access token
+        if (is_string($bearer) && $bearer !== '' && str_contains($bearer, '|')) {
             return $this->autenticaSanctum($request, $next, $bearer, $permesso);
         }
 
-        // X-API-Key con formato non valido = come credenziale invalida
-        return $this->error(401, 'auth_invalid', 'API key non valida.');
+        // Altrimenti chiave legacy (Bearer o X-API-Key), cercata per hash.
+        // Nessuna chiave legittima supera i 255 caratteri: input abnormi
+        // vengono respinti senza nemmeno calcolare l'hash.
+        $legacyKey = is_string($bearer) && $bearer !== '' ? $bearer : $headerKey;
+
+        if (strlen($legacyKey) > 255) {
+            return $this->error(401, 'auth_invalid', 'API key non valida.');
+        }
+
+        return $this->autenticaApiKey($request, $next, $legacyKey, $permesso);
     }
 
     private function autenticaApiKey(Request $request, Closure $next, string $token, ?string $permesso): Response
     {
         /** @var ApiKey|null $apiKey */
-        $apiKey = ApiKey::query()->with('associazione:id,nome,attiva')->where('api_key', $token)->first();
+        $apiKey = ApiKey::query()->with('associazione:id,nome,attiva')->perChiave($token)->first();
 
         if (! $apiKey) {
             return $this->error(401, 'auth_invalid', 'API key non valida.');
@@ -100,8 +99,6 @@ class AuthenticateApiV1
         }
 
         $context = new ApiClientContext(
-            tipo: ApiClientContext::TIPO_API_KEY,
-            identificatore: $apiKey->id,
             associazioneId: $apiKey->associazione_id,
             permessi: $apiKey->permessi ?? [],
         );
@@ -139,6 +136,19 @@ class AuthenticateApiV1
             return $this->error(403, 'key_expired', 'Token scaduto.');
         }
 
+        // Scadenza massima di sistema (config sanctum.expiration, in minuti)
+        // per i token senza expires_at: chi ha una scadenza propria (tutti i
+        // token creati dal pannello, e quelli preesistenti dopo il backfill
+        // della migration) segue quella.
+        $scadenzaMinuti = config('sanctum.expiration');
+
+        if ($accessToken->expires_at === null
+            && is_numeric($scadenzaMinuti) && (int) $scadenzaMinuti > 0
+            && $accessToken->created_at !== null
+            && $accessToken->created_at->copy()->addMinutes((int) $scadenzaMinuti)->isPast()) {
+            return $this->error(403, 'key_expired', 'Token scaduto.');
+        }
+
         $utente = $accessToken->tokenable;
 
         if (! $utente instanceof Utente || ! $utente->attivo) {
@@ -158,8 +168,6 @@ class AuthenticateApiV1
         }
 
         $context = new ApiClientContext(
-            tipo: ApiClientContext::TIPO_SANCTUM,
-            identificatore: (string) $accessToken->id,
             associazioneId: $utente->associazione_id ?: null,
             permessi: $accessToken->abilities ?? [],
         );

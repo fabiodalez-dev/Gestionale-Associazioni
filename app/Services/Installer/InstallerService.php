@@ -4,6 +4,7 @@ namespace App\Services\Installer;
 
 use App\Models\Associazione;
 use App\Models\Utente;
+use App\Services\Sistema\EnvEditor;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Encryption\Encrypter;
@@ -74,16 +75,18 @@ class InstallerService
         return $creato;
     }
 
-    /** Il wizard è stato avviato (marcatore presente e non scaduto), da chiunque. */
+    /**
+     * Il wizard è stato avviato da qualcuno: il marcatore esiste. Resta vero
+     * anche oltre la scadenza (il TTL vale solo per il token del browser,
+     * vedi wizardInCorso): con lo schema già importato e nessun super admin,
+     * un marcatore scaduto non deve riaprire lo step admin a chiunque passi
+     * di lì. La via d'uscita è quella indicata dal 403 di EnsureInstalled:
+     * eliminare il file in-corso (chi può farlo ha accesso al server) e
+     * ricominciare dallo step database.
+     */
     public function wizardRivendicato(): bool
     {
-        $file = (string) config('installer.in_progress_file');
-        if (! is_file($file)) {
-            return false;
-        }
-        $minuti = (int) config('installer.in_progress_ttl_minutes', 120);
-
-        return (filemtime($file) ?: 0) >= time() - $minuti * 60;
+        return is_file((string) config('installer.in_progress_file'));
     }
 
     /**
@@ -225,8 +228,32 @@ class InstallerService
                 'server' => $versione,
             ];
         } catch (PDOException $e) {
-            return ['ok' => false, 'error' => $e->getMessage(), 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => null];
+            // Il messaggio del driver (SQLSTATE, testo del server, a volte il
+            // nome dell'host interno) resta nel log: al browser va solo una
+            // spiegazione per categoria, senza il testo grezzo dell'errore
+            report($e);
+
+            return ['ok' => false, 'error' => $this->messaggioConnessioneFallita($e, $cfg), 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => null];
         }
+    }
+
+    /**
+     * Spiegazione per l'utente di una connessione fallita, in base al codice
+     * del driver MySQL, costruita solo con i parametri inseriti nel form.
+     *
+     * @param  array{host: string, port: int|string, database: string, username: string, password: ?string}  $cfg
+     */
+    private function messaggioConnessioneFallita(PDOException $e, array $cfg): string
+    {
+        $codice = (int) ($e->errorInfo[1] ?? (is_numeric($e->getCode()) ? $e->getCode() : 0));
+
+        return match ($codice) {
+            2002, 2003, 2005 => sprintf('server non raggiungibile su %s:%s. Verifica host e porta (il dettaglio è nel log dell\'applicazione).', $cfg['host'], $cfg['port']),
+            1045 => sprintf('accesso negato per l\'utente "%s". Verifica nome utente e password.', $cfg['username']),
+            1044 => sprintf('l\'utente "%s" non ha i permessi sul database "%s".', $cfg['username'], $cfg['database']),
+            1049 => sprintf('il database "%s" non esiste. Spunta "Crea il database" se l\'utente ha i permessi, oppure crealo dal pannello dell\'hosting.', $cfg['database']),
+            default => 'impossibile connettersi con questi parametri. Verifica host, porta, nome utente e password; il dettaglio dell\'errore è nel log dell\'applicazione (storage/logs).',
+        };
     }
 
     /**
@@ -291,38 +318,31 @@ class InstallerService
     }
 
     /**
-     * Scrive (o aggiorna) coppie KEY=VALUE nel file .env.
+     * Scrive (o aggiorna) coppie KEY=VALUE nel file .env tramite EnvEditor
+     * (lo stesso della pagina Impostazioni di sistema): rifiuta a capo e
+     * NUL, quota il valore in modo che phpdotenv lo rilegga identico
+     * (verificato rileggendo il contenuto generato), sostituzione atomica.
+     * Il valore inserito dall'utente non passa mai da preg_replace come
+     * stringa di sostituzione: una password con "$1" o "\1" verrebbe
+     * interpretata come backreference e scritta corrotta.
      *
      * @param  array<string, string>  $valori
+     *
+     * @throws \InvalidArgumentException se una chiave o un valore non è ammesso
+     * @throws RuntimeException se il file non è scrivibile o il valore non sopravviverebbe alla rilettura
      */
     public function writeEnv(array $valori): void
     {
-        $envFile = config('installer.env_file');
+        $envFile = (string) config('installer.env_file');
 
-        $contenuto = file_exists($envFile)
-            ? (string) file_get_contents($envFile)
-            : (string) file_get_contents(base_path('.env.example'));
-
-        foreach ($valori as $chiave => $valore) {
-            $valore = $this->quoteEnvValue($valore);
-
-            if (preg_match("/^{$chiave}=.*$/m", $contenuto)) {
-                $contenuto = (string) preg_replace("/^{$chiave}=.*$/m", "{$chiave}={$valore}", $contenuto);
-            } else {
-                $contenuto .= PHP_EOL."{$chiave}={$valore}";
+        // Senza .env si parte da .env.example, come in preparaEnv()
+        if (! file_exists($envFile) && is_file(base_path('.env.example'))) {
+            if (@copy(base_path('.env.example'), $envFile)) {
+                @chmod($envFile, 0600);
             }
         }
 
-        file_put_contents($envFile, $contenuto);
-    }
-
-    private function quoteEnvValue(string $valore): string
-    {
-        if ($valore === '' || preg_match('/^[A-Za-z0-9_.\/:@-]+$/', $valore)) {
-            return $valore;
-        }
-
-        return '"'.str_replace('"', '\\"', $valore).'"';
+        app(EnvEditor::class)->write($valori);
     }
 
     /**

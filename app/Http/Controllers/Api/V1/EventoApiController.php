@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\ApiKey;
+use App\Models\Associazione;
 use App\Models\Evento;
 use App\Models\EventoPartecipante;
 use App\Models\Prenotazione;
 use App\Models\Socio;
 use App\Models\Tessera;
+use App\Services\ApiV1\ApiClientContext;
 use App\Services\EventiVita\PresenzeSociService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,10 +19,11 @@ use Illuminate\Support\Facades\Log;
 /**
  * REST API v1 — modulo eventi (consumata dalla pagina mobile di check-in).
  *
- * Autenticazione: middleware AuthenticateApiKey (Bearer).
- * - Chiave scoped → solo eventi del tenant della chiave.
- * - Chiave globale (super_admin) → tutti i tenant; per il check-in il tenant
- *   è SEMPRE derivato dall'evento, non dalla chiave.
+ * Autenticazione: middleware AuthenticateApiV1 (chiave api_keys o token
+ * Sanctum), contesto in $request->attributes->get('api_client').
+ * - Client scoped → solo eventi del tenant del client.
+ * - Client globale (super_admin) → tutti i tenant; per il check-in il tenant
+ *   è SEMPRE derivato dall'evento, non dalla credenziale.
  *
  * Gli scope globali Eloquent vengono bypassati (allTenants): lo scoping è
  * esplicito e deterministico, indipendente da sessioni web eventualmente attive.
@@ -33,15 +35,16 @@ class EventoApiController extends Controller
      */
     public function ping(Request $request): JsonResponse
     {
-        /** @var ApiKey $apiKey */
-        $apiKey = $request->attributes->get('api_key');
+        $client = $this->client($request);
 
         return response()->json([
             'success' => true,
             'message' => 'API key valida.',
             'api_version' => 'v1',
-            'globale' => $apiKey->isGlobale(),
-            'associazione' => $apiKey->isGlobale() ? null : $apiKey->associazione?->nome,
+            'globale' => $client->isGlobale(),
+            'associazione' => $client->isGlobale()
+                ? null
+                : Associazione::query()->whereKey($client->associazioneId)->value('nome'),
         ]);
     }
 
@@ -51,21 +54,20 @@ class EventoApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        /** @var ApiKey $apiKey */
-        $apiKey = $request->attributes->get('api_key');
+        $client = $this->client($request);
 
         $page = max(1, (int) $request->query('page', '1'));
         $limit = min(100, max(1, (int) $request->query('limit', '20')));
 
         $query = Evento::allTenants()
-            ->when(! $apiKey->isGlobale(), fn ($q) => $q->where('associazione_id', $apiKey->associazione_id))
+            ->when(! $client->isGlobale(), fn ($q) => $q->where('associazione_id', $client->associazioneId))
             ->when($request->query('futuri') === '1', fn ($q) => $q->where('data_evento', '>=', now()))
             ->when($request->query('oggi') === '1', fn ($q) => $q->whereDate('data_evento', now()->toDateString()));
 
         $total = (clone $query)->count();
 
         $eventi = $query
-            ->when($apiKey->isGlobale(), fn ($q) => $q->with('associazione:id,nome'))
+            ->when($client->isGlobale(), fn ($q) => $q->with('associazione:id,nome'))
             ->orderByDesc('data_evento')
             ->forPage($page, $limit)
             ->get();
@@ -75,7 +77,7 @@ class EventoApiController extends Controller
             'total' => $total,
             'page' => $page,
             'limit' => $limit,
-            'eventi' => $eventi->map(function (Evento $evento) use ($apiKey) {
+            'eventi' => $eventi->map(function (Evento $evento) use ($client) {
                 $row = [
                     'id' => $evento->id,
                     'titolo' => $evento->titolo,
@@ -84,7 +86,7 @@ class EventoApiController extends Controller
                     'luogo' => $evento->luogo,
                 ];
 
-                if ($apiKey->isGlobale()) {
+                if ($client->isGlobale()) {
                     $row['associazione_id'] = $evento->associazione_id;
                     $row['associazione_nome'] = $evento->associazione?->nome;
                 }
@@ -103,7 +105,7 @@ class EventoApiController extends Controller
             return $this->error(400, 'invalid_id', 'ID evento non valido.');
         }
 
-        $evento = $this->findEvento($request->attributes->get('api_key'), $id);
+        $evento = $this->findEvento($this->client($request), $id);
 
         if (! $evento) {
             return $this->error(404, 'not_found', 'Evento non trovato.');
@@ -159,7 +161,7 @@ class EventoApiController extends Controller
             return $this->error(400, 'invalid_id', 'ID evento non valido.');
         }
 
-        $evento = $this->findEvento($request->attributes->get('api_key'), $id);
+        $evento = $this->findEvento($this->client($request), $id);
 
         if (! $evento) {
             return $this->error(404, 'not_found', 'Evento non trovato.');
@@ -277,14 +279,28 @@ class EventoApiController extends Controller
     }
 
     /**
-     * Lookup evento: chiave scoped → vincolata al tenant della chiave;
-     * chiave globale → solo per id.
+     * Contesto del client autenticato, impostato da AuthenticateApiV1.
      */
-    private function findEvento(ApiKey $apiKey, string $id): ?Evento
+    private function client(Request $request): ApiClientContext
+    {
+        $client = $request->attributes->get('api_client');
+
+        if (! $client instanceof ApiClientContext) {
+            abort(401);
+        }
+
+        return $client;
+    }
+
+    /**
+     * Lookup evento: client scoped → vincolato al tenant del client;
+     * client globale → solo per id.
+     */
+    private function findEvento(ApiClientContext $client, string $id): ?Evento
     {
         return Evento::allTenants()
             ->where('id', $id)
-            ->when(! $apiKey->isGlobale(), fn ($q) => $q->where('associazione_id', $apiKey->associazione_id))
+            ->when(! $client->isGlobale(), fn ($q) => $q->where('associazione_id', $client->associazioneId))
             ->first();
     }
 

@@ -111,4 +111,78 @@ class ImpostazioniPagamentiTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('sk_test_riservata');
     }
+
+    // ------------------------------------------------------------------
+    // Hardening (audit run-1): il webhook id PayPal è obbligatorio se
+    // PayPal è abilitato (senza non si verifica la firma dei webhook)
+    // ------------------------------------------------------------------
+
+    public function test_paypal_abilitato_richiede_il_webhook_id(): void
+    {
+        $base = [
+            'paypal_enabled' => '1',
+            'paypal_client_id' => 'pp_client',
+            'paypal_client_secret' => 'pp_secret',
+            'paypal_mode' => 'sandbox',
+            'valuta' => 'EUR',
+        ];
+
+        $this->actingAs($this->admin)
+            ->put(route('quote.impostazioni.update'), $base + ['paypal_webhook_id' => ''])
+            ->assertSessionHasErrors('paypal_webhook_id');
+        $this->assertNull(PaymentGatewaySetting::forTenant($this->associazione->id));
+
+        // PayPal disabilitato: il webhook id può restare vuoto
+        $this->actingAs($this->admin)
+            ->put(route('quote.impostazioni.update'), ['paypal_enabled' => '0', 'paypal_mode' => 'sandbox', 'valuta' => 'EUR'])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)
+            ->put(route('quote.impostazioni.update'), $base + ['paypal_webhook_id' => 'WH-ABC'])
+            ->assertSessionHasNoErrors();
+
+        $settings = PaymentGatewaySetting::forTenant($this->associazione->id);
+        $this->assertSame('WH-ABC', $settings->paypal_webhook_id);
+        $this->assertTrue($settings->isPayPalOperational());
+    }
+
+    public function test_configurazioni_struttura_richiedono_il_webhook_id_se_paypal_abilitato(): void
+    {
+        $this->actingAs($this->admin)
+            ->post(route('configurazioni.pagamenti'), [
+                'paypal_enabled' => '1',
+                'paypal_client_id' => 'pp_client',
+                'paypal_client_secret' => 'pp_secret',
+                'paypal_mode' => 'sandbox',
+                'valuta' => 'EUR',
+            ])
+            ->assertSessionHasErrors('paypal_webhook_id');
+        $this->assertNull(PaymentGatewaySetting::forTenant($this->associazione->id));
+
+        $this->actingAs($this->admin)
+            ->post(route('configurazioni.pagamenti'), [
+                'stripe_enabled' => '1',
+                'stripe_publishable_key' => 'pk_test_x',
+                'paypal_mode' => 'sandbox',
+                'valuta' => 'EUR',
+            ])
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_paypal_non_e_operativo_senza_webhook_id(): void
+    {
+        $settings = $this->configuraPayPal(['paypal_webhook_id' => '']);
+        $this->assertFalse($settings->isPayPalOperational());
+
+        $settings->paypal_webhook_id = 'WH-1';
+        $this->assertTrue($settings->isPayPalOperational());
+    }
+
+    public function test_il_form_segnala_il_webhook_id_come_obbligatorio(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('quote.impostazioni.edit'))
+            ->assertOk()
+            ->assertSee('Obbligatorio se PayPal è abilitato');
+    }
 }

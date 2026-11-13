@@ -117,15 +117,21 @@ class PreiscrizioneTest extends TestCase
             ->assertSessionHasErrors('telefono');
     }
 
-    public function test_duplicato_per_email_bloccato(): void
+    public function test_duplicato_per_email_ignorato_con_risposta_neutra(): void
     {
         Socio::factory()->create([
             'associazione_id' => $this->associazione->id,
             'email' => 'giulia.verdi@example.com',
+            'nome' => 'Giulia', 'cognome' => 'Verdi',
         ]);
 
-        $this->post('/preiscrizione/'.$this->associazione->id, $this->datiValidi())
-            ->assertSessionHas('error');
+        // Stessa risposta di una richiesta accettata: il modulo pubblico non deve
+        // rivelare né che l'email è di un socio né il suo nome
+        $response = $this->post('/preiscrizione/'.$this->associazione->id, $this->datiValidi())
+            ->assertRedirect(route('preiscrizione.show', ['associazione' => $this->associazione->id]))
+            ->assertSessionHas('success')
+            ->assertSessionMissing('error');
+        $this->assertStringNotContainsString('Verdi', (string) session('success'));
 
         $this->assertSame(
             1,

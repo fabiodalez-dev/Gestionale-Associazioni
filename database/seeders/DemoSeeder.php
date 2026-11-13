@@ -54,10 +54,13 @@ use Illuminate\Support\Str;
  * dev, assente con composer install --no-dev).
  *
  * Il frontend pubblico è attivo su /a/associazione-demo; l'account demo
- * (demo@account-demo.test / demo1234) è verificato e ha una prenotazione
- * confermata sull'evento gratuito. Il secondo account
- * (giulia@account-demo.test / demo1234) ha una richiesta di iscrizione
- * socio in attesa, visibile nella pagina admin "Richieste iscrizione".
+ * (demo@account-demo.test) ha una prenotazione confermata sull'evento
+ * gratuito. Il secondo account (giulia@account-demo.test) ha una richiesta
+ * di iscrizione socio in attesa, visibile nella pagina admin "Richieste
+ * iscrizione". Gli account demo servono solo a popolare le pagine admin:
+ * non hanno credenziali note (password casuale non mostrata da nessuna
+ * parte), non sono verificati e sono disattivati, così un'installazione
+ * con i dati dimostrativi non espone login pubblici con password nota.
  * La "Visita guidata in cantina" è l'evento con approvazione richiesta.
  *
  * Vita sociale (PIANO-VITA-SOCIALE): due cariche negli organi sociali
@@ -247,17 +250,18 @@ class DemoSeeder extends Seeder
             'richiede_approvazione' => true,
         ]);
 
-        // Account demo del frontend pubblico: email verificata,
-        // password "demo1234" (hash dal cast 'hashed' del modello)
+        // Account demo del frontend pubblico: password casuale mai mostrata
+        // (hash dal cast 'hashed' del modello), non verificato e disattivato:
+        // esiste solo per dare un nominativo alla prenotazione demo.
         $account = Account::create([
             'associazione_id' => $associazione->id,
             'nome' => 'Mario',
             'cognome' => 'Rossi',
             'email' => 'demo@account-demo.test',
-            'password' => 'demo1234',
-            'email_verified_at' => now(),
+            'password' => $this->passwordCasuale(),
+            'email_verified_at' => null,
             'telefono' => '3331234567',
-            'attivo' => true,
+            'attivo' => false,
             'preferenze' => ['promemoria_eventi' => true],
             'privacy_accettata_at' => now(),
         ]);
@@ -285,10 +289,10 @@ class DemoSeeder extends Seeder
             'nome' => 'Giulia',
             'cognome' => 'Neri',
             'email' => 'giulia@account-demo.test',
-            'password' => 'demo1234',
-            'email_verified_at' => now(),
+            'password' => $this->passwordCasuale(),
+            'email_verified_at' => null,
             'telefono' => '3387654321',
-            'attivo' => true,
+            'attivo' => false,
             'preferenze' => ['promemoria_eventi' => true],
             'privacy_accettata_at' => now(),
         ]);
@@ -771,5 +775,14 @@ class DemoSeeder extends Seeder
             'visibile_sul_sito' => true,
             'sito_url' => 'https://caffedelborgo.test',
         ]);
+    }
+
+    /**
+     * Password casuale per gli account demo: mai mostrata né loggata, serve
+     * solo a non lasciare una credenziale nota (hash dal cast 'hashed').
+     */
+    private function passwordCasuale(): string
+    {
+        return bin2hex(random_bytes(24));
     }
 }

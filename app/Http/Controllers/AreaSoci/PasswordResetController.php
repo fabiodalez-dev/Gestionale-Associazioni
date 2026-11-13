@@ -21,16 +21,20 @@ class PasswordResetController extends Controller
     public function sendLink(RichiestaResetPasswordRequest $request): RedirectResponse
     {
         /** @var Socio|null $socio */
+        // Nessun link a chi non ha diritto di accesso (in attesa, cessato):
+        // la risposta resta neutra in ogni caso
         $socio = Socio::allTenants()
+            ->whereIn('stato', Socio::STATI_CON_ACCESSO_AREA_SOCI)
             ->where('email', $request->string('email')->toString())
             ->first();
 
         if ($socio !== null) {
             $token = bin2hex(random_bytes(32));
 
-            // Un solo token valido per socio: sovrascrive l'eventuale precedente
+            // Un solo token valido per socio: sovrascrive l'eventuale precedente.
+            // Nel DB va solo l'impronta: il token in chiaro è nel link
             $socio->forceFill([
-                'password_reset_token' => $token,
+                'password_reset_token' => Socio::hashTokenReset($token),
                 'password_reset_expires' => now()->addHour(),
             ])->save();
 

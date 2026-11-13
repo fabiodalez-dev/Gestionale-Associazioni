@@ -136,6 +136,15 @@ class FeedbackEventiTest extends TestCase
         ]);
     }
 
+    /**
+     * URL firmata del form: la rotta POST richiede la firma come la GET
+     * (la form rimanda alla stessa URL con cui è stata aperta).
+     */
+    private function urlFirmata(FeedbackEvento $feedback): string
+    {
+        return URL::signedRoute('feedback-eventi.show', ['token' => $feedback->token]);
+    }
+
     public function test_link_firmato_mostra_il_form(): void
     {
         $feedback = $this->creaFeedback();
@@ -166,7 +175,8 @@ class FeedbackEventiTest extends TestCase
     {
         $feedback = $this->creaFeedback();
 
-        $this->post("/feedback-eventi/{$feedback->token}", [
+        // Il POST va alla stessa URL firmata del GET (rotta POST con 'signed')
+        $this->post($this->urlFirmata($feedback), [
             'voto' => 4,
             'commento' => 'Bellissima serata, torneremo!',
         ])->assertOk()->assertSee('feedback è stato registrato', false);
@@ -181,7 +191,7 @@ class FeedbackEventiTest extends TestCase
     {
         $feedback = $this->creaFeedback();
 
-        $this->post("/feedback-eventi/{$feedback->token}", ['voto' => 6])
+        $this->post($this->urlFirmata($feedback), ['voto' => 6])
             ->assertSessionHasErrors('voto');
 
         $this->assertNull($feedback->fresh()->compilato_at);
@@ -191,13 +201,48 @@ class FeedbackEventiTest extends TestCase
     {
         $feedback = $this->creaFeedback();
 
-        $this->post("/feedback-eventi/{$feedback->token}", ['voto' => 5]);
-        $this->post("/feedback-eventi/{$feedback->token}", ['voto' => 1, 'commento' => 'cambio idea'])
+        $this->post($this->urlFirmata($feedback), ['voto' => 5]);
+        $this->post($this->urlFirmata($feedback), ['voto' => 1, 'commento' => 'cambio idea'])
             ->assertSessionHasErrors('voto');
 
         $feedback->refresh();
         $this->assertSame(5, $feedback->voto);
         $this->assertNull($feedback->commento);
+    }
+
+    public function test_post_senza_firma_viene_rifiutato(): void
+    {
+        $feedback = $this->creaFeedback();
+
+        $this->post("/feedback-eventi/{$feedback->token}", ['voto' => 4])->assertForbidden();
+
+        $this->assertNull($feedback->fresh()->compilato_at);
+    }
+
+    public function test_la_form_rimanda_alla_stessa_url_firmata(): void
+    {
+        $feedback = $this->creaFeedback();
+        $url = $this->urlFirmata($feedback);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('action="'.e($url).'"', false);
+    }
+
+    public function test_il_link_dell_email_scade_con_la_finestra_di_feedback(): void
+    {
+        $feedback = $this->creaFeedback();
+        $account = Account::allTenants()->findOrFail($feedback->prenotazione()->withoutGlobalScope('associazione')->firstOrFail()->account_id);
+
+        $url = (new FeedbackEventoNotification($feedback))->toMail($account)->actionUrl;
+
+        $this->assertStringContainsString('expires=', $url);
+        $this->get($url)->assertOk();
+
+        $this->travel(FeedbackEventoNotification::GIORNI_VALIDITA_LINK + 1)->days();
+
+        $this->get($url)->assertForbidden();
+        $this->post($url, ['voto' => 5])->assertForbidden();
     }
 
     // ------------------------------------------------------------------

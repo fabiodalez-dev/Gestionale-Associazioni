@@ -82,7 +82,8 @@ class InstallerTest extends TestCase
             $this->assertFileExists($env);
             $contenuto = (string) file_get_contents($env);
             $this->assertStringContainsString('DB_CONNECTION=mysql', $contenuto, 'Parte da .env.example');
-            $this->assertMatchesRegularExpression('/^APP_KEY="?base64:[A-Za-z0-9+\/=]+"?$/m', $contenuto);
+            // EnvEditor quota con l'apice singolo (nessuna interpolazione)
+            $this->assertMatchesRegularExpression('/^APP_KEY=["\']?base64:[A-Za-z0-9+\/=]+["\']?$/m', $contenuto);
             // Creato dal wizard = sito in produzione, non la copia di sviluppo
             $this->assertMatchesRegularExpression('/^APP_ENV=production$/m', $contenuto);
             $this->assertMatchesRegularExpression('/^APP_DEBUG=false$/m', $contenuto);
@@ -123,8 +124,19 @@ class InstallerTest extends TestCase
         // Browser giusto: prosegue
         $this->withUnencryptedCookie('installer_token', $token)->get('/install/admin')->assertOk();
 
-        // Marcatore scaduto: nessuno lo ha più rivendicato, si può riprendere
+        // Marcatore scaduto: prima lo step admin si riapriva a chiunque
+        // (schema pronto, nessun super admin: il primo che passa diventa
+        // amministratore). Ora il marcatore resta una rivendicazione finché
+        // esiste: scade solo il token del browser, e la via d'uscita è
+        // quella del messaggio 403, eliminare il file in-corso
         touch($this->inCorsoFile, time() - 3 * 3600);
+        $this->get('/install/admin')->assertForbidden()->assertSee('installer-in-corso');
+        $this->post('/install/admin', ['nome' => 'x'])->assertForbidden();
+        $this->withUnencryptedCookie('installer_token', $token)->get('/install/admin')->assertForbidden();
+        $this->assertTrue(app(InstallerService::class)->wizardRivendicato());
+        $this->assertFalse(app(InstallerService::class)->wizardInCorso($token));
+
+        File::delete($this->inCorsoFile);
         $this->get('/install/admin')->assertOk();
     }
 
@@ -141,6 +153,40 @@ class InstallerTest extends TestCase
 
         $this->get('/install')->assertRedirect('/login');
         $this->get('/login')->assertOk();
+    }
+
+    public function test_installer_disabilitato_chiude_le_rotte_anche_con_lock_presente(): void
+    {
+        // INSTALLER_ENABLED=false deve CHIUDERE il wizard, non saltare il lock:
+        // su un'app installata nessuna rotta /install* può riscrivere il .env
+        config(['installer.enabled' => false]);
+        file_put_contents($this->lockFile, 'test');
+        $env = (string) file_get_contents((string) config('installer.env_file'));
+
+        $this->get('/install')->assertNotFound();
+        $this->get('/install/email')->assertNotFound();
+        $this->get('/install/database')->assertNotFound();
+        $this->post('/install/email', [
+            'driver' => 'smtp', 'from_address' => 'a@b.test', 'from_name' => 'X',
+            'smtp_host' => 'evil.test', 'smtp_port' => 25,
+        ])->assertNotFound();
+        $this->post('/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'x', 'username' => 'u',
+        ])->assertNotFound();
+
+        $this->assertSame($env, file_get_contents((string) config('installer.env_file')));
+        // Il resto dell'app resta servito normalmente
+        $this->get('/login')->assertOk();
+    }
+
+    public function test_installer_disabilitato_senza_lock_non_apre_il_wizard(): void
+    {
+        config(['installer.enabled' => false]);
+
+        $this->get('/install')->assertNotFound();
+        $this->post('/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'x', 'username' => 'u',
+        ])->assertNotFound();
     }
 
     public function test_step_database_mostra_il_form(): void
@@ -186,6 +232,99 @@ class InstallerTest extends TestCase
             ->assertRedirect(route('installer.admin'))->assertSessionHas('success')->assertCookie('installer_token');
 
         $this->assertFileExists($this->inCorsoFile, 'Dopo lo schema il wizard segna che è in corso');
+    }
+
+    public function test_sito_in_https_scrive_app_url_e_cookie_di_sessione_solo_sicuro(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => '8.0.36']);
+            $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
+            $mock->shouldReceive('writeEnv')->once()->withArgs(fn (array $v) => ($v['APP_URL'] ?? null) === 'https://associazione.example'
+                && ($v['SESSION_SECURE_COOKIE'] ?? null) === 'true');
+        });
+
+        $this->call('POST', 'https://associazione.example/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'demo', 'username' => 'root', 'password' => '',
+        ])->assertRedirect(route('installer.admin'));
+    }
+
+    public function test_sito_in_http_non_forza_il_cookie_di_sessione_sicuro(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => '8.0.36']);
+            $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
+            $mock->shouldReceive('writeEnv')->once()->withArgs(fn (array $v) => ($v['APP_URL'] ?? null) === 'http://associazione.example'
+                && ! array_key_exists('SESSION_SECURE_COOKIE', $v));
+        });
+
+        $this->call('POST', 'http://associazione.example/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'demo', 'username' => 'root', 'password' => '',
+        ])->assertRedirect(route('installer.admin'));
+    }
+
+    public function test_app_url_non_valido_non_viene_scritto_nel_env(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->once()->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'tabelle' => [], 'installata' => false, 'server' => '8.0.36']);
+            $mock->shouldReceive('installaSchema')->once()->andReturn(['tabelle' => 94, 'migrazioni' => 66]);
+            // La configurazione del database si scrive comunque, l'APP_URL no
+            $mock->shouldReceive('writeEnv')->once()->withArgs(fn (array $v) => ($v['DB_DATABASE'] ?? null) === 'demo'
+                && ! array_key_exists('APP_URL', $v) && ! array_key_exists('SESSION_SECURE_COOKIE', $v));
+        });
+
+        // Host oltre i 255 caratteri ammessi per APP_URL (etichette da 63)
+        $host = implode('.', array_fill(0, 5, str_repeat('a', 63))).'.example';
+        $this->call('POST', 'http://'.$host.'/install/database', [
+            'host' => '127.0.0.1', 'port' => 3306, 'database' => 'demo', 'username' => 'root', 'password' => '',
+        ])->assertRedirect(route('installer.admin'));
+    }
+
+    public function test_valori_con_a_capo_o_host_non_valido_vengono_rifiutati_dalla_validazione(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->never();
+            $mock->shouldReceive('writeEnv')->never();
+        });
+        $base = ['host' => '127.0.0.1', 'port' => 3306, 'database' => 'demo', 'username' => 'root', 'password' => 'ok'];
+
+        // Una riga iniettata nel .env diventerebbe un'altra variabile
+        $this->from('/install/database')->post('/install/database', ['password' => "segreta\nAPP_DEBUG=true"] + $base)
+            ->assertRedirect('/install/database')->assertSessionHasErrors('password');
+        $this->from('/install/database')->post('/install/database', ['username' => "root\r\nX=1"] + $base)
+            ->assertSessionHasErrors('username');
+        // (le risposte JSON di errore sono riservate ad api/*: qui la
+        // validazione fallita redirige con gli errori in sessione)
+        $this->from('/install/database')->post('/install/database/test', ['host' => "db\nX=1"] + $base)
+            ->assertRedirect('/install/database')->assertSessionHasErrors('host');
+
+        // Host: solo nome host o IP (localhost e rete privata restano ammessi)
+        $this->from('/install/database')->post('/install/database/test', ['host' => 'db host; drop'] + $base)
+            ->assertSessionHasErrors('host');
+        $this->from('/install/database')->post('/install/database/test', ['host' => 'mysql://evil'] + $base)
+            ->assertSessionHasErrors('host');
+
+        // Lo step email ha la stessa protezione
+        $this->wizardInCorso();
+        $this->from('/install/email')->post('/install/email', [
+            'driver' => 'smtp', 'from_address' => 'a@b.test', 'from_name' => 'X',
+            'smtp_host' => 'smtp.example.com', 'smtp_port' => 587, 'smtp_password' => "p\nMAIL_MAILER=log",
+        ])->assertSessionHasErrors('smtp_password');
+        $this->from('/install/email')->post('/install/email', [
+            'driver' => 'smtp', 'from_address' => 'a@b.test', 'from_name' => 'X',
+            'smtp_host' => 'smtp host', 'smtp_port' => 587,
+        ])->assertSessionHasErrors('smtp_host');
+    }
+
+    public function test_host_locali_e_di_rete_privata_passano_la_validazione(): void
+    {
+        $this->partialMock(InstallerService::class, function ($mock) {
+            $mock->shouldReceive('testDatabase')->times(4)->andReturn(['ok' => true, 'error' => null, 'tables' => 0, 'installata' => false]);
+        });
+
+        foreach (['localhost', '10.0.0.5', '::1', 'db_1.internal'] as $host) {
+            $this->postJson('/install/database/test', ['host' => $host, 'port' => 3306, 'database' => 'demo', 'username' => 'root'])
+                ->assertOk()->assertJson(['ok' => true]);
+        }
     }
 
     public function test_wizard_in_corso_resta_aperto_solo_al_browser_che_lo_sta_facendo(): void

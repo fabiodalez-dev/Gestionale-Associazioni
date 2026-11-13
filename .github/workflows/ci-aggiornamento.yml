@@ -1,0 +1,90 @@
+name: Aggiornamento
+
+# Il percorso di chi aggiorna davvero: la prima release pubblicata installata
+# su un database vuoto, aggiornata al pacchetto costruito da questo commit
+# (gira l'updater vecchio) e poi alla patch successiva (gira l'updater nuovo,
+# con il sito interrogato durante la manutenzione).
+# Da v0.1.0 passano tutte le migration e il suo updater non si può più
+# correggere: resta il punto di partenza più difficile.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  aggiornamento:
+    name: Da v0.1.0 al pacchetto di questo commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # Legge il codice e scarica il pacchetto di v0.1.0.
+
+    services:
+      database:
+        image: mysql:8.4@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip, pdo_mysql, pdo_sqlite, xml, curl, fileinfo, bcmath
+          tools: composer:v2
+          coverage: none
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Dipendenze bloccate
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Pacchetto di questo commit
+        run: bash bin/build-release.sh
+
+      - name: Pacchetto pubblicato di v0.1.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release download v0.1.0 --pattern 'gestionale-associazioni-v0.1.0.zip' --dir "$RUNNER_TEMP"
+
+      - name: .env per la suite
+        run: |
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: Aggiornamento reale (nessun test saltato)
+        env:
+          INSTALLER_TEST_MYSQL_DSN: mysql://root:root@127.0.0.1:3306/gestione_installer_test
+        run: |
+          versione="$(tr -d '[:space:]' < VERSION)"
+          export UPDATE_E2E_PACCHETTO_DA="$RUNNER_TEMP/gestionale-associazioni-v0.1.0.zip"
+          export UPDATE_E2E_PACCHETTO_A="$PWD/releases/gestionale-associazioni-v$versione.zip"
+          php artisan test --filter=AggiornamentoPacchettiRealiTest --fail-on-skipped
+
+      - name: Rimuovi il .env di CI
+        if: always()
+        run: rm -f .env

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Spatie\PersonalDataExport\ExportsPersonalData;
 use Spatie\PersonalDataExport\PersonalDataSelection;
 
@@ -55,6 +56,22 @@ class Account extends Authenticatable implements ExportsPersonalData, MustVerify
         'password',
         'remember_token',
     ];
+
+    /**
+     * Un cambio di password o di verifica email invalida anche i cookie
+     * "ricordami" già emessi: senza questo, una sessione ripristinata dal cookie
+     * rientrerebbe dopo il cambio e si legherebbe alla credenziale nuova.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $account): void {
+            if ($account->exists
+                && ($account->isDirty('password') || $account->isDirty('email_verified_at'))
+                && ! $account->isDirty('remember_token')) {
+                $account->remember_token = Str::random(60);
+            }
+        });
+    }
 
     protected function casts(): array
     {

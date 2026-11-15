@@ -291,6 +291,25 @@ class AuditRun3Test extends TestCase
         $this->get($base.'/account')->assertRedirect($base.'/login');
     }
 
+    public function test_il_cookie_ricordami_dell_account_non_sopravvive_a_password_e_verifica(): void
+    {
+        $account = Account::factory()->nonVerificato()->create(['associazione_id' => $this->associazione->id]);
+        $account->forceFill(['remember_token' => 'token-emesso-prima'])->save();
+        $this->assertSame('token-emesso-prima', $account->fresh()->remember_token);
+
+        $account->forceFill(['email_verified_at' => now()])->save();
+        $dopoVerifica = $account->fresh()->remember_token;
+        $this->assertNotSame('token-emesso-prima', $dopoVerifica);
+
+        $account->forceFill(['password' => 'Nuova-Password-Sicura-2026!'])->save();
+        $this->assertNotSame($dopoVerifica, $account->fresh()->remember_token);
+
+        // Altri salvataggi non lo toccano
+        $stabile = $account->fresh()->remember_token;
+        $account->forceFill(['nome' => 'Altro'])->save();
+        $this->assertSame($stabile, $account->fresh()->remember_token);
+    }
+
     public function test_la_sessione_di_un_socio_non_sopravvive_alla_nuova_password(): void
     {
         $socio = Socio::factory()->conAccessoAreaSoci()->create([
@@ -305,7 +324,7 @@ class AuditRun3Test extends TestCase
 
     // ── Mail e accessi ──────────────────────────────────────────────
 
-    public function test_il_link_password_dell_area_soci_ha_un_tetto_per_destinatario(): void
+    public function test_il_link_password_dell_area_soci_ha_una_pausa_per_destinatario(): void
     {
         Mail::fake();
         $this->withoutMiddleware(ThrottleRequests::class);
@@ -317,8 +336,16 @@ class AuditRun3Test extends TestCase
             $this->post(route('area-soci.password.email'), ['email' => 'tetto@example.com'])->assertSessionHas('status');
         }
 
-        Mail::assertSent(ImpostaPasswordSocioMail::class, 3);
-        $this->assertNotNull($socio->fresh()->password_reset_token);
+        // Una sola mail nella pausa: gli altri tentativi non rinnovano il token
+        Mail::assertSent(ImpostaPasswordSocioMail::class, 1);
+        $token = $socio->fresh()->password_reset_token;
+        $this->assertNotNull($token);
+
+        // Passata la pausa il titolare può chiederne un altro
+        $this->travel(11)->minutes();
+        $this->post(route('area-soci.password.email'), ['email' => 'tetto@example.com'])->assertSessionHas('status');
+        Mail::assertSent(ImpostaPasswordSocioMail::class, 2);
+        $this->assertNotSame($token, $socio->fresh()->password_reset_token);
     }
 
     public function test_il_limite_di_accessi_staff_conta_insieme_le_varianti_accentate(): void

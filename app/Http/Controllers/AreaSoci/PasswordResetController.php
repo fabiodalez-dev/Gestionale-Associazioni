@@ -20,8 +20,13 @@ use Throwable;
  */
 class PasswordResetController extends Controller
 {
-    /** Link di impostazione password inviabili allo stesso socio in 24 ore. */
-    private const LINK_PER_SOCIO_AL_GIORNO = 3;
+    /**
+     * Pausa tra due link di impostazione password allo stesso socio. Breve di
+     * proposito: chi non è il titolare dell'indirizzo non deve poterlo escludere
+     * a lungo dal recupero, ma non può nemmeno rinnovare di continuo il token
+     * (invalidando il link appena arrivato) né inondare la casella.
+     */
+    private const PAUSA_TRA_LINK_SECONDI = 600;
 
     public function sendLink(RichiestaResetPasswordRequest $request): RedirectResponse
     {
@@ -38,13 +43,13 @@ class PasswordResetController extends Controller
             ->get();
 
         foreach ($soci as $socio) {
-            // Tetto per destinatario: una sola fonte non può tenere sotto
-            // mail un indirizzo altrui né invalidare di continuo il suo link
+            // Pausa per destinatario: nessuna fonte può tenere sotto mail un
+            // indirizzo altrui né invalidare di continuo il link appena inviato
             $chiave = 'area-soci-reset-link:'.$socio->id;
-            if (RateLimiter::tooManyAttempts($chiave, self::LINK_PER_SOCIO_AL_GIORNO)) {
+            if (RateLimiter::tooManyAttempts($chiave, 1)) {
                 continue;
             }
-            RateLimiter::hit($chiave, 86400);
+            RateLimiter::hit($chiave, self::PAUSA_TRA_LINK_SECONDI);
 
             $token = bin2hex(random_bytes(32));
 

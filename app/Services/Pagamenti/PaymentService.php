@@ -286,7 +286,17 @@ class PaymentService
             return EsitoWebhook::OK;
         }
 
-        $esito = $this->elaboraSessioneStripe($event, $config, $associazioneId);
+        try {
+            $esito = $this->elaboraSessioneStripe($event, $config, $associazioneId);
+        } catch (\Throwable $e) {
+            // Eccezione (deadlock, timeout del DB): la chiave non deve restare, altrimenti
+            // il retry di Stripe verrebbe scartato come replay e il pagamento non registrato
+            if ($chiaveDedup !== null) {
+                Cache::forget($chiaveDedup);
+            }
+
+            throw $e;
+        }
 
         if ($esito === EsitoWebhook::FALLITO && $chiaveDedup !== null) {
             // Elaborazione non riuscita: libera la chiave perché il retry di

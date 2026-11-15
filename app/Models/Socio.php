@@ -150,6 +150,13 @@ class Socio extends Authenticatable implements ExportsPersonalData, HasMedia
                 $socio->codice_referral = self::generaCodiceReferral();
             }
         });
+
+        // Eliminazione definitiva: i documenti del fascicolo vanno via con i loro file.
+        // Il cascade del database non emette eventi Eloquent, quindi il file e la riga
+        // media resterebbero senza un record a cui appartengono
+        static::forceDeleting(function (self $socio): void {
+            $socio->documenti()->withoutGlobalScopes()->get()->each->forceDelete();
+        });
     }
 
     /**

@@ -95,6 +95,14 @@ class IscrizioneController extends Controller
             return $this->storeOspite($request, $associazione);
         }
 
+        // Come per l'ospite, chi non ha provato di possedere l'indirizzo non crea
+        // un socio con quell'email: prima va confermata dal link ricevuto
+        if (! $account->hasVerifiedEmail()) {
+            return redirect()
+                ->route('pubblico.verifica-email.avviso', ['associazione' => $associazione->slug])
+                ->withErrors(['iscrizione' => 'Conferma prima il tuo indirizzo email dal link che ti abbiamo inviato, poi invia la richiesta di iscrizione.']);
+        }
+
         try {
             $richiesta = $this->form->salva($account, $request->validated(), $associazione);
         } catch (IscrizioneException $e) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Tessere;
 
+use App\Models\Socio;
 use App\Models\Tessera;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,9 +31,12 @@ class UpdateTesseraRequest extends FormRequest
             'socio_id' => [
                 'required',
                 'uuid',
-                Rule::exists('soci', 'id')
-                    ->where('associazione_id', $associazioneId)
-                    ->whereNull('deleted_at'),
+                // Query Eloquent: applica scope tenant e scope sede (Rule::exists li ignora)
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! Socio::query()->whereKey($value)->exists()) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
             ],
             'numero_tessera' => [
                 'required',

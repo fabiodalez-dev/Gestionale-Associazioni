@@ -5,7 +5,6 @@ namespace App\Http\Requests\SpaziRisorse;
 use App\Models\PrenotazioneSpazio;
 use App\Models\Spazio;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
@@ -31,9 +30,13 @@ class PrenotazioneSpazioRequest extends FormRequest
             'spazio_id' => [
                 'required',
                 'uuid',
-                // Solo spazi del tenant corrente (Rule::exists ignora il global scope)
-                Rule::exists((new Spazio)->getTable(), 'id')
-                    ->where('associazione_id', PrenotazioneSpazio::currentAssociazioneId()),
+                // Solo spazi visibili all'utente: la query Eloquent applica lo scope del
+                // tenant e quello della sede (Rule::exists li ignorerebbe entrambi)
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! Spazio::query()->whereKey($value)->exists()) {
+                        $fail(__('validation.exists', ['attribute' => $attribute]));
+                    }
+                },
             ],
             'titolo' => ['required', 'string', 'max:200'],
             'dal' => ['required', 'date'],

@@ -117,21 +117,30 @@ class AreaRiservataProfiloTest extends TestCase
         Notification::assertSentTo($account, VerificaEmailAccount::class);
     }
 
-    public function test_cambio_email_rifiuta_email_gia_usata_nel_tenant(): void
+    public function test_cambio_email_con_indirizzo_gia_usato_non_lo_rivela_e_non_cambia_l_email(): void
     {
+        Notification::fake();
+
         Account::factory()->create([
             'associazione_id' => $this->associazione->id,
             'email' => 'occupata@example.com',
         ]);
+        $emailPrima = $this->account->email;
 
+        // Stesso esito di un indirizzo libero (nessun errore sul campo), ma l'email resta
+        // quella attuale: l'account torna da verificare e il link parte al suo indirizzo
         $this->actingAs($this->account, 'account')
             ->from($this->urlTenant('account/profilo'))
             ->patch($this->urlTenant('account/profilo/email'), [
                 'email' => 'occupata@example.com',
             ])
-            ->assertSessionHasErrors('email');
+            ->assertSessionHasNoErrors()
+            ->assertRedirect($this->urlTenant('verifica-email'));
 
-        $this->assertNotSame('occupata@example.com', $this->account->fresh()->email);
+        $account = $this->account->fresh();
+        $this->assertSame($emailPrima, $account->email);
+        $this->assertNull($account->email_verified_at);
+        Notification::assertSentTo($account, VerificaEmailAccount::class);
     }
 
     // ── Preferenze ───────────────────────────────────────────────────

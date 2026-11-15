@@ -14,6 +14,7 @@ use App\Models\Socio;
 use App\Models\Tessera;
 use App\Models\Utente;
 use App\Models\Verbale;
+use App\Support\PerimetroSedi;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -128,8 +129,25 @@ class RegistroModificheController extends Controller
      */
     private function scopeTenant(Builder $query, string $tenantId): Builder
     {
-        return $query->where(function (Builder $q) use ($tenantId) {
+        // Staff limitato a una o più sedi: il subject deve essere visibile dalla query
+        // Eloquent del modello (scope tenant e scope sede, anche per i soft-deleted).
+        // Le righe eliminate fisicamente non hanno una sede verificabile: non si mostrano.
+        $limitato = PerimetroSedi::limitato();
+
+        return $query->where(function (Builder $q) use ($tenantId, $limitato) {
             foreach (self::MODELLI as $classe) {
+                if ($limitato) {
+                    $visibili = method_exists($classe, 'withTrashed')
+                        ? $classe::query()->withTrashed()
+                        : $classe::query();
+
+                    $q->orWhere(fn (Builder $w) => $w
+                        ->where('subject_type', $classe)
+                        ->whereIn('subject_id', $visibili->select('id')));
+
+                    continue;
+                }
+
                 $tabella = (new $classe)->getTable();
 
                 $q->orWhere(fn (Builder $w) => $w

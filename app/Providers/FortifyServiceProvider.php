@@ -109,7 +109,8 @@ class FortifyServiceProvider extends ServiceProvider
 
             // Durata del blocco e azzeramento dal super admin: App\Support\LimiteAccessi
             return Limit::perMinutes(LimiteAccessi::minutiBlocco(), max(1, (int) config('auth.login_max_attempts', 5)))
-                ->by(LimiteAccessi::chiave($email.'|'.$request->ip()));
+                // Come il database: le varianti accentate dello stesso indirizzo contano insieme
+                ->by(LimiteAccessi::chiave(Str::transliterate($email.'|'.$request->ip())));
         });
 
         // Rate limiting sulla challenge 2FA: 5 tentativi al minuto per sessione di login

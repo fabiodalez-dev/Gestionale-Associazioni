@@ -1090,16 +1090,25 @@ class Flussi01_AdesioneAccountFlussiTest extends TestCase
         $altra = Associazione::factory()->create(['frontend_pubblico_attivo' => true]);
         Account::factory()->create(['associazione_id' => $altra->id, 'email' => 'libera-altrove@example.com']);
 
+        // Indirizzo già di un altro account: stesso esito di uno libero (nessun
+        // errore che riveli chi è registrato); l'email non cambia ma l'account
+        // torna da verificare e il link parte verso il suo indirizzo attuale
         $this->actingAs($account, 'account')
             ->from($this->url('account/profilo'))
             ->patch($this->url('account/profilo/email'), ['email' => 'occupata@example.com'])
-            ->assertRedirect($this->url('account/profilo'))
-            ->assertSessionHasErrors(['email' => 'Esiste già un account registrato con questo indirizzo email.']);
+            ->assertSessionHasNoErrors()
+            ->assertRedirect($this->url('verifica-email'))
+            ->assertSessionHas('success');
 
         $account->refresh();
         $this->assertSame('prima@example.com', $account->email);
-        $this->assertNotNull($account->email_verified_at);
-        Notification::assertNotSentTo($account, VerificaEmailAccount::class);
+        $this->assertNull($account->email_verified_at);
+        Notification::assertSentToTimes($account, VerificaEmailAccount::class, 1);
+
+        // Verifica avvenuta altrove: la sessione precedente non vale più, se ne apre una nuova
+        $account->forceFill(['email_verified_at' => now()])->save();
+        $this->flushSession();
+        Notification::fake();
 
         $this->actingAs($account, 'account')
             ->patch($this->url('account/profilo/email'), ['email' => 'libera-altrove@example.com'])

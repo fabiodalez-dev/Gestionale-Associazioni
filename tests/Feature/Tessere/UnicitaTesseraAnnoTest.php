@@ -432,12 +432,58 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
     }
 
     /**
-     * Modifica in gara con un'emissione concorrente per un socio fuori dal
-     * perimetro di sede dell'operatore: il doppione va riconosciuto anche se
-     * l'operatore non vede quella tessera (errore su anno_validita, non sul
-     * numero tessera).
+     * Modifica in gara con un'emissione concorrente per un altro socio della
+     * stessa sede: il doppione va riconosciuto con un errore su anno_validita
+     * (non sul numero tessera) anche se la tessera concorrente nasce dopo la
+     * validazione.
      */
-    public function test_modifica_in_gara_con_doppione_fuori_dal_perimetro_di_sede_segnala_l_anno(): void
+    public function test_modifica_in_gara_con_doppione_di_un_altro_socio_segnala_l_anno(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $assoc = Associazione::factory()->create();
+        $padova = Sede::create(['associazione_id' => $assoc->id, 'nome' => 'Padova']);
+
+        $responsabile = Utente::factory()->operatore()->create(['associazione_id' => $assoc->id]);
+        $responsabile->syncRoles(['responsabile_sede']);
+        $responsabile->assegnaSedi([$padova->id]);
+
+        $socioUno = Socio::factory()->create(['associazione_id' => $assoc->id, 'sede_id' => $padova->id]);
+        $socioDue = Socio::factory()->create(['associazione_id' => $assoc->id, 'sede_id' => $padova->id]);
+        $tessera = Tessera::factory()->create([
+            'associazione_id' => $assoc->id,
+            'socio_id' => $socioUno->id,
+            'anno_validita' => 2025,
+            'numero_tessera' => '20250001',
+        ]);
+
+        // Validazione superata: subito dopo un altro flusso emette la
+        // tessera 2026 del secondo socio
+        $this->app->afterResolving(UpdateTesseraRequest::class, function () use ($socioDue): void {
+            $this->inserisciTesseraGrezza($socioDue, 2026, 'V-2026');
+        });
+
+        $this->actingAs($responsabile)->withSession(['associazione_id' => $assoc->id])
+            ->from('/tessere')
+            ->put('/tessere/'.$tessera->id, [
+                'socio_id' => $socioDue->id,
+                'numero_tessera' => '20250001',
+                'anno_validita' => 2026,
+                'data_emissione' => '2026-01-10',
+                'stato' => 'Attiva',
+            ])
+            ->assertRedirect('/tessere')
+            ->assertSessionHasErrors(['anno_validita' => "Il socio ha già una tessera non annullata per l'anno 2026".self::ANCHE_SCADUTA])
+            ->assertSessionDoesntHaveErrors('numero_tessera');
+
+        $this->assertSame($socioUno->id, $tessera->fresh()->socio_id);
+    }
+
+    /**
+     * Riassegnare una tessera a un socio di un'altra sede non è ammesso a chi è
+     * limitato alla propria: il socio non passa la validazione e la tessera non
+     * cambia titolare.
+     */
+    public function test_modifica_non_sposta_la_tessera_su_un_socio_fuori_dal_perimetro_di_sede(): void
     {
         $this->seed(RolesSeeder::class);
         $assoc = Associazione::factory()->create();
@@ -457,12 +503,6 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
             'numero_tessera' => '20250001',
         ]);
 
-        // Validazione superata: subito dopo un altro flusso emette la
-        // tessera 2026 del socio di Vicenza
-        $this->app->afterResolving(UpdateTesseraRequest::class, function () use ($socioVicenza): void {
-            $this->inserisciTesseraGrezza($socioVicenza, 2026, 'V-2026');
-        });
-
         $this->actingAs($responsabile)->withSession(['associazione_id' => $assoc->id])
             ->from('/tessere')
             ->put('/tessere/'.$tessera->id, [
@@ -473,8 +513,7 @@ class UnicitaTesseraAnnoTest extends TessereTestCase
                 'stato' => 'Attiva',
             ])
             ->assertRedirect('/tessere')
-            ->assertSessionHasErrors(['anno_validita' => "Il socio ha già una tessera non annullata per l'anno 2026".self::ANCHE_SCADUTA])
-            ->assertSessionDoesntHaveErrors('numero_tessera');
+            ->assertSessionHasErrors('socio_id');
 
         $this->assertSame($socioPadova->id, $tessera->fresh()->socio_id);
     }

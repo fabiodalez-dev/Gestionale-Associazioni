@@ -9,6 +9,8 @@ use App\Observers\EventoGoogleCalendarObserver;
 use App\Services\Calendario\CalendarioEsterno;
 use App\Services\Calendario\GoogleCalendarSpatie;
 use App\Services\Email\SmtpPinnedTransport;
+use App\Support\LegameSessione;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
@@ -44,6 +46,15 @@ class AppServiceProvider extends ServiceProvider
         // Audit accessi (f.25 piano "Gestione 2"): Login/Failed/Logout
         // di tutte le guard registrati best-effort nella tabella accessi
         Event::subscribe(RegistraAccesso::class);
+
+        // Sessioni di account pubblici e soci legate alla credenziale con cui nascono:
+        // si legano al login, così un cambio di password o di verifica email
+        // chiude anche la sessione di chi non ha mai fatto una richiesta protetta
+        Event::listen(Login::class, function (Login $evento): void {
+            if (in_array($evento->guard, ['account', 'socio'], true) && app()->bound('request') && request()->hasSession()) {
+                LegameSessione::aggiorna(request(), $evento->guard, $evento->user);
+            }
+        });
 
         // Sincronizzazione eventi → Google Calendar (solo associazioni che l'hanno attivata)
         Evento::observe(EventoGoogleCalendarObserver::class);

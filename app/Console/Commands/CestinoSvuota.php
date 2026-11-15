@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Documento;
+use App\Models\DocumentoSocio;
 use App\Models\Evento;
 use App\Models\Socio;
 use App\Models\Verbale;
@@ -30,6 +31,7 @@ class CestinoSvuota extends Command
         'soci' => Socio::class,
         'eventi' => Evento::class,
         'documenti' => Documento::class,
+        'documenti_socio' => DocumentoSocio::class,
         'verbali' => Verbale::class,
     ];
 

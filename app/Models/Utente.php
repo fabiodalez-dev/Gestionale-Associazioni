@@ -149,6 +149,9 @@ class Utente extends Authenticatable
     {
         $this->forceFill(['remember_token' => Str::random(60)])->save();
 
+        // Anche i token API personali: non devono sopravvivere a una revoca
+        $this->tokens()->delete();
+
         $tabella = (string) config('session.table', 'sessions');
         if (config('session.driver') === 'database' && Schema::hasTable($tabella)) {
             DB::table($tabella)->where('user_id', $this->getKey())->delete();

@@ -222,9 +222,12 @@ class TesseraController extends Controller
                 ->toDateString();
         }
 
+        // Il socio passa dalla query Eloquent (scope tenant e sede), come in store()
+        $socio = Socio::query()->findOrFail($dati['socio_id']);
+
         try {
             $tessera->update([
-                'socio_id' => $dati['socio_id'],
+                'socio_id' => $socio->id,
                 'numero_tessera' => $dati['numero_tessera'],
                 'anno_validita' => (int) $dati['anno_validita'],
                 'data_emissione' => $dati['data_emissione'],

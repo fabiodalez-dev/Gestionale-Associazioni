@@ -167,6 +167,18 @@ class AuditRun3Test extends TestCase
         $this->assertNull(Socio::withoutGlobalScopes()->find($b->id)->nucleo_id);
     }
 
+    public function test_un_nucleo_con_un_socio_nel_cestino_si_scioglie_comunque(): void
+    {
+        $nucleo = Nucleo::factory()->create(['associazione_id' => $this->associazione->id]);
+        $this->socio($this->padova, ['nucleo_id' => $nucleo->id]);
+        $cestinato = $this->socio($this->padova, ['nucleo_id' => $nucleo->id]);
+        $cestinato->delete();
+
+        $this->come($this->admin())->delete('/nuclei/'.$nucleo->id)->assertSessionHasNoErrors();
+        $this->assertNull(Nucleo::query()->find($nucleo->id));
+        $this->assertNull(Socio::withTrashed()->find($cestinato->id)->nucleo_id);
+    }
+
     // ── Documenti dei soci ──────────────────────────────────────────
 
     private function documento(Socio $socio): DocumentoSocio

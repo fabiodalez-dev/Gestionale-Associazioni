@@ -6,6 +6,7 @@ import {
     emailUnica,
     fixture,
     loginAccount,
+    nuovaSessione,
     prenota,
     registraAccount,
 } from '../helpers';
@@ -90,8 +91,12 @@ test.describe('Catalogo pubblico e autenticazione account', () => {
         await expect(page).toHaveURL(/verifica-email$/);
         await expect(page.getByRole('heading', { name: /verifica il tuo indirizzo email/i })).toBeVisible();
 
-        // Dopo la verifica via fixture la stessa prenotazione va a buon fine
+        // La verifica avviene altrove (fixture): la sessione aperta prima non vale più
+        // (coperto dai test PHPUnit), si riparte da una sessione nuova e la stessa
+        // prenotazione va a buon fine
         fixture('verifica-account', { email });
+        await nuovaSessione(page);
+        await loginAccount(page, email);
         await prenota(page, evento.evento_id);
         await expect(page.getByText(/prenotazione confermata/i)).toBeVisible();
     });

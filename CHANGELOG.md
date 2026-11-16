@@ -2,7 +2,7 @@
 
 Le modifiche rilevanti di ogni versione. Le versioni precedenti alla 0.3.2 sono descritte nelle [release su GitHub](https://github.com/fabiodalez-dev/Gestionale-Associazioni/releases). Il dettaglio operativo per chi aggiorna è in [docs/AGGIORNAMENTI.md](docs/AGGIORNAMENTI.md).
 
-## [0.3.2] - da rilasciare
+## [0.3.2] - 2026-11-16
 
 Versione di sicurezza: raccoglie le correzioni del terzo audit del codice. Nessuna correzione è critica o alta; due erano di gravità media, le altre basse. Contiene una migration e nessuna nuova variabile di configurazione.
 

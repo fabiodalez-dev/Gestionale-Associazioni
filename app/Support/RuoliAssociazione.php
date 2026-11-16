@@ -48,7 +48,7 @@ final class RuoliAssociazione
         'operatore' => ['label' => 'Operatore', 'descrizione' => 'Gestione operativa quotidiana: soci, tessere, quote, eventi, verbali e scadenze.'],
         'presidente' => ['label' => 'Presidente', 'descrizione' => 'Visione completa e gestione di tutte le attività, configurazione inclusa (senza chiavi API).'],
         'vicepresidente' => ['label' => 'Vicepresidente', 'descrizione' => 'Come il presidente, ma senza eliminare dati.'],
-        'segretario' => ['label' => 'Segretario', 'descrizione' => 'Anagrafica, iscrizioni, tessere, verbali, riunioni, documenti e comunicazioni.'],
+        'segretario' => ['label' => 'Segretario', 'descrizione' => 'Anagrafica, iscrizioni con incasso allo sportello, tessere, verbali, riunioni, documenti e comunicazioni.'],
         'tesoriere' => ['label' => 'Tesoriere', 'descrizione' => 'Quote, prima nota, donazioni e rendiconti dei progetti; soci in sola lettura.'],
         'consigliere' => ['label' => 'Consigliere', 'descrizione' => 'Consultazione di tutte le attività dell\'associazione, senza modifiche.'],
         'responsabile_sede' => ['label' => 'Responsabile di sede', 'descrizione' => 'Soci, tessere, quote, eventi, volontari e spazi della propria sede; prima nota in inserimento. Va assegnato insieme alle sedi.'],
@@ -84,7 +84,10 @@ final class RuoliAssociazione
             'presidente' => $presidente,
             'vicepresidente' => array_map(fn (string $a) => str_replace('d', '', $a), $presidente),
             'segretario' => [
-                'soci' => 'vcud', 'iscrizioni' => 'vcud', 'tessere' => 'vcud', 'quote' => 'v',
+                'soci' => 'vcud', 'iscrizioni' => 'vcud', 'tessere' => 'vcud',
+                // Quote in modifica: incassa allo sportello confermando il
+                // pagamento delle pre-iscrizioni (richiede quote.update)
+                'quote' => 'vu',
                 'eventi' => 'vcu', 'volontari' => 'v', 'spazi' => 'v', 'progetti' => 'v',
                 'riunioni' => 'vcud', 'proposte' => 'vcud', 'verbali' => 'vcud', 'documenti' => 'vcud', 'manuale' => 'vcud', 'scadenze' => 'vcud',
                 'email' => 'vcu', 'comunicazione' => 'vcud', 'relazioni' => 'vcu', 'struttura' => 'v',

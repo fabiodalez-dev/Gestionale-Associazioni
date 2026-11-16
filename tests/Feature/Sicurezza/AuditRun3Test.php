@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 use Srmklive\PayPal\Services\PayPal as PayPalClient;
 use Tests\TestCase;
 
@@ -521,16 +522,21 @@ class AuditRun3Test extends TestCase
     {
         $socio = $this->socio(null, ['stato' => Socio::STATO_IN_ATTESA_DI_PAGAMENTO]);
         $dati = ['importo' => '25.00', 'metodo' => 'contanti', 'data_pagamento' => now()->toDateString()];
+        $lista = '/soci?status=pending';
 
-        // Segretario: anagrafica e iscrizioni sì, quote in sola lettura
-        $segretario = $this->staff(['segretario']);
-        $this->come($segretario)->get('/soci')->assertOk()->assertDontSee(route('soci.conferma-pagamento', $socio));
-        $this->come($segretario)->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertForbidden();
+        // Ruolo personalizzato con le sole anagrafiche: niente quote pagate
+        Role::findOrCreate('anagrafe', 'web')->syncPermissions(['soci.view', 'soci.update']);
+        $anagrafe = $this->staff(['anagrafe']);
+        $this->come($anagrafe)->get($lista)->assertOk()->assertSee($socio->cognome)->assertDontSee(route('soci.conferma-pagamento', $socio));
+        $this->come($anagrafe)->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertForbidden();
         $this->assertSame(Socio::STATO_IN_ATTESA_DI_PAGAMENTO, $socio->fresh()->stato);
         $this->assertSame(0, $socio->quote()->count());
 
+        // Il Segretario predefinito incassa allo sportello come prima
         $this->nuovaRichiesta();
-        $this->come($this->admin())->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertSessionHas('success');
+        $segretario = $this->staff(['segretario']);
+        $this->come($segretario)->get($lista)->assertOk()->assertSee(route('soci.conferma-pagamento', $socio));
+        $this->come($segretario)->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertSessionHas('success');
         $this->assertSame(Socio::STATO_ATTIVO, $socio->fresh()->stato);
         $this->assertSame(1, $socio->quote()->count());
     }

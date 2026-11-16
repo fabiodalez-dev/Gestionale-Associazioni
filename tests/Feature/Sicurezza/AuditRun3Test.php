@@ -8,21 +8,29 @@ use App\Models\Account;
 use App\Models\Associazione;
 use App\Models\DocumentoSocio;
 use App\Models\Nucleo;
+use App\Models\PaymentGatewaySetting;
 use App\Models\PrenotazioneSpazio;
 use App\Models\RichiestaIscrizione;
 use App\Models\Sede;
+use App\Models\SmtpSetting;
 use App\Models\Socio;
 use App\Models\Spazio;
+use App\Models\Tessera;
 use App\Models\Utente;
 use App\Notifications\Piattaforma\TentativiAccessoFallitiNotification;
+use App\Services\Email\TenantNotificationMailer;
+use App\Services\Pagamenti\Gateways\PayPalGateway;
+use App\Services\Tessere\TesseraQrService;
 use App\Support\TestoMarkdown;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Srmklive\PayPal\Services\PayPal as PayPalClient;
 use Tests\TestCase;
 
 /**
@@ -404,5 +412,105 @@ class AuditRun3Test extends TestCase
 
         $this->assertSame(0, RichiestaIscrizione::withoutGlobalScopes()->count());
         $this->assertDatabaseMissing('soci', ['email' => $account->email]);
+    }
+
+    // ── Tessere ─────────────────────────────────────────────────────
+
+    public function test_la_tessera_di_un_socio_non_piu_attivo_non_risulta_valida(): void
+    {
+        $socio = $this->socio();
+        $tessera = Tessera::factory()->create([
+            'socio_id' => $socio->id,
+            'associazione_id' => $this->associazione->id,
+        ]);
+        $qr = app(TesseraQrService::class);
+        $json = route('tessere.verifica.json', ['tessera' => $tessera->id, 'signature' => $qr->signature($tessera->id)]);
+
+        $this->getJson($json)->assertOk()->assertJsonPath('stato', 'valida');
+
+        // Stato cambiato dalla scheda, senza cessazione: la tessera resta Attiva sul DB
+        $socio->forceFill(['stato' => Socio::STATO_RADIATO])->save();
+        $this->assertSame(Tessera::STATO_ATTIVA, $tessera->fresh()->stato);
+
+        $this->getJson($json)->assertOk()
+            ->assertJsonPath('stato', 'scaduta')
+            ->assertJsonPath('tessera.stato_tessera', 'Socio non attivo');
+
+        $this->get($qr->verificationUrl($tessera))->assertOk()
+            ->assertSee('Tessera Scaduta / Non Attiva')
+            ->assertSee('Socio non attivo')
+            ->assertDontSee('Radiato');
+    }
+
+    // ── Voci da validare chiuse in codice ───────────────────────────
+
+    public function test_il_mailer_del_tenant_in_un_worker_acceso_segue_l_smtp_aggiornato(): void
+    {
+        $settings = SmtpSetting::create([
+            'associazione_id' => $this->associazione->id,
+            'smtp_host' => 'smtp.primo.test',
+            'smtp_port' => 587,
+            'smtp_user' => 'posta',
+            'smtp_pass_encrypted' => 'segretissima',
+            'smtp_encryption' => 'tls',
+            'from_email' => 'noreply@audit.test',
+            'from_name' => 'Audit',
+            'max_per_hour' => 100,
+        ]);
+        $nome = 'tenant-'.$this->associazione->id;
+
+        TenantNotificationMailer::applica(new MailMessage, $this->associazione->fresh());
+        $primo = Mail::mailer($nome);
+
+        // Stessa configurazione: il mailer già costruito resta quello
+        TenantNotificationMailer::applica(new MailMessage, $this->associazione->fresh());
+        $this->assertSame($primo, Mail::mailer($nome));
+
+        // SMTP cambiato nello stesso processo: il mailer va ricostruito
+        $settings->forceFill(['smtp_host' => 'smtp.secondo.test'])->save();
+        TenantNotificationMailer::applica(new MailMessage, $this->associazione->fresh());
+        $secondo = Mail::mailer($nome);
+
+        $this->assertNotSame($primo, $secondo);
+        $this->assertStringContainsString('smtp.secondo.test', (string) $secondo->getSymfonyTransport());
+    }
+
+    public function test_un_webhook_paypal_senza_header_di_firma_non_chiama_paypal(): void
+    {
+        $config = PaymentGatewaySetting::forceCreate([
+            'associazione_id' => $this->associazione->id,
+            'paypal_enabled' => true,
+            'paypal_client_id' => 'client',
+            'paypal_client_secret_encrypted' => 'segreto',
+            'paypal_webhook_id' => 'WH-123',
+        ]);
+
+        $gateway = new class extends PayPalGateway
+        {
+            public int $chiamate = 0;
+
+            protected function provider(PaymentGatewaySetting $config): PayPalClient
+            {
+                $this->chiamate++;
+
+                throw new \RuntimeException('nessuna chiamata a PayPal attesa');
+            }
+        };
+
+        $headerCompleti = [
+            'paypal-auth-algo' => 'SHA256withRSA',
+            'paypal-cert-url' => 'https://api.paypal.com/cert',
+            'paypal-transmission-id' => 'id',
+            'paypal-transmission-sig' => 'firma',
+            'paypal-transmission-time' => '2026-11-15T10:00:00Z',
+        ];
+
+        $this->assertFalse($gateway->verifyWebhookSignature($config, [], ['event_type' => 'CHECKOUT.ORDER.APPROVED']));
+        $this->assertFalse($gateway->verifyWebhookSignature($config, array_merge($headerCompleti, ['paypal-transmission-sig' => '']), []));
+        $this->assertSame(0, $gateway->chiamate);
+
+        // Con tutti gli header si arriva alla verifica (qui il client fallisce: false, fail closed)
+        $this->assertFalse($gateway->verifyWebhookSignature($config, $headerCompleti, []));
+        $this->assertSame(1, $gateway->chiamate);
     }
 }

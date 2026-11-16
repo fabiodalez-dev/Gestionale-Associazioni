@@ -55,7 +55,7 @@
                             <p><strong>Socio:</strong> {{ $tessera->socio?->nome }} {{ $tessera->socio?->cognome }}</p>
                             <p><strong>N. Tessera:</strong> {{ $tessera->numero_tessera }}</p>
                             <p><strong>Scadenza:</strong> {{ $tessera->data_scadenza?->format('d/m/Y') }}</p>
-                            <p><strong>Stato:</strong> {{ $tessera->stato }}</p>
+                            <p><strong>Stato:</strong> {{ \App\Http\Controllers\Tessere\VerificaTesseraController::statoMostrato($stato, $tessera) }}</p>
                         </div>
                     @endif
 

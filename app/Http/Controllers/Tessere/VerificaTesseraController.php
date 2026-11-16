@@ -97,7 +97,23 @@ class VerificaTesseraController extends Controller
             return ['not_found', null];
         }
 
-        return [$tessera->isValida() ? 'valida' : 'scaduta', $tessera];
+        // Valida solo se lo è la tessera e il socio è ancora attivo: chi viene
+        // messo a Radiato, Deceduto, Trasferito o Sospeso dalla scheda o
+        // dall'azione massiva (senza passare dalla cessazione, che annulla le
+        // tessere) non deve risultare in regola a chi verifica il QR.
+        $valida = $tessera->isValida() && $tessera->socio?->isAttivo() === true;
+
+        return [$valida ? 'valida' : 'scaduta', $tessera];
+    }
+
+    /**
+     * Stato da mostrare a chi verifica: una tessera ancora Attiva di un socio
+     * non più attivo appare come "Socio non attivo", senza dire il motivo
+     * (radiazione, decesso, trasferimento) a un pubblico anonimo.
+     */
+    public static function statoMostrato(string $stato, Tessera $tessera): string
+    {
+        return $stato === 'scaduta' && $tessera->isValida() ? 'Socio non attivo' : (string) $tessera->stato;
     }
 
     private function jsonResponse(string $stato, ?Tessera $tessera): JsonResponse
@@ -109,7 +125,7 @@ class VerificaTesseraController extends Controller
                 'numero_tessera' => $tessera->numero_tessera,
                 'anno_validita' => $tessera->anno_validita,
                 'data_scadenza' => $tessera->data_scadenza->toDateString(),
-                'stato_tessera' => $tessera->stato,
+                'stato_tessera' => self::statoMostrato($stato, $tessera),
                 'socio_nome' => $tessera->socio?->nome,
                 'socio_cognome' => $tessera->socio?->cognome,
                 'associazione_nome' => $tessera->associazione?->nome,

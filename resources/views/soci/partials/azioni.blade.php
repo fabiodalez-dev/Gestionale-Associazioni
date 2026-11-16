@@ -14,6 +14,7 @@
         </button>
     </form>
 @elseif ($socio->stato === \App\Models\Socio::STATO_IN_ATTESA_DI_PAGAMENTO)
+    @can('quote.update')
     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal"
             data-bs-target="#confermaPagamentoModal"
             data-socio-id="{{ $socio->id }}"
@@ -22,6 +23,7 @@
             data-action="{{ route('soci.conferma-pagamento', $socio) }}">
         <i class="bi bi-cash-coin"></i> Conferma pagamento
     </button>
+    @endcan
     <form method="POST" action="{{ route('soci.rifiuta', $socio) }}" class="d-inline"
           data-conferma="Rifiutare ed eliminare definitivamente questa pre-iscrizione?">
         @csrf

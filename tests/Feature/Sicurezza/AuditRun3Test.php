@@ -27,9 +27,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Srmklive\PayPal\Services\PayPal as PayPalClient;
 use Tests\TestCase;
 
@@ -512,5 +515,56 @@ class AuditRun3Test extends TestCase
         // Con tutti gli header si arriva alla verifica (qui il client fallisce: false, fail closed)
         $this->assertFalse($gateway->verifyWebhookSignature($config, $headerCompleti, []));
         $this->assertSame(1, $gateway->chiamate);
+    }
+
+    public function test_confermare_il_pagamento_di_una_pre_iscrizione_richiede_i_permessi_sulle_quote(): void
+    {
+        $socio = $this->socio(null, ['stato' => Socio::STATO_IN_ATTESA_DI_PAGAMENTO]);
+        $dati = ['importo' => '25.00', 'metodo' => 'contanti', 'data_pagamento' => now()->toDateString()];
+
+        // Segretario: anagrafica e iscrizioni sì, quote in sola lettura
+        $segretario = $this->staff(['segretario']);
+        $this->come($segretario)->get('/soci')->assertOk()->assertDontSee(route('soci.conferma-pagamento', $socio));
+        $this->come($segretario)->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertForbidden();
+        $this->assertSame(Socio::STATO_IN_ATTESA_DI_PAGAMENTO, $socio->fresh()->stato);
+        $this->assertSame(0, $socio->quote()->count());
+
+        $this->nuovaRichiesta();
+        $this->come($this->admin())->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertSessionHas('success');
+        $this->assertSame(Socio::STATO_ATTIVO, $socio->fresh()->stato);
+        $this->assertSame(1, $socio->quote()->count());
+    }
+
+    public function test_le_chiavi_api_globali_preesistenti_vengono_sospese_dall_aggiornamento(): void
+    {
+        $path = ['--path' => base_path('database/migrations/2026_11_16_100000_sospendi_chiavi_api_globali_preesistenti.php'), '--realpath' => true, '--force' => true];
+        $this->assertSame(0, Artisan::call('migrate:rollback', $path), Artisan::output());
+
+        $inserisci = function (?string $associazioneId, bool $globale, string $chiaro): string {
+            $id = (string) Str::uuid();
+            DB::table('api_keys')->insert([
+                'id' => $id, 'associazione_id' => $associazioneId, 'globale' => $globale,
+                'api_key_hash' => hash('sha256', $chiaro), 'api_key_prefix' => substr($chiaro, 0, 8),
+                'nome' => 'Chiave '.$chiaro[0], 'permessi' => json_encode(['*']), 'attiva' => true,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return $id;
+        };
+        $chiaroGlobale = str_repeat('d4', 32);
+        $globale = $inserisci(null, true, $chiaroGlobale);
+        $scopata = $inserisci($this->associazione->id, false, str_repeat('e5', 32));
+
+        $this->getJson('/api/v1/associazioni', ['Authorization' => 'Bearer '.$chiaroGlobale])->assertOk();
+
+        $this->assertSame(0, Artisan::call('migrate', $path), Artisan::output());
+
+        $this->assertFalse((bool) DB::table('api_keys')->where('id', $globale)->value('attiva'));
+        $this->assertTrue((bool) DB::table('api_keys')->where('id', $scopata)->value('attiva'));
+        $this->getJson('/api/v1/associazioni', ['Authorization' => 'Bearer '.$chiaroGlobale])->assertForbidden();
+
+        // Il super admin la riattiva dalla pagina Chiavi API dopo averla riconosciuta
+        DB::table('api_keys')->where('id', $globale)->update(['attiva' => true]);
+        $this->getJson('/api/v1/associazioni', ['Authorization' => 'Bearer '.$chiaroGlobale])->assertOk();
     }
 }

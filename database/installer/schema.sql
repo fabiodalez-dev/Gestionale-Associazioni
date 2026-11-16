@@ -2532,6 +2532,7 @@ INSERT INTO `migrations` (`migration`, `batch`) VALUES
 ('2026_11_13_120000_backfill_expires_at_personal_access_tokens', 1),
 ('2026_11_13_130000_add_cariche_confermate_at_to_elezioni_table', 1),
 ('2026_11_13_140500_add_globale_to_api_keys_table', 1),
-('2026_11_13_150000_create_iscrizioni_da_confermare_table', 1);
+('2026_11_13_150000_create_iscrizioni_da_confermare_table', 1),
+('2026_11_16_100000_sospendi_chiavi_api_globali_preesistenti', 1);
 
 SET FOREIGN_KEY_CHECKS = 1;

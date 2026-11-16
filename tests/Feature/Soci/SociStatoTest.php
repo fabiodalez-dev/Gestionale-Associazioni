@@ -6,6 +6,7 @@ use App\Models\Associazione;
 use App\Models\Quota;
 use App\Models\Socio;
 use App\Models\Utente;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,10 +22,14 @@ class SociStatoTest extends TestCase
     {
         parent::setUp();
 
+        // Ruoli e permessi come in un'installazione reale: la conferma
+        // pagamento controlla anche quote.update, senza fallback per ruolo
+        $this->seed(RolesSeeder::class);
         $this->associazione = Associazione::factory()->create();
         $this->admin = Utente::factory()->adminAssociazione()->create([
             'associazione_id' => $this->associazione->id,
         ]);
+        $this->admin->assignRole('admin_associazione');
     }
 
     public function test_approvazione_pre_iscrizione(): void

@@ -578,4 +578,18 @@ class AuditRun3Test extends TestCase
         DB::table('api_keys')->where('id', $globale)->update(['attiva' => true]);
         $this->getJson('/api/v1/associazioni', ['Authorization' => 'Bearer '.$chiaroGlobale])->assertOk();
     }
+
+    public function test_matrice_ruoli_del_super_admin_ignora_i_permessi_speciali(): void
+    {
+        $this->seed(RolesSeeder::class);
+        $super = Utente::factory()->create(['ruolo' => Utente::RUOLO_SUPER_ADMIN, 'associazione_id' => null]);
+        $super->assignRole(Utente::RUOLO_SUPER_ADMIN);
+        auth()->forgetGuards();
+        auth()->shouldUse('web');
+
+        $risposta = $this->actingAs($super)->get(route('associazioni.index'))->assertOk();
+
+        // "iscrizioni.incasso" non è un'azione della griglia: l'admin resta "Completo"
+        $this->assertSame('Completo', $risposta->viewData('matrice')['iscrizioni']['admin_associazione']);
+    }
 }

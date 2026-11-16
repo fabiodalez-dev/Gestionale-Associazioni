@@ -3,6 +3,7 @@
 namespace App\Http\Middleware\FrontendPubblico;
 
 use App\Models\Associazione;
+use App\Support\LegameSessione;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -41,5 +42,23 @@ class AutenticaAccount extends Authenticate
         }
 
         return is_string($associazione) ? $associazione : null;
+    }
+
+    /**
+     * Oltre all'autenticazione, la sessione deve essere ancora legata alla
+     * credenziale con cui è nata (password ed email verificata).
+     *
+     * @param  Request  $request
+     * @param  array<int, string>  $guards
+     */
+    protected function authenticate($request, array $guards): void
+    {
+        parent::authenticate($request, $guards);
+
+        if (! LegameSessione::valida($request, 'account')) {
+            LegameSessione::chiudi($request, 'account');
+
+            $this->unauthenticated($request, ['account']);
+        }
     }
 }

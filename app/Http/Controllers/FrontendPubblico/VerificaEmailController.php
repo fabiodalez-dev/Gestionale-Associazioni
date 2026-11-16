@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Associazione;
 use App\Notifications\Accounts\BenvenutoAccount;
+use App\Support\LegameSessione;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,6 +62,10 @@ class VerificaEmailController extends Controller
         }
 
         if (Auth::guard('account')->id() === $account->id) {
+            // Chi verifica da una sessione propria la mantiene; le altre sessioni
+            // aperte prima della verifica si chiudono
+            LegameSessione::aggiorna($request, 'account', $account);
+
             return redirect()
                 ->route('pubblico.home.show', $associazione->slug)
                 ->with('success', 'Email verificata con successo!');

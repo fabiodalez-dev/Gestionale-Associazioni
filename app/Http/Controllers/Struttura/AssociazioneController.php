@@ -75,7 +75,10 @@ class AssociazioneController extends Controller
         foreach ($ruoliMatrice as $ruolo) {
             $permessi = RuoliAssociazione::permessi($ruolo);
             foreach (array_keys($moduli) as $modulo) {
-                $azioni = array_map(fn ($p) => substr($p, strlen($modulo) + 1), array_filter($permessi, fn ($p) => str_starts_with($p, $modulo.'.')));
+                $azioni = array_values(array_intersect(
+                    array_map(fn ($p) => substr($p, strlen($modulo) + 1), array_filter($permessi, fn ($p) => str_starts_with($p, $modulo.'.'))),
+                    array_keys(RuoliAssociazione::AZIONI),
+                ));
                 $matrice[$modulo][$ruolo] = match (true) {
                     $azioni === [] => null,
                     count($azioni) === 4 => 'Completo',

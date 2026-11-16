@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Piattaforma;
 
+use App\Support\TestoMarkdown;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -38,11 +39,14 @@ class TentativiAccessoFallitiNotification extends Notification implements Should
 
     public function toMail(object $notifiable): MailMessage
     {
+        // L'email è quella digitata da chi ha provato ad accedere: non va letta come Markdown
+        $email = TestoMarkdown::neutralizza($this->email);
+
         $message = (new MailMessage)
             ->error()
             ->subject("Allarme sicurezza: {$this->tentativi} accessi falliti per {$this->email}")
             ->greeting('Attenzione!')
-            ->line("Sono stati registrati {$this->tentativi} tentativi di accesso falliti negli ultimi {$this->finestraMinuti} minuti per l'email {$this->email}.")
+            ->line("Sono stati registrati {$this->tentativi} tentativi di accesso falliti negli ultimi {$this->finestraMinuti} minuti per l'email {$email}.")
             ->line('Area interessata: '.(['web' => 'pannello admin', 'socio' => 'area soci', 'account' => 'frontend pubblico'][$this->guard] ?? $this->guard)
                 .($this->ip !== null ? " — ultimo IP: {$this->ip}." : '.'))
             ->line('Se l\'attività non è riconducibile a un utente legittimo, valuta di verificare l\'account interessato e l\'audit completo degli accessi.');

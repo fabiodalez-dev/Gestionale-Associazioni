@@ -14,6 +14,15 @@ use Srmklive\PayPal\Services\PayPal as PayPalClient;
  */
 class PayPalGateway implements PayPalGatewayInterface
 {
+    /** Header di firma che PayPal invia con ogni webhook (chiavi in minuscolo). */
+    private const HEADER_FIRMA = [
+        'paypal-auth-algo',
+        'paypal-cert-url',
+        'paypal-transmission-id',
+        'paypal-transmission-sig',
+        'paypal-transmission-time',
+    ];
+
     public function createOrder(
         PaymentGatewaySetting $config,
         Pagabile $pagabile,
@@ -137,15 +146,31 @@ class PayPalGateway implements PayPalGatewayInterface
             return false;
         }
 
+        // Un webhook vero di PayPal porta sempre tutti gli header di firma:
+        // senza, la verifica fallirebbe comunque, e si risparmiano la
+        // richiesta del token OAuth e quella di verifica con le credenziali
+        // del tenant (una POST anonima non deve costare due chiamate a PayPal)
+        $firma = [];
+
+        foreach (self::HEADER_FIRMA as $header) {
+            $valore = $headers[$header] ?? null;
+
+            if (! is_string($valore) || trim($valore) === '') {
+                return false;
+            }
+
+            $firma[$header] = $valore;
+        }
+
         try {
             $provider = $this->provider($config);
 
             $response = $provider->verifyWebHook([
-                'auth_algo' => $headers['paypal-auth-algo'] ?? '',
-                'cert_url' => $headers['paypal-cert-url'] ?? '',
-                'transmission_id' => $headers['paypal-transmission-id'] ?? '',
-                'transmission_sig' => $headers['paypal-transmission-sig'] ?? '',
-                'transmission_time' => $headers['paypal-transmission-time'] ?? '',
+                'auth_algo' => $firma['paypal-auth-algo'],
+                'cert_url' => $firma['paypal-cert-url'],
+                'transmission_id' => $firma['paypal-transmission-id'],
+                'transmission_sig' => $firma['paypal-transmission-sig'],
+                'transmission_time' => $firma['paypal-transmission-time'],
                 'webhook_id' => $config->paypal_webhook_id,
                 'webhook_event' => $event,
             ]);

@@ -7,6 +7,7 @@ use App\Models\SmtpSetting;
 use App\Models\Socio;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 use Throwable;
 
@@ -56,7 +57,16 @@ class TenantNotificationMailer
         $nome = 'tenant-'.$associazione->id;
 
         try {
-            config(["mail.mailers.{$nome}" => TenantMailer::mailerConfig($settings)]);
+            $nuova = TenantMailer::mailerConfig($settings);
+
+            // Il MailManager tiene in memoria il mailer già costruito per nome:
+            // in un worker di coda che resta acceso, un SMTP cambiato (credenziali
+            // ruotate, host nuovo o non più ammesso) verrebbe ignorato fino al
+            // riavvio. Se la configurazione è cambiata si butta il mailer vecchio.
+            if (config("mail.mailers.{$nome}") !== $nuova) {
+                config(["mail.mailers.{$nome}" => $nuova]);
+                Mail::purge($nome);
+            }
         } catch (InvalidArgumentException $e) {
             // Host SMTP del tenant non ammesso (locale/privato non in allowlist,
             // non risolvibile): si ripiega sul mailer di default invece di far

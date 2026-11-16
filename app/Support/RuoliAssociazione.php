@@ -43,12 +43,31 @@ final class RuoliAssociazione
         'api' => 'Chiavi API',
     ];
 
+    /**
+     * Permessi puntuali fuori dalla griglia modulo × azione, con l'etichetta
+     * mostrata nella pagina "Ruoli e permessi".
+     */
+    public const PERMESSI_SPECIALI = [
+        // Conferma pagamento di una pre-iscrizione: crea quota pagata, ricevuta
+        // e movimento di prima nota senza dare la modifica delle quote esistenti
+        'iscrizioni.incasso' => 'Incasso allo sportello delle pre-iscrizioni',
+    ];
+
+    /**
+     * Ruoli che hanno ciascun permesso speciale (super admin e admin li hanno tutti).
+     *
+     * @var array<string, list<string>>
+     */
+    private const RUOLI_PERMESSI_SPECIALI = [
+        'iscrizioni.incasso' => ['operatore', 'presidente', 'vicepresidente', 'segretario', 'tesoriere', 'responsabile_sede'],
+    ];
+
     /** Ruoli assegnabili agli utenti staff dalla pagina "Ruoli e permessi" */
     public const RUOLI_STAFF = [
         'operatore' => ['label' => 'Operatore', 'descrizione' => 'Gestione operativa quotidiana: soci, tessere, quote, eventi, verbali e scadenze.'],
         'presidente' => ['label' => 'Presidente', 'descrizione' => 'Visione completa e gestione di tutte le attività, configurazione inclusa (senza chiavi API).'],
         'vicepresidente' => ['label' => 'Vicepresidente', 'descrizione' => 'Come il presidente, ma senza eliminare dati.'],
-        'segretario' => ['label' => 'Segretario', 'descrizione' => 'Anagrafica, iscrizioni, tessere, verbali, riunioni, documenti e comunicazioni.'],
+        'segretario' => ['label' => 'Segretario', 'descrizione' => 'Anagrafica, iscrizioni con incasso allo sportello, tessere, verbali, riunioni, documenti e comunicazioni.'],
         'tesoriere' => ['label' => 'Tesoriere', 'descrizione' => 'Quote, prima nota, donazioni e rendiconti dei progetti; soci in sola lettura.'],
         'consigliere' => ['label' => 'Consigliere', 'descrizione' => 'Consultazione di tutte le attività dell\'associazione, senza modifiche.'],
         'responsabile_sede' => ['label' => 'Responsabile di sede', 'descrizione' => 'Soci, tessere, quote, eventi, volontari e spazi della propria sede; prima nota in inserimento. Va assegnato insieme alle sedi.'],
@@ -121,7 +140,7 @@ final class RuoliAssociazione
             }
         }
 
-        return $permessi;
+        return [...$permessi, ...array_keys(self::PERMESSI_SPECIALI)];
     }
 
     /**
@@ -144,6 +163,12 @@ final class RuoliAssociazione
         foreach (self::matrice()[$ruolo] ?? [] as $modulo => $azioni) {
             foreach (str_split($azioni) as $lettera) {
                 $permessi[] = "{$modulo}.{$lettere[$lettera]}";
+            }
+        }
+
+        foreach (self::RUOLI_PERMESSI_SPECIALI as $permesso => $ruoli) {
+            if (in_array($ruolo, ['super_admin', 'admin_associazione', ...$ruoli], true)) {
+                $permessi[] = $permesso;
             }
         }
 

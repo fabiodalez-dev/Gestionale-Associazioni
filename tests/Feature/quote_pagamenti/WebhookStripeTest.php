@@ -381,6 +381,29 @@ class WebhookStripeTest extends TestCase
         $this->assertTrue($quota->fresh()->isPagata());
     }
 
+    public function test_eccezione_durante_l_elaborazione_libera_la_chiave_e_il_retry_viene_elaborato(): void
+    {
+        $socio = $this->creaSocio();
+        $quota = $this->creaQuota($socio);
+        $this->configuraStripe();
+        $this->mockFirmaValida();
+
+        // Il primo tentativo incontra un errore transitorio (es. deadlock) durante il salvataggio
+        $tentativi = 0;
+        Quota::updating(function () use (&$tentativi): void {
+            if ($tentativi++ === 0) {
+                throw new \RuntimeException('deadlock simulato');
+            }
+        });
+
+        $this->inviaStripe($this->stripePayloadCon($quota, [], ['id' => 'evt_eccezione']))->assertStatus(500);
+        $this->assertFalse($quota->fresh()->isPagata());
+
+        // Il retry di Stripe con lo stesso id evento non è scartato come replay
+        $this->inviaStripe($this->stripePayloadCon($quota, [], ['id' => 'evt_eccezione']))->assertOk()->assertJson(['status' => 'ok']);
+        $this->assertTrue($quota->fresh()->isPagata());
+    }
+
     public function test_livemode_incoerente_con_la_chiave_di_test_viene_ignorato(): void
     {
         $socio = $this->creaSocio();

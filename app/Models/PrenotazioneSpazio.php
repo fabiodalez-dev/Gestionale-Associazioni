@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAssociazione;
 use App\Models\Concerns\HasDefaultActivityLog;
+use App\Models\Concerns\NelPerimetroSedeTramite;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,13 @@ class PrenotazioneSpazio extends Model
     use HasDefaultActivityLog;
     use HasFactory;
     use HasUuids;
+    use NelPerimetroSedeTramite;
+
+    /**
+     * Il perimetro per sede passa dallo spazio prenotato: lo scope dello spazio
+     * lascia visibili anche quelli di tutta l'associazione (sede vuota).
+     */
+    public const PERIMETRO_TRAMITE = 'spazio';
 
     protected $table = 'prenotazioni_spazi';
 

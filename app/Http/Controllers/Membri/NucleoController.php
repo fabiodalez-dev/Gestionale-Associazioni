@@ -110,6 +110,15 @@ class NucleoController extends Controller
 
         $nome = $nucleo->nome;
 
+        // Un utente limitato a certe sedi non può sganciare soci di altre sedi:
+        // se il nucleo ne contiene, lo scioglie solo chi vede tutte le sedi
+        // Entrambi i conteggi includono il cestino: devono differire solo per lo scope sede
+        $tutti = Socio::withTrashed()->withoutGlobalScope('sede')->where('nucleo_id', $nucleo->id)->count();
+        $visibili = Socio::withTrashed()->where('nucleo_id', $nucleo->id)->count();
+        if ($tutti !== $visibili) {
+            return back()->withErrors(['nucleo' => 'Il nucleo comprende soci di altre sedi: non puoi scioglierlo.']);
+        }
+
         Socio::withoutGlobalScopes()
             ->where('nucleo_id', $nucleo->id)
             ->update(['nucleo_id' => null]);

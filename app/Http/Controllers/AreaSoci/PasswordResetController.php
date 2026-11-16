@@ -9,6 +9,7 @@ use App\Mail\AreaSoci\ImpostaPasswordSocioMail;
 use App\Models\Socio;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
 /**
@@ -19,6 +20,14 @@ use Throwable;
  */
 class PasswordResetController extends Controller
 {
+    /**
+     * Pausa tra due link di impostazione password allo stesso socio. Breve di
+     * proposito: chi non è il titolare dell'indirizzo non deve poterlo escludere
+     * a lungo dal recupero, ma non può nemmeno rinnovare di continuo il token
+     * (invalidando il link appena arrivato) né inondare la casella.
+     */
+    private const PAUSA_TRA_LINK_SECONDI = 600;
+
     public function sendLink(RichiestaResetPasswordRequest $request): RedirectResponse
     {
         // La stessa email può essere socia di più associazioni: un link (e un
@@ -34,6 +43,14 @@ class PasswordResetController extends Controller
             ->get();
 
         foreach ($soci as $socio) {
+            // Pausa per destinatario: nessuna fonte può tenere sotto mail un
+            // indirizzo altrui né invalidare di continuo il link appena inviato
+            $chiave = 'area-soci-reset-link:'.$socio->id;
+            if (RateLimiter::tooManyAttempts($chiave, 1)) {
+                continue;
+            }
+            RateLimiter::hit($chiave, self::PAUSA_TRA_LINK_SECONDI);
+
             $token = bin2hex(random_bytes(32));
 
             // Un solo token valido per socio: sovrascrive l'eventuale precedente.

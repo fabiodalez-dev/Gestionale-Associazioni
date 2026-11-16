@@ -135,6 +135,20 @@
                         @endforeach
                     </tr>
                 @endforeach
+                @foreach (\App\Support\RuoliAssociazione::PERMESSI_SPECIALI as $permesso => $etichetta)
+                    <tr>
+                        <th class="text-start fw-normal">{{ $etichetta }}</th>
+                        @foreach ($ruoliMatrice as $ruolo)
+                            <td>
+                                @if (in_array($permesso, $permessiPerRuolo[$ruolo], true))
+                                    <span class="badge bg-success-subtle text-success-emphasis">sì</span>
+                                @else
+                                    <span class="text-body-tertiary" aria-label="Nessun accesso">—</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                @endforeach
             </tbody>
         </table>
     </div>

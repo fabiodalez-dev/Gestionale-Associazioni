@@ -87,6 +87,9 @@ class DocumentoSocioController extends Controller
 
         abort_unless($documento->socio_id === $socio->id, 404);
 
+        // Come nel modulo documenti: eliminare richiede documenti.delete
+        $this->authorize('delete', $documento);
+
         // Soft delete (miglioramento 11): il file resta sul disco finché il
         // documento non viene eliminato definitivamente dal cestino documenti.
         $documento->delete();

@@ -42,6 +42,9 @@ class UpdateUserPassword implements UpdatesUserPasswords
         ])->save();
 
         $this->chiudiAltreSessioni($user);
+
+        // I token API personali non sopravvivono al cambio password
+        $user->tokens()->delete();
     }
 
     /**

@@ -31,6 +31,9 @@ class ResetUserPassword implements ResetsUserPasswords
             'remember_token' => Str::random(60),
         ])->save();
 
+        // Un recupero password chiude anche i token API personali
+        $user->tokens()->delete();
+
         // Sessioni attive su altri dispositivi (driver database)
         $tabellaSessioni = (string) config('session.table', 'sessions');
         if (Schema::hasTable($tabellaSessioni)) {

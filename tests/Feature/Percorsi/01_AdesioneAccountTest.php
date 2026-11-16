@@ -243,6 +243,11 @@ class Percorso01_AdesioneAccountTest extends TestCase
         $this->assertNotNull($account->fresh()->email_verified_at);
         Notification::assertSentTo($account, BenvenutoAccount::class);
 
+        // Tra una richiesta e l'altra l'utente si rilegge dal database (nel test il
+        // processo è lo stesso e la guard terrebbe in memoria l'account non verificato)
+        auth()->forgetGuards();
+        auth()->shouldUse('web');
+
         // Esce e rientra con le credenziali scelte
         $this->post($this->urlTenant('logout'))->assertRedirect($this->urlTenant());
         $this->assertGuest('account');

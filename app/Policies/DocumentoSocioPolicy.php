@@ -23,20 +23,27 @@ class DocumentoSocioPolicy
         return $utente->isSuperAdmin() ? true : null;
     }
 
+    /**
+     * I documenti del fascicolo sono dati del socio: oltre al permesso del modulo
+     * documenti serve l'autorità sul socio stesso (soci.view per leggere,
+     * soci.update per aggiungere), come nel tab documenti della scheda socio.
+     */
     public function viewAny(Utente $utente): bool
     {
-        return $this->allowed($utente, 'documenti.view', self::FALLBACK_VIEW);
+        return $this->allowed($utente, 'documenti.view', self::FALLBACK_VIEW)
+            && $this->allowed($utente, 'soci.view', self::FALLBACK_VIEW);
     }
 
     public function view(Utente $utente, DocumentoSocio $documento): bool
     {
-        return $this->allowed($utente, 'documenti.view', self::FALLBACK_VIEW)
+        return $this->viewAny($utente)
             && $this->stessoTenant($utente, $documento);
     }
 
     public function create(Utente $utente): bool
     {
-        return $this->allowed($utente, 'documenti.create', self::FALLBACK_VIEW);
+        return $this->allowed($utente, 'documenti.create', self::FALLBACK_VIEW)
+            && $this->allowed($utente, 'soci.update', self::FALLBACK_VIEW);
     }
 
     public function delete(Utente $utente, DocumentoSocio $documento): bool

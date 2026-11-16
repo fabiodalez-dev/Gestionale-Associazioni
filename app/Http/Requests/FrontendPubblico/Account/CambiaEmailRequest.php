@@ -4,7 +4,6 @@ namespace App\Http\Requests\FrontendPubblico\Account;
 
 use App\Models\Account;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Cambio email dall'area riservata: la nuova email deve essere unica
@@ -32,20 +31,10 @@ class CambiaEmailRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('accounts', 'email')
-                    ->where('associazione_id', $account->associazione_id)
-                    ->ignore($account->id),
+                // Niente regola unique: la risposta non deve dire se l'indirizzo è già
+                // registrato (vedi ProfiloAccountController::email); il vincolo
+                // unique del database resta come ultima difesa
             ],
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function messages(): array
-    {
-        return [
-            'email.unique' => 'Esiste già un account registrato con questo indirizzo email.',
         ];
     }
 }

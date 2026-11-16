@@ -8,6 +8,7 @@ use App\Http\Requests\FrontendPubblico\Account\CambiaEmailRequest;
 use App\Http\Requests\FrontendPubblico\Account\CambiaPasswordRequest;
 use App\Models\Account;
 use App\Models\Associazione;
+use App\Support\LegameSessione;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,6 +63,9 @@ class ProfiloAccountController extends Controller
         // Cast 'hashed' sul modello: il valore viene hashato al salvataggio
         $account->forceFill(['password' => $request->validated('password')])->save();
 
+        // Le altre sessioni dell'account non valgono più; questa resta aperta
+        LegameSessione::aggiorna($request, 'account', $account);
+
         return redirect()
             ->route('pubblico.account.profilo', ['associazione' => $associazione->slug])
             ->with('success', 'Password aggiornata.');
@@ -87,10 +91,23 @@ class ProfiloAccountController extends Controller
                 ->with('success', 'L\'indirizzo email è rimasto invariato.');
         }
 
-        $account->forceFill([
-            'email' => $nuovaEmail,
-            'email_verified_at' => null,
-        ])->save();
+        // Esito identico se l'indirizzo è libero o già di un altro account del
+        // tenant, così la richiesta non rivela chi è registrato: se è già
+        // occupato non si cambia nulla ma l'account torna "da verificare" e il
+        // link parte verso il suo indirizzo attuale
+        $occupata = Account::query()->withTrashed()
+            ->where('associazione_id', $account->associazione_id)
+            ->where('email', $nuovaEmail)
+            ->whereKeyNot($account->id)
+            ->exists();
+
+        $account->forceFill(['email_verified_at' => null]);
+        if (! $occupata) {
+            $account->forceFill(['email' => $nuovaEmail]);
+        }
+        $account->save();
+
+        LegameSessione::aggiorna($request, 'account', $account);
 
         $account->sendEmailVerificationNotification();
 

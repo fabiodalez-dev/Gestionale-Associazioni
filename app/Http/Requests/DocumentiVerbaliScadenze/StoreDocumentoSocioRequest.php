@@ -4,8 +4,8 @@ namespace App\Http\Requests\DocumentiVerbaliScadenze;
 
 use App\Models\Documento;
 use App\Models\DocumentoSocio;
+use App\Models\Socio;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Upload documento del fascicolo socio (estensione §6.1):
@@ -24,7 +24,12 @@ class StoreDocumentoSocioRequest extends FormRequest
             'socio_id' => [
                 'required',
                 'uuid',
-                Rule::exists('soci', 'id')->where('associazione_id', session('associazione_id')),
+                // Query Eloquent: applica scope tenant e scope sede (Rule::exists li ignora)
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! Socio::query()->whereKey($value)->exists()) {
+                        $fail('Il socio selezionato non esiste o non appartiene all\'associazione corrente.');
+                    }
+                },
             ],
             'document_file' => [
                 'required',

@@ -14,7 +14,7 @@
         </button>
     </form>
 @elseif ($socio->stato === \App\Models\Socio::STATO_IN_ATTESA_DI_PAGAMENTO)
-    @can('quote.update')
+    @can('iscrizioni.incasso')
     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal"
             data-bs-target="#confermaPagamentoModal"
             data-socio-id="{{ $socio->id }}"

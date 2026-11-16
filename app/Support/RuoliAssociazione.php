@@ -43,6 +43,25 @@ final class RuoliAssociazione
         'api' => 'Chiavi API',
     ];
 
+    /**
+     * Permessi puntuali fuori dalla griglia modulo × azione, con l'etichetta
+     * mostrata nella pagina "Ruoli e permessi".
+     */
+    public const PERMESSI_SPECIALI = [
+        // Conferma pagamento di una pre-iscrizione: crea quota pagata, ricevuta
+        // e movimento di prima nota senza dare la modifica delle quote esistenti
+        'iscrizioni.incasso' => 'Incasso allo sportello delle pre-iscrizioni',
+    ];
+
+    /**
+     * Ruoli che hanno ciascun permesso speciale (super admin e admin li hanno tutti).
+     *
+     * @var array<string, list<string>>
+     */
+    private const RUOLI_PERMESSI_SPECIALI = [
+        'iscrizioni.incasso' => ['operatore', 'presidente', 'vicepresidente', 'segretario', 'tesoriere', 'responsabile_sede'],
+    ];
+
     /** Ruoli assegnabili agli utenti staff dalla pagina "Ruoli e permessi" */
     public const RUOLI_STAFF = [
         'operatore' => ['label' => 'Operatore', 'descrizione' => 'Gestione operativa quotidiana: soci, tessere, quote, eventi, verbali e scadenze.'],
@@ -84,10 +103,7 @@ final class RuoliAssociazione
             'presidente' => $presidente,
             'vicepresidente' => array_map(fn (string $a) => str_replace('d', '', $a), $presidente),
             'segretario' => [
-                'soci' => 'vcud', 'iscrizioni' => 'vcud', 'tessere' => 'vcud',
-                // Quote in modifica: incassa allo sportello confermando il
-                // pagamento delle pre-iscrizioni (richiede quote.update)
-                'quote' => 'vu',
+                'soci' => 'vcud', 'iscrizioni' => 'vcud', 'tessere' => 'vcud', 'quote' => 'v',
                 'eventi' => 'vcu', 'volontari' => 'v', 'spazi' => 'v', 'progetti' => 'v',
                 'riunioni' => 'vcud', 'proposte' => 'vcud', 'verbali' => 'vcud', 'documenti' => 'vcud', 'manuale' => 'vcud', 'scadenze' => 'vcud',
                 'email' => 'vcu', 'comunicazione' => 'vcud', 'relazioni' => 'vcu', 'struttura' => 'v',
@@ -124,7 +140,7 @@ final class RuoliAssociazione
             }
         }
 
-        return $permessi;
+        return [...$permessi, ...array_keys(self::PERMESSI_SPECIALI)];
     }
 
     /**
@@ -147,6 +163,12 @@ final class RuoliAssociazione
         foreach (self::matrice()[$ruolo] ?? [] as $modulo => $azioni) {
             foreach (str_split($azioni) as $lettera) {
                 $permessi[] = "{$modulo}.{$lettere[$lettera]}";
+            }
+        }
+
+        foreach (self::RUOLI_PERMESSI_SPECIALI as $permesso => $ruoli) {
+            if (in_array($ruolo, ['super_admin', 'admin_associazione', ...$ruoli], true)) {
+                $permessi[] = $permesso;
             }
         }
 

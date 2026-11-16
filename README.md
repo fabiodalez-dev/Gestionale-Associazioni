@@ -217,7 +217,7 @@ Dettagli in [docs/AGGIORNAMENTI.md](docs/AGGIORNAMENTI.md); le novità di ogni v
 È una versione di sicurezza. Prima di aggiornare, tieni presente che:
 
 - **le chiavi API globali vengono disattivate**: prima della 0.3.1 le chiavi di un'associazione eliminata diventavano globali e non si distinguono da quelle vere. Dopo l'aggiornamento il super admin riattiva dalla pagina Chiavi API solo quelle che riconosce; fino ad allora le integrazioni che le usano ricevono 403;
-- **la conferma del pagamento di una pre-iscrizione richiede il permesso di modifica sulle quote**: il Segretario predefinito lo riceve e continua a incassare allo sportello; i ruoli personalizzati con i soli permessi sui soci non vedono più il pulsante;
+- **la conferma del pagamento di una pre-iscrizione richiede il nuovo permesso "Incasso allo sportello"**: lo hanno tutti i ruoli che incassavano già (Segretario compreso, che resta con le quote in sola lettura), non Consigliere e Volontario;
 - **il modulo Documenti dei soci richiede anche i permessi sui soci**: il Volontario non vi accede più e il Tesoriere non può caricare; i ruoli personalizzati vanno ricontrollati;
 - **i token API personali vengono eliminati** a ogni recupero o cambio password e vanno rigenerati.
 

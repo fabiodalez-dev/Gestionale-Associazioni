@@ -70,9 +70,9 @@ class SocioStatoController extends Controller
         $this->authorize('update', $socio);
 
         // Crea una quota (pagata, con ricevuta e prima nota, o con il link di
-        // pagamento): serve lo stesso permesso del pagamento manuale delle
-        // quote (QuotaPolicy::registraPagamento), non basta l'anagrafica
-        abort_unless($request->user()?->can('quote.update'), 403);
+        // pagamento): non basta l'anagrafica, serve il permesso puntuale
+        // dell'incasso allo sportello (non la modifica delle quote esistenti)
+        abort_unless($request->user()?->can('iscrizioni.incasso'), 403);
 
         if ($socio->stato !== Socio::STATO_IN_ATTESA_DI_PAGAMENTO) {
             return back()->with('error', 'Socio non trovato o stato non valido.');

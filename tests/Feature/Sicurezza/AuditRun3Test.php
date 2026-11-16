@@ -524,7 +524,7 @@ class AuditRun3Test extends TestCase
         $dati = ['importo' => '25.00', 'metodo' => 'contanti', 'data_pagamento' => now()->toDateString()];
         $lista = '/soci?status=pending';
 
-        // Ruolo personalizzato con le sole anagrafiche: niente quote pagate
+        // Ruolo con le sole anagrafiche: niente incasso allo sportello
         Role::findOrCreate('anagrafe', 'web')->syncPermissions(['soci.view', 'soci.update']);
         $anagrafe = $this->staff(['anagrafe']);
         $this->come($anagrafe)->get($lista)->assertOk()->assertSee($socio->cognome)->assertDontSee(route('soci.conferma-pagamento', $socio));
@@ -539,6 +539,11 @@ class AuditRun3Test extends TestCase
         $this->come($segretario)->post("/soci/{$socio->id}/conferma-pagamento", $dati)->assertSessionHas('success');
         $this->assertSame(Socio::STATO_ATTIVO, $socio->fresh()->stato);
         $this->assertSame(1, $socio->quote()->count());
+
+        // L'incasso non dà la modifica delle quote esistenti
+        $this->assertFalse($segretario->can('quote.update'));
+        $this->assertTrue($segretario->can('iscrizioni.incasso'));
+        $this->assertFalse($this->staff(['consigliere'])->can('iscrizioni.incasso'));
     }
 
     public function test_le_chiavi_api_globali_preesistenti_vengono_sospese_dall_aggiornamento(): void
